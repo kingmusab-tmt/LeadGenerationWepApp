@@ -1,0 +1,193 @@
+// pages/api/assign-lead.ts
+import { NextRequest, NextResponse } from "next/server";
+import dbConnect from "@/lib/connectdb";
+import { Lead } from "@/models/leads"; // Import Lead model
+import { Buyer } from "@/models/leadbuyers";
+import { sendEmailNotification } from "@/utils/email";
+import { sendSmsNotification } from "@/utils/sms";
+import { sendPushNotification } from "@/utils/pushNotification";
+
+export async function POST(req: NextRequest) {
+  try {
+    // Connect to the database
+    await dbConnect();
+
+    // Parse the request body
+    const { leadIds, buyerIds } = await req.json();
+
+    // Validate request body
+    if (
+      !leadIds ||
+      !buyerIds ||
+      !Array.isArray(leadIds) ||
+      !Array.isArray(buyerIds)
+    ) {
+      return NextResponse.json(
+        { message: "Missing or invalid leadIds or buyerIds in request body" },
+        { status: 400 }
+      );
+    }
+
+    // Find all leads and buyers in the database
+    const leads = (await Lead.find({ _id: { $in: leadIds } })) as Array<{
+      assignedTo: any;
+      status: string;
+      save(): unknown;
+      _id: string;
+    }>;
+    const buyers = await Buyer.find({ _id: { $in: buyerIds } });
+
+    // Check if all leads and buyers exist
+    if (leads.length !== leadIds.length) {
+      const missingLeadIds = leadIds.filter(
+        (id) => !leads.some((lead) => (lead._id as string).toString() === id)
+      );
+      return NextResponse.json(
+        { message: `Leads not found: ${missingLeadIds.join(", ")}` },
+        { status: 404 }
+      );
+    }
+    if (buyers.length !== buyerIds.length) {
+      const missingBuyerIds = buyerIds.filter(
+        (id) => !buyers.some((buyer) => buyer._id.toString() === id)
+      );
+      return NextResponse.json(
+        { message: `Buyers not found: ${missingBuyerIds.join(", ")}` },
+        { status: 404 }
+      );
+    }
+
+    // Assign leads to buyers
+    const assignmentResults = [];
+    const notificationErrors = [];
+
+    for (const lead of leads) {
+      for (const buyer of buyers) {
+        try {
+          // Update the lead's assignedTo array
+          lead.assignedTo = lead.assignedTo || [];
+
+          // Check if the buyer is already assigned
+          const isAlreadyAssigned = lead.assignedTo.some(
+            (assigned: { buyerId: { toString: () => string } }) =>
+              assigned.buyerId.toString() === buyer._id.toString()
+          );
+
+          if (!isAlreadyAssigned) {
+            // Add the buyer to the assignedTo array in the correct format
+            lead.assignedTo.push({
+              buyerId: buyer._id,
+              accepted: false,
+              rejected: false,
+            });
+          }
+
+          lead.status = "assigned";
+
+          // Save the updated lead
+          await lead.save();
+
+          // Send notification based on buyer's preference
+          try {
+            if (
+              buyer.notificationPreferences.includes("email") &&
+              buyer.notificationPreferences.includes("sms") &&
+              buyer.notificationPreferences.includes("dashboard")
+            ) {
+              await sendEmailNotification(buyer._id, lead);
+              await sendSmsNotification(buyer._id, lead);
+              await sendPushNotification(buyer._id, lead);
+            } else if (
+              buyer.notificationPreferences.includes("email") &&
+              buyer.notificationPreferences.includes("sms")
+            ) {
+              await sendEmailNotification(buyer._id, lead);
+              await sendSmsNotification(buyer._id, lead);
+            } else if (
+              buyer.notificationPreferences.includes("email") &&
+              buyer.notificationPreferences.includes("dashboard")
+            ) {
+              await sendEmailNotification(buyer._id, lead);
+              await sendPushNotification(buyer._id, lead);
+            } else if (
+              buyer.notificationPreferences.includes("dashboard") &&
+              buyer.notificationPreferences.includes("sms")
+            ) {
+              await sendPushNotification(buyer._id, lead);
+              await sendSmsNotification(buyer._id, lead);
+            } else if (buyer.notificationPreferences.includes("email")) {
+              await sendEmailNotification(buyer._id, lead);
+            } else if (buyer.notificationPreferences.includes("sms")) {
+              await sendSmsNotification(buyer._id, lead);
+            } else if (buyer.notificationPreferences.includes("dashboard")) {
+              await sendPushNotification(buyer._id, lead);
+            } else {
+              console.log("No notification preference set");
+            }
+          } catch (notificationError) {
+            console.error("Error sending notifications:", notificationError);
+            notificationErrors.push({
+              leadId: lead._id,
+              buyerId: buyer._id,
+              error:
+                notificationError instanceof Error
+                  ? notificationError.message
+                  : "Unknown error",
+            });
+          }
+
+          assignmentResults.push({
+            leadId: lead._id,
+            buyerId: buyer._id,
+            status: "assigned",
+          });
+        } catch (assignmentError) {
+          console.error("Error assigning lead to buyer:", assignmentError);
+          assignmentResults.push({
+            leadId: lead._id,
+            buyerId: buyer._id,
+            status: "failed",
+            error:
+              assignmentError instanceof Error
+                ? assignmentError.message
+                : "Unknown error",
+          });
+        }
+      }
+    }
+
+    // Check if any assignments failed
+    const failedAssignments = assignmentResults.filter(
+      (result) => result.status === "failed"
+    );
+
+    if (failedAssignments.length > 0 || notificationErrors.length > 0) {
+      return NextResponse.json(
+        {
+          message: "Some assignments or notifications failed",
+          assignmentResults,
+          notificationErrors,
+        },
+        { status: 207 } // 207 Multi-Status
+      );
+    }
+
+    return NextResponse.json(
+      { message: "All leads assigned successfully", assignmentResults },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error assigning leads:", error);
+    return NextResponse.json(
+      {
+        message: "Failed to assign leads",
+        error: error instanceof Error ? error.message : "Unknown error", // Include the error message for debugging
+        stack:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.stack
+            : undefined, // Include stack trace in development
+      },
+      { status: 500 }
+    );
+  }
+}

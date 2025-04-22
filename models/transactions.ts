@@ -1,0 +1,139 @@
+import mongoose, { Schema, Document, Model } from "mongoose";
+
+// Define the interface for the Transaction document
+export interface ITransaction extends Document {
+  type:
+    | "lead_purchase" // Buyer purchases a lead
+    | "call_purchase" // Buyer purchases a call
+    | "units_purchase" // Buyer purchases units
+    | "seller_income" // Seller earns income from a lead sale
+    | "seller_payout" // Seller withdraws earnings
+    | "refund" // Refund issued to buyer or seller
+    | "admin_adjustment" // Admin manually adjusts units/balance
+    | "subscription_payment" // Seller subscribes to a package
+    | "subscription_renewal" // Seller renews a subscription
+    | "subscription_cancellation"; // Seller cancels a subscription
+  userId: mongoose.Types.ObjectId; // Reference to the User model (buyer or seller)
+  amount: number;
+  previousBalance: number; // Previous balance before the transaction
+  currentBalance: number; // Current balance after the transaction
+  currency: string;
+  metadata: {
+    leadId?: string; // For lead_purchase
+    unitsPurchased?: number; // For units_purchase
+    sellerId?: string; // For seller_income (ID of the seller earning income)
+    buyerId: String;
+    refund: boolean;
+    payoutId?: string; // For seller_payout (ID from payment gateway)
+    refundReason?: string; // For refund
+    adminNote?: string; // For admin_adjustment
+    subscriptionId?: mongoose.Types.ObjectId; // For subscription_payment, renewal, or cancellation
+    subscriptionPlan?: string; // For subscription_payment or renewal
+    subscriptionDuration?: string; // For subscription_payment or renewal (e.g., "monthly", "yearly")
+  };
+  paymentGateway: "stripe" | "paypal" | "square" | "manual";
+  gatewayTransactionId?: string; // Transaction ID from the payment gateway
+  status: "pending" | "completed" | "failed" | "refunded";
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Define the Mongoose schema
+const TransactionSchema: Schema = new Schema<ITransaction>(
+  {
+    type: {
+      type: String,
+      required: true,
+      enum: [
+        "lead_purchase",
+        "units_purchase",
+        "seller_income",
+        "seller_payout",
+        "refund",
+        "admin_adjustment",
+        "subscription_payment",
+        "subscription_renewal",
+        "subscription_cancellation",
+      ],
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      ref: "User", // Reference to the User model
+    },
+    amount: {
+      type: Number,
+    },
+    previousBalance: { type: Number }, // Previous balance before the transaction
+    currentBalance: { type: Number }, // Current balance after the transaction
+    currency: {
+      type: String,
+      default: "USD",
+    },
+    metadata: {
+      leadId: {
+        type: String,
+      },
+      unitsPurchased: {
+        type: Number,
+      },
+      sellerId: {
+        type: String,
+      },
+      buyerId: {
+        type: String,
+      },
+      refund: {
+        type: Boolean,
+      },
+      payoutId: {
+        type: String,
+      },
+      refundReason: {
+        type: String,
+      },
+
+      adminNote: {
+        type: String,
+      },
+      subscriptionId: {
+        type: Schema.Types.ObjectId,
+        ref: "Subscription", // Reference to the Subscription model
+      },
+      subscriptionPlan: {
+        type: String,
+      },
+      subscriptionDuration: {
+        type: String,
+      },
+    },
+    paymentGateway: {
+      type: String,
+      enum: ["stripe", "paypal", "square", "manual"],
+    },
+    gatewayTransactionId: {
+      type: String,
+    },
+    status: {
+      type: String,
+      required: true,
+      enum: ["pending", "completed", "failed", "refunded"],
+      default: "pending",
+    },
+  },
+  {
+    timestamps: true, // Automatically manage createdAt and updatedAt
+  }
+);
+
+// Indexes
+TransactionSchema.index({ userId: 1 }); // Index on userId field for faster queries
+TransactionSchema.index({ type: 1 }); // Index on type field for faster queries
+TransactionSchema.index({ status: 1 }); // Index on status field for faster queries
+TransactionSchema.index({ "metadata.sellerId": 1 }); // Index on sellerId for faster queries
+TransactionSchema.index({ "metadata.subscriptionId": 1 }); // Index on subscriptionId for faster queries
+
+// Create and export the Mongoose model
+export const Transaction: Model<ITransaction> =
+  mongoose.models.Transaction ||
+  mongoose.model<ITransaction>("Transaction", TransactionSchema);

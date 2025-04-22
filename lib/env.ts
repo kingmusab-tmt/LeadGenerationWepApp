@@ -1,0 +1,38 @@
+// lib/env.ts
+import { z } from "zod";
+
+const envSchema = z.object({
+  TWILIO_ACCOUNT_SID: z.string(),
+  TWILIO_AUTH_TOKEN: z.string(),
+  UPSTASH_REDIS_REST_URL: z.string().url(),
+  UPSTASH_REDIS_REST_TOKEN: z.string(),
+  AUTH_URL_INTERNAL: z.string().url(),
+  AUTH_URL: z.string().url(),
+  AUTH_SECRET: z.string(),
+  AUTH_GOOGLE_ID: z.string(),
+  AUTH_GOOGLE_SECRET: z.string(),
+  EMAIL_FROM: z.string(),
+  EMAIL_SERVER_USER: z.string(),
+  ENCRYPTION_KEY: z.string(),
+  ENCRYPTION_IV: z.string(),
+  EMAIL_SERVER: z.string(),
+  FRONTEND_URL: z.string(),
+  NEXT_TEST_PUBLIC_DOMAIN: z.string(),
+  EMAIL_PASSWORD: z.string(),
+  EMAIL_PORT: z.number(),
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string(),
+  NEXT_PUBLIC_VT_TOKEN: z.string(),
+  NEXT_PUBLIC_DOMAIN: z.string(),
+  NEXT_SECRET_VT_SECRET: z.string(),
+  NEXT_HTTPS: z.boolean(),
+  MONGODB_URI: z.string(),
+  VAPID_PRIVATE_KEY: z.string(),
+  TWILIO_PHONE_NUMBER: z.string(),
+  STRIPE_WEBHOOK_SECRET: z.string(),
+  STRIPE_PUBLIC_KEY: z.string(),
+  PAYPAL_WEBHOOK_ID: z.string(),
+  PAYPAL_CLIENT_ID: z.string(),
+  PAYPAL_CLIENT_SECRET: z.string(),
+  STRIPE_SECRET_KEY: z.string(),
+});
+export const env = envSchema.parse(process.env);
