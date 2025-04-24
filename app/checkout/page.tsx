@@ -154,7 +154,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push(
-        `/auth/signin?callbackUrl=${encodeURIComponent(
+        `/auth/sign-in?callbackUrl=${encodeURIComponent(
           window.location.pathname
         )}`
       );
@@ -165,7 +165,7 @@ const CheckoutPage = () => {
     const fetchTier = async () => {
       const tierId = searchParams.get("tierId");
       if (!tierId) {
-        router.push("/pricing");
+        router.push("/landingpage");
         return;
       }
 
