@@ -4,16 +4,16 @@ import { Tier } from "@/models/tier";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 
-// GET all tiers (including inactive)
-export async function GET() {
+// GET all tiers
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role != "admin") {
+    if (!session || session.user.role !== "seller") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await dbConnect();
-    const tiers = await Tier.find().sort({ order: 1 });
+    const tiers = await Tier.find().sort({ order: 1 }).lean();
     return NextResponse.json(tiers);
   } catch (error) {
     console.error("Error fetching tiers:", error);
@@ -24,25 +24,32 @@ export async function GET() {
   }
 }
 
-// Create a new tier
+// Create new tier
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user.isAdmin) {
+    if (!session || session.user.role !== "seller") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const data = await req.json();
     await dbConnect();
 
-    // Set order to last if not provided
+    // Set default order if not provided
     if (!data.order) {
       const count = await Tier.countDocuments();
       data.order = count + 1;
     }
 
-    const tier = new Tier(data);
-    await tier.save();
+    // Validate required fields
+    if (!data.name || !data.price || !data.description) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    const tier = await Tier.create(data);
     return NextResponse.json(tier, { status: 201 });
   } catch (error) {
     console.error("Error creating tier:", error);
@@ -53,30 +60,151 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Update multiple tiers (for reordering)
+// Update tier order (bulk update)
+// export async function PUT(req: NextRequest) {
+//   try {
+//     const session = await getServerSession(authOptions);
+//     if (!session || session.user.role !== "seller") {
+//       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+//     }
+
+//     const { tiers: updatedTiers } = await req.json();
+
+//     if (!Array.isArray(updatedTiers)) {
+//       return NextResponse.json(
+//         { error: "Invalid data format" },
+//         { status: 400 }
+//       );
+//     }
+
+//     await dbConnect();
+
+//     const bulkOps = updatedTiers.map((tier) => ({
+//       updateOne: {
+//         filter: { _id: tier._id },
+//         update: { $set: { order: tier.order } },
+//       },
+//     }));
+
+//     await Tier.bulkWrite(bulkOps);
+//     return NextResponse.json({ success: true });
+//   } catch (error) {
+//     console.error("Error updating tiers:", error);
+//     return NextResponse.json(
+//       { error: "Failed to update tiers" },
+//       { status: 500 }
+//     );
+//   }
+// }
+
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user.isAdmin) {
+    if (!session || session.user.role !== "seller") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { tiers } = await req.json();
+    const updateData = await req.json();
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+    }
+
+    await dbConnect();
+    console.log("DB connected");
+    console.log("ID:", id);
+    console.log("updateData:", updateData);
+
+    const updatedTier = await Tier.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updatedTier) {
+      return NextResponse.json({ error: "Tier not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(updatedTier);
+  } catch (error) {
+    console.error("Error updating tier:", error);
+    return NextResponse.json(
+      { error: "Failed to update tier" },
+      { status: 500 }
+    );
+  }
+}
+
+// Individual tier operations (PUT/DELETE)
+export async function PATCH(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "seller") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const updateData = await req.json();
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+    }
     await dbConnect();
 
-    const bulkOps = tiers.map((tier: any) => ({
-      updateOne: {
-        filter: { _id: tier._id },
-        update: { $set: { order: tier.order } },
-      },
-    }));
+    const updatedTier = await Tier.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
 
-    await Tier.bulkWrite(bulkOps);
+    if (!updatedTier) {
+      return NextResponse.json({ error: "Tier not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(updatedTier);
+  } catch (error) {
+    console.error("Error updating tier:", error);
+    return NextResponse.json(
+      { error: "Failed to update tier" },
+      { status: 500 }
+    );
+  }
+}
+
+// Delete tier
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "seller") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+    }
+    await dbConnect();
+
+    const tierToDelete = await Tier.findById(id);
+    if (!tierToDelete) {
+      return NextResponse.json({ error: "Tier not found" }, { status: 404 });
+    }
+
+    await Tier.findByIdAndDelete(id);
+
+    // Update order of remaining tiers
+    await Tier.updateMany(
+      { order: { $gt: tierToDelete.order } },
+      { $inc: { order: -1 } }
+    );
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating tiers:", error);
+    console.error("Error deleting tier:", error);
     return NextResponse.json(
-      { error: "Failed to update tiers" },
+      { error: "Failed to delete tier" },
       { status: 500 }
     );
   }

@@ -5,13 +5,10 @@ import {
   Button,
   Container,
   Typography,
-  Card,
-  CardContent,
   TextField,
   List,
   ListItem,
   ListItemText,
-  Divider,
   Switch,
   FormControlLabel,
   Grid,
@@ -26,7 +23,23 @@ import {
   Chip,
   ListItemIcon,
 } from "@mui/material";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { SortableItem } from "../components/sortableItem";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -57,6 +70,17 @@ const TierManagement = () => {
     severity: "success",
   });
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 10,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     fetchTiers();
   }, []);
@@ -64,14 +88,19 @@ const TierManagement = () => {
   const fetchTiers = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/tiers");
+      const response = await fetch("/api/adminapi/tier");
       if (!response.ok) throw new Error("Failed to fetch tiers");
       const data = await response.json();
-      setTiers(data);
+      setTiers(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unknown error occurred"
       );
+      setSnackbar({
+        open: true,
+        message: "Failed to load tiers",
+        severity: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -131,14 +160,12 @@ const TierManagement = () => {
 
       const method = currentTier._id ? "PUT" : "POST";
       const url = currentTier._id
-        ? `/api/admin/tiers/${currentTier._id}`
-        : "/api/admin/tiers";
+        ? `/api/adminapi/tier?id=${currentTier._id}`
+        : "/api/adminapi/tier";
 
       const response = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(currentTier),
       });
 
@@ -162,7 +189,7 @@ const TierManagement = () => {
 
   const handleDeleteTier = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/tiers/${id}`, {
+      const response = await fetch(`/api/adminapi/tier/?id=${id}`, {
         method: "DELETE",
       });
 
@@ -183,27 +210,26 @@ const TierManagement = () => {
     }
   };
 
-  const handleDragEnd = async (result: any) => {
-    if (!result.destination) return;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    const items = Array.from(tiers);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    const oldIndex = tiers.findIndex((tier) => tier._id === active.id);
+    const newIndex = tiers.findIndex((tier) => tier._id === over.id);
 
-    // Update order based on new position
-    const updatedTiers = items.map((tier, index) => ({
-      ...tier,
-      order: index + 1,
-    }));
+    const updatedTiers = arrayMove(tiers, oldIndex, newIndex).map(
+      (tier, index) => ({
+        ...tier,
+        order: index + 1,
+      })
+    );
 
     setTiers(updatedTiers);
 
     try {
-      await fetch("/api/admin/tiers", {
+      await fetch("/api/adminapi/tier/reorder", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tiers: updatedTiers }),
       });
     } catch (err) {
@@ -212,7 +238,6 @@ const TierManagement = () => {
         message: "Failed to update tier order",
         severity: "error",
       });
-      // Revert if failed
       fetchTiers();
     }
   };
@@ -234,7 +259,7 @@ const TierManagement = () => {
     );
   }
 
-  if (error) {
+  if (!Array.isArray(tiers)) {
     return (
       <Box
         display="flex"
@@ -242,7 +267,7 @@ const TierManagement = () => {
         alignItems="center"
         minHeight="200px"
       >
-        <Typography color="error">{error}</Typography>
+        <Typography color="error">Invalid tiers data format</Typography>
       </Box>
     );
   }
@@ -262,88 +287,86 @@ const TierManagement = () => {
           Add New Tier
         </Button>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="tiers">
-            {(provided) => (
-              <List {...provided.droppableProps} ref={provided.innerRef}>
-                {tiers
-                  .sort((a, b) => a.order - b.order)
-                  .map((tier, index) => (
-                    <Draggable
-                      key={tier._id}
-                      draggableId={tier._id}
-                      index={index}
-                    >
-                      {(provided) => (
-                        <Paper
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          elevation={2}
-                          sx={{ mb: 2 }}
-                        >
-                          <ListItem>
-                            <ListItemText
-                              primary={
-                                <Box display="flex" alignItems="center">
-                                  <Typography variant="h6" sx={{ mr: 2 }}>
-                                    {tier.name}
-                                  </Typography>
-                                  {tier.highlight && (
-                                    <Chip
-                                      label="Highlighted"
-                                      color="primary"
-                                      size="small"
-                                      sx={{ mr: 1 }}
-                                    />
-                                  )}
-                                  {!tier.isActive && (
-                                    <Chip
-                                      label="Inactive"
-                                      color="secondary"
-                                      size="small"
-                                    />
-                                  )}
-                                </Box>
-                              }
-                              secondary={
-                                <>
-                                  <Typography component="span" sx={{ mr: 2 }}>
-                                    {tier.price}/month
-                                  </Typography>
-                                  <Typography component="span">
-                                    {tier.description}
-                                  </Typography>
-                                </>
-                              }
-                            />
-                            <Box>
-                              <IconButton
-                                onClick={() => handleOpenDialog(tier)}
-                                color="primary"
-                              >
-                                <EditIcon />
-                              </IconButton>
-                              <IconButton
-                                onClick={() => handleDeleteTier(tier._id)}
-                                color="error"
-                              >
-                                <DeleteIcon />
-                              </IconButton>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToVerticalAxis]}
+        >
+          <SortableContext
+            items={tiers.map((tier) => tier._id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <List>
+              {tiers
+                .sort((a, b) => a.order - b.order)
+                .map((tier) => (
+                  <SortableItem key={tier._id} id={tier._id}>
+                    <Paper elevation={2} sx={{ mb: 2 }}>
+                      <ListItem>
+                        <ListItemText
+                          primary={
+                            <Box display="flex" alignItems="center">
+                              <Typography variant="h6" sx={{ mr: 2 }}>
+                                {tier.name}
+                              </Typography>
+                              {tier.highlight && (
+                                <Chip
+                                  label="Highlighted"
+                                  color="primary"
+                                  size="small"
+                                  sx={{ mr: 1 }}
+                                />
+                              )}
+                              {!tier.isActive && (
+                                <Chip
+                                  label="Inactive"
+                                  color="secondary"
+                                  size="small"
+                                />
+                              )}
                             </Box>
-                          </ListItem>
-                        </Paper>
-                      )}
-                    </Draggable>
-                  ))}
-                {provided.placeholder}
-              </List>
-            )}
-          </Droppable>
-        </DragDropContext>
+                          }
+                          secondary={
+                            <>
+                              <Typography component="span" sx={{ mr: 2 }}>
+                                {tier.price}/month
+                              </Typography>
+                              <Typography component="span">
+                                {tier.description}
+                              </Typography>
+                            </>
+                          }
+                        />
+                        <Box>
+                          <IconButton
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDialog(tier);
+                            }}
+                            color="primary"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTier(tier._id);
+                            }}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      </ListItem>
+                    </Paper>
+                  </SortableItem>
+                ))}
+            </List>
+          </SortableContext>
+        </DndContext>
       </Box>
 
-      {/* Tier Edit/Create Dialog */}
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
@@ -400,7 +423,7 @@ const TierManagement = () => {
                         onChange={handleChange}
                       />
                     }
-                    label="Highlight this tier (Most Popular)"
+                    label="Highlight this tier"
                   />
                   <FormControlLabel
                     control={
@@ -462,7 +485,6 @@ const TierManagement = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
