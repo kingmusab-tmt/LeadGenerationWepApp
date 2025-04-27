@@ -15,5 +15,10 @@ export const checkIsAuthenticated = async () => {
   const user = await User.findOne({
     _id: session.user.id,
   });
-  return { isAuthenticated: true, role: user?.role || "user" }; // Default to "user" if role is not set
+  return {
+    isAuthenticated: true,
+    role: user?.role || "user",
+    isSubActive: user?.subscription?.isSubscriptionActive,
+    subType: user?.subscription?.subscriptionPlan,
+  }; // Default to "user" if role is not set
 };

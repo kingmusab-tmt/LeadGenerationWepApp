@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const user = await User.findOne({ email: session.user.email });
 
-  if (!user?.subscription || user.subscription.status !== "active") {
+  if (!user?.subscription || user.subscription.isSubscriptionActive === false) {
     return NextResponse.json(
       {
         error: "Subscription required",

@@ -4,10 +4,12 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 // Subscription interface
 interface ISubscription {
-  plan: "starter" | "professional" | "enterprise";
-  status: "active" | "canceled" | "pending" | "expired";
-  startDate: Date;
-  endDate?: Date;
+  subscriptionPlan: "Free" | "Lead Seller" | "Business" | "Premium";
+  subscriptionPrice?: number; // Price of the subscription plan
+  subscriptionStartDate: Date; // when user signed up
+  subscriptionExpiryDate: Date; // when Free Tier or Paid plan ends
+  isSubscriptionActive: boolean; // true/false
+  isTrial: boolean; // true if Free Tier trial is active
   renewalDate?: Date;
   paymentMethod: "stripe" | "paypal" | "manual";
   paymentId?: string; // Stripe/PayPal subscription ID
@@ -60,7 +62,7 @@ export interface IUser extends Document {
   email: string;
   businessName: string;
   loginlink: string;
-  role: "admin" | "seller" | "buyer" | "user";
+  role: "admin" | "seller" | "buyer" | "user" | "business-admin" | "staff";
   image?: string;
   walletBalance: number;
   provider: string;
@@ -119,24 +121,9 @@ export interface IUser extends Document {
   subscription?: ISubscription;
 
   // Add billing history
-  billingHistory?: Array<{
-    date: Date;
-    amount: number;
-    description: string;
-    status: "completed" | "failed" | "refunded";
-    invoiceId?: string;
-  }>;
+
   stripeCustomerId?: string;
   paypalCustomerId?: string;
-}
-
-interface IPayment extends Document {
-  userId: mongoose.Schema.Types.ObjectId;
-  amount: number;
-  currency?: string;
-  paymentMethod?: string;
-  status: "completed" | "failed";
-  details?: Record<string, unknown>;
 }
 
 interface IReport extends Document {
@@ -269,20 +256,19 @@ const UserSchema: Schema = new Schema<IUser>(
     stripeCustomerId: { type: String },
     paypalCustomerId: { type: String },
     subscription: {
-      plan: {
+      subscriptionPlan: {
         type: String,
-        enum: ["starter", "professional", "enterprise"],
+        enum: ["Free", "Lead Seller", "Business", "Premium"],
+        default: "Free",
       },
-      status: {
-        type: String,
-        enum: ["active", "canceled", "pending", "expired"],
-        default: "pending",
-      },
-      startDate: {
+      subscriptionStartDate: {
         type: Date,
         default: Date.now,
       },
-      endDate: Date,
+      subscriptionPrice: { type: Number },
+      subscriptionExpiryDate: Date,
+      isSubscriptionActive: { type: Boolean, default: false },
+      isTrial: { type: Boolean, default: false },
       renewalDate: Date,
       paymentMethod: {
         type: String,
@@ -300,19 +286,6 @@ const UserSchema: Schema = new Schema<IUser>(
         callSeconds: { type: Number, default: 0 },
       },
     },
-
-    billingHistory: [
-      {
-        date: { type: Date, default: Date.now },
-        amount: Number,
-        description: String,
-        status: {
-          type: String,
-          enum: ["completed", "failed", "refunded"],
-        },
-        invoiceId: String,
-      },
-    ],
   },
   {
     timestamps: true,
@@ -323,27 +296,6 @@ UserSchema.index({ buyers: 1 }); // Index on buyers array
 
 export const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
-
-// Payment Model
-const PaymentSchema = new Schema<IPayment>(
-  {
-    userId: { type: Schema.Types.ObjectId, ref: "User" },
-    amount: { type: Number, required: true },
-    currency: { type: String, default: "USD" },
-    paymentMethod: { type: String },
-    status: {
-      type: String,
-      enum: ["completed", "failed"],
-      default: "completed",
-    },
-    details: { type: Object },
-  },
-  {
-    timestamps: true, // Automatically manage createdAt and updatedAt fields
-  }
-);
-export const Payment: Model<IPayment> =
-  mongoose.models.Payment || mongoose.model<IPayment>("Payment", PaymentSchema);
 
 // Report Model
 const ReportSchema = new Schema<IReport>({

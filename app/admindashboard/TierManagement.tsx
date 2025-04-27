@@ -22,6 +22,10 @@ import {
   Snackbar,
   Chip,
   ListItemIcon,
+  Radio,
+  RadioGroup,
+  FormControl,
+  FormLabel,
 } from "@mui/material";
 import {
   DndContext,
@@ -55,6 +59,12 @@ interface Tier {
   highlight: boolean;
   isActive: boolean;
   order: number;
+  tierType: "free" | "paid";
+  tierUserType: "seller" | "business";
+  discountPercentage?: number;
+  discountedPrice?: string;
+  renewalPrice?: string;
+  annualPrice?: string;
 }
 
 const TierManagement = () => {
@@ -69,6 +79,7 @@ const TierManagement = () => {
     message: "",
     severity: "success",
   });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -91,7 +102,12 @@ const TierManagement = () => {
       const response = await fetch("/api/adminapi/tier");
       if (!response.ok) throw new Error("Failed to fetch tiers");
       const data = await response.json();
-      setTiers(Array.isArray(data) ? data : []);
+      // Ensure tierType is properly set based on price
+      const processedTiers = data.map((tier: Tier) => ({
+        ...tier,
+        tierType: tier.price === "0" ? "free" : "paid",
+      }));
+      setTiers(processedTiers);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unknown error occurred"
@@ -107,32 +123,76 @@ const TierManagement = () => {
   };
 
   const handleOpenDialog = (tier: Partial<Tier> | null) => {
-    setCurrentTier(
-      tier || {
-        name: "",
-        price: "",
-        description: "",
-        features: [],
-        ctaText: "Get Started",
-        highlight: false,
-        isActive: true,
-        order: tiers.length + 1,
-      }
-    );
+    const baseTier = tier || {
+      name: "",
+      price: "",
+      description: "",
+      features: [],
+      ctaText: "Get Started",
+      highlight: false,
+      isActive: true,
+      order: tiers.length + 1,
+      tierType: "paid",
+      tierUserType: "seller",
+      discountPercentage: 0,
+      renewalPrice: "",
+    };
+
+    // Ensure tierType is set based on price when opening dialog
+    setCurrentTier({
+      ...baseTier,
+      tierType: baseTier.price === "0" ? "free" : "paid",
+    });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setCurrentTier(null);
+    setShowAdvanced(false);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
+    const newValue = type === "checkbox" ? checked : value;
+
+    setCurrentTier((prev) => {
+      const updatedTier = {
+        ...prev,
+        [name]: newValue,
+      };
+
+      // Automatically update tierType when price changes
+      if (name === "price") {
+        return {
+          ...updatedTier,
+          tierType: newValue === "0" ? "free" : "paid",
+        };
+      }
+
+      return updatedTier;
+    });
+  };
+
+  const handleTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
     setCurrentTier((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: value,
     }));
+  };
+
+  const calculateDiscountedPrice = () => {
+    if (!currentTier?.price || !currentTier?.discountPercentage) return "";
+    const price = parseFloat(currentTier.price);
+    const discount = (price * (currentTier.discountPercentage / 100)) / 12;
+    return (price - discount).toFixed(2);
+  };
+
+  const calculateAnnualPrice = () => {
+    if (!currentTier?.price) return "";
+    const price = parseFloat(currentTier.price);
+    return (price * 12).toFixed(2);
   };
 
   const handleAddFeature = () => {
@@ -158,6 +218,14 @@ const TierManagement = () => {
     try {
       if (!currentTier) return;
 
+      // Ensure tierType is set correctly before saving
+      const tierToSave = {
+        ...currentTier,
+        tierType: currentTier.price === "0" ? "free" : "paid",
+        discountedPrice: calculateDiscountedPrice(),
+        annualPrice: calculateAnnualPrice(),
+      };
+
       const method = currentTier._id ? "PUT" : "POST";
       const url = currentTier._id
         ? `/api/adminapi/tier?id=${currentTier._id}`
@@ -166,7 +234,7 @@ const TierManagement = () => {
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(currentTier),
+        body: JSON.stringify(tierToSave),
       });
 
       if (!response.ok) throw new Error("Failed to save tier");
@@ -325,13 +393,43 @@ const TierManagement = () => {
                                   size="small"
                                 />
                               )}
+                              <Chip
+                                label={
+                                  tier.tierType === "free" ? "Free" : "Paid"
+                                }
+                                color={
+                                  tier.tierType === "free"
+                                    ? "success"
+                                    : "warning"
+                                }
+                                size="small"
+                                sx={{ ml: 1 }}
+                              />
+                              {tier.discountPercentage &&
+                                tier.discountPercentage > 0 && (
+                                  <Chip
+                                    label={`Save ${tier.discountPercentage}%`}
+                                    color="success"
+                                    size="small"
+                                    sx={{ ml: 1 }}
+                                  />
+                                )}
                             </Box>
                           }
                           secondary={
                             <>
                               <Typography component="span" sx={{ mr: 2 }}>
-                                {tier.price}/month
+                                ${tier.price}/mo
                               </Typography>
+                              {tier.tierType === "paid" &&
+                                tier.discountPercentage &&
+                                tier.discountPercentage > 0 && (
+                                  <Typography component="span" sx={{ mr: 2 }}>
+                                    Renews at $
+                                    {(parseFloat(tier.price) * 12).toFixed(2)}
+                                    /year
+                                  </Typography>
+                                )}
                               <Typography component="span">
                                 {tier.description}
                               </Typography>
@@ -390,12 +488,45 @@ const TierManagement = () => {
                 />
                 <TextField
                   fullWidth
-                  label="Price"
+                  label="Monthly Price ($)"
                   name="price"
                   value={currentTier.price || ""}
                   onChange={handleChange}
                   margin="normal"
+                  type="number"
+                  inputProps={{ step: "0.01" }}
                 />
+                {currentTier.tierType === "paid" && (
+                  <>
+                    <TextField
+                      fullWidth
+                      label="Discount Percentage (%)"
+                      name="discountPercentage"
+                      value={currentTier.discountPercentage || ""}
+                      onChange={handleChange}
+                      margin="normal"
+                      type="number"
+                      helperText="Enter 0 for no discount"
+                      disabled={
+                        (currentTier?.tierType as "free" | "paid") === "free"
+                      }
+                    />
+                    <TextField
+                      fullWidth
+                      label="Renewal Price ($)"
+                      name="renewalPrice"
+                      value={currentTier.renewalPrice || ""}
+                      onChange={handleChange}
+                      margin="normal"
+                      type="number"
+                      inputProps={{ step: "0.01" }}
+                      helperText="Price after discount period ends"
+                      disabled={
+                        (currentTier?.tierType as "free" | "paid") === "free"
+                      }
+                    />
+                  </>
+                )}
                 <TextField
                   fullWidth
                   label="Description"
@@ -436,6 +567,45 @@ const TierManagement = () => {
                     label="Active"
                   />
                 </Box>
+
+                <Button
+                  variant="text"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  sx={{ mt: 2 }}
+                >
+                  {showAdvanced ? "Hide" : "Show"} Advanced Options
+                </Button>
+
+                {showAdvanced && (
+                  <Box
+                    sx={{
+                      mt: 2,
+                      p: 2,
+                      border: "1px dashed #ccc",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <FormControl component="fieldset" sx={{ mb: 2 }}>
+                      <FormLabel component="legend">Tier User Type</FormLabel>
+                      <RadioGroup
+                        name="tierUserType"
+                        value={currentTier.tierUserType || "seller"}
+                        onChange={handleTypeChange}
+                      >
+                        <FormControlLabel
+                          value="seller"
+                          control={<Radio />}
+                          label="For Sellers"
+                        />
+                        <FormControlLabel
+                          value="business"
+                          control={<Radio />}
+                          label="For Businesses"
+                        />
+                      </RadioGroup>
+                    </FormControl>
+                  </Box>
+                )}
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
@@ -473,6 +643,85 @@ const TierManagement = () => {
                     </ListItem>
                   ))}
                 </List>
+
+                {/* Pricing Preview */}
+                <Box
+                  sx={{
+                    mt: 4,
+                    p: 2,
+                    border: "1px solid #eee",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography variant="subtitle1" gutterBottom>
+                    Pricing Preview:
+                  </Typography>
+                  {currentTier.price && (
+                    <>
+                      <Typography variant="h6">
+                        {currentTier.name || "Tier Name"}
+                      </Typography>
+                      <Typography variant="h5" color="primary">
+                        $
+                        {currentTier.tierType === "free"
+                          ? "0"
+                          : currentTier.discountPercentage &&
+                            currentTier.discountPercentage > 0
+                          ? calculateDiscountedPrice()
+                          : currentTier.price}
+                        /mo
+                        <Typography
+                          component="span"
+                          variant="h6"
+                          color="text.secondary"
+                          sx={{ ml: 1 }}
+                        >
+                          (
+                          {currentTier.tierType === "free"
+                            ? "7 days Trial"
+                            : "Monthly"}
+                          )
+                        </Typography>
+                      </Typography>
+                      {currentTier.tierType === "paid" &&
+                        currentTier.discountPercentage &&
+                        currentTier.discountPercentage > 0 && (
+                          <Typography variant="body2" color="text.secondary">
+                            Save {currentTier.discountPercentage}% on 1st year
+                          </Typography>
+                        )}
+                      {currentTier.tierType === "paid" && (
+                        <Typography variant="body2">
+                          {currentTier.discountPercentage &&
+                          currentTier.discountPercentage > 0 ? (
+                            <>
+                              <Box component="span" fontWeight="bold">
+                                You pay $
+                                {(
+                                  parseFloat(calculateDiscountedPrice()) * 12
+                                ).toFixed(2)}
+                              </Box>
+                              <Box component="span">
+                                {" "}
+                                - renews at $
+                                {currentTier.renewalPrice ||
+                                  (parseFloat(currentTier.price) * 12).toFixed(
+                                    2
+                                  )}
+                                /year
+                              </Box>
+                            </>
+                          ) : (
+                            <Box component="span" fontWeight="bold">
+                              ${(parseFloat(currentTier.price) * 12).toFixed(2)}
+                              /year
+                            </Box>
+                          )}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                </Box>
               </Grid>
             </Grid>
           )}

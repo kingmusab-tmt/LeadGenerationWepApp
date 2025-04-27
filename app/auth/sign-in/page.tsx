@@ -14,7 +14,8 @@ const SignIn: React.FC = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { isAuthenticated, role } = await checkIsAuthenticated();
+      const { isAuthenticated, role, isSubActive } =
+        await checkIsAuthenticated();
       setIsAuthenticated(isAuthenticated);
       setUserRole(role);
 
@@ -22,12 +23,15 @@ const SignIn: React.FC = () => {
         if (role === "user") {
           // Redirect to RoleSelectionPage if role is "user"
           router.push("/completeregistration");
+        } else if (role === "admin") {
+          // Redirect to admin dashboard
+          router.push("/admindashboard");
         } else if (
-          role === "seller" ||
-          role === "buyer" ||
-          role === "admin" ||
-          role === "business-admin" ||
-          role === "staff"
+          (role === "buyer" ||
+            role === "staff" ||
+            role === "seller" ||
+            role === "business-admin") &&
+          isSubActive === true
         ) {
           // Redirect to the respective dashboard based on role
           router.push(`/dashboard/${role}/overview`);
@@ -40,7 +44,7 @@ const SignIn: React.FC = () => {
   if (isAuthenticated === null) {
     // Show a loading state while checking authentication
     return (
-      <div>
+      <div className="flex items-center justify-center min-h-screen">
         <LoadingComponent />
       </div>
     );

@@ -26,13 +26,7 @@ import {
   TrendingUp,
 } from "@mui/icons-material";
 
-type UserRole =
-  | "user"
-  | "seller"
-  | "buyer"
-  // | "admin"
-  | "business-admin"
-  | "staff";
+type UserRole = "user" | "seller" | "buyer" | "business-admin" | "staff";
 
 const RoleSelectionPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -52,7 +46,6 @@ const RoleSelectionPage: React.FC = () => {
   const router = useRouter();
   const theme = useTheme();
 
-  // Check user session and role on component mount
   useEffect(() => {
     const checkAuthAndRole = async () => {
       try {
@@ -60,15 +53,12 @@ const RoleSelectionPage: React.FC = () => {
         const data = await response.json();
 
         if (!response.ok || !data.user) {
-          // No session exists, redirect to sign-in
           router.push("/signin");
           return;
         }
 
-        // Set the current user role
         setCurrentUserRole(data.user.role || "user");
 
-        // If user has a role other than "user", redirect to appropriate dashboard
         if (data.user.role && data.user.role !== "user") {
           redirectBasedOnRole(data.user.role);
         }
@@ -92,11 +82,15 @@ const RoleSelectionPage: React.FC = () => {
   const redirectBasedOnRole = (role: UserRole) => {
     if (!role || role === "user") return;
 
+    // Redirect sellers and business-admins to plan selection
+    if (role === "seller" || role === "business-admin") {
+      router.push("/plan");
+      return;
+    }
+
+    // Redirect other roles to their dashboards
     const dashboardPaths: Record<string, string> = {
-      seller: "/dashboard/seller/overview",
       buyer: "/dashboard/buyer/overview",
-      // admin: "/dashboard/admin/overview",
-      "business-admin": "/dashboard/business-admin/overview",
       staff: "/dashboard/staff/overview",
     };
 
@@ -119,13 +113,12 @@ const RoleSelectionPage: React.FC = () => {
       });
 
       if (response.ok) {
+        setCurrentUserRole(role);
         setSnackbar({
           open: true,
-          message:
-            "Role updated successfully! Redirecting to your dashboard...",
+          message: "Role updated successfully! Redirecting...",
           severity: "success",
         });
-        setCurrentUserRole(role);
         redirectBasedOnRole(role);
       } else {
         const errorData = await response.json();
@@ -184,8 +177,6 @@ const RoleSelectionPage: React.FC = () => {
     );
   }
 
-  // If user already has a non-"user" role, we'll redirect them (handled in useEffect)
-  // This is just a fallback UI
   if (currentUserRole && currentUserRole !== "user") {
     return (
       <Box
@@ -200,7 +191,9 @@ const RoleSelectionPage: React.FC = () => {
       >
         <CircularProgress size={60} />
         <Typography variant="h6">
-          Redirecting to your {currentUserRole} dashboard...
+          {["seller", "business-admin"].includes(currentUserRole)
+            ? "Redirecting to plan selection..."
+            : `Redirecting to your ${currentUserRole} dashboard...`}
         </Typography>
       </Box>
     );
@@ -276,22 +269,19 @@ const RoleSelectionPage: React.FC = () => {
                     {
                       value: "seller",
                       label: "Lead Seller",
-                      description: "Connect with qualified buyers",
+                      description:
+                        "Connect with qualified buyers (requires plan selection)",
                     },
                     {
                       value: "buyer",
                       label: "Lead Buyer",
                       description: "Find quality leads for your business",
                     },
-                    // {
-                    //   value: "admin",
-                    //   label: "Administrator",
-                    //   description: "Manage platform settings and users",
-                    // },
                     {
                       value: "business-admin",
                       label: "Business Admin",
-                      description: "Manage your organization's account",
+                      description:
+                        "Manage your organization's account (requires plan selection)",
                     },
                     {
                       value: "staff",
@@ -427,7 +417,7 @@ const RoleSelectionPage: React.FC = () => {
           <LoadingComponent />
           <Typography variant="h6" sx={{ mt: 2 }}>
             {selectedRole
-              ? `Setting up your ${selectedRole} dashboard...`
+              ? `Setting up your ${selectedRole} access...`
               : "Processing..."}
           </Typography>
         </Box>

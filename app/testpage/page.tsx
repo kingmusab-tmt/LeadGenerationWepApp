@@ -1,5 +1,5 @@
 import React from "react";
-// import HelpManagement from "../admindashboard/helpmanagement";
+import PricingSection from "../plan/page";
 import TierManagement from "../admindashboard/TierManagement";
 
 const TestingPage = () => {

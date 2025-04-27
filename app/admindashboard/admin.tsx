@@ -31,7 +31,7 @@ import {
   Logout,
   Menu as MenuIcon,
 } from "@mui/icons-material";
-import { useTheme } from "@mui/material/styles";
+// import { useTheme } from "@mui/material/styles";
 import { useSession } from "next-auth/react";
 
 const AdminDashboard: React.FC = () => {
