@@ -32,6 +32,8 @@ import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import BuildIcon from "@mui/icons-material/Build";
 import Header from "../components/generalComponent/Header";
 import Footer from "../components/generalComponent/Footer";
+import logo from "../../public/BRIXCOT.png";
+import Image from "next/image";
 
 interface Tier {
   _id: string;
@@ -94,19 +96,19 @@ const LandingPage = () => {
       name: "Sarah Johnson",
       role: "Real Estate Agency Owner",
       text: "Increased our lead conversion by 40% in just 2 months!",
-      avatar: "/avatars/1.jpg",
+      // avatar: "/avatars/1.jpg",
     },
     {
       name: "Michael Chen",
       role: "Insurance Broker",
       text: "The automated lead distribution saves us hours every week.",
-      avatar: "/avatars/2.jpg",
+      // avatar: "/avatars/2.jpg",
     },
     {
       name: "David Wilson",
       role: "Solar Sales Director",
       text: "Best ROI of any marketing tool we use. Pays for itself in days.",
-      avatar: "/avatars/3.jpg",
+      // avatar: "/avatars/3.jpg",
     },
   ];
 
@@ -164,15 +166,16 @@ const LandingPage = () => {
                   in={checked}
                   style={{ transitionDelay: checked ? "300ms" : "0ms" }}
                 >
-                  <Box
-                    component="img"
-                    src="/images/lead-dashboard.png"
+                  <Image
+                    src={logo}
                     alt="Lead Management Dashboard"
-                    sx={{
-                      width: "100%",
-                      borderRadius: 2,
-                      boxShadow: 6,
-                      border: "1px solid rgba(255,255,255,0.2)",
+                    style={{
+                      width: "50%",
+                      height: "auto",
+                      // borderRadius: "8px",
+                      // boxShadow: "6px 6px 12px rgba(0,0,0,0.1)",
+                      // border: "1px solid rgba(255,255,255,0.2)",
+                      marginLeft: "60px",
                     }}
                   />
                 </Zoom>
@@ -472,7 +475,7 @@ const LandingPage = () => {
                     }}
                   >
                     <Box display="flex" alignItems="center" mb={2}>
-                      <Avatar src={testimonial.avatar} sx={{ mr: 2 }} />
+                      {/* <Avatar src={testimonial.avatar} sx={{ mr: 2 }} /> */}
                       <Box>
                         <Typography fontWeight="bold">
                           {testimonial.name}

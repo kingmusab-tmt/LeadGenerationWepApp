@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import StarIcon from "@mui/icons-material/Star";
-import { getUserRole } from "@/lib/getUserRoleServerAction";
+import { useSession } from "next-auth/react";
 
 interface Tier {
   _id: string;
@@ -39,14 +39,15 @@ interface Tier {
   order: number;
 }
 
-export default async function PricingSection() {
+export default function PricingSection() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
+  const { data: session } = useSession();
+  const role = session?.user?.role || "seller"; // Default to "buyer" if role is not available
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const router = useRouter();
   const theme = useTheme();
-  const role = await getUserRole();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   useEffect(() => {
@@ -82,7 +83,7 @@ export default async function PricingSection() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            tierId: tier.id,
+            tierId: tier._id,
             planName: tier.name,
             tierType: tier.tierType,
           }),
@@ -96,7 +97,7 @@ export default async function PricingSection() {
         router.push(`/dashboard/${role}/overview`);
       } else {
         // Redirect to checkout for paid tiers
-        router.push(`/checkout?plan=${tier.id}`);
+        router.push(`/checkout?plan=${tier._id}`);
       }
     } catch (err) {
       console.error("Error processing subscription:", err);

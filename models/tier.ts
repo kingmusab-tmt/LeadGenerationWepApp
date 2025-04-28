@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-interface ITier extends Document {
+export interface ITier extends Document {
   name: string;
   price: string;
   description: string;

@@ -190,6 +190,11 @@ const TierManagement = () => {
   };
 
   const calculateAnnualPrice = () => {
+    const discountedPrice = parseFloat(calculateDiscountedPrice());
+    return (discountedPrice * 12).toFixed(2);
+  };
+
+  const calculateRenewalPrice = () => {
     if (!currentTier?.price) return "";
     const price = parseFloat(currentTier.price);
     return (price * 12).toFixed(2);
@@ -224,6 +229,7 @@ const TierManagement = () => {
         tierType: currentTier.price === "0" ? "free" : "paid",
         discountedPrice: calculateDiscountedPrice(),
         annualPrice: calculateAnnualPrice(),
+        renewalPrice: calculateRenewalPrice(),
       };
 
       const method = currentTier._id ? "PUT" : "POST";
@@ -678,7 +684,7 @@ const TierManagement = () => {
                         >
                           (
                           {currentTier.tierType === "free"
-                            ? "7 days Trial"
+                            ? "100% Free Trial just for 1 month"
                             : "Monthly"}
                           )
                         </Typography>

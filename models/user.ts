@@ -4,22 +4,30 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 // Subscription interface
 interface ISubscription {
-  subscriptionPlan: "Free" | "Lead Seller" | "Business" | "Premium";
-  subscriptionPrice?: number; // Price of the subscription plan
+  subscriptionTierId: string;
+  subscriptionTierType: "free" | "paid"; // Subscription tier type (free or paid)
+  subscriptionTierUserType: "seller" | "business"; // User type for the subscription tier
+  subscriptionPlan:
+    | "Free Tier"
+    | "Lead Seller Tier"
+    | "Business Tier"
+    | "Premium Tier"; // Subscription plan name
+  subscriptionPrice?: number; // Price of the   subscription plan
   subscriptionStartDate: Date; // when user signed up
   subscriptionExpiryDate: Date; // when Free Tier or Paid plan ends
   isSubscriptionActive: boolean; // true/false
   isTrial: boolean; // true if Free Tier trial is active
-  renewalDate?: Date;
-  paymentMethod: "stripe" | "paypal" | "manual";
-  paymentId?: string; // Stripe/PayPal subscription ID
-  limits: {
+  subscriptionRenewalDate?: Date;
+  subscriptionPaymentMethod: "stripe" | "paypal" | "manual";
+  subscriptionPaymentId?: string; // Stripe/PayPal subscription ID
+  subscriptionRenewalPrice?: number; // Renewal price for the subscription
+  subscriptionLimits: {
     leads: number;
     buyers: number;
     numbers: number;
     callSeconds: number;
   };
-  usage: {
+  subscriptionUsage: {
     leads: number;
     callSeconds: number;
   };
@@ -126,14 +134,6 @@ export interface IUser extends Document {
   paypalCustomerId?: string;
 }
 
-interface IReport extends Document {
-  userId: mongoose.Schema.Types.ObjectId;
-  type: "performance" | "revenue";
-  content: Record<string, unknown>;
-  generatedAt?: Date;
-  filters?: Record<string, unknown>;
-}
-
 interface INotification extends Document {
   userId: mongoose.Schema.Types.ObjectId;
   type: "info" | "alert";
@@ -154,7 +154,7 @@ const UserSchema: Schema = new Schema<IUser>(
     loginlink: { type: String },
     role: {
       type: String,
-      enum: ["admin", "seller", "buyer", "user"],
+      enum: ["admin", "seller", "buyer", "user", "staff", "business-admin"],
       default: "user",
     },
     notificationPreferences: [
@@ -258,7 +258,12 @@ const UserSchema: Schema = new Schema<IUser>(
     subscription: {
       subscriptionPlan: {
         type: String,
-        enum: ["Free", "Lead Seller", "Business", "Premium"],
+        enum: [
+          "Free Tier",
+          "Lead Seller Tier",
+          "Business Tier",
+          "Premium Tier",
+        ],
         default: "Free",
       },
       subscriptionStartDate: {
@@ -269,19 +274,19 @@ const UserSchema: Schema = new Schema<IUser>(
       subscriptionExpiryDate: Date,
       isSubscriptionActive: { type: Boolean, default: false },
       isTrial: { type: Boolean, default: false },
-      renewalDate: Date,
-      paymentMethod: {
+      subscriptionRenewalDate: Date,
+      subscriptionPaymentMethod: {
         type: String,
         enum: ["stripe", "paypal", "manual"],
       },
-      paymentId: String,
-      limits: {
+      subscriptionPaymentId: String,
+      subscriptionLimits: {
         leads: { type: Number, default: 0 },
         buyers: { type: Number, default: 0 },
         numbers: { type: Number, default: 0 },
         callSeconds: { type: Number, default: 0 },
       },
-      usage: {
+      subscriptionUsage: {
         leads: { type: Number, default: 0 },
         callSeconds: { type: Number, default: 0 },
       },
@@ -296,17 +301,6 @@ UserSchema.index({ buyers: 1 }); // Index on buyers array
 
 export const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
-
-// Report Model
-const ReportSchema = new Schema<IReport>({
-  userId: { type: Schema.Types.ObjectId, ref: "User" },
-  type: { type: String, enum: ["performance", "revenue"], required: true },
-  content: { type: Object },
-  generatedAt: { type: Date, default: Date.now },
-  filters: { type: Object },
-});
-export const Report: Model<IReport> =
-  mongoose.models.Report || mongoose.model<IReport>("Report", ReportSchema);
 
 // Notification Model
 const NotificationSchema = new Schema<INotification>(

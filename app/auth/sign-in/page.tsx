@@ -10,6 +10,7 @@ import LoadingComponent from "@/app/components/generalComponent/loadingcomponent
 const SignIn: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isSubActive, setIsSubActive] = useState<boolean>(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -18,20 +19,30 @@ const SignIn: React.FC = () => {
         await checkIsAuthenticated();
       setIsAuthenticated(isAuthenticated);
       setUserRole(role);
+      setIsSubActive(isSubActive ?? false);
 
       if (isAuthenticated) {
-        if (role === "user") {
-          // Redirect to RoleSelectionPage if role is "user"
-          router.push("/completeregistration");
-        } else if (role === "admin") {
+        if (role === "admin") {
           // Redirect to admin dashboard
           router.push("/admindashboard");
+        } else if (role === "user" && isSubActive === false) {
+          // Redirect to RoleSelectionPage if role is "user"
+          router.push("/completeregistration");
         } else if (
           (role === "buyer" ||
             role === "staff" ||
             role === "seller" ||
             role === "business-admin") &&
-          isSubActive === true
+          isSubActive === false
+        ) {
+          // Redirect to subscription page if subscription is inactive
+          router.push("/plan");
+        } else if (
+          (role === "buyer" ||
+            role === "staff" ||
+            role === "seller" ||
+            role === "business-admin") &&
+          isSubActive === false
         ) {
           // Redirect to the respective dashboard based on role
           router.push(`/dashboard/${role}/overview`);

@@ -24,6 +24,11 @@ export interface ITransaction extends Document {
     sellerId?: string; // For seller_income (ID of the seller earning income)
     buyerId: String;
     refund: boolean;
+    tierId: string;
+    tierName: string;
+    userEmail: string; // For subscription_payment or renewal (email of the user)
+    tierType: string;
+    subscriptionYears: number; // For
     payoutId?: string; // For seller_payout (ID from payment gateway)
     refundReason?: string; // For refund
     adminNote?: string; // For admin_adjustment
@@ -71,6 +76,21 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
       default: "USD",
     },
     metadata: {
+      tierId: {
+        type: String,
+      },
+      tierName: {
+        type: String,
+      },
+      tierType: {
+        type: String,
+      },
+      subscriptionYears: {
+        type: Number,
+      },
+      userEmail: {
+        type: String,
+      },
       leadId: {
         type: String,
       },
