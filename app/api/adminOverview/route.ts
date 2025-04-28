@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next"; // Import session helper
 import { authOptions } from "@/auth"; // Import your NextAuth configuration
-import { User, Payment } from "@/models/user";
+import { User } from "@/models/user";
 import { Campaign } from "@/models/campaign";
 import { Lead } from "@/models/leads";
 import { Buyer } from "@/models/leadbuyers";
@@ -32,11 +32,11 @@ export async function GET(req: NextRequest) {
     const activeCampaigns = await Campaign.countDocuments({ status: "active" });
 
     // Calculate total revenue from completed payments
-    const totalRevenue = await Payment.aggregate([
-      { $match: { status: "completed" } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]);
-    const totalPayments = totalRevenue[0]?.total || 0;
+    // const totalRevenue = await Payment.aggregate([
+    //   { $match: { status: "completed" } },
+    //   { $group: { _id: null, total: { $sum: "$amount" } } },
+    // ]);
+    // const totalPayments = totalRevenue[0]?.total || 0;
 
     // Lead Status (new, verified, closed)
     const leadStatus = await Lead.aggregate([
@@ -79,10 +79,10 @@ export async function GET(req: NextRequest) {
       totalLeads,
       totalUsers,
       activeCampaigns,
-      totalRevenue: totalPayments,
+      // totalRevenue: totalPayments,
       conversionRate,
       leadStatus: leadStatusCounts,
-      totalPayments,
+      // totalPayments,
       campaignPerformance,
       totalLeadBuyers,
       newLeadBuyers,
