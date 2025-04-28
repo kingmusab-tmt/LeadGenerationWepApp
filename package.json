@@ -20,6 +20,7 @@
     "@mui/material": "^6.3.1",
     "@mui/x-data-grid": "^7.23.5",
     "@paypal/checkout-server-sdk": "^1.0.3",
+    "@paypal/paypal-server-sdk": "^1.0.0",
     "@paypal/react-paypal-js": "^8.8.2",
     "@reduxjs/toolkit": "^2.5.1",
     "@stripe/react-stripe-js": "^3.5.1",
