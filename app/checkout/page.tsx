@@ -552,6 +552,11 @@ interface CheckoutComponentProps {
   searchParams: { [key: string]: string | string[] | undefined };
 }
 
+interface PageProps {
+  params: { slug: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
 interface Tier {
   _id: string;
   name: string;
@@ -1023,11 +1028,7 @@ const CheckoutComponent = ({ searchParams }: CheckoutComponentProps) => {
   );
 };
 
-const CheckoutPage = ({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) => {
+const CheckoutPage = ({ searchParams }: PageProps) => {
   return (
     <Suspense fallback={<LoadingComponent />}>
       <CheckoutComponent searchParams={searchParams} />
