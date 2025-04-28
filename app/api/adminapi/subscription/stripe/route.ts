@@ -5,7 +5,7 @@ import { authOptions } from "@/auth";
 import { User } from "@/models/user";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-01-27.acacia",
+  apiVersion: "2025-02-24.acacia",
 });
 
 // Helper function to get Stripe price ID

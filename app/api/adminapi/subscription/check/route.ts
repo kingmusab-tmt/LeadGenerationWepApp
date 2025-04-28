@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         error: "Subscription required",
-        redirect: "/pricing",
+        redirect: "/plan",
       },
       { status: 403 }
     );

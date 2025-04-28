@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         error: "No subscription found",
-        redirect: "/pricing",
+        redirect: "/plan",
       },
       { status: 404 }
     );
