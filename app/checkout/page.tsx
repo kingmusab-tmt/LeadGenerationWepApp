@@ -543,9 +543,14 @@ import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { useSession } from "next-auth/react";
 import Head from "next/head";
 import axios from "axios";
+import LoadingComponent from "../components/generalComponent/loadingcomponent";
 
 // Stripe setup
 const stripePromise = loadStripe(process.env.STRIPE_PUBLIC_KEY!);
+
+interface CheckoutComponentProps {
+  searchParams: { [key: string]: string | string[] | undefined };
+}
 
 interface Tier {
   _id: string;
@@ -716,11 +721,7 @@ const PaymentSection = ({
   );
 };
 
-const CheckoutContent = ({
-  searchParams,
-}: {
-  searchParams: URLSearchParams;
-}) => {
+const CheckoutComponent = ({ searchParams }: CheckoutComponentProps) => {
   const router = useRouter();
   const { data: session, status } = useSession();
 
@@ -756,7 +757,7 @@ const CheckoutContent = ({
     };
 
     const fetchTier = async () => {
-      const planId = searchParams.get("plan");
+      const planId = searchParams.plan as string; // Access plan directly from searchParams
       if (!planId) {
         router.push("/plan");
         return;
@@ -1022,10 +1023,14 @@ const CheckoutContent = ({
   );
 };
 
-const CheckoutPage = ({ searchParams }: { searchParams: URLSearchParams }) => {
+const CheckoutPage = ({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) => {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <CheckoutContent searchParams={searchParams} />
+    <Suspense fallback={<LoadingComponent />}>
+      <CheckoutComponent searchParams={searchParams} />
     </Suspense>
   );
 };
