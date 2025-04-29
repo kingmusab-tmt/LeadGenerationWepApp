@@ -25,6 +25,9 @@ import StarIcon from "@mui/icons-material/Star";
 import { useSession } from "next-auth/react";
 
 interface Tier {
+  discountPercentage: number;
+  discountedPrice: string;
+  renewalPrice: any;
   _id: string;
   id: string;
   name: string;
@@ -166,7 +169,7 @@ export default function PricingSection() {
             alignItems="stretch"
             justifyContent="center"
           >
-            {tiers.map((tier) => (
+            {tiers.map((tier, index) => (
               <Grid
                 item
                 xs={12}
@@ -178,153 +181,161 @@ export default function PricingSection() {
                   justifyContent: "center",
                 }}
               >
-                <Badge
-                  badgeContent={
-                    tier.highlight ? (
-                      <StarIcon
-                        sx={{
-                          color: theme.palette.warning.main,
-                          fontSize: "1.5rem",
-                        }}
-                      />
-                    ) : null
-                  }
-                  anchorOrigin={{
-                    vertical: "top",
-                    horizontal: "left",
-                  }}
+                <Card
                   sx={{
-                    width: "100%",
-                    "& .MuiBadge-badge": {
-                      top: 16,
-                      left: 16,
-                      transform: "none",
+                    height: "100%",
+                    border: tier.highlight
+                      ? `2px solid ${theme.palette.primary.main}`
+                      : undefined,
+                    transform:
+                      tier.highlight && !isMobile ? "scale(1.05)" : undefined,
+                    transition: "all 0.3s ease-in-out",
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
+                    "&:hover": {
+                      boxShadow: theme.shadows[8],
+                      transform:
+                        tier.highlight && !isMobile
+                          ? "scale(1.07)"
+                          : "scale(1.02)",
                     },
                   }}
                 >
-                  <Card
-                    sx={{
-                      height: "100%",
-                      width: "100%",
-                      maxWidth: 400,
-                      border: tier.highlight
-                        ? `2px solid ${theme.palette.primary.main}`
-                        : "1px solid rgba(0, 0, 0, 0.12)",
-                      boxShadow: tier.highlight
-                        ? `0 8px 24px -4px ${theme.palette.primary.light}`
-                        : "none",
-                      transform:
-                        tier.highlight && !isMobile ? "scale(1.02)" : "none",
-                      transition: "all 0.3s ease",
-                      display: "flex",
-                      flexDirection: "column",
-                      "&:hover": {
-                        transform: !isMobile
-                          ? tier.highlight
-                            ? "scale(1.05)"
-                            : "scale(1.03)"
-                          : "none",
-                        boxShadow: `0 8px 32px -4px ${theme.palette.primary.light}`,
-                      },
-                    }}
-                  >
-                    <CardContent
+                  {tier.highlight && (
+                    <Box
+                      bgcolor="primary.main"
+                      color="primary.contrastText"
+                      textAlign="center"
+                      py={1}
+                    >
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        MOST POPULAR
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {tier.discountPercentage > 0 && (
+                    <Box
                       sx={{
-                        flexGrow: 1,
-                        p: { xs: 2, sm: 3 },
+                        position: "absolute",
+                        top: 16,
+                        right: 16,
+                        bgcolor: "success.main",
+                        color: "success.contrastText",
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1,
+                        zIndex: 1,
                       }}
                     >
-                      {tier.highlight && (
-                        <Box
-                          bgcolor="primary.main"
-                          color="primary.contrastText"
-                          textAlign="center"
-                          py={1}
-                          mb={2}
-                          borderRadius={1}
-                        >
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            MOST POPULAR
-                          </Typography>
-                        </Box>
-                      )}
-
-                      <Typography
-                        variant="h5"
-                        component="h2"
-                        gutterBottom
-                        sx={{ fontWeight: 600 }}
-                      >
-                        {tier.name}
+                      <Typography variant="caption" fontWeight="bold">
+                        SAVE {tier.discountPercentage}%
                       </Typography>
-                      <Typography
-                        variant="h3"
-                        component="div"
-                        gutterBottom
-                        sx={{ fontWeight: 700 }}
-                      >
-                        ${tier.price}
+                    </Box>
+                  )}
+
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      {tier.name}
+                    </Typography>
+
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="h3" component="div">
+                        $
+                        {tier.discountPercentage > 0
+                          ? tier.discountedPrice
+                          : tier.price}
                         <Typography
                           component="span"
                           variant="h6"
                           color="text.secondary"
+                          sx={{ ml: 1 }}
                         >
-                          {tier.price > 0 ? "/month" : ""}
+                          /month
                         </Typography>
                       </Typography>
-                      <Typography
-                        variant="subtitle1"
-                        color="text.secondary"
-                        paragraph
-                        minHeight={60}
-                      >
-                        {tier.description}
-                      </Typography>
 
-                      <Divider sx={{ my: 2 }} />
+                      {tier.discountPercentage > 0 && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ textDecoration: "line-through" }}
+                        >
+                          ${tier.price}/month
+                        </Typography>
+                      )}
+                    </Box>
 
-                      <List dense disablePadding>
-                        {tier.features.map((feature, index) => (
-                          <ListItem key={index} disableGutters>
-                            <ListItemIcon sx={{ minWidth: 32 }}>
-                              <CheckCircleIcon
-                                color="primary"
-                                fontSize="small"
-                              />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary={feature}
-                              primaryTypographyProps={{
-                                variant: "body2",
-                              }}
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-                    </CardContent>
+                    {tier.tierType === "paid" && (
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.primary">
+                          <Box component="span" fontWeight="bold">
+                            You pay $
+                            {(
+                              parseFloat(
+                                String(tier.discountedPrice || tier.price)
+                              ) * 12
+                            ).toFixed(2)}
+                          </Box>
+                          {tier.renewalPrice && (
+                            <Box component="span">
+                              {" "}
+                              - renews at ${tier.renewalPrice}/year
+                            </Box>
+                          )}
+                        </Typography>
+                        {tier.discountPercentage > 0 && (
+                          <Typography variant="caption" color="success.main">
+                            Save {tier.discountPercentage}% on first year
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
 
-                    <CardActions sx={{ p: { xs: 2, sm: 3 }, pt: 0 }}>
-                      <Button
-                        fullWidth
-                        variant={tier.highlight ? "contained" : "outlined"}
-                        color={tier.highlight ? "primary" : "inherit"}
-                        size="large"
-                        onClick={() => handleSelectPlan(tier)}
-                        disabled={isProcessing}
-                        sx={{
-                          py: 1.5,
-                          fontWeight: 600,
-                          borderRadius: 1,
-                        }}
-                      >
-                        {isProcessing
-                          ? "Processing..."
-                          : tier.ctaText ||
-                            (tier.isFree ? "Get Started" : "Subscribe")}
-                      </Button>
-                    </CardActions>
-                  </Card>
-                </Badge>
+                    <Typography
+                      variant="subtitle1"
+                      color="text.secondary"
+                      paragraph
+                    >
+                      {tier.description}
+                    </Typography>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <List dense>
+                      {tier.features.map((feature, index) => (
+                        <ListItem key={index} disableGutters>
+                          <ListItemIcon sx={{ minWidth: 32 }}>
+                            <CheckCircleIcon color="primary" fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText primary={feature} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </CardContent>
+
+                  <CardActions sx={{ p: { xs: 2, sm: 3 }, pt: 0 }}>
+                    <Button
+                      fullWidth
+                      variant={tier.highlight ? "contained" : "outlined"}
+                      color={tier.highlight ? "primary" : "inherit"}
+                      size="large"
+                      onClick={() => handleSelectPlan(tier)}
+                      disabled={isProcessing}
+                      sx={{
+                        py: 1.5,
+                        fontWeight: 600,
+                        borderRadius: 1,
+                      }}
+                    >
+                      {isProcessing
+                        ? "Processing..."
+                        : tier.ctaText ||
+                          (tier.isFree ? "Get Started" : "Subscribe")}
+                    </Button>
+                  </CardActions>
+                </Card>
               </Grid>
             ))}
           </Grid>

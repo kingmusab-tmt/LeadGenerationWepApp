@@ -7,11 +7,7 @@ interface ISubscription {
   subscriptionTierId: string;
   subscriptionTierType: "free" | "paid"; // Subscription tier type (free or paid)
   subscriptionTierUserType: "seller" | "business"; // User type for the subscription tier
-  subscriptionPlan:
-    | "Free Tier"
-    | "Lead Seller Tier"
-    | "Business Tier"
-    | "Premium Tier"; // Subscription plan name
+  subscriptionPlan: string; // Subscription plan name
   subscriptionPrice?: number; // Price of the   subscription plan
   subscriptionStartDate: Date; // when user signed up
   subscriptionExpiryDate: Date; // when Free Tier or Paid plan ends
@@ -271,6 +267,18 @@ const UserSchema: Schema = new Schema<IUser>(
         default: Date.now,
       },
       subscriptionPrice: { type: Number },
+      subscriptionTierId: { type: String },
+      subscriptionTierType: {
+        type: String,
+        enum: ["free", "paid"],
+        default: "free",
+      },
+      subscriptionTierUserType: {
+        type: String,
+        enum: ["seller", "business"],
+        default: "seller",
+      },
+      subscriptionRenewalPrice: { type: Number },
       subscriptionExpiryDate: Date,
       isSubscriptionActive: { type: Boolean, default: false },
       isTrial: { type: Boolean, default: false },

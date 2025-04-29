@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 // Define the interface for the Transaction document
 export interface ITransaction extends Document {
+  _id: string; // Unique identifier for the transaction
   type:
     | "lead_purchase" // Buyer purchases a lead
     | "call_purchase" // Buyer purchases a call
@@ -26,6 +27,7 @@ export interface ITransaction extends Document {
     refund: boolean;
     tierId: string;
     tierName: string;
+    tierRenewalDate?: Date; // For subscription_renewal (renewal date of the subscription)
     userEmail: string; // For subscription_payment or renewal (email of the user)
     tierType: string;
     subscriptionYears: number; // For
@@ -85,6 +87,9 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
       tierType: {
         type: String,
       },
+      tierRenewalDate: {
+        type: Date,
+      },
       subscriptionYears: {
         type: Number,
       },
@@ -115,10 +120,6 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
 
       adminNote: {
         type: String,
-      },
-      subscriptionId: {
-        type: Schema.Types.ObjectId,
-        ref: "Subscription", // Reference to the Subscription model
       },
       subscriptionPlan: {
         type: String,

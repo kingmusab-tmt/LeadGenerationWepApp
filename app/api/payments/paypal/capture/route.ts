@@ -38,6 +38,8 @@ export async function POST(req: Request) {
     console.log("tierRenewalPrice", renewalPrice);
     console.log("subscriptionYears");
     console.log("anualPrice", annualPrice);
+    console.log("tierId", tierId);
+    console.log("orderID", orderID);
 
     // Validate required fields
     if (!orderID || !tierId || !name || !price) {
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
     }
 
     // Validate and parse numeric values
-    const parsedTierPrice = parseFloat(price);
+    const parsedTierPrice = annualPrice ? parseFloat(annualPrice) : 0;
     const parsedRenewalPrice = renewalPrice ? parseFloat(renewalPrice) : 0;
 
     if (isNaN(parsedTierPrice) || (renewalPrice && isNaN(parsedRenewalPrice))) {
@@ -99,20 +101,34 @@ export async function POST(req: Request) {
     expiryDate.setFullYear(expiryDate.getFullYear() + subscriptionYears);
 
     // Prepare subscription update
+    console.log("subscriptionPlan", name);
+    console.log("subscriptionStartDate", startDate);
+    console.log("subscriptionExpiryDate", expiryDate);
+    console.log("isSubscriptionActive", true);
+    console.log("isTrial", false);
+    console.log("subscriptionPaymentMethod", "paypal");
+    console.log("subscriptionTierId", tierId);
+    console.log("subscriptionTierType", tierType);
+    console.log("subscriptionPrice", parsedTierPrice);
+    console.log("subscriptionPaymentId", orderID);
+    console.log("subscriptionRenewalPrice", parsedRenewalPrice);
+    console.log("userId", userId);
+    console.log("userRole", userRole);
+    console.log("userEmail", email);
+    console.log("subscriptionYears", subscriptionYears);
+
     const subscriptionUpdate = {
       "subscription.subscriptionPlan": name,
       "subscription.subscriptionStartDate": startDate,
       "subscription.subscriptionExpiryDate": expiryDate,
       "subscription.isSubscriptionActive": true,
-      "subscription.isTrial": tierType === "free",
-      "subscription.subscriptionPaymentMethod":
-        tierType === "free" ? "free" : "paid",
-      "subscription.subscriptionTierId": new ObjectId(tierId),
+      "subscription.isTrial": false,
+      "subscription.subscriptionPaymentMethod": "paypal",
+      "subscription.subscriptionTierId": tierId,
       "subscription.subscriptionTierType": tierType,
       "subscription.subscriptionPrice": parsedTierPrice,
-      "subscription.subscriptionTieruserType": userRole,
-      "subscription.subscriptionRenewalPrice":
-        tierType === "free" ? 0 : parsedRenewalPrice,
+      "subscription.subscriptionPaymentId": orderID,
+      "subscription.subscriptionRenewalPrice": parsedRenewalPrice,
     };
 
     // Update user's subscription
@@ -132,18 +148,18 @@ export async function POST(req: Request) {
     // Create transaction record with proper typing
     const transactionData = {
       type: "subscription_payment",
-      userId: new ObjectId(userId),
+      userId: userId,
       amount: parsedTierPrice,
       currency: "USD",
       paymentGateway: "paypal",
       gatewayTransactionId: orderID,
       status: "completed", // Explicitly typed
       metadata: {
-        tierId: new ObjectId(tierId),
-        name,
+        tierId: tierId,
         tierType,
-        subscriptionYears,
-        userEmail: email,
+        tierRenewalDate: expiryDate,
+        subscriptionDuration: subscriptionYears,
+        subscriptionPlan: name,
       },
       createdAt: new Date(),
       updatedAt: new Date(),
