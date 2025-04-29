@@ -97,7 +97,7 @@ export default function PricingSection() {
         }
 
         // Redirect to dashboard or success page
-        router.push(`/dashboard/${role}/overview`);
+        router.push(`/dashboard/${session?.user.role}/overview`);
       } else {
         // Redirect to checkout for paid tiers
         router.push(`/checkout?plan=${tier._id}`);
