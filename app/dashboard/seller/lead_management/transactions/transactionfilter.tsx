@@ -24,6 +24,7 @@ interface TransactionFiltersProps {
     endDate?: Date | null;
   };
   onFilterChange: (filters: any) => void;
+  isMobile: any;
 }
 
 const TransactionFilters: React.FC<TransactionFiltersProps> = ({
