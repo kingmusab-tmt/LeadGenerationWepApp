@@ -166,18 +166,26 @@ const LandingPage = () => {
                   in={checked}
                   style={{ transitionDelay: checked ? "300ms" : "0ms" }}
                 >
-                  <Image
-                    src={logo}
-                    alt="Lead Management Dashboard"
+                  <div
                     style={{
-                      width: "50%",
-                      height: "auto",
-                      // borderRadius: "8px",
-                      // boxShadow: "6px 6px 12px rgba(0,0,0,0.1)",
-                      // border: "1px solid rgba(255,255,255,0.2)",
+                      backgroundColor: "white", // Force white background
+                      display: "inline-block",
+                      padding: "8px", // Optional: Add spacing around image
+                      borderRadius: "100%", // Optional: Rounded corners
+                      boxShadow: "6px 6px 12px rgba(0,0,0,0.1)", // Optional: Add subtle shadow
                       marginLeft: "60px",
                     }}
-                  />
+                  >
+                    <Image
+                      src={logo}
+                      alt="Lead Management Dashboard"
+                      style={{
+                        width: "100%",
+                        height: "auto",
+                        display: "block",
+                      }}
+                    />
+                  </div>
                 </Zoom>
               </Grid>
             </Grid>

@@ -42,6 +42,7 @@ import { useMediaQuery } from "@mui/material";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
+import InactivityLogout from "@/app/components/generalComponent/InactivityLogout";
 
 interface UserDashboardProps {
   children: React.ReactNode;
@@ -120,6 +121,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>
       <CssBaseline />
+      <InactivityLogout />
       <AppBar position="fixed">
         <Toolbar>
           <IconButton

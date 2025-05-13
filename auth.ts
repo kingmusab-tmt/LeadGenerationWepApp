@@ -14,7 +14,8 @@ export const authOptions = {
 
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days in seconds (this value is also the default)
+    maxAge: 2 * 24 * 60 * 60, // 2 days in seconds (this value is also the default)
+    updateAge: 12 * 60 * 60, // Re-issue token every 24 hours
   },
   pages: {
     signIn: "/auth/sign-in",
@@ -72,10 +73,57 @@ export const authOptions = {
       },
     }),
   ],
+  //   callbacks: {
+  //     async redirect({ url, baseUrl }) {
+  //       // Allow only internal URLs, fallback to base
+  //       return url.startsWith(baseUrl) ? url : baseUrl;
+  //     },
+  //     async jwt({ token, trigger, session, user }) {
+  //       if (user) {
+  //         token.email = user.email;
+  //         token.name = user.name;
+  //         token.id = user.id;
+  //         token.image = user.image;
+  //         token.role = user.role;
+  //         if (Date.now() % 10 === 0) await clearStaleTokens(); // run ~10% of the time
+  //       } else if (trigger === "update" && session?.name) {
+  //         token.email = user["email"];
+  //         token.name = user["name"];
+  //         token.id = user["id"];
+  //         token.image = user["image"];
+  //         token.isActive = user["isActive"];
+  //         token.role = user["role"];
+  //         if (Date.now() % 10 === 0) await clearStaleTokens(); // run ~10% of the time
+  //       }
+  //       return token;
+  //     },
+  //     async session({ session, token }) {
+  //       await dbConnect();
+  //       const userEmail = session?.user?.email;
+  //       const dbUser = await User.findOne({ email: userEmail });
+
+  //       if (dbUser) {
+  //         session.user.email = dbUser.email;
+  //         session.user.name = dbUser.name;
+  //         session.user.id = dbUser.id;
+  //         session.user.image = dbUser.image ?? null;
+  //         session.user.role = dbUser.role;
+  //       } else {
+  //         session.user.email = token.email;
+  //         session.user.name = token.name;
+  //         session.user.id = token.id;
+  //         session.user.image = token.image;
+  //         session.user.role = token.role;
+  //       }
+  //       return session;
+  //     },
+  //   },
+  // } as NextAuthOptions;
   callbacks: {
     async redirect({ url, baseUrl }) {
-      return baseUrl + "/auth/sign-in";
+      return url.startsWith(baseUrl) ? url : baseUrl;
     },
+
     async jwt({ token, trigger, session, user }) {
       if (user) {
         token.email = user.email;
@@ -83,36 +131,37 @@ export const authOptions = {
         token.id = user.id;
         token.image = user.image;
         token.role = user.role;
-        await clearStaleTokens();
+        if (Date.now() % 10 === 0) await clearStaleTokens(); // ~10% of the time
       } else if (trigger === "update" && session?.name) {
-        token.email = user["email"];
-        token.name = user["name"];
-        token.id = user["id"];
-        token.image = user["image"];
-        token.isActive = user["isActive"];
-        token.role = user["role"];
-        await clearStaleTokens();
+        token.email = session.user?.email;
+        token.name = session.user?.name;
+        token.id = session.user?.id;
+        token.image = session.user?.image;
+        token.isActive = session.user?.isActive;
+        token.role = session.user?.role;
+        if (Date.now() % 10 === 0) await clearStaleTokens();
       }
       return token;
     },
+
     async session({ session, token }) {
       await dbConnect();
-      const userEmail = session?.user?.email;
+      const userEmail = token?.email;
       const dbUser = await User.findOne({ email: userEmail });
 
-      if (dbUser) {
-        session.user.email = dbUser.email;
-        session.user.name = dbUser.name;
-        session.user.id = dbUser.id;
-        session.user.image = dbUser.image ?? null;
-        session.user.role = dbUser.role;
-      } else {
-        session.user.email = token.email;
-        session.user.name = token.name;
-        session.user.id = token.id;
-        session.user.image = token.image;
-        session.user.role = token.role;
+      if (!dbUser) {
+        // User deleted – invalidate session
+        return null;
       }
+
+      session.user = {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        image: dbUser.image ?? null,
+        role: dbUser.role,
+      };
+
       return session;
     },
   },

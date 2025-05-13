@@ -4,6 +4,8 @@ export interface ITier extends Document {
   name: string;
   price: string;
   description: string;
+  stripePriceId?: string;
+  stripeProductId?: string;
   features: string[];
   ctaText: string;
   highlight: boolean;
@@ -23,6 +25,8 @@ const TierSchema = new Schema<ITier>(
     price: { type: String, required: true },
     description: { type: String, required: true },
     features: { type: [String], required: true },
+    stripePriceId: { type: String },
+    stripeProductId: { type: String },
     ctaText: { type: String, default: "Get Started" },
     highlight: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
