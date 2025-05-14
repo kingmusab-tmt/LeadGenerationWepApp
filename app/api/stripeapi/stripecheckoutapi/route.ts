@@ -50,6 +50,138 @@
 //     );
 //   }
 // }
+// import { NextRequest, NextResponse } from "next/server";
+// import Stripe from "stripe";
+// import { getServerSession } from "next-auth";
+// import { authOptions } from "@/auth";
+// import dbConnect from "@/lib/connectdb";
+// import { Tier } from "@/models/tier";
+
+// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+//   apiVersion: "2025-02-24.acacia",
+// });
+
+// export async function POST(req: NextRequest) {
+//   await dbConnect();
+
+//   const { units, cost, tierId, durationMonths } = await req.json();
+//   const userSession = await getServerSession(authOptions);
+
+//   if (!userSession) {
+//     return NextResponse.json(
+//       { success: false, message: "User not authenticated" },
+//       { status: 401 }
+//     );
+//   }
+
+//   try {
+//     // Determine if this is a credit purchase or subscription
+//     const isSubscription = !!tierId;
+//     let sessionParams: Stripe.Checkout.SessionCreateParams;
+
+//     if (isSubscription) {
+//       // Handle subscription checkout
+//       const tier = await Tier.findById(tierId);
+//       if (!tier) {
+//         return NextResponse.json(
+//           { success: false, message: "Tier not found" },
+//           { status: 404 }
+//         );
+//       }
+
+//       if (!tier.stripePriceId) {
+//         return NextResponse.json(
+//           {
+//             success: false,
+//             message: "Stripe price ID not configured for this tier",
+//           },
+//           { status: 400 }
+//         );
+//       }
+
+//       const totalAmount =
+//         parseFloat(tier.discountedPrice || "0") * (durationMonths || 1);
+
+//       sessionParams = {
+//         payment_method_types: ["card"],
+//         line_items: [
+//           {
+//             price: tier.stripePriceId,
+//             quantity: durationMonths || 1,
+//           },
+//         ],
+//         mode: "payment", // Use subscription mode for recurring payments
+//         success_url: `${process.env.FRONTEND_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+//         cancel_url: `${process.env.FRONTEND_URL}/checkout/cancel`,
+//         customer_email: userSession.user.email,
+//         metadata: {
+//           tierId,
+//           userId: userSession.user.id,
+//           durationMonths: (durationMonths || 1).toString(),
+//           purchaseType: "subscription",
+//         },
+//         subscription_data: {
+//           metadata: {
+//             tierId,
+//             userId: userSession.user.id,
+//           },
+//         },
+//       };
+//     } else {
+//       // Handle credit purchase
+//       if (!units || !cost) {
+//         return NextResponse.json(
+//           {
+//             success: false,
+//             message: "Units and cost are required for credit purchases",
+//           },
+//           { status: 400 }
+//         );
+//       }
+
+//       sessionParams = {
+//         payment_method_types: ["card"],
+//         line_items: [
+//           {
+//             price_data: {
+//               currency: "usd",
+//               product_data: { name: `${units} Lead Credits` },
+//               unit_amount: cost * 100,
+//             },
+//             quantity: 1,
+//           },
+//         ],
+//         mode: "payment",
+//         success_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
+//         cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
+//         customer_email: userSession.user.email,
+//         metadata: {
+//           units: units.toString(),
+//           userId: userSession.user.id,
+//           purchaseType: "credits",
+//         },
+//       };
+//     }
+
+//     const session = await stripe.checkout.sessions.create(sessionParams);
+
+//     return NextResponse.json({
+//       success: true,
+//       sessionId: session.id,
+//       sessionUrl: session.url,
+//     });
+//   } catch (error: any) {
+//     console.error("Checkout session creation error:", error);
+//     return NextResponse.json(
+//       {
+//         success: false,
+//         message: "Internal server error",
+//         error: error.message,
+//       },
+//       { status: 500 }
+//     );
+//   }
+// }
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getServerSession } from "next-auth";
@@ -75,11 +207,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Determine if this is a credit purchase or subscription
-    const isSubscription = !!tierId;
     let sessionParams: Stripe.Checkout.SessionCreateParams;
 
-    if (isSubscription) {
+    if (tierId) {
       // Handle subscription checkout
       const tier = await Tier.findById(tierId);
       if (!tier) {
@@ -89,42 +219,34 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      if (!tier.stripePriceId) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Stripe price ID not configured for this tier",
-          },
-          { status: 400 }
-        );
-      }
-
-      const totalAmount =
-        parseFloat(tier.discountedPrice || "0") * (durationMonths || 1);
+      const pricePerMonth = parseFloat(tier.discountedPrice || tier.price);
+      const totalAmount = pricePerMonth * (durationMonths || 1);
 
       sessionParams = {
         payment_method_types: ["card"],
         line_items: [
           {
-            price: tier.stripePriceId,
-            quantity: durationMonths || 1,
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: `${tier.name} Subscription (${durationMonths || 1} month${
+                  durationMonths !== 1 ? "s" : ""
+                })`,
+              },
+              unit_amount: Math.round(totalAmount * 100), // Convert to cents
+            },
+            quantity: 1,
           },
         ],
-        mode: "subscription", // Use subscription mode for recurring payments
-        success_url: `${process.env.FRONTEND_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL}/checkout/cancel`,
+        mode: "payment",
+        success_url: `${process.env.AUTH_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.AUTH_URL}/checkout?plan=${tierId}&payment=canceled`,
         customer_email: userSession.user.email,
         metadata: {
           tierId,
           userId: userSession.user.id,
           durationMonths: (durationMonths || 1).toString(),
           purchaseType: "subscription",
-        },
-        subscription_data: {
-          metadata: {
-            tierId,
-            userId: userSession.user.id,
-          },
         },
       };
     } else {
@@ -146,14 +268,14 @@ export async function POST(req: NextRequest) {
             price_data: {
               currency: "usd",
               product_data: { name: `${units} Lead Credits` },
-              unit_amount: cost * 100,
+              unit_amount: Math.round(cost * 100),
             },
             quantity: 1,
           },
         ],
         mode: "payment",
-        success_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
-        cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
+        success_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
+        cancel_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
         customer_email: userSession.user.email,
         metadata: {
           units: units.toString(),

@@ -1278,10 +1278,9 @@ const StripeCheckoutButton = ({
       {loading ? (
         <CircularProgress size={24} />
       ) : (
-        //  `Pay $${(parseFloat(tier.discountedPrice) * duration).toFixed(2)}`
         `Pay $${(
           parseFloat(tier.discountedPrice || tier.price) * duration
-        ).toFixed(2)}`
+        ).toFixed(2)} for ${duration} month${duration !== 1 ? "s" : ""}`
       )}
     </Button>
   );
@@ -1352,38 +1351,6 @@ const PaymentSection = ({
   onSuccess: () => void;
   onError: (message: string) => void;
 }) => {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    if (paymentMethod === "stripe") {
-      const paymentStatus = searchParams.get("payment");
-      const sessionId = searchParams.get("session_id");
-
-      if (paymentStatus === "success" && sessionId) {
-        // Verify Stripe payment
-        const verifyPayment = async () => {
-          try {
-            const response = await axios.get(
-              `/api/payments/verify?session_id=${sessionId}`
-            );
-            if (response.data.success) {
-              onSuccess();
-              // Clean the URL
-              router.replace(window.location.pathname);
-            } else {
-              onError("Payment verification failed");
-            }
-          } catch (err) {
-            onError("Error verifying payment");
-          }
-        };
-
-        verifyPayment();
-      }
-    }
-  }, [paymentMethod, searchParams, onSuccess, onError, router]);
-
   return (
     <Box>
       {paymentMethod === "stripe" && (
@@ -1423,7 +1390,6 @@ const CheckoutContent = () => {
   const [paypalClientId, setPaypalClientId] = useState<string | null>(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isCanceled, setIsCanceled] = useState(false);
-  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -1436,8 +1402,8 @@ const CheckoutContent = () => {
   }, [status, router]);
 
   useEffect(() => {
-    // Handle canceled payments from URL params
-    if (searchParams.get("payment") === "canceled") {
+    // Check for canceled payment
+    if (searchParams.get("canceled") === "true") {
       setError("Payment was canceled");
       setIsCanceled(true);
     }
@@ -1486,18 +1452,14 @@ const CheckoutContent = () => {
   const handlePaymentSuccess = () => {
     setActiveStep(2);
     setCompleted(true);
-    setVerifying(false);
   };
 
   const handlePaymentError = (message: string) => {
     setError(message);
-    setVerifying(false);
   };
 
   const handlePaymentMethodSelect = (method: "stripe" | "paypal") => {
     setPaymentMethod(method);
-    setError(null);
-    setIsCanceled(false);
   };
 
   const handleCancelOrder = () => {
@@ -1512,28 +1474,7 @@ const CheckoutContent = () => {
   const handleBackToPayment = () => {
     setIsCanceled(false);
     setError(null);
-  };
-
-  const handleRetryVerification = async () => {
-    const sessionId = searchParams.get("session_id");
-    if (!sessionId) return;
-
-    setVerifying(true);
-    setError(null);
-    try {
-      const response = await axios.get(
-        `/api/payments/status?session_id=${sessionId}`
-      );
-      if (response.data.success) {
-        handlePaymentSuccess();
-      } else {
-        setError("Payment verification failed");
-      }
-    } catch (err) {
-      setError("Error verifying payment");
-    } finally {
-      setVerifying(false);
-    }
+    setActiveStep(0);
   };
 
   if (status !== "authenticated" || loading) {
@@ -1781,59 +1722,36 @@ const CheckoutContent = () => {
             </Grid>
           </Grid>
         ) : (
-          <Dialog open={completed} fullWidth maxWidth="sm">
-            <DialogTitle>
-              <Box display="flex" alignItems="center">
-                <CheckCircleIcon color="success" sx={{ mr: 2 }} />
-                Payment Successful!
-              </Box>
-            </DialogTitle>
-            <DialogContent>
-              <Typography variant="body1" paragraph>
-                Thank you for subscribing to the <strong>{tier.name}</strong>{" "}
-                plan.
-              </Typography>
-              <Typography variant="body1" paragraph>
-                Your {duration}-month subscription is now active. You can manage
-                your account from the dashboard.
-              </Typography>
-            </DialogContent>
-            <DialogActions>
+          <Paper elevation={3} sx={{ p: 6, textAlign: "center" }}>
+            <CheckCircleIcon color="success" sx={{ fontSize: 80, mb: 3 }} />
+            <Typography variant="h4" gutterBottom>
+              Payment Successful!
+            </Typography>
+            <Typography variant="body1" paragraph>
+              Thank you for subscribing to the <strong>{tier.name}</strong>{" "}
+              plan.
+            </Typography>
+            <Typography variant="body1" paragraph>
+              Your {duration}-month subscription is now active. You can manage
+              your account from the dashboard.
+            </Typography>
+            <Box mt={4}>
               <Button
                 variant="contained"
                 color="primary"
+                size="large"
                 onClick={() =>
                   router.push(`/dashboard/${session?.user?.role}/overview`)
                 }
               >
                 Go to Dashboard
               </Button>
-            </DialogActions>
-          </Dialog>
+            </Box>
+          </Paper>
         )}
 
-        {verifying && (
-          <Alert severity="info" sx={{ mt: 2 }}>
-            Verifying payment... <CircularProgress size={20} sx={{ ml: 2 }} />
-          </Alert>
-        )}
-
-        {error && !isCanceled && !verifying && (
-          <Alert
-            severity="error"
-            sx={{ mt: 2 }}
-            action={
-              searchParams.get("session_id") && (
-                <Button
-                  color="inherit"
-                  size="small"
-                  onClick={handleRetryVerification}
-                >
-                  Retry
-                </Button>
-              )
-            }
-          >
+        {error && !isCanceled && (
+          <Alert severity="error" sx={{ mt: 2 }}>
             {error}
           </Alert>
         )}

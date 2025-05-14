@@ -31,10 +31,11 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json({
-      status:
+      success:
         session.payment_status === "paid"
           ? "succeeded"
           : session.payment_status,
+      session,
       transactionStatus: transaction?.status,
     });
   } catch (error: any) {
