@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
+    if (!session || session.user?.role !== "seller") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
+    if (!session || session.user?.role !== "seller") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -127,7 +127,7 @@ export async function PUT(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
+    if (!session || session.user?.role !== "seller") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

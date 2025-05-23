@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   // Get the current user session
   const session = await getServerSession(authOptions);
-  if (!session) {
+  if (!session || session.user?.role !== "seller") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -74,7 +74,7 @@ export default function SellerForms() {
 
   const handleDelete = async (formId: string) => {
     try {
-      const response = await fetch(`/api/form/delete/id=${formId}`, {
+      const response = await fetch(`/api/form/delete?id=${formId}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete form");

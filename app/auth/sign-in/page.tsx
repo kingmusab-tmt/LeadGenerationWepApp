@@ -42,12 +42,15 @@ const SignIn: React.FC = () => {
             role === "staff" ||
             role === "seller" ||
             role === "business-admin") &&
-          isSubActive === false
+          isSubActive === true
         ) {
           // Redirect to the respective dashboard based on role
           router.push(`/dashboard/${role}/overview`);
         }
       }
+      // else {
+      //   router.push("/auth/sign-in");
+      // }
     };
     checkAuth();
   }, [router]);

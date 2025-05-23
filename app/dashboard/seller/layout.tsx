@@ -40,7 +40,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import InactivityLogout from "@/app/components/generalComponent/InactivityLogout";
 
@@ -65,7 +65,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   let subMenuTimeout: NodeJS.Timeout;
 
   useEffect(() => {
-    if (session) {
+    if (!session) {
+      redirect("/auth/sign-in");
+    } else if (session) {
       setImage(session.user?.image || "");
       setName(session.user?.name || "");
     }
@@ -83,6 +85,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const onSignOut = async () => {
     setLoading(true);
     try {
+      router.push("/auth/sign-in");
       await handleSignOut();
     } catch (error) {
       console.error("Failed to sign out:", error);

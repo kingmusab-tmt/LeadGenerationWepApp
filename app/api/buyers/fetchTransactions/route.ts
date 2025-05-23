@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
+    if (!session || !session.user?.email || session.user.role !== "buyer") {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 }

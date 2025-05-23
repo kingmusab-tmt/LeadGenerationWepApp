@@ -1,4 +1,5 @@
-// utils/sms.ts
+// Twilio SMS Notification Utility
+// Description: This utility function sends an SMS notification to a lead buyer when a new lead is assigned to them. It uses the Twilio API for sending SMS messages.
 import twilio from "twilio";
 import { Buyer } from "@/models/leadbuyers";
 import { User } from "@/models/user";

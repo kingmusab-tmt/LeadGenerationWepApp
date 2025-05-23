@@ -63,7 +63,9 @@ export async function GET(req: NextRequest) {
       },
       { new: 0, available: 0, sold: 0, assigned: 0 }
     );
-    console.log(leadStatusCounts.new);
+    console.log(`new: ${leadStatusCounts.new}`);
+    console.log(`Avaiable Leads: ${leadStatusCounts.available}`);
+    console.log(`sold Leads: ${leadStatusCounts.sold}`);
 
     // 3. REVENUE AND PAYMENTS (using Transaction schema)
     const revenueData = await Transaction.aggregate([
@@ -113,7 +115,7 @@ export async function GET(req: NextRequest) {
 
     // 6. LEAD BUYERS DATA
     const buyerData = await Buyer.aggregate([
-      { $match: { registeredWith: userId } },
+      { $match: { registeredWith: new mongoose.Types.ObjectId(userId) } },
       {
         $facet: {
           totalBuyers: [{ $count: "count" }],
@@ -172,7 +174,7 @@ export async function GET(req: NextRequest) {
 
     // 7. LEAD TRENDS (MONTHLY)
     const leadTrends = await Lead.aggregate([
-      { $match: { userId: userId } },
+      { $match: { userId: userId || new mongoose.Types.ObjectId(userId) } },
       {
         $group: {
           _id: { $month: "$createdAt" },
@@ -190,7 +192,7 @@ export async function GET(req: NextRequest) {
     const revenueTrend = await Transaction.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: userId || new mongoose.Types.ObjectId(userId),
           type: "seller_income",
           status: "completed",
           createdAt: { $gte: twoMonthsAgo },
@@ -207,7 +209,7 @@ export async function GET(req: NextRequest) {
 
     // 9. LEAD SOURCES
     const leadSources = await Lead.aggregate([
-      { $match: { userId: userId } },
+      { $match: { userId: userId || new mongoose.Types.ObjectId(userId) } },
       {
         $group: {
           _id: "$leadSource",
@@ -232,7 +234,7 @@ export async function GET(req: NextRequest) {
     const recentActivities = await Transaction.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: userId || new mongoose.Types.ObjectId(userId),
           type: "seller_income",
           status: "completed",
         },
@@ -289,7 +291,7 @@ export async function GET(req: NextRequest) {
     const currentPeriodRevenue = await Transaction.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: userId || new mongoose.Types.ObjectId(userId),
           type: "seller_income",
           status: "completed",
           createdAt: { $gte: oneMonthAgo, $lte: currentDate },
@@ -301,7 +303,7 @@ export async function GET(req: NextRequest) {
     const previousPeriodRevenue = await Transaction.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: userId || new mongoose.Types.ObjectId(userId),
           type: "seller_income",
           status: "completed",
           createdAt: { $gte: twoMonthsAgo, $lte: oneMonthAgo },
@@ -322,7 +324,7 @@ export async function GET(req: NextRequest) {
 
     // 12. CALL METRICS
     const callMetrics = await Call.aggregate([
-      { $match: { userId: userId } },
+      { $match: { userId: userId || new mongoose.Types.ObjectId(userId) } },
       {
         $group: {
           _id: null,
@@ -337,7 +339,7 @@ export async function GET(req: NextRequest) {
 
     // LEAD QUALITY METRICS
     const leadQualityMetrics = await Lead.aggregate([
-      { $match: { userId: userId } },
+      { $match: { userId: userId || new mongoose.Types.ObjectId(userId) } },
       {
         $group: {
           _id: null,
@@ -371,7 +373,7 @@ export async function GET(req: NextRequest) {
     const topPerformingCampaigns = await Campaign.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: userId || new mongoose.Types.ObjectId(userId),
           status: { $in: ["active", "completed"] },
         },
       },
@@ -504,7 +506,7 @@ export async function GET(req: NextRequest) {
     const dailySales = await Transaction.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: userId || new mongoose.Types.ObjectId(userId),
           type: "seller_income",
           status: "completed",
           createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
@@ -524,7 +526,7 @@ export async function GET(req: NextRequest) {
     const weeklySales = await Transaction.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: userId || new mongoose.Types.ObjectId(userId),
           type: "seller_income",
           status: "completed",
           createdAt: { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },

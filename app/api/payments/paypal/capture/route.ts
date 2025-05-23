@@ -22,7 +22,10 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
 
-    const { orderID, tierId, subscriptionYears = 1 } = await req.json();
+    const { orderID, tierId, durationMonths } = await req.json();
+
+    console.log("Received data:", { orderID, tierId, durationMonths });
+
     const tierinfor = await Tier.findOne({ _id: new ObjectId(tierId) });
     if (!tierinfor) {
       return NextResponse.json(
@@ -30,32 +33,24 @@ export async function POST(req: Request) {
         { status: 404 }
       );
     }
-    const { tierType, name, price, renewalPrice, annualPrice } = tierinfor;
-
-    console.log("tierType", tierType);
-    console.log("tierName", name);
-    console.log("tierPrice", price);
-    console.log("tierRenewalPrice", renewalPrice);
-    console.log("subscriptionYears");
-    console.log("anualPrice", annualPrice);
-    console.log("tierId", tierId);
-    console.log("orderID", orderID);
+    const { tierType, name, price, renewalPrice, discountedPrice } = tierinfor;
 
     // Validate required fields
-    if (!orderID || !tierId || !name || !price) {
+    if (!orderID || !tierId || !durationMonths) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Missing required fields (orderID, tierId, tierName, tierPrice)",
+          error: "Missing required fields (orderID, tierId, durationMonths)",
         },
         { status: 400 }
       );
     }
 
     // Validate and parse numeric values
-    const parsedTierPrice = annualPrice ? parseFloat(annualPrice) : 0;
-    const parsedRenewalPrice = renewalPrice ? parseFloat(renewalPrice) : 0;
+    const parsedTierPrice = discountedPrice
+      ? parseFloat(discountedPrice)
+      : parseFloat(price);
+    const parsedRenewalPrice = price ? parseFloat(price) : 0;
 
     if (isNaN(parsedTierPrice) || (renewalPrice && isNaN(parsedRenewalPrice))) {
       return NextResponse.json(
@@ -97,25 +92,9 @@ export async function POST(req: Request) {
 
     // Calculate subscription dates
     const startDate = new Date();
-    const expiryDate = new Date(startDate);
-    expiryDate.setFullYear(expiryDate.getFullYear() + subscriptionYears);
-
-    // Prepare subscription update
-    console.log("subscriptionPlan", name);
-    console.log("subscriptionStartDate", startDate);
-    console.log("subscriptionExpiryDate", expiryDate);
-    console.log("isSubscriptionActive", true);
-    console.log("isTrial", false);
-    console.log("subscriptionPaymentMethod", "paypal");
-    console.log("subscriptionTierId", tierId);
-    console.log("subscriptionTierType", tierType);
-    console.log("subscriptionPrice", parsedTierPrice);
-    console.log("subscriptionPaymentId", orderID);
-    console.log("subscriptionRenewalPrice", parsedRenewalPrice);
-    console.log("userId", userId);
-    console.log("userRole", userRole);
-    console.log("userEmail", email);
-    console.log("subscriptionYears", subscriptionYears);
+    const expiryDate = new Date(
+      startDate.getTime() + durationMonths * 30 * 24 * 60 * 60 * 1000
+    ); // Assuming durationMonths is in months
 
     const subscriptionUpdate = {
       "subscription.subscriptionPlan": name,
@@ -126,9 +105,10 @@ export async function POST(req: Request) {
       "subscription.subscriptionPaymentMethod": "paypal",
       "subscription.subscriptionTierId": tierId,
       "subscription.subscriptionTierType": tierType,
-      "subscription.subscriptionPrice": parsedTierPrice,
+      "subscription.subscriptionPrice": parsedTierPrice * durationMonths,
       "subscription.subscriptionPaymentId": orderID,
-      "subscription.subscriptionRenewalPrice": parsedRenewalPrice,
+      "subscription.subscriptionRenewalPrice":
+        parsedRenewalPrice * durationMonths,
     };
 
     // Update user's subscription
@@ -149,7 +129,7 @@ export async function POST(req: Request) {
     const transactionData = {
       type: "subscription_payment",
       userId: userId,
-      amount: parsedTierPrice,
+      amount: parsedTierPrice * durationMonths,
       currency: "USD",
       paymentGateway: "paypal",
       gatewayTransactionId: orderID,
@@ -158,20 +138,20 @@ export async function POST(req: Request) {
         tierId: tierId,
         tierType,
         tierRenewalDate: expiryDate,
-        subscriptionDuration: subscriptionYears,
+        subscriptionDuration: durationMonths,
         subscriptionPlan: name,
       },
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    const creditsPurchaseTransaction = new Transaction(transactionData);
-    await creditsPurchaseTransaction.save();
+    const subscritionTransaction = new Transaction(transactionData);
+    await subscritionTransaction.save();
 
     return NextResponse.json({
       success: true,
       data: {
-        transactionId: creditsPurchaseTransaction._id,
+        transactionId: subscritionTransaction._id,
         subscription: updatedUser.subscription,
         paymentStatus: response.result.status,
       },

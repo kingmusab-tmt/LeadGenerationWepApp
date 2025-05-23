@@ -1,3 +1,4 @@
+// description: This code generates a PayPal access token using the client ID and secret.
 import axios from "axios";
 
 export const generatePayPalAccessToken = async () => {

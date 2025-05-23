@@ -1,3 +1,4 @@
+// Description: Utility functions to send notifications via email and SMS using Twilio and Nodemailer.
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 

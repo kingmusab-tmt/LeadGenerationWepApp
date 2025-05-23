@@ -1,3 +1,4 @@
+//description: This file contains the API routes for handling individual tier operations such as GET, PUT, and DELETE.
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { Tier } from "@/models/tier";
@@ -8,7 +9,7 @@ import { getServerSession } from "next-auth";
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user.isAdmin) {
+    if (!session || session.user.role !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { searchParams } = new URL(req.url);
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user.isAdmin) {
+    if (!session || session.user.role !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -61,7 +62,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user.isAdmin) {
+    if (!session || session.user.role !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { searchParams } = new URL(req.url);

@@ -140,8 +140,8 @@ const Home: React.FC = () => {
   return (
     <div>
       {/* <SignIn /> */}
-      {/* <PushNotificationManager /> */}
-      {/* <InstallPrompt /> */}
+      {/* <PushNotificationManager />
+      <InstallPrompt /> */}
       <HomePage />
     </div>
   );

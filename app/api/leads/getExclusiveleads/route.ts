@@ -18,9 +18,11 @@ export async function GET(req: NextRequest) {
 
     // Fetch leads that are exclusive and available
     const availableLeads = await Lead.find({
-      isExclusive: true,
+      exclusive: true,
       status: "available",
+      userId: session.user.id,
     });
+    console.log("Available leads:", availableLeads);
 
     return NextResponse.json(availableLeads, { status: 200 });
   } catch (error) {

@@ -1,4 +1,4 @@
-// utils/email.ts
+// Description: This code is responsible for sending email notifications to buyers when they are assigned a new lead. It uses the Nodemailer library to handle email sending and connects to a MongoDB database to retrieve buyer and seller information.
 import nodemailer from "nodemailer";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/user";
@@ -30,7 +30,7 @@ export const sendEmailNotification = async (buyerId: any, lead: any) => {
       from: seller?.businessName || process.env.EMAIL_FROM,
       to: buyer?.email,
       subject: "New Lead Assigned",
-      text: `You have been assigned a new lead from. Please login to your account to view the details.`,
+      text: `You have been assigned a new lead BRIXCOT. Please login to your account to view the details.`,
     };
 
     // Send the email

@@ -254,13 +254,6 @@ const UserSchema: Schema = new Schema<IUser>(
     subscription: {
       subscriptionPlan: {
         type: String,
-        enum: [
-          "Free Tier",
-          "Lead Seller Tier",
-          "Business Tier",
-          "Premium Tier",
-        ],
-        default: "Free",
       },
       subscriptionStartDate: {
         type: Date,

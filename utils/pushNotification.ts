@@ -1,4 +1,5 @@
 // utils/notification.ts
+// Description: This utility function sends a push notification to a lead buyer when a new lead is assigned to them. It uses the Web Push API for sending notifications.
 export const sendPushNotification = async (user: any, lead: any) => {
   try {
     // Check if the browser supports service workers and push notifications

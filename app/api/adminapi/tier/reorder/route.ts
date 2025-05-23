@@ -1,3 +1,4 @@
+// Description: This API route handles the reordering of tiers in bulk.
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { Tier } from "@/models/tier";

@@ -55,7 +55,7 @@ const RegisterBuyerPageContent: React.FC = () => {
 
       // Redirect to a "Thank You" page after a short delay
       setTimeout(() => {
-        router.push(`/auth/signin`);
+        router.push(`/auth/sign-in`);
       }, 2000);
     } catch (error) {
       console.error("Failed to register buyer:", error);
@@ -79,7 +79,13 @@ const RegisterBuyerPageContent: React.FC = () => {
       <h1>Register as a Lead Buyer</h1>
       <BuyerForm
         open={true} // Always open the form
-        onClose={() => alert("Form closed")} // Handle form close
+        onClose={() =>
+          setSnackbar({
+            open: true,
+            message: "Buyer registered successfully! Redirecting...",
+            severity: "success",
+          })
+        } // Handle form close
         onSave={handleSave}
         sellerId={sellerId} // Pass sellerId to the form
       />

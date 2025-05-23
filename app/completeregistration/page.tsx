@@ -53,7 +53,7 @@ const RoleSelectionPage: React.FC = () => {
         const data = await response.json();
 
         if (!response.ok || !data.user) {
-          router.push("/signin");
+          router.push("/auth/sign-in");
           return;
         }
 
@@ -69,7 +69,7 @@ const RoleSelectionPage: React.FC = () => {
           message: "Error verifying your session. Please try again.",
           severity: "error",
         });
-        router.push("/signin");
+        router.push("/auth/sign-in");
       } finally {
         setAuthChecking(false);
         setLoading(false);

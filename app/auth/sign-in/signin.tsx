@@ -6,7 +6,6 @@ import {
   Button,
   Box,
   Typography,
-  Container,
   Paper,
   Tooltip,
   useTheme,
@@ -145,7 +144,7 @@ export const SignInPage: React.FC = () => {
                 },
               }}
             >
-              {loading ? <LoadingComponent /> : "Continue with Google"}
+              {loading ? <LoadingComponent /> : "Sign-in/Sign-up with Google"}
             </Button>
           </span>
         </Tooltip>

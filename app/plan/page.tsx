@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme, useMediaQuery } from "@mui/material";
@@ -17,11 +16,9 @@ import {
   ListItemText,
   Divider,
   Button,
-  Badge,
   Skeleton,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import StarIcon from "@mui/icons-material/Star";
 import { useSession } from "next-auth/react";
 
 interface Tier {
@@ -42,16 +39,48 @@ interface Tier {
   order: number;
 }
 
+async function checkIsAuthenticated() {
+  try {
+    const response = await fetch("/api/auth/check-auth");
+    if (!response.ok) {
+      throw new Error("Failed to check authentication status");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error checking authentication:", error);
+    return { isAuthenticated: false, role: null, isSubActive: false };
+  }
+}
+
 export default function PricingSection() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
   const { data: session } = useSession();
-  const role = session?.user?.role || "seller"; // Default to "buyer" if role is not available
+  const role = session?.user?.role || "seller"; // Default to "seller" if role is not available
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSubActive, setIsSubActive] = useState<boolean | null>(null);
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
+  useEffect(() => {
+    const checkAuthAndSubscription = async () => {
+      const { isAuthenticated, role, isSubActive } =
+        await checkIsAuthenticated();
+      setIsSubActive(isSubActive ?? false);
+
+      if (isAuthenticated && isSubActive) {
+        router.push(`/dashboard/${role}/overview`);
+      } else if (isAuthenticated && !isSubActive) {
+        router.push("/plan");
+      } else {
+        router.push("/auth/sign-in");
+      }
+    };
+
+    checkAuthAndSubscription();
+  }, [router]);
 
   useEffect(() => {
     const fetchTiers = async () => {

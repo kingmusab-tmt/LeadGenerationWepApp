@@ -65,6 +65,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     if (session) {
       setImage(session.user?.image || "");
       setName(session.user?.name || "");
+    } else {
+      router.push("/auth/sign-in");
     }
   }, [session]);
 
@@ -80,6 +82,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const onSignOut = async () => {
     setLoading(true);
     try {
+      router.push("/auth/sign-in");
       await handleSignOut();
     } catch (error) {
       console.error("Failed to sign out:", error);

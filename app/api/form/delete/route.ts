@@ -4,7 +4,7 @@ import Form from "@/models/form";
 import { authOptions } from "@/auth";
 import { getServerSession } from "next-auth";
 
-export async function PATCH(req: NextRequest) {
+export async function DELETE(req: NextRequest) {
   try {
     await dbConnect();
     const session = await getServerSession(authOptions);

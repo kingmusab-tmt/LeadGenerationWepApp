@@ -275,11 +275,11 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
             control={<Radio />}
             label="Automatic Request"
           />
-          <FormControlLabel
+          {/* <FormControlLabel
             value="Manual"
             control={<Radio />}
             label="Manual Entry"
-          />
+          /> */}
         </RadioGroup>
 
         {method === "Manual" && (

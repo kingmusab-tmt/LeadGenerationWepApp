@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import dbConnect from "@/lib/connectdb";
 import { Buyer } from "@/models/leadbuyers";
 import { authOptions } from "@/auth";
+import mongoose from "mongoose";
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,10 +20,18 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const preferredMethod = searchParams.get("preferredMethod");
 
-    // Fetch buyers from the database based on preferredMethod
-    const filteredBuyers = await Buyer.find(
-      preferredMethod ? { preferredMethod } : {}
-    );
+    // Create filter object
+    const filter: any = {
+      registeredWith: new mongoose.Types.ObjectId(session.user.id),
+    };
+
+    // Add preferredMethod to filter if provided
+    if (preferredMethod) {
+      filter.preferredMethod = preferredMethod;
+    }
+
+    // Fetch buyers from the database
+    const filteredBuyers = await Buyer.find(filter);
 
     return NextResponse.json(filteredBuyers, { status: 200 });
   } catch (error) {

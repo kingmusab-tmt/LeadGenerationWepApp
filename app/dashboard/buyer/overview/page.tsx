@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import UserDashboard from "../layout";
+import { useRouter } from "next/navigation";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
 // Styled Paper component for styling
@@ -48,6 +49,7 @@ const Overview: React.FC = () => {
   const [overviewData, setOverviewData] = useState(initialOverviewData);
   const [loading, setLoading] = useState(true);
   const theme = useTheme();
+  const router = useRouter();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // Detect mobile screens
 
   useEffect(() => {
@@ -59,7 +61,7 @@ const Overview: React.FC = () => {
           const data = await response.json();
           setOverviewData(data);
         } else {
-          console.warn("Server returned an error");
+          router.push("/auth/sign-in");
         }
       } catch (error) {
         console.error("Failed to fetch overview data", error);

@@ -16,7 +16,7 @@ interface AssignedBuyer {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session || session?.user?.role !== "buyer") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); // Unauthorized
     }
 

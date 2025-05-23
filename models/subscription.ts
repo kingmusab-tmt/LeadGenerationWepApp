@@ -1,4 +1,5 @@
 // models/subscription.ts
+// description: This file defines a Mongoose model for storing subscription data in MongoDB.
 
 import mongoose, { Schema, Document, Model } from "mongoose";
 // import dbConnect from "../utils/connectDB";

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     // Get the session to retrieve the buyer's email
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    if (!session || session.user.role !== "buyer") {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 }

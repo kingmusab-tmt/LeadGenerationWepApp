@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   Container,
-  Grid,
   Paper,
   Typography,
   useMediaQuery,
@@ -15,6 +14,7 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
+  Grid2,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import {
@@ -34,7 +34,9 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { useSession } from "next-auth/react";
 import UserDashboard from "../layout";
+import { redirect, useRouter } from "next/navigation";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import {
   ArrowUpward,
@@ -155,6 +157,8 @@ const initialOverviewData = {
 
 const Overview: React.FC = () => {
   const [overviewData, setOverviewData] = useState(initialOverviewData);
+  const { data: session } = useSession();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<"daily" | "weekly" | "monthly">(
     "monthly"
@@ -163,185 +167,198 @@ const Overview: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
+    if (!session) {
+      redirect("/auth/sign-in");
+    }
+    return;
+  }, [session]);
+
+  useEffect(() => {
+    // if (!authChecked) return;
+
     const fetchOverviewData = async () => {
       try {
-        const response = await fetch("/api/overview");
-        if (response.ok) {
-          const data = await response.json();
-          setOverviewData({
-            ...initialOverviewData,
-            ...data,
-            kpiTrends: {
-              ...initialOverviewData.kpiTrends,
-              ...(data.kpiTrends || {}),
-            },
-            leadTrends: {
-              ...initialOverviewData.leadTrends,
-              ...(data.leadTrends || {}),
-            },
-            leadQualityMetrics: {
-              ...initialOverviewData.leadQualityMetrics,
-              ...(data.leadQualityMetrics || {}),
-            },
-            campaignPerformance: {
-              ...initialOverviewData.campaignPerformance,
-              ...(data.campaignPerformance || {}),
-            },
-          });
+        if (session && session.user.role === "seller") {
+          const response = await fetch("/api/overview");
+          if (response.ok) {
+            const data = await response.json();
+            setOverviewData({
+              ...initialOverviewData,
+              ...data,
+              kpiTrends: {
+                ...initialOverviewData.kpiTrends,
+                ...(data.kpiTrends || {}),
+              },
+              leadTrends: {
+                ...initialOverviewData.leadTrends,
+                ...(data.leadTrends || {}),
+              },
+              leadQualityMetrics: {
+                ...initialOverviewData.leadQualityMetrics,
+                ...(data.leadQualityMetrics || {}),
+              },
+              campaignPerformance: {
+                ...initialOverviewData.campaignPerformance,
+                ...(data.campaignPerformance || {}),
+              },
+            });
+          } else {
+            // Set dummy data for demonstration
+            setOverviewData({
+              ...initialOverviewData,
+              totalLeads: 1245,
+              totalUsers: 42,
+              activeCampaigns: 8,
+              totalRevenue: 58250,
+              conversionRate: 32,
+              leadStatus: {
+                new: 845,
+                verified: 275,
+                closed: 125,
+              },
+              campaignPerformance: {
+                budgetUsage: 65,
+                roi: 215,
+              },
+              kpiTrends: {
+                conversionRateTrend: 5,
+                revenueTrend: 12,
+                leadVolumeTrend: 8,
+              },
+              topLeadBuyers: [
+                {
+                  id: "1",
+                  name: "Acme Corp",
+                  leadsPurchased: 245,
+                  totalSpend: 12250,
+                },
+                {
+                  id: "2",
+                  name: "Globex Inc",
+                  leadsPurchased: 189,
+                  totalSpend: 9450,
+                },
+                {
+                  id: "3",
+                  name: "Soylent Corp",
+                  leadsPurchased: 156,
+                  totalSpend: 7800,
+                },
+                {
+                  id: "4",
+                  name: "Initech",
+                  leadsPurchased: 132,
+                  totalSpend: 6600,
+                },
+                {
+                  id: "5",
+                  name: "Umbrella Corp",
+                  leadsPurchased: 98,
+                  totalSpend: 4900,
+                },
+              ],
+              salesPerformance: {
+                daily: Array(30)
+                  .fill(0)
+                  .map((_, i) => ({
+                    day: `Day ${i + 1}`,
+                    sales: Math.floor(Math.random() * 1000) + 500,
+                  })),
+                weekly: Array(12)
+                  .fill(0)
+                  .map((_, i) => ({
+                    week: `Week ${i + 1}`,
+                    sales: Math.floor(Math.random() * 5000) + 3000,
+                  })),
+                monthly: Array(12)
+                  .fill(0)
+                  .map((_, i) => ({
+                    month: new Date(0, i).toLocaleString("default", {
+                      month: "short",
+                    }),
+                    sales: Math.floor(Math.random() * 20000) + 15000,
+                  })),
+              },
+              recentActivities: [
+                {
+                  id: "1",
+                  type: "Lead Sold",
+                  description: "Lead #12345 sold to Acme Corp for $50",
+                  timestamp: new Date(Date.now() - 3600000).toISOString(),
+                },
+                {
+                  id: "2",
+                  type: "New Lead",
+                  description: "New lead generated from Facebook campaign",
+                  timestamp: new Date(Date.now() - 7200000).toISOString(),
+                },
+                {
+                  id: "3",
+                  type: "Payment Received",
+                  description: "Payment of $1,250 received from Globex Inc",
+                  timestamp: new Date(Date.now() - 86400000).toISOString(),
+                },
+                {
+                  id: "4",
+                  type: "Campaign Update",
+                  description:
+                    "Summer Promotion campaign reached 80% of budget",
+                  timestamp: new Date(Date.now() - 172800000).toISOString(),
+                },
+              ],
+              leadTrends: {
+                monthlyLeads: [120, 190, 140, 210, 180, 220, 240],
+                monthlyConversions: [40, 65, 45, 70, 60, 75, 80],
+              },
+              leadStatusDistribution: [
+                { status: "New", count: 845 },
+                { status: "Contacted", count: 275 },
+                { status: "Converted", count: 125 },
+              ],
+              topPerformingCampaigns: [
+                {
+                  id: "1",
+                  name: "Summer Sale",
+                  conversionRate: 42,
+                  revenue: 18500,
+                },
+                {
+                  id: "2",
+                  name: "New Product Launch",
+                  conversionRate: 38,
+                  revenue: 15200,
+                },
+                {
+                  id: "3",
+                  name: "Holiday Special",
+                  conversionRate: 35,
+                  revenue: 12400,
+                },
+              ],
+              leadQualityMetrics: {
+                averageLeadScore: 7.2,
+                contactRate: 68,
+                followUpRate: 72,
+              },
+              revenueTrend: [
+                { month: "Jan", revenue: 4000 },
+                { month: "Feb", revenue: 6500 },
+                { month: "Mar", revenue: 5800 },
+                { month: "Apr", revenue: 7200 },
+                { month: "May", revenue: 8900 },
+                { month: "Jun", revenue: 10500 },
+              ],
+              leadSources: [
+                { source: "Facebook", count: 420, conversionRate: 28 },
+                { source: "Google", count: 380, conversionRate: 32 },
+                { source: "Email", count: 210, conversionRate: 35 },
+                { source: "Referral", count: 150, conversionRate: 40 },
+                { source: "Other", count: 85, conversionRate: 25 },
+              ],
+            });
+          }
         } else {
-          console.warn("Server returned an error");
-          // Set dummy data for demonstration
-          setOverviewData({
-            ...initialOverviewData,
-            totalLeads: 1245,
-            totalUsers: 42,
-            activeCampaigns: 8,
-            totalRevenue: 58250,
-            conversionRate: 32,
-            leadStatus: {
-              new: 845,
-              verified: 275,
-              closed: 125,
-            },
-            campaignPerformance: {
-              budgetUsage: 65,
-              roi: 215,
-            },
-            kpiTrends: {
-              conversionRateTrend: 5,
-              revenueTrend: 12,
-              leadVolumeTrend: 8,
-            },
-            topLeadBuyers: [
-              {
-                id: "1",
-                name: "Acme Corp",
-                leadsPurchased: 245,
-                totalSpend: 12250,
-              },
-              {
-                id: "2",
-                name: "Globex Inc",
-                leadsPurchased: 189,
-                totalSpend: 9450,
-              },
-              {
-                id: "3",
-                name: "Soylent Corp",
-                leadsPurchased: 156,
-                totalSpend: 7800,
-              },
-              {
-                id: "4",
-                name: "Initech",
-                leadsPurchased: 132,
-                totalSpend: 6600,
-              },
-              {
-                id: "5",
-                name: "Umbrella Corp",
-                leadsPurchased: 98,
-                totalSpend: 4900,
-              },
-            ],
-            salesPerformance: {
-              daily: Array(30)
-                .fill(0)
-                .map((_, i) => ({
-                  day: `Day ${i + 1}`,
-                  sales: Math.floor(Math.random() * 1000) + 500,
-                })),
-              weekly: Array(12)
-                .fill(0)
-                .map((_, i) => ({
-                  week: `Week ${i + 1}`,
-                  sales: Math.floor(Math.random() * 5000) + 3000,
-                })),
-              monthly: Array(12)
-                .fill(0)
-                .map((_, i) => ({
-                  month: new Date(0, i).toLocaleString("default", {
-                    month: "short",
-                  }),
-                  sales: Math.floor(Math.random() * 20000) + 15000,
-                })),
-            },
-            recentActivities: [
-              {
-                id: "1",
-                type: "Lead Sold",
-                description: "Lead #12345 sold to Acme Corp for $50",
-                timestamp: new Date(Date.now() - 3600000).toISOString(),
-              },
-              {
-                id: "2",
-                type: "New Lead",
-                description: "New lead generated from Facebook campaign",
-                timestamp: new Date(Date.now() - 7200000).toISOString(),
-              },
-              {
-                id: "3",
-                type: "Payment Received",
-                description: "Payment of $1,250 received from Globex Inc",
-                timestamp: new Date(Date.now() - 86400000).toISOString(),
-              },
-              {
-                id: "4",
-                type: "Campaign Update",
-                description: "Summer Promotion campaign reached 80% of budget",
-                timestamp: new Date(Date.now() - 172800000).toISOString(),
-              },
-            ],
-            leadTrends: {
-              monthlyLeads: [120, 190, 140, 210, 180, 220, 240],
-              monthlyConversions: [40, 65, 45, 70, 60, 75, 80],
-            },
-            leadStatusDistribution: [
-              { status: "New", count: 845 },
-              { status: "Contacted", count: 275 },
-              { status: "Converted", count: 125 },
-            ],
-            topPerformingCampaigns: [
-              {
-                id: "1",
-                name: "Summer Sale",
-                conversionRate: 42,
-                revenue: 18500,
-              },
-              {
-                id: "2",
-                name: "New Product Launch",
-                conversionRate: 38,
-                revenue: 15200,
-              },
-              {
-                id: "3",
-                name: "Holiday Special",
-                conversionRate: 35,
-                revenue: 12400,
-              },
-            ],
-            leadQualityMetrics: {
-              averageLeadScore: 7.2,
-              contactRate: 68,
-              followUpRate: 72,
-            },
-            revenueTrend: [
-              { month: "Jan", revenue: 4000 },
-              { month: "Feb", revenue: 6500 },
-              { month: "Mar", revenue: 5800 },
-              { month: "Apr", revenue: 7200 },
-              { month: "May", revenue: 8900 },
-              { month: "Jun", revenue: 10500 },
-            ],
-            leadSources: [
-              { source: "Facebook", count: 420, conversionRate: 28 },
-              { source: "Google", count: 380, conversionRate: 32 },
-              { source: "Email", count: 210, conversionRate: 35 },
-              { source: "Referral", count: 150, conversionRate: 40 },
-              { source: "Other", count: 85, conversionRate: 25 },
-            ],
-          });
+          router.push("/auth/sign-in");
         }
       } catch (error) {
         console.error("Failed to fetch overview data", error);
@@ -405,7 +422,7 @@ const Overview: React.FC = () => {
 
   return (
     <UserDashboard>
-      <Container sx={{ mt: 4, mb: 4 }}>
+      <Container sx={{ mt: 4, mb: 10 }}>
         <Typography
           variant="h4"
           gutterBottom
@@ -414,9 +431,9 @@ const Overview: React.FC = () => {
           Seller Dashboard Overview
         </Typography>
 
-        <Grid container spacing={3}>
+        <Grid2 container spacing={3}>
           {/* Key Metrics Row */}
-          <Grid item xs={12}>
+          <Grid2 size={{ xs: 12 }}>
             <Typography
               variant="h6"
               gutterBottom
@@ -424,10 +441,10 @@ const Overview: React.FC = () => {
             >
               <Assessment sx={{ mr: 1 }} /> Key Performance Indicators
             </Typography>
-          </Grid>
+          </Grid2>
 
           {/* New Leads */}
-          <Grid item xs={6} sm={6} md={3}>
+          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -447,9 +464,9 @@ const Overview: React.FC = () => {
                 value={overviewData.kpiTrends?.leadVolumeTrend || 0}
               />
             </StyledPaper>
-          </Grid>
+          </Grid2>
           {/* Purchased Leads */}
-          <Grid item xs={6} sm={6} md={3}>
+          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -469,9 +486,9 @@ const Overview: React.FC = () => {
                 value={overviewData.kpiTrends?.leadVolumeTrend || 0}
               />
             </StyledPaper>
-          </Grid>
+          </Grid2>
           {/* Total Leads */}
-          <Grid item xs={6} sm={6} md={3}>
+          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -491,9 +508,9 @@ const Overview: React.FC = () => {
                 value={overviewData.kpiTrends?.leadVolumeTrend || 0}
               />
             </StyledPaper>
-          </Grid>
+          </Grid2>
           {/* Total Lead Buyers */}
-          <Grid item xs={6} sm={6} md={3}>
+          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -513,9 +530,9 @@ const Overview: React.FC = () => {
                 value={overviewData.kpiTrends?.leadVolumeTrend || 0}
               />
             </StyledPaper>
-          </Grid>
+          </Grid2>
           {/* New Lead Buyers */}
-          <Grid item xs={6} sm={6} md={3}>
+          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -535,10 +552,10 @@ const Overview: React.FC = () => {
                 value={overviewData.kpiTrends?.leadVolumeTrend || 0}
               />
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Conversion Rate */}
-          <Grid item xs={6} sm={6} md={3}>
+          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -558,10 +575,10 @@ const Overview: React.FC = () => {
                 value={overviewData.kpiTrends?.conversionRateTrend || 0}
               />
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Total Revenue */}
-          <Grid item xs={6} sm={6} md={3}>
+          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -581,10 +598,10 @@ const Overview: React.FC = () => {
                 value={overviewData.kpiTrends?.revenueTrend || 0}
               />
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* ROI */}
-          <Grid item xs={6} sm={6} md={3}>
+          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -602,10 +619,10 @@ const Overview: React.FC = () => {
               </Typography>
               <Typography variant="caption">Return on Investment</Typography>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Lead Quality Metrics */}
-          <Grid item xs={12} md={4}>
+          <Grid2 size={{ xs: 12, md: 4 }}>
             <StyledPaper>
               <Typography
                 variant="h6"
@@ -615,8 +632,8 @@ const Overview: React.FC = () => {
                 <Assessment sx={{ mr: 1 }} /> Lead Quality Metrics
               </Typography>
               <Box mt={2}>
-                <Grid container spacing={2}>
-                  <Grid item xs={4}>
+                <Grid2 container spacing={2}>
+                  <Grid2 size={{ xs: 4 }}>
                     <Box>
                       <Typography variant="subtitle2">
                         Avg Lead Score
@@ -626,16 +643,16 @@ const Overview: React.FC = () => {
                         /10
                       </Typography>
                     </Box>
-                  </Grid>
-                  <Grid item xs={4}>
+                  </Grid2>
+                  <Grid2 size={{ xs: 4 }}>
                     <Box>
                       <Typography variant="subtitle2">Contact Rate</Typography>
                       <Typography variant="h5">
                         {overviewData.leadQualityMetrics?.contactRate || 0}%
                       </Typography>
                     </Box>
-                  </Grid>
-                  <Grid item xs={4}>
+                  </Grid2>
+                  <Grid2 size={{ xs: 4 }}>
                     <Box>
                       <Typography variant="subtitle2">
                         Follow Up Rate
@@ -644,14 +661,14 @@ const Overview: React.FC = () => {
                         {overviewData.leadQualityMetrics?.followUpRate || 0}%
                       </Typography>
                     </Box>
-                  </Grid>
-                </Grid>
+                  </Grid2>
+                </Grid2>
               </Box>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Top Performing Campaigns */}
-          <Grid item xs={12} md={4}>
+          <Grid2 size={{ xs: 12, md: 4 }}>
             <StyledPaper sx={{ textAlign: "left" }}>
               <Typography
                 variant="h6"
@@ -677,10 +694,10 @@ const Overview: React.FC = () => {
                 ))}
               </Stack>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Lead Sources */}
-          <Grid item xs={12} md={4}>
+          <Grid2 size={{ xs: 12, md: 4 }}>
             <StyledPaper>
               <Typography
                 variant="h6"
@@ -718,10 +735,10 @@ const Overview: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Top Lead Buyers */}
-          <Grid item xs={12} md={4}>
+          <Grid2 size={{ xs: 12, md: 4 }}>
             <StyledPaper sx={{ textAlign: "left" }}>
               <Typography
                 variant="h6"
@@ -751,10 +768,10 @@ const Overview: React.FC = () => {
                 ))}
               </Stack>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Sales Performance */}
-          <Grid item xs={12} md={8}>
+          <Grid2 size={{ xs: 12, md: 4 }}>
             <StyledPaper>
               <Box
                 display="flex"
@@ -803,10 +820,10 @@ const Overview: React.FC = () => {
                 </LineChart>
               </ResponsiveContainer>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Charts Section */}
-          <Grid item xs={12}>
+          <Grid2 size={{ xs: 12 }}>
             <Typography
               variant="h6"
               gutterBottom
@@ -814,9 +831,9 @@ const Overview: React.FC = () => {
             >
               <BarChartIcon sx={{ mr: 1 }} /> Lead Trends
             </Typography>
-          </Grid>
+          </Grid2>
 
-          <Grid item xs={12} md={6}>
+          <Grid2 size={{ xs: 12, md: 6 }}>
             <StyledPaper>
               <Typography variant="subtitle1" gutterBottom>
                 Monthly Lead Volume
@@ -840,9 +857,9 @@ const Overview: React.FC = () => {
                 </BarChart>
               </ResponsiveContainer>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
-          <Grid item xs={12} md={6}>
+          <Grid2 size={{ xs: 12, md: 6 }}>
             <StyledPaper>
               <Typography variant="subtitle1" gutterBottom>
                 Revenue Trend
@@ -868,10 +885,10 @@ const Overview: React.FC = () => {
                 </AreaChart>
               </ResponsiveContainer>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Lead Status Distribution */}
-          <Grid item xs={12} md={6}>
+          <Grid2 size={{ xs: 12, md: 6 }} mb={3}>
             <StyledPaper>
               <Typography variant="subtitle1" gutterBottom>
                 Lead Status Distribution
@@ -901,10 +918,10 @@ const Overview: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             </StyledPaper>
-          </Grid>
+          </Grid2>
 
           {/* Recent Activities */}
-          <Grid item xs={12} md={6}>
+          <Grid2 size={{ xs: 12, md: 6 }} mb={3}>
             <StyledPaper sx={{ textAlign: "left" }}>
               <Typography
                 variant="subtitle1"
@@ -932,8 +949,8 @@ const Overview: React.FC = () => {
                 ))}
               </Stack>
             </StyledPaper>
-          </Grid>
-        </Grid>
+          </Grid2>
+        </Grid2>
       </Container>
     </UserDashboard>
   );

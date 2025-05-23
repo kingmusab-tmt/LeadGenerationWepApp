@@ -13,6 +13,7 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
+  console.log("sessionId", sessionId);
 
   if (!sessionId) {
     return NextResponse.json(

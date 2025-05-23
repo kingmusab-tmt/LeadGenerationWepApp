@@ -11,6 +11,7 @@ import {
   FormControl,
   Select,
   InputLabel,
+  Tooltip,
   Snackbar,
   Alert,
 } from "@mui/material";
@@ -147,7 +148,6 @@ const FormBuilder = () => {
 
   // Publish the form
   const handlePublish = async () => {
-    console.log("Starting handlePublish...");
     if (fields.length === 0) {
       setSnackbar({
         open: true,
@@ -156,10 +156,8 @@ const FormBuilder = () => {
       });
       return;
     }
-    console.log("Passed filed check...");
     setIsPublishing(true);
     try {
-      console.log("inside try and catch...");
       const response = await fetch("/api/form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,7 +169,6 @@ const FormBuilder = () => {
         }),
       });
       const result = await response.json();
-      console.log(result);
 
       if (result.status === 200) {
         setSnackbar({
@@ -249,35 +246,52 @@ const FormBuilder = () => {
             >
               Form Details
             </Typography>
-            <TextField
-              label="Form Name"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              label="Lead Source"
-              value={leadSource}
-              onChange={(e) => setLeadSource(e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Industry/Niche</InputLabel>
-              <Select
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value as string)}
-                label="Industry/Niche"
-              >
-                {industryNiches.map((ind) => (
-                  <MenuItem key={ind.value} value={ind.value}>
-                    {ind.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
+            <Tooltip
+              title="Provide a name for your form to identify it later"
+              placement="top"
+              arrow
+            >
+              <TextField
+                label="Form Name"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                fullWidth
+                sx={{ mb: 2 }}
+              />
+            </Tooltip>
+            <Tooltip
+              title="Specify the source of the lead (e.g., website, social media)"
+              placement="top"
+              arrow
+            >
+              <TextField
+                label="Lead Source"
+                value={leadSource}
+                onChange={(e) => setLeadSource(e.target.value)}
+                fullWidth
+                sx={{ mb: 2 }}
+              />
+            </Tooltip>
+            <Tooltip
+              title="Select the industry or niche for your form"
+              placement="top"
+              arrow
+            >
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Industry/Niche</InputLabel>
+                <Select
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value as string)}
+                  label="Industry/Niche"
+                >
+                  {industryNiches.map((ind) => (
+                    <MenuItem key={ind.value} value={ind.value}>
+                      {ind.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Tooltip>
             <Typography
               variant="h6"
               gutterBottom
@@ -293,62 +307,111 @@ const FormBuilder = () => {
               fullWidth
               sx={{ mb: 2 }}
             />
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => addField("text", "Text Input")}
-              sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+            {/* Field Type Buttons with Tooltips */}
+            <Tooltip
+              title="Add a single-line text input field for short text responses"
+              placement="top"
+              arrow
             >
-              Text Input
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => addField("textarea", "Long Text / Textarea")}
-              sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => addField("text", "Text Input")}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                Text Input
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a multi-line textarea field for longer text responses"
+              placement="top"
+              arrow
             >
-              Long Text / Textarea
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => addField("dropdown", "Dropdown")}
-              sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => addField("textarea", "Long Text / Textarea")}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                Long Text / Textarea
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a dropdown select field with predefined options"
+              placement="top"
+              arrow
             >
-              Dropdown
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => addField("checkbox", "Checkbox")}
-              sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => addField("dropdown", "Dropdown")}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                Dropdown List
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a checkbox field for yes/no or multiple selection options"
+              placement="top"
+              arrow
             >
-              Checkbox
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => addField("radio", "Radio Button")}
-              sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => addField("checkbox", "Checkbox")}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                Multiple Choice Field
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add radio buttons for single selection from multiple options"
+              placement="top"
+              arrow
             >
-              Radio Button
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => addField("file", "File Upload")}
-              sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => addField("radio", "Radio Button")}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                Single Choice Field
+              </Button>
+            </Tooltip>
+
+            {/* <Tooltip
+              title="Add a file upload field to collect documents or images"
+              placement="top"
+              arrow
             >
-              File Upload
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={addLeadContactFields}
-              sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => addField("file", "File Upload")}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                File Upload
+              </Button>
+            </Tooltip> */}
+
+            <Tooltip
+              title="Add preconfigured contact fields (Name, Email, Phone) for lead collection"
+              placement="top"
+              arrow
             >
-              Lead Contact
-            </Button>
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={addLeadContactFields}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                Contact Fields
+              </Button>
+            </Tooltip>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={8}>
@@ -435,10 +498,11 @@ const FormBuilder = () => {
           <Button
             variant="contained"
             color="primary"
+            disabled={isPublishing}
             onClick={handlePublish}
             sx={{ mt: 2, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
           >
-            Publish Form
+            {isPublishing ? "Publishing Your Form" : "Publish Form"}
           </Button>
         </Grid>
       </Grid>

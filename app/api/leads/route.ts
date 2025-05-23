@@ -2,11 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { Lead } from "@/models/leads";
 import dbConnect from "@/lib/connectdb";
 import { ObjectId } from "mongodb";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 
 // GET /api/leads - Fetch all leads
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await dbConnect();
+    if (session.user.role !== "admin") {
+      const leads = await Lead.find({ userId: session.user.id });
+      return NextResponse.json(leads, { status: 200 });
+    }
+
     const leads = await Lead.find();
     return NextResponse.json(leads, { status: 200 });
   } catch (error) {
@@ -19,6 +31,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     await dbConnect();
     const body = await req.json();
     const newLead = new Lead(body);
@@ -43,6 +59,10 @@ export async function POST(req: NextRequest) {
 // PUT /api/leads/:leadId - Update an existing lead
 export async function PUT(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(req.url);
     const leadId = searchParams.get("id");
 
@@ -101,6 +121,10 @@ export async function DELETE(req: NextRequest) {
   const leadId = searchParams.get("id");
 
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     await dbConnect();
     const deletedLead = await Lead.deleteOne({ leadId });
 
