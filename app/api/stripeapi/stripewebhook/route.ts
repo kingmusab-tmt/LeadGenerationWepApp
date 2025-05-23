@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (error) {
-    console.error("Webhook signature verification failed:", error);
     return NextResponse.json(
       { success: false, message: "Webhook signature verification failed" },
       { status: 400 }
@@ -50,11 +49,9 @@ export async function POST(req: NextRequest) {
         return await handleCheckoutSessionCompleted(session);
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
         return NextResponse.json({ received: true });
     }
   } catch (error: any) {
-    console.error("Webhook handler error:", error);
     return NextResponse.json(
       {
         success: false,
@@ -74,7 +71,6 @@ async function handleCheckoutSessionCompleted(
     ? (session.metadata as unknown as Metadata)
     : null;
   if (!metadata?.purchaseType || !metadata?.userId) {
-    console.error("Missing required metadata in session:", session);
     return NextResponse.json(
       { success: false, message: "Missing required metadata" },
       { status: 400 }
@@ -103,7 +99,6 @@ async function handleCreditsPurchase(
   const email = session.customer_details?.email;
 
   if (!email) {
-    console.error("Customer email not found in session:", session);
     return NextResponse.json(
       { success: false, message: "Customer email not found" },
       { status: 400 }
@@ -118,7 +113,7 @@ async function handleCreditsPurchase(
   }
 
   // Find the buyer by user ID
-  const buyer = await Buyer.findOne({ userId: new ObjectId(userId) });
+  const buyer = await Buyer.findOne({ email: email });
   if (!buyer) {
     return NextResponse.json(
       { success: false, message: "Buyer not found" },
@@ -150,7 +145,6 @@ async function handleCreditsPurchase(
     },
   });
   await transaction.save();
-
   // Update lead seller's balance if applicable
   if (buyer.registeredWith) {
     const leadSeller = await User.findByIdAndUpdate(

@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     });
 
     const rejectedLeads = await Lead.countDocuments({
-      "assignedTo.buyerId": buyer._id,
+      "assignedTo.buyerId": buyer._id.toString(),
       "assignedTo.rejected": true,
     });
 

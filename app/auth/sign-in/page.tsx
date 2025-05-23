@@ -28,20 +28,16 @@ const SignIn: React.FC = () => {
         } else if (role === "user" && isSubActive === false) {
           // Redirect to RoleSelectionPage if role is "user"
           router.push("/completeregistration");
+        } else if (role === "buyer" || role === "staff") {
+          router.push("/dashboard/buyer/overview");
         } else if (
-          (role === "buyer" ||
-            role === "staff" ||
-            role === "seller" ||
-            role === "business-admin") &&
+          (role === "seller" || role === "business-admin") &&
           isSubActive === false
         ) {
           // Redirect to subscription page if subscription is inactive
           router.push("/plan");
         } else if (
-          (role === "buyer" ||
-            role === "staff" ||
-            role === "seller" ||
-            role === "business-admin") &&
+          (role === "seller" || role === "business-admin") &&
           isSubActive === true
         ) {
           // Redirect to the respective dashboard based on role

@@ -76,7 +76,7 @@ const RegisterBuyerPageContent: React.FC = () => {
 
   return (
     <div>
-      <h1>Register as a Lead Buyer</h1>
+      {/* <h1>Register as a Lead Buyer</h1> */}
       <BuyerForm
         open={true} // Always open the form
         onClose={() =>

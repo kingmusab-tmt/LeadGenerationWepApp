@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
     if (action === "accept") {
       // Check if the buyer has sufficient wallet balance
       if (buyer.walletUnit < lead.unit) {
+        console.log("Insufficient credit balance");
         return NextResponse.json(
           { error: "Insufficient credit balance" },
           { status: 400 }
@@ -99,6 +100,15 @@ export async function POST(req: NextRequest) {
         createdAt: new Date(),
         unit: lead.unit,
       });
+      // Set accepted to true for the assigned buyer
+      const assignedBuyer = lead.assignedTo.find(
+        (assigned: AssignedBuyer) =>
+          assigned.buyerId && assigned.buyerId.toString() === buyerId.toString()
+      );
+      if (assignedBuyer) {
+        assignedBuyer.accepted = true;
+        assignedBuyer.rejected = false;
+      }
       lead.status = "sold";
       await lead.save();
 
@@ -109,6 +119,15 @@ export async function POST(req: NextRequest) {
     } else if (action === "reject") {
       // Update lead status to 'available' and remove buyer from assignedTo
       lead.status = "available";
+      // Set rejected to true for the assigned buyer before removing or updating
+      const assignedBuyer = lead.assignedTo.find(
+        (assigned: AssignedBuyer) =>
+          assigned.buyerId && assigned.buyerId.toString() === buyerId.toString()
+      );
+      if (assignedBuyer) {
+        assignedBuyer.rejected = true;
+        assignedBuyer.accepted = false;
+      }
       lead.assignedTo = lead.assignedTo.filter(
         (assigned: AssignedBuyer) =>
           assigned.buyerId && assigned.buyerId.toString() !== buyerId.toString()

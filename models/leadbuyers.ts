@@ -38,10 +38,10 @@ export interface IBuyer extends Document {
 const BuyerSchema: Schema = new Schema({
   name: { type: String, required: true },
   company: { type: String, required: true },
-  walletUnit: { type: Number },
+  walletUnit: { type: Number, required: true, default: 0 },
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: true },
-  walletBalance: { type: Number },
+  walletBalance: { type: Number, required: true, default: 0 },
   preferredDistribution: {
     type: String,
     enum: ["automatic", "manual", "direct"],
