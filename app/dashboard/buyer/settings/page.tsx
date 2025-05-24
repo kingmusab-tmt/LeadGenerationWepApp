@@ -339,14 +339,14 @@ const AccountSettings = () => {
                   mt: 3,
                 }}
               >
-                <Box>
+                {/* <Box>
                   <Typography component="span">Dark Mode</Typography>
                   <Switch
                     checked={darkMode}
                     onChange={handleDarkModeToggle}
                     color="primary"
                   />
-                </Box>
+                </Box> */}
                 <Button
                   variant="contained"
                   color="primary"

@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
       rejectedLeads,
       walletUnit,
       totalUnitPurchased,
-      totalUnitUsed: totalUnitUsedValue,
+      totalUnitUsed: totalUnitPurchased - walletUnit,
       callsReceived,
       callsMissed,
     });

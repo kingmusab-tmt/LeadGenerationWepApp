@@ -17,6 +17,7 @@ import { IUser } from "@/models/user";
 import UnitPricingComponent from "./unitsetting/page";
 import PaymentSetupForm from "./creditsetting/page";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import TawkSetupForm from "./tawksetting/page";
 
 const AccountSettings = () => {
   const [tabValue, setTabValue] = useState(0);
@@ -92,6 +93,8 @@ const AccountSettings = () => {
         <Tab label="Lead Settings" />
         <Tab label="Units Settings" />
         <Tab label="Credit Settings" />
+        <Tab label="Live Chat Setup" />
+        {/* <Tab label="Transaction Pin" /> */}
       </Tabs>
       {loading ? (
         <Box
@@ -171,14 +174,14 @@ const AccountSettings = () => {
                   mt: 3,
                 }}
               >
-                <Box>
+                {/* <Box>
                   <Typography component="span">Dark Mode</Typography>
                   <Switch
                     checked={darkMode}
                     onChange={handleDarkModeToggle}
                     color="primary"
                   />
-                </Box>
+                </Box> */}
                 <Button
                   variant="contained"
                   color="primary"
@@ -194,8 +197,8 @@ const AccountSettings = () => {
       {tabValue === 1 && <LeadSettings />}
       {tabValue === 2 && <UnitPricingComponent />}
       {tabValue === 3 && <PaymentSetupForm />}
-      {/* {tabValue === 4 && <KycForm />}
-      {tabValue === 5 && <SetupTransactionPin />} */}
+      {tabValue === 4 && <TawkSetupForm />}
+      {/*{tabValue === 5 && <SetupTransactionPin />} */}
     </Box>
   );
 };

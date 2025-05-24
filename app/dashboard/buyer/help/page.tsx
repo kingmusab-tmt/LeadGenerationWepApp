@@ -18,7 +18,6 @@ import {
   ListItemText,
   Paper,
   Button,
-  IconButton,
   Chip,
   Dialog,
   DialogTitle,
@@ -29,7 +28,6 @@ import {
   PlayCircle,
   Search,
   ContactSupport,
-  SupportAgent,
   Chat,
   CheckCircle,
 } from "@mui/icons-material";
@@ -69,6 +67,8 @@ const HelpSection = () => {
       answer: string;
     }[]
   >([]);
+  const [propertyId, setPropertyId] = useState("");
+  const [widgetId, setWidgetId] = useState("");
   const [openModal, setOpenModal] = useState(false);
   const [modalContent, setModalContent] = useState<{
     title: string;
@@ -80,13 +80,17 @@ const HelpSection = () => {
     const fetchHelpData = async () => {
       try {
         setLoading(true);
-        const [videosResponse, faqsResponse] = await Promise.all([
-          axios.get("/api/help/videos"),
-          axios.get("/api/help/faqs"),
-        ]);
+        const [videosResponse, faqsResponse, userTawkinformation] =
+          await Promise.all([
+            axios.get("/api/help/videos"),
+            axios.get("/api/help/faqs"),
+            axios.get("/api/settings/sellerlivechat"),
+          ]);
 
         setVideos(videosResponse.data);
         setFaqs(faqsResponse.data);
+        setPropertyId(userTawkinformation.data.propertyId);
+        setWidgetId(userTawkinformation.data.widgetId);
 
         if (videosResponse.data.length > 0) {
           setSelectedVideo(videosResponse.data[0]);
@@ -327,7 +331,7 @@ const HelpSection = () => {
                 <CardHeader title="Quick Help" />
                 <CardContent>
                   <List>
-                    <ListItem>
+                    {/* <ListItem>
                       <Button
                         startIcon={<ContactSupport />}
                         fullWidth
@@ -346,7 +350,7 @@ const HelpSection = () => {
                       >
                         Follow-Up Ticket Status
                       </Button>
-                    </ListItem>
+                    </ListItem> */}
                     <ListItem>
                       <Button
                         startIcon={<Chat />}
@@ -354,7 +358,7 @@ const HelpSection = () => {
                         sx={{ justifyContent: "flex-start" }}
                         onClick={() => handleQuickHelpClick("chat")}
                       >
-                        Live Chat
+                        Live Chat with Seller
                       </Button>
                     </ListItem>
                   </List>
@@ -384,7 +388,7 @@ const HelpSection = () => {
       </Dialog>
 
       {/* Tawk Chat Widget */}
-      <TawkChatWidget open={showChatWidget} />
+      <TawkChatWidget open={true} propertyId={propertyId} widgetId={widgetId} />
     </UserDashboard>
   );
 };

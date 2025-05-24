@@ -75,6 +75,8 @@ export interface IUser extends Document {
   twilioActivated: boolean;
   twilioAccountSid: string;
   twilioAuthToken: string;
+  tawkPropertyId: string;
+  tawkWidgetId: string;
   pushToken: string;
   trackingNumbers: ITrackingNumber[];
   preferences?: Record<string, unknown>;
@@ -164,6 +166,8 @@ const UserSchema: Schema = new Schema<IUser>(
     walletBalance: { type: Number },
     preferences: { type: Object },
     mobileNumber: { type: String },
+    tawkPropertyId: { type: String, default: "" },
+    tawkWidgetId: { type: String, default: "" },
     twilioActivated: { type: Boolean, default: false },
     trackingNumbers: [
       {
