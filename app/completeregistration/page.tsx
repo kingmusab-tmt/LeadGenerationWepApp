@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import LoadingComponent from "../components/generalComponent/loadingcomponent";
 import Image from "next/image";
-import CompanyLogo from "@/public/images/5ae9cfb6c909a_thumb900.png"; // Replace with your actual logo path
+import CompanyLogo from "../../public/images/5ae9cfb6c909a_thumb900.png";
 import {
   CheckCircle,
   Shield,

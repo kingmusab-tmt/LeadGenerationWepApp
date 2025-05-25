@@ -44,6 +44,35 @@ export async function POST(req: NextRequest) {
     await dbConnect();
 
     switch (event.type) {
+      case "account.updated":
+        const account = event.data.object;
+
+        if (account.tos_acceptance?.date) {
+          await User.findOneAndUpdate(
+            { stripeAccountId: account.id },
+            {
+              "tosAcceptance.accepted": true,
+              "tosAcceptance.acceptedAt": new Date(
+                account.tos_acceptance.date * 1000
+              ),
+              "tosAcceptance.ipAddress": account.tos_acceptance.ip || "unknown",
+            }
+          );
+        }
+        // Update user in database
+        await User.findOneAndUpdate(
+          { stripeAccountId: account.id },
+          {
+            stripeOnboarded: account.details_submitted,
+            $set: {
+              "stripeDetails.chargesEnabled": account.charges_enabled,
+              "stripeDetails.payoutsEnabled": account.payouts_enabled,
+              "stripeDetails.requirements": account.requirements,
+            },
+          }
+        );
+        break;
+
       case "checkout.session.completed":
         const session = event.data.object as Stripe.Checkout.Session;
         return await handleCheckoutSessionCompleted(session);

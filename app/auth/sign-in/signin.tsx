@@ -20,7 +20,11 @@ import Logo from "@/public/images/5ae9cfb6c909a_thumb900.png"; // Replace with y
 import TermsOfServiceDialog from "@/app/components/legal/TermsOfServiceDialog";
 import PrivacyPolicyDialog from "@/app/components/legal/PrivacyPolicyDialog";
 
-export const SignInPage: React.FC = () => {
+interface SignInPageProps {
+  callbackUrl?: string;
+}
+
+export const SignInPage: React.FC<SignInPageProps> = ({ callbackUrl }) => {
   const [loading, setLoading] = useState(false);
   const [openTerms, setOpenTerms] = useState(false);
   const [openPrivacy, setOpenPrivacy] = useState(false);
@@ -29,7 +33,7 @@ export const SignInPage: React.FC = () => {
 
   const handleGoogleSignIn = () => {
     setLoading(true);
-    signIn("google").finally(() => setLoading(false));
+    signIn("google", { callbackUrl }).finally(() => setLoading(false));
   };
 
   return (

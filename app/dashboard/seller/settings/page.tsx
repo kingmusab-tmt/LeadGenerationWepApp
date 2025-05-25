@@ -18,12 +18,34 @@ import UnitPricingComponent from "./unitsetting/page";
 import PaymentSetupForm from "./creditsetting/page";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import TawkSetupForm from "./tawksetting/page";
+import StripePayOut from "./stripepayout/page";
+import { useRouter } from "next/navigation";
+import StripeOnboardingPage from "./stripeonboarding/page";
+import PaypalPayOutPage from "./paypalpayout/page";
 
 const AccountSettings = () => {
   const [tabValue, setTabValue] = useState(0);
   const [darkMode, setDarkMode] = useState(false);
   const [user, setUser] = useState<IUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const tabMap = [
+    "general",
+    "lead-settings",
+    "units-settings",
+    "credit-settings",
+    "live-chat-setup",
+    "stripe-onboarding",
+    "stripe-payout",
+    "paypal-payout",
+  ];
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const tabParam = url.searchParams.get("tab");
+    const index = tabMap.indexOf(tabParam || "general");
+    setTabValue(index >= 0 ? index : 0);
+  }, []);
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -41,11 +63,15 @@ const AccountSettings = () => {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    const tabKey = tabMap[newValue];
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tabKey);
+    window.history.pushState({}, "", url);
   };
 
-  const handleDarkModeToggle = () => {
-    setDarkMode((prev) => !prev);
-  };
+  // const handleDarkModeToggle = () => {
+  //   setDarkMode((prev) => !prev);
+  // };
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -94,7 +120,9 @@ const AccountSettings = () => {
         <Tab label="Units Settings" />
         <Tab label="Credit Settings" />
         <Tab label="Live Chat Setup" />
-        {/* <Tab label="Transaction Pin" /> */}
+        <Tab label="Stripe Onboarding" />
+        <Tab label="Stripe Payout" />
+        <Tab label="Paypal Payout" />
       </Tabs>
       {loading ? (
         <Box
@@ -198,7 +226,9 @@ const AccountSettings = () => {
       {tabValue === 2 && <UnitPricingComponent />}
       {tabValue === 3 && <PaymentSetupForm />}
       {tabValue === 4 && <TawkSetupForm />}
-      {/*{tabValue === 5 && <SetupTransactionPin />} */}
+      {tabValue === 5 && <StripeOnboardingPage />}
+      {tabValue === 6 && <StripePayOut />}
+      {tabValue === 6 && <PaypalPayOutPage />}
     </Box>
   );
 };

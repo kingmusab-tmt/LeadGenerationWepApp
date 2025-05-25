@@ -128,8 +128,16 @@ export interface IUser extends Document {
 
   // Add billing history
 
+  stripeAccountId?: string;
+  stripeOnboarded?: boolean;
   stripeCustomerId?: string;
   paypalCustomerId?: string;
+
+  tosAcceptance?: {
+    accepted: boolean;
+    acceptedAt?: Date;
+    ipAddress?: string;
+  };
 }
 
 interface INotification extends Document {
@@ -232,6 +240,13 @@ const UserSchema: Schema = new Schema<IUser>(
       twilioSid: { type: String },
       twilioAuthToken: { type: String },
       twilioPhoneNumber: { type: String },
+    },
+    stripeAccountId: { type: String },
+    stripeOnboarded: { type: Boolean, default: false },
+    tosAcceptance: {
+      accepted: { type: Boolean, default: false },
+      acceptedAt: { type: Date },
+      ipAddress: { type: String },
     },
     creditSetup: {
       stripeSecretKey: { type: String, default: "" },

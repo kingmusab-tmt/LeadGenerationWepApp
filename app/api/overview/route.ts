@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     const revenueData = await Transaction.aggregate([
       {
         $match: {
-          sellerId: new mongoose.Types.ObjectId(userId),
+          userId: new mongoose.Types.ObjectId(userId),
           type: "seller_income",
           status: "completed",
         },
@@ -124,8 +124,8 @@ export async function GET(req: NextRequest) {
             {
               $lookup: {
                 from: "transactions",
-                localField: "_id",
-                foreignField: "metadata.buyerId",
+                localField: "userId",
+                foreignField: "buyer._id",
                 as: "transactions",
               },
             },
