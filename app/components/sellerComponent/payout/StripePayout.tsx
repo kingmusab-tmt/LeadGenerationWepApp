@@ -33,7 +33,7 @@ export default function StripePayout() {
     setSuccess(false);
 
     try {
-      const response = await fetch("/api/payment/payouts/stripe", {
+      const response = await fetch("/api/payments/payout/stripe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

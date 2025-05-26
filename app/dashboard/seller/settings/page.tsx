@@ -228,7 +228,7 @@ const AccountSettings = () => {
       {tabValue === 4 && <TawkSetupForm />}
       {tabValue === 5 && <StripeOnboardingPage />}
       {tabValue === 6 && <StripePayOut />}
-      {tabValue === 6 && <PaypalPayOutPage />}
+      {tabValue === 7 && <PaypalPayOutPage />}
     </Box>
   );
 };

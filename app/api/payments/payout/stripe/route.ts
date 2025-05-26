@@ -4,6 +4,7 @@ import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/user";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { Transaction } from "@/models/transactions";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-
+    await dbConnect();
     const seller = await User.findOne({
       email: session.user.email,
     });
@@ -54,37 +55,110 @@ export async function POST(req: Request) {
       );
     }
 
+    await stripe.charges.create({
+      amount: 5000, // $50
+      currency: "usd",
+      source: "tok_bypassPending", // Optional, use this to skip pending in test
+      description: "Test funding charge",
+    });
+
     // Convert amount to cents (Stripe uses smallest currency unit)
     const amountInCents = Math.round(body.amount * 100);
 
-    // Create transfer to the connected account
-    const transfer = await stripe.transfers.create({
-      amount: amountInCents,
-      currency: body.currency.toLowerCase(),
-      destination: seller.stripeAccountId,
-    });
+    // Fetch platform account balance
+    const balance = await stripe.balance.retrieve();
+    console.log("Available:", balance.available);
 
-    return NextResponse.json(
-      {
-        message: "Payout successful",
-        transferId: transfer.id,
-        amount: transfer.amount / 100,
-        currency: transfer.currency,
-      },
-      { status: 200 }
+    const availableBalance = balance.available.find(
+      (bal) => bal.currency.toLowerCase() === body.currency.toLowerCase()
     );
-  } catch (error) {
-    console.error("Stripe payout error:", error);
 
-    if (error instanceof Stripe.errors.StripeError) {
+    if (!availableBalance || availableBalance.amount < amountInCents) {
       return NextResponse.json(
-        { message: error.message },
-        { status: error.statusCode || 500 }
+        { message: "Insufficient funds in platform Stripe account" },
+        { status: 402 }
       );
     }
 
+    // Proceed with transfer
+    // Create transfer to the connected account
+    const transfer = await stripe.transfers.create({
+      amount: amountInCents,
+      currency: "usd",
+      destination: seller.stripeAccountId,
+      transfer_group: `SELLER_WITHDRAWAL_${session.user.id}_${Date.now()}`,
+    });
+
+    // Step 1.5: Check seller's balance
+    const userbalance = await stripe.balance.retrieve({
+      stripeAccount: seller.stripeAccountId,
+    });
+
+    const availableUsd = userbalance.available.find(
+      (b) => b.currency === "usd"
+    );
+
+    if (!availableUsd || availableUsd.amount < amountInCents) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Transferred funds not yet available for payout.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Step 2: Create payout from seller’s Stripe balance to their bank account
+    const payout = await stripe.payouts.create(
+      {
+        amount: amountInCents,
+        currency: "usd",
+        // Optional: specify destination bank account
+      },
+      {
+        stripeAccount: seller.stripeAccountId,
+      }
+    );
+
+    // Update seller’s wallet balance in DB
+    const updatedSeller = await User.findByIdAndUpdate(
+      session.user.id,
+      { $inc: { walletBalance: -body.amount } },
+      { new: true }
+    );
+
+    // Save transaction record
+    const transaction = new Transaction({
+      type: "seller_payout",
+      userId: session.user.id,
+      amount: body.amount,
+      currency: "usd",
+      status: "initiated",
+      paymentGateway: "stripe",
+      gatewayTransactionId: payout.id,
+      metadata: {
+        stripeTransferId: transfer.id,
+        payoutId: payout.id,
+      },
+    });
+
+    await transaction.save();
+
+    return NextResponse.json({
+      success: true,
+      message: "Payout initiated successfully.",
+      transferId: transfer.id,
+      payoutId: payout.id,
+      updatedBalance: updatedSeller?.walletBalance,
+    });
+  } catch (error: any) {
     return NextResponse.json(
-      { message: "Internal server error" },
+      {
+        success: false,
+        message: "An error occurred while initiating payout.",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      },
       { status: 500 }
     );
   }
