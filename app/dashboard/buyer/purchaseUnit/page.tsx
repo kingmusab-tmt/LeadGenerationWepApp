@@ -17,12 +17,6 @@ import {
 import { useRouter } from "next/navigation"; // Import useRouter for redirection
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
-// declare global {
-//   interface Window {
-//     paypal: any;
-//   }
-// }
-
 const UnitPurchase: React.FC = () => {
   const [units, setUnits] = useState<number>(0);
   const [cost, setCost] = useState<number>(0);

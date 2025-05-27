@@ -89,6 +89,31 @@ export async function POST(req: Request) {
       transfer_group: `SELLER_WITHDRAWAL_${session.user.id}_${Date.now()}`,
     });
 
+    // Update seller’s wallet balance in DB
+    const updatedSeller = await User.findByIdAndUpdate(
+      session.user.id,
+      { $inc: { walletBalance: -body.amount } },
+      { new: true }
+    );
+    // Save transaction record
+    const transaction = new Transaction({
+      type: "seller_payout",
+      userId: session.user.id,
+      amount: body.amount,
+      currency: "usd",
+      previousBalance: updatedSeller?.walletBalance || 0,
+      currentBalance: (updatedSeller?.walletBalance || 0) - body.amount,
+      status: "pending",
+      paymentGateway: "stripe",
+      gatewayTransactionId: transfer.id,
+      stripeAccountId: seller.stripeAccountId,
+      metadata: {
+        stripeTransferId: transfer.id,
+      },
+    });
+
+    await transaction.save();
+
     // Step 1.5: Check seller's balance
     const userbalance = await stripe.balance.retrieve({
       stripeAccount: seller.stripeAccountId,
@@ -119,30 +144,6 @@ export async function POST(req: Request) {
         stripeAccount: seller.stripeAccountId,
       }
     );
-
-    // Update seller’s wallet balance in DB
-    const updatedSeller = await User.findByIdAndUpdate(
-      session.user.id,
-      { $inc: { walletBalance: -body.amount } },
-      { new: true }
-    );
-
-    // Save transaction record
-    const transaction = new Transaction({
-      type: "seller_payout",
-      userId: session.user.id,
-      amount: body.amount,
-      currency: "usd",
-      status: "initiated",
-      paymentGateway: "stripe",
-      gatewayTransactionId: payout.id,
-      metadata: {
-        stripeTransferId: transfer.id,
-        payoutId: payout.id,
-      },
-    });
-
-    await transaction.save();
 
     return NextResponse.json({
       success: true,

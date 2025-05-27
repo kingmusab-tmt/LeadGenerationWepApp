@@ -2,58 +2,6 @@
 // import Stripe from "stripe";
 // import { getServerSession } from "next-auth";
 // import { authOptions } from "@/auth";
-
-// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-//   apiVersion: "2025-02-24.acacia",
-// });
-
-// export async function POST(req: NextRequest) {
-//   const { units, cost } = await req.json();
-//   // Get the user's session
-//   const userSession = await getServerSession(authOptions);
-//   if (!userSession) {
-//     // Check if the user is authenticated
-//     return NextResponse.json(
-//       // Return an error if the user is not authenticated
-//       { success: false, message: "User not authenticated" }, // Return an error message
-//       { status: 401 } // Return a 401 status code (Unauthorized)
-//     );
-//   }
-
-//   try {
-//     const session = await stripe.checkout.sessions.create({
-//       payment_method_types: ["card"],
-//       line_items: [
-//         {
-//           price_data: {
-//             currency: "usd",
-//             product_data: { name: `${units} Lead Credits` },
-//             unit_amount: cost * 100, // Stripe uses cents
-//           },
-//           quantity: 1,
-//         },
-//       ],
-//       mode: "payment",
-//       success_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=success`,
-//       cancel_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
-//       customer_email: userSession.user.email, // Pass the user's email
-//       metadata: {
-//         units: units.toString(), // Pass the number of units as metadata
-//       },
-//     });
-
-//     return NextResponse.json({ success: true, sessionUrl: session.url });
-//   } catch (error) {
-//     return NextResponse.json(
-//       { success: false, message: "Internal server error" },
-//       { status: 500 }
-//     );
-//   }
-// }
-// import { NextRequest, NextResponse } from "next/server";
-// import Stripe from "stripe";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "@/auth";
 // import dbConnect from "@/lib/connectdb";
 // import { Tier } from "@/models/tier";
 
@@ -75,11 +23,9 @@
 //   }
 
 //   try {
-//     // Determine if this is a credit purchase or subscription
-//     const isSubscription = !!tierId;
 //     let sessionParams: Stripe.Checkout.SessionCreateParams;
 
-//     if (isSubscription) {
+//     if (tierId) {
 //       // Handle subscription checkout
 //       const tier = await Tier.findById(tierId);
 //       if (!tier) {
@@ -89,42 +35,34 @@
 //         );
 //       }
 
-//       if (!tier.stripePriceId) {
-//         return NextResponse.json(
-//           {
-//             success: false,
-//             message: "Stripe price ID not configured for this tier",
-//           },
-//           { status: 400 }
-//         );
-//       }
-
-//       const totalAmount =
-//         parseFloat(tier.discountedPrice || "0") * (durationMonths || 1);
+//       const pricePerMonth = parseFloat(tier.discountedPrice || tier.price);
+//       const totalAmount = pricePerMonth * (durationMonths || 1);
 
 //       sessionParams = {
 //         payment_method_types: ["card"],
 //         line_items: [
 //           {
-//             price: tier.stripePriceId,
-//             quantity: durationMonths || 1,
+//             price_data: {
+//               currency: "usd",
+//               product_data: {
+//                 name: `${tier.name} Subscription (${durationMonths || 1} month${
+//                   durationMonths !== 1 ? "s" : ""
+//                 })`,
+//               },
+//               unit_amount: Math.round(totalAmount * 100), // Convert to cents
+//             },
+//             quantity: 1,
 //           },
 //         ],
-//         mode: "payment", // Use subscription mode for recurring payments
-//         success_url: `${process.env.FRONTEND_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-//         cancel_url: `${process.env.FRONTEND_URL}/checkout/cancel`,
+//         mode: "payment",
+//         success_url: `${process.env.AUTH_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
+//         cancel_url: `${process.env.AUTH_URL}/checkout?plan=${tierId}&payment=canceled`,
 //         customer_email: userSession.user.email,
 //         metadata: {
 //           tierId,
 //           userId: userSession.user.id,
 //           durationMonths: (durationMonths || 1).toString(),
 //           purchaseType: "subscription",
-//         },
-//         subscription_data: {
-//           metadata: {
-//             tierId,
-//             userId: userSession.user.id,
-//           },
 //         },
 //       };
 //     } else {
@@ -146,14 +84,14 @@
 //             price_data: {
 //               currency: "usd",
 //               product_data: { name: `${units} Lead Credits` },
-//               unit_amount: cost * 100,
+//               unit_amount: Math.round(cost * 100),
 //             },
 //             quantity: 1,
 //           },
 //         ],
 //         mode: "payment",
-//         success_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
-//         cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
+//         success_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
+//         cancel_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
 //         customer_email: userSession.user.email,
 //         metadata: {
 //           units: units.toString(),
@@ -182,12 +120,16 @@
 //     );
 //   }
 // }
+//above is the initial code snippet that would direct both credit and subscription purchases to the platform's Stripe account.
+
+// The following code snippet modifies the checkout session creation to route credit purchases to the seller's Stripe account.
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Tier } from "@/models/tier";
+import { User } from "@/models/user";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
@@ -205,12 +147,13 @@ export async function POST(req: NextRequest) {
       { status: 401 }
     );
   }
+  const sellerId = userSession.user.id;
 
   try {
     let sessionParams: Stripe.Checkout.SessionCreateParams;
 
     if (tierId) {
-      // Handle subscription checkout
+      // Handle subscription checkout - processed by platform's Stripe account
       const tier = await Tier.findById(tierId);
       if (!tier) {
         return NextResponse.json(
@@ -233,7 +176,7 @@ export async function POST(req: NextRequest) {
                   durationMonths !== 1 ? "s" : ""
                 })`,
               },
-              unit_amount: Math.round(totalAmount * 100), // Convert to cents
+              unit_amount: Math.round(totalAmount * 100),
             },
             quantity: 1,
           },
@@ -250,12 +193,25 @@ export async function POST(req: NextRequest) {
         },
       };
     } else {
-      // Handle credit purchase
-      if (!units || !cost) {
+      // Handle credit purchase - processed by seller's Stripe account
+      if (!units || !cost || !sellerId) {
         return NextResponse.json(
           {
             success: false,
-            message: "Units and cost are required for credit purchases",
+            message:
+              "Units, cost, and sellerId are required for credit purchases",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Get seller's Stripe account ID
+      const seller = await User.findById(sellerId);
+      if (!seller || !seller.stripeAccountId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Seller payment account not configured",
           },
           { status: 400 }
         );
@@ -267,19 +223,35 @@ export async function POST(req: NextRequest) {
           {
             price_data: {
               currency: "usd",
-              product_data: { name: `${units} Lead Credits` },
+              product_data: {
+                name: `${units} Lead Credits`,
+                // Include seller information if needed
+                metadata: {
+                  sellerId: sellerId,
+                  sellerName: seller.name || seller.email,
+                },
+              },
               unit_amount: Math.round(cost * 100),
             },
             quantity: 1,
           },
         ],
         mode: "payment",
+        payment_intent_data: {
+          // This routes the payment to the seller's Stripe account
+          transfer_data: {
+            destination: seller.stripeAccountId,
+          },
+          // You can set application fee amount here if you take a platform cut
+          // application_fee_amount: Math.round(cost * 100 * 0.1), // 10% platform fee
+        },
         success_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
         cancel_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
         customer_email: userSession.user.email,
         metadata: {
           units: units.toString(),
           userId: userSession.user.id,
+          sellerId: sellerId,
           purchaseType: "credits",
         },
       };

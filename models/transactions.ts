@@ -19,6 +19,7 @@ export interface ITransaction extends Document {
   previousBalance: number; // Previous balance before the transaction
   currentBalance: number; // Current balance after the transaction
   currency: string;
+  stripeAccountId?: string; // For seller_payout (Stripe account ID of the seller)
   metadata: {
     leadId?: string; // For lead_purchase
     unitsPurchased?: number; // For units_purchase
@@ -26,6 +27,7 @@ export interface ITransaction extends Document {
     buyerId: String;
     refund: boolean;
     tierId: string;
+    stripeTransferId: string; // For seller_payout (ID from Stripe transfer)
     tierName: string;
     tierRenewalDate?: Date; // For subscription_renewal (renewal date of the subscription)
     userEmail: string; // For subscription_payment or renewal (email of the user)
@@ -71,14 +73,21 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
     amount: {
       type: Number,
     },
+    stripeAccountId: {
+      type: String, // For seller payouts, the Stripe account ID of the seller
+    },
     previousBalance: { type: Number }, // Previous balance before the transaction
     currentBalance: { type: Number }, // Current balance after the transaction
     currency: {
       type: String,
       default: "USD",
     },
+
     metadata: {
       tierId: {
+        type: String,
+      },
+      stripeTransferId: {
         type: String,
       },
       tierName: {
