@@ -1,3 +1,4 @@
+"use client";
 import PayPalPayout from "@/app/components/sellerComponent/payout/PayPalPayout";
 import React from "react";
 

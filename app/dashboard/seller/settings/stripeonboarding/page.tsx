@@ -1,3 +1,4 @@
+"use client";
 import StripeOnboarding from "@/app/components/sellerComponent/payout/stripeonboarding/StripeOnboarding";
 import React from "react";
 import { useSession } from "next-auth/react";
