@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme, useMediaQuery } from "@mui/material";
+import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
 import {
   Box,
   Container,
@@ -39,19 +40,6 @@ interface Tier {
   order: number;
 }
 
-async function checkIsAuthenticated() {
-  try {
-    const response = await fetch("/api/auth/check-auth");
-    if (!response.ok) {
-      throw new Error("Failed to check authentication status");
-    }
-    return await response.json();
-  } catch (error) {
-    console.error("Error checking authentication:", error);
-    return { isAuthenticated: false, role: null, isSubActive: false };
-  }
-}
-
 export default function PricingSection() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,11 +51,13 @@ export default function PricingSection() {
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkAuthAndSubscription = async () => {
       const { isAuthenticated, role, isSubActive } =
         await checkIsAuthenticated();
+      setIsAuthenticated(isAuthenticated);
       setIsSubActive(isSubActive ?? false);
 
       if (isAuthenticated && isSubActive) {
