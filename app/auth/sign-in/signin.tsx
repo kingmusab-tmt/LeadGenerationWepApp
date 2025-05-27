@@ -24,7 +24,7 @@ interface SignInPageProps {
   callbackUrl?: string;
 }
 
-export const SignInPage: React.FC<SignInPageProps> = ({ callbackUrl }) => {
+export const SignInPage: React.FC<SignInPageProps> = () => {
   const [loading, setLoading] = useState(false);
   const [openTerms, setOpenTerms] = useState(false);
   const [openPrivacy, setOpenPrivacy] = useState(false);
@@ -33,7 +33,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({ callbackUrl }) => {
 
   const handleGoogleSignIn = () => {
     setLoading(true);
-    signIn("google", { callbackUrl }).finally(() => setLoading(false));
+    signIn("google").finally(() => setLoading(false));
   };
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { SignInPage } from "./signin";
 import RoleSelectionPage from "@/app/completeregistration/page";
 import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
@@ -12,8 +12,8 @@ const SignIn: React.FC = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isSubActive, setIsSubActive] = useState<boolean>(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || undefined;
+  // const searchParams = useSearchParams();
+  // const callbackUrl = searchParams.get("callbackUrl") || undefined;
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -25,10 +25,10 @@ const SignIn: React.FC = () => {
 
       if (isAuthenticated) {
         // Redirect according to role & subscription, but respect callbackUrl if present
-        if (callbackUrl) {
-          router.push(callbackUrl);
-          return;
-        }
+        // if (callbackUrl) {
+        //   router.push(callbackUrl);
+        //   return;
+        // }
 
         if (role === "admin") {
           // Redirect to admin dashboard
@@ -57,7 +57,7 @@ const SignIn: React.FC = () => {
       // }
     };
     checkAuth();
-  }, [router, callbackUrl]);
+  }, [router]);
 
   if (isAuthenticated === null) {
     // Show a loading state while checking authentication
@@ -72,7 +72,7 @@ const SignIn: React.FC = () => {
     return <RoleSelectionPage />;
   }
 
-  return <SignInPage callbackUrl={callbackUrl} />;
+  return <SignInPage />;
 };
 
 export default SignIn;
