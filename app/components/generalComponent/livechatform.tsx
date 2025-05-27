@@ -40,7 +40,7 @@ const LiveChatForm = () => {
             minWidth: 300,
           }}
         >
-          <TawkChatWidget open={open} />
+          <TawkChatWidget open={open} propertyId={""} widgetId={""} />
         </Box>
       </Modal>
     </>
