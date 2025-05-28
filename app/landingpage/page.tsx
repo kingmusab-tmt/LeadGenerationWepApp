@@ -19,7 +19,6 @@ import {
   Paper,
   Avatar,
   ListItemText,
-  CircularProgress,
   Grow,
   Fade,
   Slide,
@@ -34,6 +33,7 @@ import Header from "../components/generalComponent/Header";
 import Footer from "../components/generalComponent/Footer";
 import logo from "../../public/BRIXCOT.png";
 import Image from "next/image";
+import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
 interface Tier {
   _id: string;
@@ -120,7 +120,7 @@ const LandingPage = () => {
         alignItems="center"
         minHeight="100vh"
       >
-        <CircularProgress />
+        <LoadingComponent />
       </Box>
     );
   }

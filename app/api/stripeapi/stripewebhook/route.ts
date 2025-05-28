@@ -316,6 +316,7 @@ interface Metadata {
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature")!;
+  console.log("reached");
 
   let event: Stripe.Event;
 
@@ -635,7 +636,7 @@ async function handleSubscriptionPurchase(
   expiryDate.setMonth(expiryDate.getMonth() + parseInt(durationMonths || "1"));
 
   // Update user's subscription
-  const updatedUser = await User.findByIdAndUpdate(
+  await User.findByIdAndUpdate(
     userId,
     {
       $set: {

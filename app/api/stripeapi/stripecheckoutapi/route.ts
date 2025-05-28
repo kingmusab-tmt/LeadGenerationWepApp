@@ -130,6 +130,7 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Tier } from "@/models/tier";
 import { User } from "@/models/user";
+import { Buyer } from "@/models/leadbuyers";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
@@ -147,7 +148,6 @@ export async function POST(req: NextRequest) {
       { status: 401 }
     );
   }
-  const sellerId = userSession.user.id;
 
   try {
     let sessionParams: Stripe.Checkout.SessionCreateParams;
@@ -193,7 +193,16 @@ export async function POST(req: NextRequest) {
         },
       };
     } else {
-      // Handle credit purchase - processed by seller's Stripe account
+      const buyer = await Buyer.findOne({
+        email: userSession.user.email,
+      });
+      if (!buyer) {
+        return NextResponse.json(
+          { success: false, message: "Buyer not found" },
+          { status: 404 }
+        );
+      }
+      const sellerId = buyer.registeredWith; // Assuming buyer has a sellerId field
       if (!units || !cost || !sellerId) {
         return NextResponse.json(
           {
@@ -227,7 +236,7 @@ export async function POST(req: NextRequest) {
                 name: `${units} Lead Credits`,
                 // Include seller information if needed
                 metadata: {
-                  sellerId: sellerId,
+                  sellerId: sellerId.toString(),
                   sellerName: seller.name || seller.email,
                 },
               },
@@ -251,7 +260,7 @@ export async function POST(req: NextRequest) {
         metadata: {
           units: units.toString(),
           userId: userSession.user.id,
-          sellerId: sellerId,
+          sellerId: buyer.registeredWith.toString(),
           purchaseType: "credits",
         },
       };
