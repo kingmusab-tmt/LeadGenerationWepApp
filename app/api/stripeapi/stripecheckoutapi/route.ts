@@ -55,8 +55,8 @@
 //           },
 //         ],
 //         mode: "payment",
-//         success_url: `${process.env.AUTH_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
-//         cancel_url: `${process.env.AUTH_URL}/checkout?plan=${tierId}&payment=canceled`,
+//         success_url: `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
+//         cancel_url: `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=canceled`,
 //         customer_email: userSession.user.email,
 //         metadata: {
 //           tierId,
@@ -90,8 +90,8 @@
 //           },
 //         ],
 //         mode: "payment",
-//         success_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
-//         cancel_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
+//         success_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=success`,
+//         cancel_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
 //         customer_email: userSession.user.email,
 //         metadata: {
 //           units: units.toString(),
@@ -182,8 +182,8 @@ export async function POST(req: NextRequest) {
           },
         ],
         mode: "payment",
-        success_url: `${process.env.AUTH_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.AUTH_URL}/checkout?plan=${tierId}&payment=canceled`,
+        success_url: `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=canceled`,
         customer_email: userSession.user.email,
         metadata: {
           tierId,
@@ -254,8 +254,8 @@ export async function POST(req: NextRequest) {
           // You can set application fee amount here if you take a platform cut
           // application_fee_amount: Math.round(cost * 100 * 0.1), // 10% platform fee
         },
-        success_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
-        cancel_url: `${process.env.AUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
+        success_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=success`,
+        cancel_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
         customer_email: userSession.user.email,
         metadata: {
           units: units.toString(),

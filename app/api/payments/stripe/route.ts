@@ -25,16 +25,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate and construct return URL
-    const baseUrl = process.env.AUTH_URL;
+    const baseUrl = process.env.FRONTEND_URL;
     if (!baseUrl) {
-      throw new Error("AUTH_URL environment variable is not set");
+      throw new Error("FRONTEND_URL environment variable is not set");
     }
 
     let returnUrl: string;
     try {
       returnUrl = new URL("/checkout/success", baseUrl).toString();
     } catch (err) {
-      throw new Error(`Invalid AUTH_URL: ${baseUrl}`);
+      throw new Error(`Invalid FRONTEND_URL: ${baseUrl}`);
     }
 
     // Create payment intent with detailed error handling
