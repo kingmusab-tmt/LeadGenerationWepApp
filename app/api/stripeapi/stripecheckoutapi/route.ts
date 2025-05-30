@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
             destination: seller.stripeAccountId,
           },
           // You can set application fee amount here if you take a platform cut
-          // application_fee_amount: Math.round(cost * 100 * 0.1), // 10% platform fee
+          application_fee_amount: Math.round(cost * 100 * 0.1), // 10% platform fee
         },
         success_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=success`,
         cancel_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=canceled`,

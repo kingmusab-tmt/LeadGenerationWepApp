@@ -69,9 +69,14 @@ export async function POST(request: NextRequest) {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
+      controller: {
+        fees: {
+          payer: "application",
+        },
+      }, //added to make sure the connect account are responsible for paying stripe fees
       business_type: "individual",
       business_profile: {
-        product_description: "Seller on our platform",
+        product_description: "Lead Seller on our Brixcot platform",
       },
     });
 

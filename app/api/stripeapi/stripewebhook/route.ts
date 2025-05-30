@@ -174,33 +174,33 @@
 //     },
 //   });
 //   await transaction.save();
-//   // Update lead seller's balance if applicable
-//   if (buyer.registeredWith) {
-//     const leadSeller = await User.findByIdAndUpdate(
-//       buyer.registeredWith,
-//       { $inc: { walletBalance: amount } },
-//       { new: true }
-//     );
+// // Update lead seller's balance if applicable
+// if (buyer.registeredWith) {
+//   const leadSeller = await User.findByIdAndUpdate(
+//     buyer.registeredWith,
+//     { $inc: { walletBalance: amount } },
+//     { new: true }
+//   );
 
-//     if (leadSeller) {
-//       const sellerTransaction = new Transaction({
-//         type: "seller_income",
-//         userId: buyer.registeredWith,
-//         amount,
-//         currency: session.currency || "usd",
-//         previousBalance: leadSeller.walletBalance - amount,
-//         currentBalance: leadSeller.walletBalance,
-//         paymentGateway: "stripe",
-//         gatewayTransactionId: session.id,
-//         status: "completed",
-//         metadata: {
-//           buyerId: buyer._id,
-//           unitsPurchased: units,
-//         },
-//       });
-//       await sellerTransaction.save();
-//     }
+//   if (leadSeller) {
+//     const sellerTransaction = new Transaction({
+//       type: "seller_income",
+//       userId: buyer.registeredWith,
+//       amount,
+//       currency: session.currency || "usd",
+//       previousBalance: leadSeller.walletBalance - amount,
+//       currentBalance: leadSeller.walletBalance,
+//       paymentGateway: "stripe",
+//       gatewayTransactionId: session.id,
+//       status: "completed",
+//       metadata: {
+//         buyerId: buyer._id,
+//         unitsPurchased: units,
+//       },
+//     });
+//     await sellerTransaction.save();
 //   }
+// }
 
 //   return NextResponse.json({
 //     success: true,
@@ -326,9 +326,16 @@ export async function POST(req: NextRequest) {
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-  } catch (error) {
+    console.log(signature);
+  } catch (error: any) {
+    console.error("Webhook signature verification failed:", error);
+
     return NextResponse.json(
-      { success: false, message: "Webhook signature verification failed" },
+      {
+        success: false,
+        message: "Webhook signature verification failed",
+        error: error?.message || "Unknown error",
+      },
       { status: 400 }
     );
   }
@@ -474,7 +481,6 @@ async function verifyPaymentIntent(paymentIntent: Stripe.PaymentIntent) {
       {
         $set: {
           "metadata.transferVerified": true,
-          "metadata.sellerAccountId": sellerAccountId,
           "metadata.transferAmount": amount,
         },
       }
@@ -590,6 +596,33 @@ async function handleCreditsPurchase(
     },
   });
   await transaction.save();
+  // Update lead seller's balance if applicable
+  if (buyer.registeredWith) {
+    const leadSeller = await User.findByIdAndUpdate(
+      buyer.registeredWith,
+      { $inc: { walletBalance: amount } },
+      { new: true }
+    );
+
+    if (leadSeller) {
+      const sellerTransaction = new Transaction({
+        type: "seller_income",
+        userId: buyer.registeredWith,
+        amount,
+        currency: session.currency || "usd",
+        previousBalance: leadSeller.walletBalance - amount,
+        currentBalance: leadSeller.walletBalance,
+        paymentGateway: "stripe",
+        gatewayTransactionId: session.id,
+        status: "completed",
+        metadata: {
+          buyerId: buyer._id,
+          unitsPurchased: units,
+        },
+      });
+      await sellerTransaction.save();
+    }
+  }
 
   return NextResponse.json({
     success: true,

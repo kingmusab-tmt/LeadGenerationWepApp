@@ -39,6 +39,8 @@ export interface ITransaction extends Document {
     subscriptionId?: mongoose.Types.ObjectId; // For subscription_payment, renewal, or cancellation
     subscriptionPlan?: string; // For subscription_payment or renewal
     subscriptionDuration?: string; // For subscription_payment or renewal (e.g., "monthly", "yearly")
+    transferVerified: boolean;
+    transferAmount: number;
   };
   paymentGateway: "stripe" | "paypal" | "square" | "manual";
   gatewayTransactionId?: string; // Transaction ID from the payment gateway
@@ -84,6 +86,8 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
     },
 
     metadata: {
+      transferVerified: { type: Boolean },
+      transferAmount: { type: Number },
       tierId: {
         type: String,
       },
