@@ -114,6 +114,110 @@ export async function GET(req: NextRequest) {
     const budgetUsage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
     // 6. LEAD BUYERS DATA
+    // const buyerData = await Buyer.aggregate([
+    //   { $match: { registeredWith: new mongoose.Types.ObjectId(userId) } },
+    //   {
+    //     $facet: {
+    //       totalBuyers: [{ $count: "count" }],
+    //       activeBuyers: [{ $match: { status: "active" } }, { $count: "count" }],
+    //       topBuyers: [
+    //         {
+    //           $lookup: {
+    //             from: "transactions",
+    //             localField: "userId",
+    //             foreignField: "buyer._id",
+    //             as: "transactions",
+    //           },
+    //         },
+    //         {
+    //           $project: {
+    //             name: 1,
+    //             company: 1,
+    //             totalSpent: {
+    //               $sum: {
+    //                 $map: {
+    //                   input: "$transactions",
+    //                   as: "txn",
+    //                   in: {
+    //                     $cond: [
+    //                       { $eq: ["$$txn.type", "lead_purchase"] },
+    //                       "$$txn.amount",
+    //                       0,
+    //                     ],
+    //                   },
+    //                 },
+    //               },
+    //             },
+    //             leadsPurchased: {
+    //               $sum: {
+    //                 $map: {
+    //                   input: "$transactions",
+    //                   as: "txn",
+    //                   in: {
+    //                     $cond: [{ $eq: ["$$txn.type", "lead_purchase"] }, 1, 0],
+    //                   },
+    //                 },
+    //               },
+    //             },
+    //           },
+    //         },
+    //         { $sort: { totalSpent: -1 } },
+    //         { $limit: 5 },
+    //       ],
+    //     },
+    //   },
+    // ]);
+    // const buyerData = await Buyer.aggregate([
+    //   { $match: { registeredWith: new mongoose.Types.ObjectId(userId) } },
+    //   {
+    //     $facet: {
+    //       totalBuyers: [{ $count: "count" }],
+    //       activeBuyers: [{ $match: { status: "active" } }, { $count: "count" }],
+    //       topBuyers: [
+    //         {
+    //           $lookup: {
+    //             from: "transactions",
+    //             let: { buyerIdStr: { $toString: "$_id" } },
+    //             pipeline: [
+    //               {
+    //                 $match: {
+    //                   $expr: {
+    //                     $and: [
+    //                       { $eq: ["$type", "lead_purchase"] },
+    //                       { $eq: ["$metadata.buyerId", "$$buyerIdStr"] },
+    //                       { $eq: ["$status", "completed"] },
+    //                     ],
+    //                   },
+    //                 },
+    //               },
+    //             ],
+    //             as: "leadTransactions",
+    //           },
+    //         },
+    //         {
+    //           $addFields: {
+    //             totalSpent: {
+    //               $sum: "$leadTransactions.amount",
+    //             },
+    //             leadsPurchased: {
+    //               $size: "$leadTransactions",
+    //             },
+    //           },
+    //         },
+    //         {
+    //           $project: {
+    //             name: 1,
+    //             company: 1,
+    //             totalSpent: 1,
+    //             leadsPurchased: 1,
+    //           },
+    //         },
+    //         { $sort: { totalSpent: -1 } },
+    //         { $limit: 5 },
+    //       ],
+    //     },
+    //   },
+    // ]);
     const buyerData = await Buyer.aggregate([
       { $match: { registeredWith: new mongoose.Types.ObjectId(userId) } },
       {
@@ -124,41 +228,39 @@ export async function GET(req: NextRequest) {
             {
               $lookup: {
                 from: "transactions",
-                localField: "userId",
-                foreignField: "buyer._id",
-                as: "transactions",
+                localField: "_id", // Buyer's _id
+                foreignField: "userId", // Transaction userId field
+                as: "leadTransactions",
+              },
+            },
+            {
+              $addFields: {
+                leadTransactions: {
+                  $filter: {
+                    input: "$leadTransactions",
+                    as: "txn",
+                    cond: {
+                      $and: [
+                        { $eq: ["$$txn.type", "lead_purchase"] },
+                        { $eq: ["$$txn.status", "completed"] },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+            {
+              $addFields: {
+                totalSpent: { $sum: "$leadTransactions.amount" },
+                leadsPurchased: { $size: "$leadTransactions" },
               },
             },
             {
               $project: {
                 name: 1,
                 company: 1,
-                totalSpent: {
-                  $sum: {
-                    $map: {
-                      input: "$transactions",
-                      as: "txn",
-                      in: {
-                        $cond: [
-                          { $eq: ["$$txn.type", "lead_purchase"] },
-                          "$$txn.amount",
-                          0,
-                        ],
-                      },
-                    },
-                  },
-                },
-                leadsPurchased: {
-                  $sum: {
-                    $map: {
-                      input: "$transactions",
-                      as: "txn",
-                      in: {
-                        $cond: [{ $eq: ["$$txn.type", "lead_purchase"] }, 1, 0],
-                      },
-                    },
-                  },
-                },
+                totalSpent: 1,
+                leadsPurchased: 1,
               },
             },
             { $sort: { totalSpent: -1 } },
@@ -171,7 +273,7 @@ export async function GET(req: NextRequest) {
     const totalLeadBuyers = buyerData[0]?.totalBuyers[0]?.count || 0;
     const newLeadBuyers = buyerData[0]?.activeBuyers[0]?.count || 0;
     const topLeadBuyers = buyerData[0]?.topBuyers || [];
-
+    console.log(topLeadBuyers);
     // 7. LEAD TRENDS (MONTHLY)
     const leadTrends = await Lead.aggregate([
       { $match: { userId: userId || new mongoose.Types.ObjectId(userId) } },
@@ -457,52 +559,6 @@ export async function GET(req: NextRequest) {
       },
     ]);
 
-    // // FOLLOW-UP METRICS
-    // const followUpMetrics = await Lead.aggregate([
-    //   { $match: { userId: userId } },
-    //   {
-    //     $project: {
-    //       hasFollowUps: { $gt: [{ $size: "$followUps" }, 0] },
-    //       wasContacted: {
-    //         $anyElementTrue: {
-    //           $map: {
-    //             input: "$followUps",
-    //             as: "fu",
-    //             in: { $eq: ["$$fu.outcome", "contacted"] },
-    //           },
-    //         },
-    //       },
-    //     },
-    //   },
-    //   {
-    //     $group: {
-    //       _id: null,
-    //       totalLeads: { $sum: 1 },
-    //       followedUp: { $sum: { $cond: ["$hasFollowUps", 1, 0] } },
-    //       contacted: { $sum: { $cond: ["$wasContacted", 1, 0] } },
-    //     },
-    //   },
-    //   {
-    //     $project: {
-    //       followUpRate: {
-    //         $cond: [
-    //           { $eq: ["$totalLeads", 0] },
-    //           0,
-    //           { $multiply: [{ $divide: ["$followedUp", "$totalLeads"] }, 100] },
-    //         ],
-    //       },
-    //       contactRate: {
-    //         $cond: [
-    //           { $eq: ["$followedUp", 0] },
-    //           0,
-    //           { $multiply: [{ $divide: ["$contacted", "$followedUp"] }, 100] },
-    //         ],
-    //       },
-    //     },
-    //   },
-    // ]);
-
-    // DAILY SALES - Using Transaction schema
     const dailySales = await Transaction.aggregate([
       {
         $match: {

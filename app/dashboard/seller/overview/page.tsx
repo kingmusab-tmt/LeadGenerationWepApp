@@ -622,7 +622,7 @@ const Overview: React.FC = () => {
           </Grid2>
 
           {/* Lead Quality Metrics */}
-          <Grid2 size={{ xs: 12, md: 4 }}>
+          {/* <Grid2 size={{ xs: 12, md: 4 }}>
             <StyledPaper>
               <Typography
                 variant="h6"
@@ -665,10 +665,10 @@ const Overview: React.FC = () => {
                 </Grid2>
               </Box>
             </StyledPaper>
-          </Grid2>
+          </Grid2> */}
 
           {/* Top Performing Campaigns */}
-          <Grid2 size={{ xs: 12, md: 4 }}>
+          {/* <Grid2 size={{ xs: 12, md: 4 }}>
             <StyledPaper sx={{ textAlign: "left" }}>
               <Typography
                 variant="h6"
@@ -694,7 +694,7 @@ const Overview: React.FC = () => {
                 ))}
               </Stack>
             </StyledPaper>
-          </Grid2>
+          </Grid2> */}
 
           {/* Lead Sources */}
           <Grid2 size={{ xs: 12, md: 4 }}>
@@ -859,7 +859,7 @@ const Overview: React.FC = () => {
             </StyledPaper>
           </Grid2>
 
-          <Grid2 size={{ xs: 12, md: 6 }}>
+          {/* <Grid2 size={{ xs: 12, md: 6 }}>
             <StyledPaper>
               <Typography variant="subtitle1" gutterBottom>
                 Revenue Trend
@@ -885,7 +885,7 @@ const Overview: React.FC = () => {
                 </AreaChart>
               </ResponsiveContainer>
             </StyledPaper>
-          </Grid2>
+          </Grid2> */}
 
           {/* Lead Status Distribution */}
           <Grid2 size={{ xs: 12, md: 6 }} mb={3}>
@@ -921,7 +921,7 @@ const Overview: React.FC = () => {
           </Grid2>
 
           {/* Recent Activities */}
-          <Grid2 size={{ xs: 12, md: 6 }} mb={3}>
+          {/* <Grid2 size={{ xs: 12, md: 6 }} mb={3}>
             <StyledPaper sx={{ textAlign: "left" }}>
               <Typography
                 variant="subtitle1"
@@ -949,7 +949,7 @@ const Overview: React.FC = () => {
                 ))}
               </Stack>
             </StyledPaper>
-          </Grid2>
+          </Grid2> */}
         </Grid2>
       </Container>
     </UserDashboard>

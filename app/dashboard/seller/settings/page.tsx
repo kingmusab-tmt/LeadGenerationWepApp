@@ -12,7 +12,7 @@ import {
   Switch,
   Grid,
 } from "@mui/material";
-import LeadSettings from "./leadsellersetting/page";
+// import LeadSettings from "./leadsellersetting/page";
 import { IUser } from "@/models/user";
 import UnitPricingComponent from "./unitsetting/page";
 import PaymentSetupForm from "./creditsetting/page";
@@ -31,7 +31,7 @@ const AccountSettings = () => {
   const router = useRouter();
   const tabMap = [
     "general",
-    "lead-settings",
+    // "lead-settings",
     "units-settings",
     "credit-settings",
     "live-chat-setup",
@@ -116,12 +116,12 @@ const AccountSettings = () => {
         sx={{ borderBottom: 1, borderColor: "divider" }}
       >
         <Tab label="General" />
-        <Tab label="Lead Settings" />
+        {/* <Tab label="Lead Settings" /> */}
         <Tab label="Units Settings" />
-        <Tab label="Credit Settings" />
+        {/* <Tab label="Credit Settings" /> */}
         <Tab label="Live Chat Setup" />
         <Tab label="Stripe Onboarding" />
-        <Tab label="Stripe Payout" />
+        {/* <Tab label="Stripe Payout" /> */}
         <Tab label="Paypal Payout" />
       </Tabs>
       {loading ? (
@@ -222,13 +222,13 @@ const AccountSettings = () => {
           )}
         </>
       )}
-      {tabValue === 1 && <LeadSettings />}
-      {tabValue === 2 && <UnitPricingComponent />}
-      {tabValue === 3 && <PaymentSetupForm />}
-      {tabValue === 4 && <TawkSetupForm />}
-      {tabValue === 5 && <StripeOnboardingPage />}
-      {tabValue === 6 && <StripePayOut />}
-      {tabValue === 7 && <PaypalPayOutPage />}
+      {/* {tabValue === 1 && <LeadSettings />} */}
+      {tabValue === 1 && <UnitPricingComponent />}
+      {/* {tabValue === 2 && <PaymentSetupForm />} */}
+      {tabValue === 2 && <TawkSetupForm />}
+      {tabValue === 3 && <StripeOnboardingPage />}
+      {/* {tabValue === 6 && <StripePayOut />} */}
+      {tabValue === 4 && <PaypalPayOutPage />}
     </Box>
   );
 };
