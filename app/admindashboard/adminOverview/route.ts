@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     // Validate session
-    if (!session || !session.user?.id || session.user.role !== "admin") {
+    if (!session || session.user.role !== "admin") {
       return NextResponse.json(
         { error: "Unauthorized: No valid session found" },
         { status: 401 }
