@@ -6,9 +6,8 @@ const Dashboard: React.FC = async () => {
   const isAuthenticated = await checkIsAuthenticated();
 
   if (
-    (isAuthenticated.isAuthenticated === true &&
-      isAuthenticated.role === "seller") ||
-    isAuthenticated.role === "admin"
+    isAuthenticated.isAuthenticated === true &&
+    isAuthenticated.role === "seller"
   ) {
     return <UserDashboard children={undefined} />;
   } else if (

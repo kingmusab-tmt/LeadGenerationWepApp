@@ -43,7 +43,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { SortableItem } from "../components/sortableItem";
+import { SortableItem } from "../../components/sortableItem";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -349,7 +349,7 @@ const TierManagement = () => {
   return (
     <Container maxWidth="lg">
       <Box my={4}>
-        <Typography variant="h4" gutterBottom>
+        <Typography variant="h5" gutterBottom sx={{ mt: 6 }}>
           Pricing Tiers Management
         </Typography>
         <Button

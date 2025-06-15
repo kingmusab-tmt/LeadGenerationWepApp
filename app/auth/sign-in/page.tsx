@@ -32,7 +32,7 @@ const SignIn: React.FC = () => {
 
         if (role === "admin") {
           // Redirect to admin dashboard
-          router.push("/admindashboard");
+          router.push("/admindashboard/overview");
         } else if (role === "user" && isSubActive === false) {
           // Redirect to RoleSelectionPage if role is "user"
           router.push("/completeregistration");

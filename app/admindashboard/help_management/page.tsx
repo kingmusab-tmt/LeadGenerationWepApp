@@ -9,7 +9,6 @@ import {
   Button,
   Card,
   CardContent,
-  Divider,
   List,
   ListItem,
   ListItemText,
@@ -204,7 +203,7 @@ const HelpManagement = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         Help Content Management
       </Typography>
 
