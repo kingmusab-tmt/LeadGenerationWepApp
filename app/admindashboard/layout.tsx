@@ -30,6 +30,7 @@ import {
   LocalAtm,
   CallReceivedRounded,
   People,
+  TireRepair,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
@@ -199,6 +200,52 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
           </ListItem>
           <ListItem
             component="button"
+            onClick={() => handleNavigation("user_management")}
+            sx={{
+              color: "blue",
+              backgroundColor: "white",
+              border: "none",
+              "&:hover": {
+                backgroundColor: "blue",
+                color: "white",
+                "& .MuiListItemIcon-root": {
+                  color: "white",
+                },
+              },
+            }}
+          >
+            <Tooltip title="User Management" placement="right">
+              <ListItemIcon sx={{ color: "blue" }}>
+                <People />
+              </ListItemIcon>
+            </Tooltip>
+            <ListItemText primary="User Management" />
+          </ListItem>
+          <ListItem
+            component="button"
+            onClick={() => handleNavigation("tier_management")}
+            sx={{
+              color: "blue",
+              backgroundColor: "white",
+              border: "none",
+              "&:hover": {
+                backgroundColor: "blue",
+                color: "white",
+                "& .MuiListItemIcon-root": {
+                  color: "white",
+                },
+              },
+            }}
+          >
+            <Tooltip title="Tier Management" placement="right">
+              <ListItemIcon sx={{ color: "blue" }}>
+                <TireRepair />
+              </ListItemIcon>
+            </Tooltip>
+            <ListItemText primary="Tier Management" />
+          </ListItem>
+          <ListItem
+            component="button"
             onClick={() => handleNavigation("help_management")}
             sx={{
               color: "blue",
@@ -222,7 +269,7 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
           </ListItem>
           <ListItem
             component="button"
-            onClick={() => handleNavigation("tier_management")}
+            onClick={() => handleNavigation("financial_management")}
             sx={{
               color: "blue",
               backgroundColor: "white",
@@ -236,63 +283,17 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               },
             }}
           >
-            <Tooltip title="Tier Management" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <People />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Tier Management" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("callhistory")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Call History" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <CallReceivedRounded />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Call History" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("transactions")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Transactions" placement="right">
+            <Tooltip title="Financial Management" placement="right">
               <ListItemIcon sx={{ color: "blue" }}>
                 <ReceiptLong />
               </ListItemIcon>
             </Tooltip>
-            <ListItemText primary="Transactions" />
+            <ListItemText primary="Financial Management" />
           </ListItem>
 
           <ListItem
             component="button"
-            onClick={() => handleNavigation("purchaseUnit")}
+            onClick={() => handleNavigation("content_management")}
             sx={{
               color: "blue",
               backgroundColor: "white",
@@ -306,14 +307,14 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               },
             }}
           >
-            <Tooltip title="Purchase Units" placement="right">
+            <Tooltip title="Content Management" placement="right">
               <ListItemIcon sx={{ color: "blue" }}>
                 <LocalAtm />
               </ListItemIcon>
             </Tooltip>
-            <ListItemText primary="Purchase Units" />
+            <ListItemText primary="Content Management" />
           </ListItem>
-          <ListItem
+          {/* <ListItem
             component="button"
             onClick={() => handleNavigation("help")}
             sx={{
@@ -335,8 +336,8 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               </ListItemIcon>
             </Tooltip>
             <ListItemText primary="Help" />
-          </ListItem>
-          <ListItem
+          </ListItem> */}
+          {/* <ListItem
             component="button"
             onClick={() => handleNavigation("settings")}
             sx={{
@@ -358,7 +359,7 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               </ListItemIcon>
             </Tooltip>
             <ListItemText primary="Settings" />
-          </ListItem>
+          </ListItem> */}
         </List>
       </Drawer>
 

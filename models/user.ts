@@ -138,6 +138,10 @@ export interface IUser extends Document {
     acceptedAt?: Date;
     ipAddress?: string;
   };
+  createdAt?: Date;
+  updatedAt?: Date;
+  lastLogin?: Date; // Last login timestamp
+  verified?: boolean; // Verification status
 }
 
 interface INotification extends Document {

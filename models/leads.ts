@@ -38,6 +38,8 @@ export interface ILead extends Document {
   }[];
   isManual: boolean;
   leadSource: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const LeadSchema = new Schema<ILead>(
