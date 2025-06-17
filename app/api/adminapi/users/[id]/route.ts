@@ -12,10 +12,11 @@ const connectDB = async () => {
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
+    const { id } = await params;
     const { status, role } = await req.json();
 
     if (!status && !role) {
@@ -26,7 +27,7 @@ export async function PUT(
     }
 
     // First find the user to check their current role
-    const user = await User.findById(params.id).lean();
+    const user = await User.findById(id).lean();
 
     let updateData: { status?: string; role?: string } = {};
     if (status) updateData.status = status;
@@ -38,11 +39,9 @@ export async function PUT(
       // If user is a buyer and we're updating role or status
       if (user.role === "buyer") {
         // Update User collection
-        const updatedUser = await User.findByIdAndUpdate(
-          params.id,
-          updateData,
-          { new: true }
-        ).lean();
+        const updatedUser = await User.findByIdAndUpdate(id, updateData, {
+          new: true,
+        }).lean();
 
         let updatedBuyer = null;
         // Only update Buyer collection if status is changing
@@ -57,7 +56,7 @@ export async function PUT(
         updatedRecord = updatedUser || updatedBuyer;
       } else {
         // For non-buyer users, just update the User collection
-        updatedRecord = await User.findByIdAndUpdate(params.id, updateData, {
+        updatedRecord = await User.findByIdAndUpdate(id, updateData, {
           new: true,
         }).lean();
       }
@@ -65,7 +64,7 @@ export async function PUT(
       // If not found in User model, try Buyer model directly (status only)
       if (status) {
         updatedRecord = await Buyer.findByIdAndUpdate(
-          params.id,
+          id,
           { status },
           { new: true }
         ).lean();
@@ -94,13 +93,14 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
+    const { id } = await params;
 
     // First find the user to check their role and get email if buyer
-    const user = await User.findById(params.id).lean();
+    const user = await User.findById(id).lean();
 
     let deletedRecord;
     let isBuyer = false;
@@ -109,7 +109,7 @@ export async function DELETE(
       isBuyer = user.role === "buyer";
 
       // Delete from User collection
-      deletedRecord = await User.findByIdAndDelete(params.id).lean();
+      deletedRecord = await User.findByIdAndDelete(id).lean();
 
       // If buyer, also delete from Buyer collection using email
       if (isBuyer && user.email) {
@@ -117,7 +117,7 @@ export async function DELETE(
       }
     } else {
       // If not found in User model, try Buyer model directly
-      deletedRecord = await Buyer.findByIdAndDelete(params.id).lean();
+      deletedRecord = await Buyer.findByIdAndDelete(id).lean();
     }
 
     if (!deletedRecord) {

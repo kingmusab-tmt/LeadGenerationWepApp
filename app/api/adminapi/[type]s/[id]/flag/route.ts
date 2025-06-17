@@ -1,24 +1,18 @@
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
-import mongoose from "mongoose";
 import { Lead } from "@/models/leads";
 import Call from "@/models/call";
-
-const connectDB = async () => {
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(process.env.MONGODB_URI!);
-  }
-};
+import dbConnects from "@/lib/connectdb";
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { type: string; id: string } }
+  { params }: { params: Promise<{ id: string; type: string }> }
 ) {
   try {
-    await connectDB();
+    await dbConnects();
 
     const { flagged } = await req.json();
-    const { type, id } = params;
+    const { type, id } = await params;
 
     if (type === "lead") {
       const updatedLead = await Lead.findByIdAndUpdate(

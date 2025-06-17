@@ -12,26 +12,23 @@ const connectDB = async () => {
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
     const { status } = await req.json();
+    const { id } = await params;
 
     // Try updating in User model first
     const updatedUser = await User.findByIdAndUpdate(
-      params.id,
+      id,
       { status },
       { new: true }
     ).lean();
 
     // If not found in User model, try Buyer model
     const updatedBuyer = !updatedUser
-      ? await Buyer.findByIdAndUpdate(
-          params.id,
-          { status },
-          { new: true }
-        ).lean()
+      ? await Buyer.findByIdAndUpdate(id, { status }, { new: true }).lean()
       : null;
 
     if (!updatedUser && !updatedBuyer) {
