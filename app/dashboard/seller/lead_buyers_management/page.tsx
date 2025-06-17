@@ -9,7 +9,6 @@ const LeadBuyerManagementPage = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "seller") {
     return <BuyersPage />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

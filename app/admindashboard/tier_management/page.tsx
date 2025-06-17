@@ -9,7 +9,6 @@ const TierManagementPage = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
     return <TierManagement />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

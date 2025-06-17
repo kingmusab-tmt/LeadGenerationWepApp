@@ -9,7 +9,6 @@ const OverViewPage = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "seller") {
     return <Overview />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

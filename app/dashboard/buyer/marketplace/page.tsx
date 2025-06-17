@@ -9,7 +9,6 @@ const MarketPlacePage = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "buyer") {
     return <BuyerLeads />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

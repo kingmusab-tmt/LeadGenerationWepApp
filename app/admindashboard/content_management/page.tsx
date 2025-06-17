@@ -10,7 +10,6 @@ const ContentManagement = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
     return <ContentVerification />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

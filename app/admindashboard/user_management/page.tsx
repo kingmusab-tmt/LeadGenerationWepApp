@@ -10,7 +10,6 @@ const UserManagementPage = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
     return <UserManagement />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

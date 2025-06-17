@@ -158,13 +158,11 @@ export function formatDuration(ms: number): string {
     seconds: Math.floor(((ms % 3600000) % 60000) / 1000),
   };
 
-  return (
-    Object.entries(time)
-      .filter(([_, val]) => val !== 0)
-      .map(([key, val]) => `${val}`.padStart(2, "0"))
-      .join(":")
-      .replace(/^0+/, "") || "0"
-  );
+  return (Object.entries(time)
+    .filter(([_, val]) => val !== 0)
+    .map(([key, val]) => `${val}`.padStart(2, "0"))
+    .join(":")
+    .replace(/^0+/, "") || "0");
 }
 
 /**

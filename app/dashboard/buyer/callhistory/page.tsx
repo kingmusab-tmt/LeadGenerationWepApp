@@ -9,7 +9,6 @@ const CallHistoryPage = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "buyer") {
     return <CallHistory />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

@@ -9,7 +9,6 @@ const FinancialManagement = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
     return <FinancialManagement />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

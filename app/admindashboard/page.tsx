@@ -9,7 +9,6 @@ const Admin: React.FC = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
     return <AdminDashboard children={undefined} />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };

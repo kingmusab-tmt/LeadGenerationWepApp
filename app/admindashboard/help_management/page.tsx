@@ -9,7 +9,6 @@ const HelpManagementPage = async () => {
   if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
     return <HelpManagement />;
   } else {
-    <Typography>You Don't have access to this resource</Typography>;
     redirect("/auth/sign-in");
   }
 };
