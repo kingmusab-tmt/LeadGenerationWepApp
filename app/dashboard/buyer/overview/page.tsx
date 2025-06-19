@@ -1,6 +1,6 @@
 import Overview from "./overview";
 
-const OverviewPage = async () => {
+const OverviewPage = () => {
   return <Overview />;
 };
 

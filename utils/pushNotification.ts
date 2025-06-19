@@ -17,7 +17,7 @@ export const sendPushNotification = async (user: any, lead: any) => {
     const registration = await navigator.serviceWorker.register(
       "/service-worker.js"
     );
-      //("Service Worker registered:", registration);
+    //("Service Worker registered:", registration);
 
     // Request permission for push notifications
     const permission = await Notification.requestPermission();
@@ -32,7 +32,7 @@ export const sendPushNotification = async (user: any, lead: any) => {
       applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, // VAPID public key
     });
 
-      //("User subscribed to push notifications:", subscription);
+    //("User subscribed to push notifications:", subscription);
 
     // Send the push notification
     await fetch("/api/send-push", {
@@ -52,10 +52,6 @@ export const sendPushNotification = async (user: any, lead: any) => {
         },
       }),
     });
-
-      //(
-      `Push notification sent to ${user.name} about lead ${lead.name}`
-    );
   } catch (error) {
     console.error("Error sending push notification:", error);
   }

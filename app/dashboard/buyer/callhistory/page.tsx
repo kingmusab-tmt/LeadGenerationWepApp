@@ -1,6 +1,6 @@
 import CallHistory from "./callhistory";
 
-const CallHistoryPage = async () => {
+const CallHistoryPage = () => {
   return <CallHistory />;
 };
 

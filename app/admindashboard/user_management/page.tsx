@@ -1,6 +1,6 @@
 import UserManagement from "./usermanagement";
 
-const UserManagementPage = async () => {
+const UserManagementPage = () => {
   return <UserManagement />;
 };
 

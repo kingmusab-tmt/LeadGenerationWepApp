@@ -1,6 +1,6 @@
 import UnitPurchase from "./purchaseunit";
 
-const PurchaseUnitPage = async () => {
+const PurchaseUnitPage = () => {
   return <UnitPurchase />;
 };
 

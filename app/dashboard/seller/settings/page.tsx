@@ -1,6 +1,6 @@
 import AccountSettings from "./setting";
 
-const SettingPage = async () => {
+const SettingPage = () => {
   return <AccountSettings />;
 };
 

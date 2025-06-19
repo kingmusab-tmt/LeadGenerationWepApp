@@ -1,6 +1,6 @@
 import BuyersPage from "./leadbuyercomponent";
 
-const LeadBuyerManagementPage = async () => {
+const LeadBuyerManagementPage = () => {
   return <BuyersPage />;
 };
 

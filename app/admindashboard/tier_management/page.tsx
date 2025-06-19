@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Typography } from "@mui/material";
 import TierManagement from "./tier";
 
-const TierManagementPage = async () => {
+const TierManagementPage = () => {
   return <TierManagement />;
 };
 

@@ -1,6 +1,6 @@
 import BuyerLeads from "./marketplace";
 
-const MarketPlacePage = async () => {
+const MarketPlacePage = () => {
   return <BuyerLeads />;
 };
 

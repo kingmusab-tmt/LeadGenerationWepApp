@@ -1,6 +1,6 @@
 import FinancialManagement from "./financial";
 
-const FinancialManagementPage = async () => {
+const FinancialManagementPage = () => {
   return <FinancialManagement />;
 };
 

@@ -1,6 +1,6 @@
 import ReportsManagement from "./report";
 
-const ReportPage = async () => {
+const ReportPage = () => {
   return <ReportsManagement />;
 };
 

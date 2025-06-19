@@ -1,6 +1,6 @@
 import AssignLeads from "./leadverification";
 
-const LeadVerificationPage = async () => {
+const LeadVerificationPage = () => {
   return <AssignLeads />;
 };
 

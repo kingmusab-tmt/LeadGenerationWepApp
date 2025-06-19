@@ -1,6 +1,6 @@
 import CampaignManagement from "./campagincomponent";
 
-const CampaignPage = async () => {
+const CampaignPage = () => {
   return <CampaignManagement />;
 };
 

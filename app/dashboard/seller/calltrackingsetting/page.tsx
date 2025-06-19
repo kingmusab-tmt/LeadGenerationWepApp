@@ -1,6 +1,6 @@
 import CallTrackingSetting from "./calltracking";
 
-const CallTrackingPage = async () => {
+const CallTrackingPage = () => {
   return <CallTrackingSetting />;
 };
 

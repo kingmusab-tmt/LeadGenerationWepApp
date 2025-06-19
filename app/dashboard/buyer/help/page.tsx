@@ -1,6 +1,6 @@
 import HelpSection from "./help";
 
-const BuyerHelpPage = async () => {
+const BuyerHelpPage = () => {
   return <HelpSection />;
 };
 

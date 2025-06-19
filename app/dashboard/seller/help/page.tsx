@@ -1,6 +1,6 @@
 import HelpSection from "./helpcomponent";
 
-const HelpPage = async () => {
+const HelpPage = () => {
   return <HelpSection />;
 };
 

@@ -1,6 +1,6 @@
 import UserDashboard from "./layout";
 
-const BuyerDashboard: React.FC = async () => {
+const BuyerDashboard: React.FC = () => {
   return <UserDashboard children={undefined} />;
 };
 

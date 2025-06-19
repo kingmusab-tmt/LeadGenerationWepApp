@@ -1,6 +1,6 @@
 import AdminOverview from "./overview";
 
-const OverviewPage = async () => {
+const OverviewPage = () => {
   return <AdminOverview />;
 };
 

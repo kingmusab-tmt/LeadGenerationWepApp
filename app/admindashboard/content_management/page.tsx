@@ -1,6 +1,6 @@
 import ContentVerification from "./content";
 
-const ContentManagement = async () => {
+const ContentManagement = () => {
   return <ContentVerification />;
 };
 

@@ -1,15 +1,13 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { redirect, useSearchParams } from "next/navigation";
+import { redirect } from "next/navigation";
 import RoleSelectionPage from "@/app/completeregistration/page";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { SignInPage } from "./signin"; // You can edit this SignInPage inline below if needed
 
 const SignIn: React.FC = () => {
   const { data: session, status } = useSession();
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
 
   if (status === "loading") {
     return (
@@ -48,20 +46,8 @@ const SignIn: React.FC = () => {
       </div>
     );
   }
-
   // Unauthenticated: Show Sign In UI with possible error
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      {error && (
-        <div className="text-red-600 mb-4 text-sm text-center">
-          {error === "OAuthAccountNotLinked"
-            ? "This account is linked to a different sign-in method. Try another one."
-            : "An error occurred. Please try again."}
-        </div>
-      )}
-      <SignInPage />
-    </div>
-  );
+  return <SignInPage />;
 };
 
 export default SignIn;

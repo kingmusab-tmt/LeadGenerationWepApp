@@ -1,6 +1,6 @@
 import TransactionHistory from "./transactions";
 
-const TransactionPage = async () => {
+const TransactionPage = () => {
   return <TransactionHistory />;
 };
 

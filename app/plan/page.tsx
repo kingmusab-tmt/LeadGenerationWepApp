@@ -1,6 +1,6 @@
 import PricingSection from "./plan";
 
-const PlanSelectionPage = async () => {
+const PlanSelectionPage = () => {
   return <PricingSection />;
 };
 

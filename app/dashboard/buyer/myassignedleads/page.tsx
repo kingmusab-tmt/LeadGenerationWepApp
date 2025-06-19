@@ -1,6 +1,6 @@
 import AssignedLeads from "./myassignedleads";
 
-const MyAssignLeadPage = async () => {
+const MyAssignLeadPage = () => {
   return <AssignedLeads />;
 };
 
