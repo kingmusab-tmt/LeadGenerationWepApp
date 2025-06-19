@@ -1,16 +1,7 @@
-import React from "react";
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
+import FinancialManagement from "./financial";
 
-const FinancialManagement = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
-    return <FinancialManagement />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+const FinancialManagementPage = async () => {
+  return <FinancialManagement />;
 };
 
-export default FinancialManagement;
+export default FinancialManagementPage;

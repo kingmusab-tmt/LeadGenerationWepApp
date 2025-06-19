@@ -33,7 +33,7 @@ const BuyerDetailsPage: React.FC = () => {
   // Fetch buyer details when component loads
   useEffect(() => {
     if (!buyerId) return;
-    console.log(`Fetching details for Buyer ID: ${buyerId}`);
+    //(`Fetching details for Buyer ID: ${buyerId}`);
 
     const fetchBuyer = async () => {
       try {
@@ -44,7 +44,7 @@ const BuyerDetailsPage: React.FC = () => {
         }
 
         const data = await response.json();
-        console.log("Buyer data received:", data);
+        //("Buyer data received:", data);
 
         if (!data) {
           setError("Buyer not found");

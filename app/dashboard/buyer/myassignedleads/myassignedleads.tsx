@@ -99,9 +99,9 @@ const AssignedLeads: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadId, action }),
       });
-      console.log("Response:", response);
+      //("Response:", response);
       const result = await response.json();
-      console.log("Result:", result);
+      //("Result:", result);
 
       if (response.ok) {
         enqueueSnackbar(result.message, {

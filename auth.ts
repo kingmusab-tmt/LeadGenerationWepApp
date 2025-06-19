@@ -43,6 +43,7 @@ export const authOptions = {
           name: profile.name,
           image: profile.picture,
           role: profile.role || "user",
+          isSubActive: false,
           provider: profile.provider ?? "google",
         };
       },
@@ -73,52 +74,6 @@ export const authOptions = {
       },
     }),
   ],
-  //   callbacks: {
-  //     async redirect({ url, baseUrl }) {
-  //       // Allow only internal URLs, fallback to base
-  //       return url.startsWith(baseUrl) ? url : baseUrl;
-  //     },
-  //     async jwt({ token, trigger, session, user }) {
-  //       if (user) {
-  //         token.email = user.email;
-  //         token.name = user.name;
-  //         token.id = user.id;
-  //         token.image = user.image;
-  //         token.role = user.role;
-  //         if (Date.now() % 10 === 0) await clearStaleTokens(); // run ~10% of the time
-  //       } else if (trigger === "update" && session?.name) {
-  //         token.email = user["email"];
-  //         token.name = user["name"];
-  //         token.id = user["id"];
-  //         token.image = user["image"];
-  //         token.isActive = user["isActive"];
-  //         token.role = user["role"];
-  //         if (Date.now() % 10 === 0) await clearStaleTokens(); // run ~10% of the time
-  //       }
-  //       return token;
-  //     },
-  //     async session({ session, token }) {
-  //       await dbConnect();
-  //       const userEmail = session?.user?.email;
-  //       const dbUser = await User.findOne({ email: userEmail });
-
-  //       if (dbUser) {
-  //         session.user.email = dbUser.email;
-  //         session.user.name = dbUser.name;
-  //         session.user.id = dbUser.id;
-  //         session.user.image = dbUser.image ?? null;
-  //         session.user.role = dbUser.role;
-  //       } else {
-  //         session.user.email = token.email;
-  //         session.user.name = token.name;
-  //         session.user.id = token.id;
-  //         session.user.image = token.image;
-  //         session.user.role = token.role;
-  //       }
-  //       return session;
-  //     },
-  //   },
-  // } as NextAuthOptions;
   callbacks: {
     async redirect({ url, baseUrl }) {
       return url.startsWith(baseUrl) ? url : baseUrl;
@@ -131,6 +86,7 @@ export const authOptions = {
         token.id = user.id;
         token.image = user.image;
         token.role = user.role;
+        token.isSubActive = user.isSubActive;
         if (Date.now() % 10 === 0) await clearStaleTokens(); // ~10% of the time
       } else if (trigger === "update" && session?.name) {
         token.email = session.user?.email;
@@ -139,6 +95,7 @@ export const authOptions = {
         token.image = session.user?.image;
         token.isActive = session.user?.isActive;
         token.role = session.user?.role;
+        token.isSubActive = session.user?.isSubActive;
         if (Date.now() % 10 === 0) await clearStaleTokens();
       }
       return token;
@@ -160,6 +117,7 @@ export const authOptions = {
         name: dbUser.name,
         image: dbUser.image ?? null,
         role: dbUser.role,
+        isSubActive: dbUser.subscription?.isSubscriptionActive,
       };
 
       return session;

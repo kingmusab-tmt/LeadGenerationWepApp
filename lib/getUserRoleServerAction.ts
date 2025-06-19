@@ -7,7 +7,7 @@ import { getServerSession } from "next-auth";
 export const getUserRole = async () => {
   const session = await getServerSession();
   if (session?.user?.role) {
-    console.log(session.user.role);
+    //(session.user.role);
     return session.user.role;
   }
 };

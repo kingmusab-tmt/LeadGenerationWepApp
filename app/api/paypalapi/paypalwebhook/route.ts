@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
         });
         await sellerIncomeTransaction.save();
 
-        console.log("Lead seller balance updated successfully:", leadSeller);
+        //("Lead seller balance updated successfully:", leadSeller);
         return NextResponse.json({
           success: true,
           message: "Lead seller balance updated successfully",
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log("Received unhandled event type:", event.event_type);
+    //("Received unhandled event type:", event.event_type);
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Error processing PayPal webhook:", error);

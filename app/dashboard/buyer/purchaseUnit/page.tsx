@@ -1,16 +1,7 @@
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
 import UnitPurchase from "./purchaseunit";
 
 const PurchaseUnitPage = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "buyer") {
-    return <UnitPurchase />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+  return <UnitPurchase />;
 };
 
 export default PurchaseUnitPage;

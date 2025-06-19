@@ -4,13 +4,7 @@ import { Typography } from "@mui/material";
 import TierManagement from "./tier";
 
 const TierManagementPage = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
-    return <TierManagement />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+  return <TierManagement />;
 };
 
 export default TierManagementPage;

@@ -1,15 +1,6 @@
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
 import LeadManagement from "./leadmanagement";
 
 const LeadManagementPage = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "seller") {
-    return <LeadManagement />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+  return <LeadManagement />;
 };
 export default LeadManagementPage;

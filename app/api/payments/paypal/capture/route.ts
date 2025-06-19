@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
     const { orderID, tierId, durationMonths } = await req.json();
 
-    console.log("Received data:", { orderID, tierId, durationMonths });
+    //("Received data:", { orderID, tierId, durationMonths });
 
     const tierinfor = await Tier.findOne({ _id: new ObjectId(tierId) });
     if (!tierinfor) {

@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       clearTimeout(timeout);
 
       const responseText = await gasResponse.text();
-      console.log(`[${requestId}] GAS response:`, responseText);
+      //(`[${requestId}] GAS response:`, responseText);
 
       if (!gasResponse.ok) {
         let errorDetails;

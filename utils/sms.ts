@@ -27,7 +27,7 @@ export const sendSmsNotification = async (buyer: any, lead: any) => {
       to: leadbuyer?.phone || buyer.phone,
     });
 
-    console.log(`SMS sent to ${buyer.name} about lead ${lead.name}`);
+    //(`SMS sent to ${buyer.name} about lead ${lead.name}`);
   } catch (error) {
     console.error("Error sending SMS:", error);
   }

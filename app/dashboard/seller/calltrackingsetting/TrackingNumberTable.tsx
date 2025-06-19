@@ -47,9 +47,6 @@ export default function TrackingNumbersTable({
 
   // Handle the "Edit" action
   const handleEdit = () => {
-    console.log(
-      `selected number in side tranking number talbe ${selectedNumber}`
-    );
     if (selectedNumber) {
       onEditNumber(selectedNumber); // Pass the selected number to the parent component
       handleMenuClose();
@@ -63,11 +60,6 @@ export default function TrackingNumbersTable({
       handleMenuClose();
     }
   };
-
-  //   useEffect(() => {
-  //     fetchUpdatedNumbers();
-  //   }, [numbers]);
-
   return (
     <>
       <Typography variant="h6" sx={{ mt: 2 }}>

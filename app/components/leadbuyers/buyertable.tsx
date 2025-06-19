@@ -50,7 +50,7 @@ const BuyerTable: React.FC<BuyerTableProps> = ({
   };
 
   const handleEdit = (buyer: IBuyer) => {
-    console.log("Editing buyer:", buyer); // Debug log
+    //("Editing buyer:", buyer); // Debug log
     if (!buyer || !buyer._id) {
       console.error("Invalid buyer object passed to onEdit:", buyer);
       return;

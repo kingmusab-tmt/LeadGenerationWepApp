@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     await dbConnect();
     const data: RequestData = await request.json();
 
-    console.log("Received Data:", data);
+    //("Received Data:", data);
 
     if (!data || !data.userId || !data.fields || !Array.isArray(data.fields)) {
       return NextResponse.json(

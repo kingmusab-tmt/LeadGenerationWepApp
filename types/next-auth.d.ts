@@ -9,6 +9,7 @@ declare module "next-auth" {
       role?: string | null;
       provider: string | null;
       image: string | null;
+      isSubActive: boolean | null;
       id: string | null;
     } & DefaultSession["seller"];
   }
@@ -16,12 +17,14 @@ declare module "next-auth" {
     id: string | null;
     role: string | null;
     image: string | null;
+    isSubActive: boolean | null;
   }
 
   interface User {
     id: string | null;
     role: string | null;
     image: string | null;
+    isSubActive: boolean | null;
     provider: string | null;
   }
 }
@@ -30,6 +33,7 @@ declare module "next-auth/jwt" {
     id: string | null;
     role: string | null;
     image: string | null;
+    isSubActive: boolean | null;
     provider: string | null;
   }
 }

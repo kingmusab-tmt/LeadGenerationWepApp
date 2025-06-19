@@ -61,26 +61,26 @@
 //       .limit(limit) // Limit the number of leads per page
 //       .select("fields status unit shareNumber soldCount soldTo createdAt"); // Include createdAt for sorting
 
-//     console.log("Fetched Leads:", leads);
+//       //("Fetched Leads:", leads);
 
 //     // Filter leads based on the buyer's ID and lead status
 //     const filteredLeads = leads
 //       .map((lead) => {
 //         if (lead.status === "sold") {
 //           // If the lead is sold, only include it if the buyer is in the soldTo array
-//           console.log(`This is the soldTo field:`, lead.soldTo);
-//           console.log(`This is the actual buyerId: ${buyerId}`);
+//             //(`This is the soldTo field:`, lead.soldTo);
+//             //(`This is the actual buyerId: ${buyerId}`);
 
 //           // Convert soldTo.buyerId to string for comparison
 //           if (lead.soldTo.some((sold) => sold.buyerId.toString() === buyerId)) {
-//             console.log("This lead is sold to this buyer");
+//               //("This lead is sold to this buyer");
 //             // Return all fields (including contact information) for the buyer who purchased the lead
 //             return {
 //               ...lead.toObject(),
 //               cost: lead.unit,
 //             };
 //           } else {
-//             console.log("This lead is not sold to this buyer");
+//               //("This lead is not sold to this buyer");
 //             // Exclude sold leads for buyers who did not purchase them
 //             return null;
 //           }
@@ -98,7 +98,7 @@
 //       })
 //       .filter((lead) => lead !== null); // Remove null entries (excluded sold leads)
 
-//     console.log("Filtered Leads:", filteredLeads);
+//       //("Filtered Leads:", filteredLeads);
 
 //     // Get the total count of leads for pagination
 //     const totalLeads = await Lead.countDocuments({

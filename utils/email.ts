@@ -35,7 +35,7 @@ export const sendEmailNotification = async (buyerId: any, lead: any) => {
 
     // Send the email
     await transporter.sendMail(mailOptions);
-    console.log(`Email sent to ${buyer?.name} about lead ${lead.name}`);
+    //(`Email sent to ${buyer?.name} about lead ${lead.name}`);
   } catch (error) {
     console.error("Error sending email:", error);
   }

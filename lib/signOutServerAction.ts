@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react";
 export const handleSignOut = async () => {
   // const router = useRouter();
   try {
-    await signOut();
+    await signOut({ callbackUrl: "/auth/sign-in" });
     // router.push("/auth/sign-in");
   } catch (error) {
     throw error;

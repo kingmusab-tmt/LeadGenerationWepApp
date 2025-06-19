@@ -1,25 +1,54 @@
-// description
 "use server";
+import { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
+import { RequestCookies } from "next/dist/server/web/spec-extension/cookies";
+import { cookies } from "next/headers";
+import { NextRequest } from "next/server";
 
-import { authOptions } from "@/auth";
-import { getServerSession } from "next-auth";
-import dbConnect from "./connectdb";
-import { User } from "@/models/user";
+export async function checkIsAuthenticated(request?: NextRequest) {
+  // Get cookies from the appropriate source
+  const cookieStore = request ? request.cookies : cookies();
+  const resolvedCookies =
+    typeof (cookieStore as Promise<unknown>).then === "function"
+      ? await (cookieStore as Promise<ReadonlyRequestCookies>)
+      : (cookieStore as RequestCookies);
+  const sessionToken = resolvedCookies.get("sessionToken")?.value;
 
-export const checkIsAuthenticated = async () => {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    return { isAuthenticated: false, role: null };
+  if (!sessionToken) {
+    return {
+      isAuthenticated: false,
+      role: null,
+      isSubActive: false,
+    };
   }
-  await dbConnect();
-  const user = await User.findOne({
-    _id: session.user.id,
-  });
-  return {
-    isAuthenticated: true,
-    role: user?.role || "user",
-    isSubActive: user?.subscription?.isSubscriptionActive,
-    subType: user?.subscription?.subscriptionPlan,
-  }; // Default to "user" if role is not set
-};
+
+  try {
+    // Verify the session token with your backend
+    const response = await fetch(`${process.env.API_BASE_URL}/auth/verify`, {
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      return {
+        isAuthenticated: false,
+        role: null,
+        isSubActive: false,
+      };
+    }
+
+    const data = await response.json();
+    return {
+      isAuthenticated: true,
+      role: data.role,
+      isSubActive: data.isSubActive,
+    };
+  } catch (error) {
+    console.error("Authentication check failed:", error);
+    return {
+      isAuthenticated: false,
+      role: null,
+      isSubActive: false,
+    };
+  }
+}

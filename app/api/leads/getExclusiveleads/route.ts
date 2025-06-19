@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       status: "available",
       userId: session.user.id,
     });
-    console.log("Available leads:", availableLeads);
+    //("Available leads:", availableLeads);
 
     return NextResponse.json(availableLeads, { status: 200 });
   } catch (error) {

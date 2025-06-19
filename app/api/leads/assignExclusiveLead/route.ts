@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
             } else if (buyer.notificationPreferences.includes("dashboard")) {
               await sendPushNotification(buyer._id, lead);
             } else {
-              console.log("No notification preference set");
+              //("No notification preference set");
             }
           } catch (notificationError) {
             console.error("Error sending notifications:", notificationError);

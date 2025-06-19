@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     // Ensure walletBalance is a valid number
     if (typeof buyer.walletUnit !== "number" || isNaN(buyer.walletUnit)) {
       buyer.walletUnit = 0; // Initialize to 0 if invalid
-      console.log(
+        //(
         "Invalid wallet balance for buyer: now initialize to zero",
         buyer.email
       );

@@ -1,16 +1,7 @@
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
 import Overview from "./overview";
 
 const OverViewPage = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "seller") {
-    return <Overview />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+  return <Overview />;
 };
 
 export default OverViewPage;

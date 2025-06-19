@@ -13,7 +13,7 @@ export const clearStaleTokens = async () => {
       expires: { $lt: new Date() },
     });
 
-    console.log(`${result.deletedCount} stale tokens cleared.`);
+    //(`${result.deletedCount} stale tokens cleared.`);
   } catch (error) {
     console.error("Failed to clear stale tokens:", error);
     throw error;

@@ -1,16 +1,7 @@
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
 import BuyerLeads from "./marketplace";
 
 const MarketPlacePage = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "buyer") {
-    return <BuyerLeads />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+  return <BuyerLeads />;
 };
 
 export default MarketPlacePage;

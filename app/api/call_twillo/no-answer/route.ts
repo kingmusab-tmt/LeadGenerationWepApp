@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     // Check if the call was unanswered
     if (callStatus === "no-answer") {
-      console.log(`Call ${callSid} was unanswered. Retrying next buyer...`);
+      //(`Call ${callSid} was unanswered. Retrying next buyer...`);
 
       // Update the call status to "no-answer"
       call.status = "no-answer";
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
       } else {
         // No forwarding rules configured
         twiml.say("No forwarding rules configured. Ending call.");
-        console.log("No forwarding rules configured. Call ended.");
+        //("No forwarding rules configured. Call ended.");
       }
 
       return new NextResponse(twiml.toString(), {

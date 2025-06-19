@@ -180,10 +180,10 @@ const PaymentSection = ({
   useEffect(() => {
     if (paymentMethod === "stripe") {
       const paymentStatus = searchParams.get("payment");
-      console.log("Payment Status:", paymentStatus);
+      //("Payment Status:", paymentStatus);
 
       const sessionId = searchParams.get("session_id");
-      console.log("Session ID:", sessionId);
+      //("Session ID:", sessionId);
 
       if (paymentStatus === "success" && sessionId) {
         const verifyPayment = async () => {

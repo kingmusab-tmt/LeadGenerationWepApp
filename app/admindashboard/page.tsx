@@ -1,16 +1,9 @@
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
 import AdminDashboard from "./layout";
 
-const Admin: React.FC = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
+// import AdminDashboard from "./layout";
 
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
-    return <AdminDashboard children={undefined} />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+const AdminPage: React.FC = async () => {
+  return <AdminDashboard children={undefined} />;
 };
 
-export default Admin;
+export default AdminPage;

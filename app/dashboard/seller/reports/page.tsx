@@ -1,16 +1,7 @@
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
 import ReportsManagement from "./report";
 
 const ReportPage = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "seller") {
-    return <ReportsManagement />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+  return <ReportsManagement />;
 };
 
 export default ReportPage;

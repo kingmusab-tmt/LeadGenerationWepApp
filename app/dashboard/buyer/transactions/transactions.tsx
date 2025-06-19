@@ -78,7 +78,7 @@ const TransactionHistory: React.FC = () => {
         const response = await axios.get("/api/buyers/fetchTransactions");
 
         // Log the response to debug
-        console.log("API Response:", response);
+        //("API Response:", response);
 
         // Ensure the response has the expected structure
         if (response.data && Array.isArray(response.data.data)) {

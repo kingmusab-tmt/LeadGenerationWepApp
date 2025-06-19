@@ -1,17 +1,7 @@
-import React from "react";
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
 import UserManagement from "./usermanagement";
 
 const UserManagementPage = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "admin") {
-    return <UserManagement />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+  return <UserManagement />;
 };
 
 export default UserManagementPage;

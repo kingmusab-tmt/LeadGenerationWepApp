@@ -91,7 +91,7 @@
 //     event: React.MouseEvent<HTMLElement>,
 //     lead: Lead
 //   ) => {
-//     console.log("Menu Clicked - Selected Lead:", lead);
+//       //("Menu Clicked - Selected Lead:", lead);
 //     setAnchorEl(event.currentTarget);
 //     setSelectedLead(lead); // Make sure selectedLead is correctly set
 //   };
@@ -432,7 +432,7 @@ const LeadList: React.FC<LeadListProps> = ({
     event: React.MouseEvent<HTMLElement>,
     lead: Lead
   ) => {
-    console.log("Menu Clicked - Selected Lead:", lead);
+    //("Menu Clicked - Selected Lead:", lead);
     setAnchorEl(event.currentTarget);
     setSelectedLead(lead);
   };

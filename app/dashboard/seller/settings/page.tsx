@@ -1,16 +1,7 @@
-import { checkIsAuthenticated } from "@/lib/checkIsAuthenticated";
-import { redirect } from "next/navigation";
-import { Typography } from "@mui/material";
 import AccountSettings from "./setting";
 
 const SettingPage = async () => {
-  const isAuthenticated = await checkIsAuthenticated();
-
-  if (isAuthenticated.isAuthenticated && isAuthenticated.role === "seller") {
-    return <AccountSettings />;
-  } else {
-    redirect("/auth/sign-in");
-  }
+  return <AccountSettings />;
 };
 
 export default SettingPage;

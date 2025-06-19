@@ -65,9 +65,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   let subMenuTimeout: NodeJS.Timeout;
 
   useEffect(() => {
-    if (!session) {
-      redirect("/auth/sign-in");
-    } else if (session) {
+    if (session) {
       setImage(session.user?.image || "");
       setName(session.user?.name || "");
     }

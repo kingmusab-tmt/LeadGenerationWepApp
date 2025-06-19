@@ -11,10 +11,10 @@ export async function GET(req: NextRequest) {
   try {
     // Connect to MongoDB
     await dbConnect();
-    console.log(`userId = ${userId}`);
+    //(`userId = ${userId}`);
     // Fetch forms created by the user
     const forms = await Form.find({ userId });
-    console.log(forms);
+    //(forms);
     return NextResponse.json(forms);
   } catch (error) {
     console.error("Failed to fetch forms:", error);

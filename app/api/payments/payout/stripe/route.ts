@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
     // Fetch platform account balance
     const balance = await stripe.balance.retrieve();
-    console.log("Available:", balance.available);
+    //("Available:", balance.available);
 
     const availableBalance = balance.available.find(
       (bal) => bal.currency.toLowerCase() === body.currency.toLowerCase()

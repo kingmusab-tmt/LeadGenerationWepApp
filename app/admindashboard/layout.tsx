@@ -35,7 +35,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
@@ -58,6 +58,13 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [subMenuVisible, setSubMenuVisible] = useState(false);
   let subMenuTimeout: NodeJS.Timeout;
+
+  // useEffect(() => {
+  //   if (!children) {
+  //     <LoadingComponent />;
+  //     redirect("/admindashboard/overview");
+  //   }
+  // }, []);
 
   useEffect(() => {
     if (session) {

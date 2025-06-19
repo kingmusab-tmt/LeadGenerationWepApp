@@ -37,8 +37,8 @@ export async function GET(req: NextRequest) {
           { status: 404 }
         );
       }
-      console.log("property ID", seller.tawkPropertyId);
-      console.log("widget ID", seller.tawkWidgetId);
+      //("property ID", seller.tawkPropertyId);
+      //("widget ID", seller.tawkWidgetId);
 
       return NextResponse.json(
         {
@@ -51,8 +51,8 @@ export async function GET(req: NextRequest) {
         { status: 200 }
       );
     } else if (session.user.role === "seller") {
-      console.log("Property", process.env.NEXT_PUBLIC_TAWKPROPERTYID!);
-      console.log("widget", process.env.NEXT_PUBLIC_TAWKWIDGETID!);
+      //("Property", process.env.NEXT_PUBLIC_TAWKPROPERTYID!);
+      //("widget", process.env.NEXT_PUBLIC_TAWKWIDGETID!);
       return NextResponse.json(
         {
           success: true,

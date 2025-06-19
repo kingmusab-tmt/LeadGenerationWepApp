@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     // Extract user ID from the session
     const userId = session.user.id;
-    console.log("User ID:", userId);
+    //("User ID:", userId);
 
     // Get current date and previous periods for trend calculations
     const currentDate = new Date();
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       { $match: { userId: userId } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
-    console.log(leadStatus);
+    //(leadStatus);
 
     const leadStatusCounts = leadStatus.reduce(
       (acc, curr) => {
@@ -63,9 +63,9 @@ export async function GET(req: NextRequest) {
       },
       { new: 0, available: 0, sold: 0, assigned: 0 }
     );
-    console.log(`new: ${leadStatusCounts.new}`);
-    console.log(`Avaiable Leads: ${leadStatusCounts.available}`);
-    console.log(`sold Leads: ${leadStatusCounts.sold}`);
+    //(`new: ${leadStatusCounts.new}`);
+    //(`Avaiable Leads: ${leadStatusCounts.available}`);
+    //(`sold Leads: ${leadStatusCounts.sold}`);
 
     // 3. REVENUE AND PAYMENTS (using Transaction schema)
     const revenueData = await Transaction.aggregate([
@@ -273,7 +273,7 @@ export async function GET(req: NextRequest) {
     const totalLeadBuyers = buyerData[0]?.totalBuyers[0]?.count || 0;
     const newLeadBuyers = buyerData[0]?.activeBuyers[0]?.count || 0;
     const topLeadBuyers = buyerData[0]?.topBuyers || [];
-    console.log(topLeadBuyers);
+    //(topLeadBuyers);
     // 7. LEAD TRENDS (MONTHLY)
     const leadTrends = await Lead.aggregate([
       { $match: { userId: userId || new mongoose.Types.ObjectId(userId) } },

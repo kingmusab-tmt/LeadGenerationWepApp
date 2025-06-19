@@ -44,7 +44,7 @@ const RegisterBuyerPageContent: React.FC = () => {
       }
 
       const result = await response.json();
-      console.log("Buyer created:", result);
+      //("Buyer created:", result);
 
       // Show success message
       setSnackbar({

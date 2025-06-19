@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   try {
     await dbConnect();
     const data = await request.json();
-    console.log(data);
+    //(data);
     const form = new Form(data);
     await form.save();
     return NextResponse.json({

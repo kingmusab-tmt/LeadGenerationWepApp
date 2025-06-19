@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       });
       await sellerIncomeTransaction.save();
 
-      console.log("Lead seller balance updated successfully:", leadSeller);
+      //("Lead seller balance updated successfully:", leadSeller);
       return NextResponse.json({ success: true });
     } else {
       return NextResponse.json(

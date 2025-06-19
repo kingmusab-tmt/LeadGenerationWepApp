@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     const buyerId = buyer._id;
-    console.log("Buyer ID:", buyerId);
+    //("Buyer ID:", buyerId);
     const { leadId, action } = await req.json(); // action: 'accept' or 'reject'
 
     if (!leadId || !action) {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     if (!lead) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
-    console.log(lead.assignedTo);
+    //(lead.assignedTo);
 
     // Check if the lead is assigned to the buyer
     const isAssigned = lead.assignedTo.some(
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     if (action === "accept") {
       // Check if the buyer has sufficient wallet balance
       if (buyer.walletUnit < lead.unit) {
-        console.log("Insufficient credit balance");
+        //("Insufficient credit balance");
         return NextResponse.json(
           { error: "Insufficient credit balance" },
           { status: 400 }
