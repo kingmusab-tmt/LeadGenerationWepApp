@@ -7,6 +7,19 @@ import { authOptions } from "@/auth";
 import mongoose from "mongoose";
 
 export async function GET(req: NextRequest) {
+  // Ensure the request is a GET request
+  if (req.method !== "GET") {
+    return NextResponse.json(
+      { message: "Method not allowed" },
+      { status: 405 }
+    );
+  }
+  // Ensure the user is authenticated and has the role of "seller"
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "seller") {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     // Connect to the database
     await dbConnect();

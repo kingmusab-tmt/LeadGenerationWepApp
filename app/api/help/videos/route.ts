@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import HelpVideo from "@/models/helpVideo";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 
 export async function GET(req: NextRequest) {
+  // Ensure the request is a GET request
+  if (req.method !== "GET") {
+    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+  }
+
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
@@ -26,6 +38,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Ensure the request is a POST request
+  if (req.method !== "POST") {
+    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+  }
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.role !== "admin") {
+    return NextResponse.json(
+      { error: "Forbidden: Only admins can create videos" },
+      { status: 403 }
+    );
+  }
   try {
     await dbConnect();
 

@@ -7,6 +7,13 @@ import { Buyer } from "@/models/leadbuyers";
 
 export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
+  // Ensure the request is a GET request
+  if (req.method !== "GET") {
+    return NextResponse.json(
+      { success: false, message: "Method not allowed" },
+      { status: 405 }
+    );
+  }
   await dbConnect();
 
   let filterUser = {};

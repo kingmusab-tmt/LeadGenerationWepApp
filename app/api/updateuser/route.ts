@@ -10,12 +10,19 @@ export async function PUT(req: NextRequest) {
   await dbConnect();
   const data = await req.json();
   const { _id, referralCode, ...UserInfo } = data;
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return Response.json({
+      message: "Unauthorized",
+      status: 401,
+      success: false,
+    });
+  }
 
   let filter = {};
   if (_id) {
     filter = { _id };
   } else {
-    const session = await getServerSession(authOptions);
     const email = session?.user?.email;
     filter = { email };
   }

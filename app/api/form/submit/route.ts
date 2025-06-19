@@ -15,6 +15,13 @@ interface RequestData {
 }
 
 export async function POST(request: Request) {
+  // Ensure the request is a POST request
+  if (request.method !== "POST") {
+    return NextResponse.json(
+      { success: false, message: "Method not allowed" },
+      { status: 405 }
+    );
+  }
   try {
     await dbConnect();
     const data: RequestData = await request.json();

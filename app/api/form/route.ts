@@ -6,10 +6,22 @@ import Form from "@/models/form";
 import { authOptions } from "@/auth";
 
 export async function GET(req: NextRequest) {
+  // Ensure the request is a GET request
+  if (req.method !== "GET") {
+    return NextResponse.json(
+      { success: false, message: "Method not allowed" },
+      { status: 405 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const formId = searchParams.get("formId");
+  const session = await getServerSession(authOptions);
 
   try {
+    if (!session) {
+      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+    }
     await dbConnect();
     const form = await Form.findOne({ formId });
     if (!form) {

@@ -9,6 +9,9 @@ export async function GET(req: NextRequest) {
   const userId = session?.user.id;
 
   try {
+    if (!session)
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+
     // Connect to MongoDB
     await dbConnect();
     //(`userId = ${userId}`);

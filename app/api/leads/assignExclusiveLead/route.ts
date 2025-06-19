@@ -6,8 +6,22 @@ import { Buyer } from "@/models/leadbuyers";
 import { sendEmailNotification } from "@/utils/email";
 import { sendSmsNotification } from "@/utils/sms";
 import { sendPushNotification } from "@/utils/pushNotification";
+import { authOptions } from "@/auth";
+import { getServerSession } from "next-auth";
 
 export async function POST(req: NextRequest) {
+  // Ensure the request is a POST request
+  if (req.method !== "POST") {
+    return NextResponse.json(
+      { message: "Method not allowed" },
+      { status: 405 }
+    );
+  }
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "seller") {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     // Connect to the database
     await dbConnect();
