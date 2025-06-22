@@ -33,7 +33,8 @@ export async function POST(req: Request) {
         { status: 404 }
       );
     }
-    const { tierType, name, price, renewalPrice, discountedPrice } = tierinfor;
+    const { tierType, name, price, renewalPrice, discountedPrice, tierLimits } =
+      tierinfor;
 
     // Validate required fields
     if (!orderID || !tierId || !durationMonths) {
@@ -109,6 +110,18 @@ export async function POST(req: Request) {
       "subscription.subscriptionPaymentId": orderID,
       "subscription.subscriptionRenewalPrice":
         parsedRenewalPrice * durationMonths,
+      "subscription.subscriptionLimits": {
+        leads: tierLimits?.leads || 0,
+        twilioNumbers: tierLimits?.twilioNumbers || 0,
+        numbers: tierLimits?.numbers || 0,
+        callSeconds: tierLimits?.callSeconds || 0,
+        forms: tierLimits?.forms || 0,
+        buyers: tierLimits?.buyers || 0,
+        exports: tierLimits?.exports || false,
+        imports: tierLimits?.imports || false,
+        liveSupport: tierLimits?.liveSupport || false,
+        industries: tierLimits?.industries || 0,
+      },
     };
 
     // Update user's subscription

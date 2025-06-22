@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/user";
+import { Tier } from "@/models/tier";
 
 export async function POST(req: Request) {
   try {
@@ -45,6 +46,12 @@ export async function POST(req: Request) {
       );
     }
 
+    // Get the tier details to access the limits
+    const tier = await Tier.findById(tierId);
+    if (!tier) {
+      return NextResponse.json({ error: "Tier not found" }, { status: 404 });
+    }
+
     // Calculate subscription dates
     const startDate = new Date();
     let expiryDate = new Date(startDate);
@@ -57,19 +64,35 @@ export async function POST(req: Request) {
       expiryDate.setFullYear(expiryDate.getFullYear() + subscriptionYears);
     }
 
-    // Prepare subscription update data
+    // Prepare subscription update data with tier limits
     const subscriptionUpdate = {
       "subscription.subscriptionPlan": planName,
       "subscription.subscriptionStartDate": startDate,
       "subscription.subscriptionExpiryDate": expiryDate,
       "subscription.isSubscriptionActive": true,
       "subscription.isTrial": tierType === "free" ? true : false,
-      "subscription.subscriptionPaymentMethod":
-        tierType === "free" ? "free" : "paid",
+      "subscription.subscriptionPaymentMethod": "free",
       "subscription.subscriptionTierId": tierId,
-      "subscription.subscriptionTierType": tierType,
+      "subscription.subscriptionTierType":
+        tierType === "free" ? "free" : "paid",
       "subscription.subscriptionPrice": price,
-      "subscription.subscriptionTieruserType": "seller",
+      "subscription.subscriptionTierUserType": tier.tierUserType || "seller",
+      "subscription.subscriptionLimits": {
+        leads: tier.tierLimits?.leads || 0,
+        twilioNumbers: tier.tierLimits?.twilioNumbers || 0,
+        numbers: tier.tierLimits?.numbers || 0,
+        callSeconds: tier.tierLimits?.callSeconds || 0,
+        forms: tier.tierLimits?.forms || 0,
+        buyers: tier.tierLimits?.buyers || 0,
+        exports: tier.tierLimits?.exports || false,
+        imports: tier.tierLimits?.imports || false,
+        liveSupport: tier.tierLimits?.liveSupport || false,
+        industries: tier.tierLimits?.industries || 0,
+      },
+      "subscription.subscriptionUsage": {
+        leads: 0, // Reset usage counters
+        callSeconds: 0,
+      },
     };
 
     // Update user's subscription

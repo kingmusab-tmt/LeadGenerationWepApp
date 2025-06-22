@@ -17,6 +17,18 @@ export interface ITier extends Document {
   discountedPrice?: string;
   renewalPrice?: string;
   annualPrice?: string;
+  tierLimits?: {
+    forms: number;
+    leads: number;
+    buyers: number;
+    numbers: number;
+    twilioNumbers: number;
+    callSeconds: number;
+    exports: boolean;
+    imports: boolean;
+    liveSupport: boolean;
+    industries: number;
+  };
 }
 
 const TierSchema = new Schema<ITier>(
@@ -55,6 +67,18 @@ const TierSchema = new Schema<ITier>(
     },
     annualPrice: {
       type: String,
+    },
+    tierLimits: {
+      leads: { type: Number, default: 0 },
+      twilioNumbers: { type: Number, default: 0 },
+      numbers: { type: Number, default: 0 },
+      callSeconds: { type: Number, default: 0 },
+      forms: { type: Number, default: 0 },
+      buyers: { type: Number, default: 0 },
+      exports: { type: Boolean, default: false },
+      imports: { type: Boolean, default: false },
+      liveSupport: { type: Boolean, default: false },
+      industries: { type: Number, default: 0 },
     },
   },
   { timestamps: true }

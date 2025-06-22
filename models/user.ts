@@ -14,14 +14,20 @@ interface ISubscription {
   isSubscriptionActive: boolean; // true/false
   isTrial: boolean; // true if Free Tier trial is active
   subscriptionRenewalDate?: Date;
-  subscriptionPaymentMethod: "stripe" | "paypal" | "manual";
+  subscriptionPaymentMethod: "stripe" | "paypal" | "free";
   subscriptionPaymentId?: string; // Stripe/PayPal subscription ID
   subscriptionRenewalPrice?: number; // Renewal price for the subscription
   subscriptionLimits: {
+    forms: number;
     leads: number;
     buyers: number;
     numbers: number;
+    twilioNumbers: number;
     callSeconds: number;
+    exports: boolean;
+    imports: boolean;
+    liveSupport: boolean;
+    industries: number;
   };
   subscriptionUsage: {
     leads: number;
@@ -301,14 +307,20 @@ const UserSchema: Schema = new Schema<IUser>(
       subscriptionRenewalDate: Date,
       subscriptionPaymentMethod: {
         type: String,
-        enum: ["stripe", "paypal", "manual"],
+        enum: ["stripe", "paypal", "free"],
       },
       subscriptionPaymentId: String,
       subscriptionLimits: {
         leads: { type: Number, default: 0 },
-        buyers: { type: Number, default: 0 },
+        twilioNumbers: { type: Number, default: 0 },
         numbers: { type: Number, default: 0 },
         callSeconds: { type: Number, default: 0 },
+        forms: { type: Number, default: 0 },
+        buyers: { type: Number, default: 0 },
+        exports: { type: Boolean, default: false },
+        imports: { type: Boolean, default: false },
+        liveSupport: { type: Boolean, default: false },
+        industries: { type: Number, default: 0 },
       },
       subscriptionUsage: {
         leads: { type: Number, default: 0 },

@@ -1,3 +1,6 @@
+// This file handles incoming calls via Twilio, processes them based on seller configurations,
+// and manages call forwarding, recording, and notifications.
+
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 import dbConnect from "@/lib/connectdb";

@@ -1,6 +1,12 @@
 import mongoose, { Schema, Model, Document } from "mongoose";
 
 export interface ILead extends Document {
+  _id: string; // Required for TypeScript compatibility with Document
+  name?: string;
+  conversationId?: string; // Optional field for conversation ID
+  email?: string;
+  phone?: string;
+  company?: string;
   leadScore: number; // 0-10 scale
   scoreFactors: {
     completeness: number; // 0-3 points
@@ -19,7 +25,14 @@ export interface ILead extends Document {
     label: string;
     value: any; // Allow any type of value
   }>;
-  status: "new" | "available" | "sold" | "assigned";
+  status:
+    | "new"
+    | "available"
+    | "sold"
+    | "assigned"
+    | "qualified"
+    | "unqualified"
+    | "transferred";
   distributionMethod: "manual" | "round_robin" | "marketplace";
   exclusive: boolean;
   shared: boolean;
@@ -32,23 +45,37 @@ export interface ILead extends Document {
     unit: number;
   }[];
   assignedTo: {
+    id?: string; // Optional field for leadId in assignment
     buyerId: string;
     accepted: boolean;
     rejected: boolean;
+    assignedAt: Date;
+    notes?: string;
   }[];
   isManual: boolean;
   leadSource: string;
   createdAt: Date;
   updatedAt: Date;
+  qualificationScore?: number; // Optional field for qualification score
+  industry?: string; // Optional field for industry
 }
 
 const LeadSchema = new Schema<ILead>(
   {
+    conversationId: { type: String, required: true, unique: true, default: "" },
+    name: { type: String, default: "" },
+    email: { type: String, default: "" },
+    phone: { type: String, default: "" },
+    company: { type: String, default: "" },
+
     distributionMethod: {
       type: String,
       enum: ["manual", "round_robin", "marketplace"],
       default: "marketplace",
     },
+    qualificationScore: { type: Number, min: 0, max: 100, default: 0 },
+    industry: { type: String, default: "" }, // Optional field for industry
+
     leadSource: { type: String },
     shared: { type: Boolean, default: false },
     soldCount: { type: Number, default: 0 },
@@ -70,16 +97,27 @@ const LeadSchema = new Schema<ILead>(
 
     status: {
       type: String,
-      enum: ["new", "available", "sold", "assigned"],
+      enum: [
+        "new",
+        "available",
+        "sold",
+        "assigned",
+        "qualified",
+        "unqualified",
+        "transferred",
+      ],
       default: "new",
     },
     isManual: { type: Boolean, default: false },
     assignedTo: {
       type: [
         {
+          id: { type: String }, // Optional field for leadId in assignment
           buyerId: { type: String },
           accepted: { type: Boolean, default: false },
           rejected: { type: Boolean, default: false },
+          assignedAt: { type: Date, default: Date.now },
+          notes: { type: String, default: "" },
         },
       ],
       default: [],

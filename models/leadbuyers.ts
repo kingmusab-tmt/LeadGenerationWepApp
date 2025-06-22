@@ -5,8 +5,16 @@ export interface IBuyer extends Document {
   _id: string;
   name: string;
   company: string;
+  priority: number; // 1-10 scale
+  maxLeadsPerDay: number;
+  isActive: boolean;
+  currentLeads: number;
+  currentLeadsToday: number;
+  qualificationScoreMinimum: number;
   walletUnit: number;
   email: string;
+  lastAssignedAt: Date;
+  lastAssignedLeadId: string;
   phone: string;
   walletBalance: number;
   status: "new" | "active" | "inactive" | "suspended";
@@ -16,6 +24,11 @@ export interface IBuyer extends Document {
     location: string;
     industry: string;
   };
+  workingHours: {
+    start: string; // "09:00"
+    end: string; // "17:00"
+  };
+  timezone: string;
   purchaseHistory: {
     leadId: string;
     date: Date;
@@ -38,10 +51,24 @@ export interface IBuyer extends Document {
 const BuyerSchema: Schema = new Schema({
   name: { type: String, required: true },
   company: { type: String, required: true },
+  priority: { type: Number, required: true, min: 1, max: 10, default: 5 },
+  isActive: { type: Boolean, required: true, default: true },
+  currentLeads: { type: Number, required: true, default: 0 },
   walletUnit: { type: Number, required: true, default: 0 },
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: true },
   walletBalance: { type: Number, required: true, default: 0 },
+  maxLeadsPerDay: { type: Number, required: true, default: 10 },
+  currentLeadsToday: { type: Number, required: true, default: 0 },
+  qualificationScoreMinimum: { type: Number, required: true, default: 0 },
+  lastAssignedAt: { type: Date, default: Date.now },
+  lastAssignedLeadId: { type: String, default: "" },
+  workingHours: {
+    start: { type: String, required: true }, // e.g., "09:00"
+    end: { type: String, required: true }, // e.g., "17:00"
+  },
+  timezone: { type: String, required: true }, // e.g., "America/New_York"
+
   preferredDistribution: {
     type: String,
     enum: ["automatic", "manual", "direct"],
