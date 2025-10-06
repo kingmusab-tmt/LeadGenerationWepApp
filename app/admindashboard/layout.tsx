@@ -22,20 +22,17 @@ import {
 } from "@mui/material";
 import {
   Dashboard,
-  Settings,
   HelpOutline,
   Menu as MenuIcon,
-  Storefront,
   ReceiptLong,
   LocalAtm,
-  CallReceivedRounded,
   People,
   TireRepair,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
 import { useSession } from "next-auth/react";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 

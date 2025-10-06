@@ -17,8 +17,12 @@ import {
   Divider,
   Button,
   Skeleton,
+  Chip,
+  Alert,
+  Snackbar,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import WarningIcon from "@mui/icons-material/Warning";
 import { useSession } from "next-auth/react";
 
 interface Tier {
@@ -39,39 +43,94 @@ interface Tier {
   order: number;
 }
 
+interface SubscriptionCheckResponse {
+  isActive: boolean;
+  expiryDate: string | null;
+  usedTrial: boolean;
+  daysRemaining?: number;
+}
+
 export default function PricingSection() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [subscriptionInfo, setSubscriptionInfo] =
+    useState<SubscriptionCheckResponse | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   useEffect(() => {
-    const fetchTiers = async () => {
+    const checkSubscriptionAndFetchTiers = async () => {
       try {
-        const response = await fetch("/api/tiers");
-        if (!response.ok) {
+        // Only check subscription status if user is authenticated
+        if (status === "authenticated" && session?.user) {
+          // Check if user has an active subscription
+          const subscriptionCheck = await fetch("/api/subscriptions/check", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (subscriptionCheck.ok) {
+            const subscriptionData: SubscriptionCheckResponse =
+              await subscriptionCheck.json();
+            setSubscriptionInfo(subscriptionData);
+
+            // Calculate days remaining if expiry date exists
+            let daysRemaining = 0;
+            if (subscriptionData.expiryDate) {
+              const expiry = new Date(subscriptionData.expiryDate);
+              const today = new Date();
+              const timeDiff = expiry.getTime() - today.getTime();
+              daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            }
+
+            // If user has active subscription AND it's not expiring soon (more than 10 days), redirect
+            if (subscriptionData.isActive && daysRemaining > 10) {
+              setShouldRedirect(true);
+              return; // Don't fetch tiers if user is subscribed with sufficient time
+            }
+
+            // If subscription is active but expiring soon (<=10 days) or inactive, allow access to pricing
+          }
+        }
+
+        // Fetch pricing tiers for non-subscribed users, users with expiring subscriptions, or unauthenticated users
+        const tiersResponse = await fetch("/api/tiers");
+        if (!tiersResponse.ok) {
           throw new Error("Failed to fetch pricing tiers");
         }
-        const data = await response.json();
-        setTiers(data);
+        const tiersData = await tiersResponse.json();
+        setTiers(tiersData);
       } catch (err) {
-        console.error("Error fetching tiers:", err);
+        console.error("Error:", err);
         setError("Failed to load pricing information. Please try again later.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTiers();
-  }, []);
+    checkSubscriptionAndFetchTiers();
+  }, [session, status]);
+
+  // Handle redirect after component render
+  useEffect(() => {
+    if (shouldRedirect && session?.user?.role) {
+      router.push(`/dashboard/${session.user.role}/overview`);
+    }
+  }, [shouldRedirect, session, router]);
 
   const handleSelectPlan = async (tier: Tier) => {
     if (isProcessing) return;
     setIsProcessing(true);
+    setApiError(null); // Clear previous errors
 
     try {
       if (tier.tierType === "free") {
@@ -88,26 +147,101 @@ export default function PricingSection() {
           }),
         });
 
+        const responseData = await response.json();
+
         if (!response.ok) {
-          throw new Error("Failed to update subscription");
+          // Handle specific error for used trial
+          if (response.status === 400 && responseData.error) {
+            setApiError(responseData.error);
+            setShowErrorSnackbar(true);
+            return; // Don't proceed with redirect
+          }
+          throw new Error(
+            responseData.error || "Failed to update subscription"
+          );
         }
 
-        // Redirect to dashboard or success page
-        router.push(`/dashboard/${session?.user.role}/overview`);
+        // Redirect to dashboard after successful subscription
+        router.push(`/dashboard/${session?.user?.role}/overview`);
       } else {
         // Redirect to checkout for paid tiers
         router.push(`/checkout?plan=${tier._id}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error processing subscription:", err);
-      setError(
-        "Failed to process your request. Please try again or contact support."
-      );
+      // Only set generic error if it's not the specific trial error
+      if (!err.message?.includes("already used your free trial")) {
+        setError(
+          "Failed to process your request. Please try again or contact support."
+        );
+      }
     } finally {
       setIsProcessing(false);
     }
   };
 
+  const handleCloseErrorSnackbar = () => {
+    setShowErrorSnackbar(false);
+    setApiError(null);
+  };
+
+  // Filter out free tier if user has already used trial
+  const filteredTiers = subscriptionInfo?.usedTrial
+    ? tiers.filter((tier) => tier.tierType !== "free")
+    : tiers;
+
+  // Determine if user is renewing (has active subscription that's expiring soon)
+  const isRenewing =
+    subscriptionInfo?.isActive &&
+    subscriptionInfo.expiryDate &&
+    (() => {
+      if (!subscriptionInfo.expiryDate) return false;
+      const expiry = new Date(subscriptionInfo.expiryDate);
+      const today = new Date();
+      const timeDiff = expiry.getTime() - today.getTime();
+      const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return daysRemaining <= 10;
+    })();
+
+  // Calculate days remaining for display
+  const daysRemaining = subscriptionInfo?.expiryDate
+    ? Math.ceil(
+        (new Date(subscriptionInfo.expiryDate).getTime() -
+          new Date().getTime()) /
+          (1000 * 3600 * 24)
+      )
+    : 0;
+
+  // Show loading state while checking authentication and subscription
+  if (status === "loading" || loading) {
+    return (
+      <Box py={{ xs: 6, md: 10 }} bgcolor="background.paper" id="pricing">
+        <Container maxWidth="lg">
+          <Typography
+            variant="h3"
+            align="center"
+            gutterBottom
+            sx={{ fontWeight: 700 }}
+          >
+            Simple, Transparent Pricing
+          </Typography>
+          <Grid container spacing={4} mt={6}>
+            {[0, 1, 2].map((index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Skeleton
+                  variant="rectangular"
+                  height={400}
+                  sx={{ borderRadius: 2 }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </Container>
+      </Box>
+    );
+  }
+
+  // Show error state if there's an error
   if (error) {
     return (
       <Box py={10} bgcolor="background.paper" id="pricing">
@@ -123,16 +257,47 @@ export default function PricingSection() {
     );
   }
 
+  // Don't render anything if redirecting (brief moment before redirect happens)
+  if (shouldRedirect) {
+    return (
+      <Box py={10} bgcolor="background.paper" id="pricing">
+        <Container maxWidth="lg">
+          <Typography align="center">
+            Redirecting to your dashboard...
+          </Typography>
+        </Container>
+      </Box>
+    );
+  }
+
   return (
     <Box py={{ xs: 6, md: 10 }} bgcolor="background.paper" id="pricing">
       <Container maxWidth="lg">
+        {/* Error Snackbar for API errors */}
+        <Snackbar
+          open={showErrorSnackbar}
+          autoHideDuration={6000}
+          onClose={handleCloseErrorSnackbar}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            severity="error"
+            onClose={handleCloseErrorSnackbar}
+            sx={{ width: "100%" }}
+          >
+            {apiError}
+          </Alert>
+        </Snackbar>
+
         <Typography
           variant="h3"
           align="center"
           gutterBottom
           sx={{ fontWeight: 700 }}
         >
-          Simple, Transparent Pricing
+          {isRenewing
+            ? "Renew Your Subscription"
+            : "Simple, Transparent Pricing"}
         </Typography>
         <Typography
           variant="subtitle1"
@@ -141,31 +306,50 @@ export default function PricingSection() {
           paragraph
           sx={{ maxWidth: 600, mx: "auto" }}
         >
-          Choose the plan that fits your business needs. Start with our free
-          tier and upgrade anytime.
+          {isRenewing
+            ? `Your subscription expires in ${daysRemaining} day${
+                daysRemaining !== 1 ? "s" : ""
+              }. Choose a plan to continue uninterrupted service.`
+            : "Choose the plan that fits your business needs. Start with our free tier and upgrade anytime."}
         </Typography>
 
-        {loading ? (
-          <Grid container spacing={4} mt={6}>
-            {[0, 1, 2].map((index) => (
-              <Grid item xs={12} sm={6} md={4} key={index}>
-                <Skeleton
-                  variant="rectangular"
-                  height={400}
-                  sx={{ borderRadius: 2 }}
-                />
-              </Grid>
-            ))}
-          </Grid>
-        ) : tiers.length > 0 ? (
+        {/* Alert for expiring subscription */}
+        {isRenewing && (
+          <Alert
+            severity="warning"
+            icon={<WarningIcon />}
+            sx={{ mb: 4, maxWidth: 600, mx: "auto" }}
+          >
+            <Typography variant="subtitle2" gutterBottom>
+              Subscription Expiring Soon
+            </Typography>
+            <Typography variant="body2">
+              Your current subscription will expire in {daysRemaining} day
+              {daysRemaining !== 1 ? "s" : ""}. Renew now to maintain access to
+              all features and avoid service interruption.
+            </Typography>
+          </Alert>
+        )}
+
+        {/* Alert for used trial */}
+        {subscriptionInfo?.usedTrial && !isRenewing && (
+          <Alert severity="info" sx={{ mb: 4, maxWidth: 600, mx: "auto" }}>
+            <Typography variant="body2">
+              You've already used your free trial. Upgrade to a paid plan to
+              continue using our services.
+            </Typography>
+          </Alert>
+        )}
+
+        {filteredTiers.length > 0 ? (
           <Grid
             container
             spacing={4}
-            mt={6}
+            mt={2}
             alignItems="stretch"
             justifyContent="center"
           >
-            {tiers.map((tier, index) => (
+            {filteredTiers.map((tier) => (
               <Grid
                 item
                 xs={12}
@@ -189,6 +373,10 @@ export default function PricingSection() {
                     display: "flex",
                     flexDirection: "column",
                     position: "relative",
+                    opacity:
+                      subscriptionInfo?.usedTrial && tier.tierType === "free"
+                        ? 0.6
+                        : 1,
                     "&:hover": {
                       boxShadow: theme.shadows[8],
                       transform:
@@ -227,6 +415,27 @@ export default function PricingSection() {
                     >
                       <Typography variant="caption" fontWeight="bold">
                         SAVE {tier.discountPercentage}%
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Used Trial Badge */}
+                  {subscriptionInfo?.usedTrial && tier.tierType === "free" && (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 16,
+                        left: 16,
+                        bgcolor: "grey.500",
+                        color: "white",
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1,
+                        zIndex: 1,
+                      }}
+                    >
+                      <Typography variant="caption" fontWeight="bold">
+                        TRIAL USED
                       </Typography>
                     </Box>
                   )}
@@ -318,7 +527,11 @@ export default function PricingSection() {
                       color={tier.highlight ? "primary" : "inherit"}
                       size="large"
                       onClick={() => handleSelectPlan(tier)}
-                      disabled={isProcessing}
+                      disabled={
+                        isProcessing ||
+                        (subscriptionInfo?.usedTrial &&
+                          tier.tierType === "free")
+                      }
                       sx={{
                         py: 1.5,
                         fontWeight: 600,
@@ -327,8 +540,15 @@ export default function PricingSection() {
                     >
                       {isProcessing
                         ? "Processing..."
+                        : subscriptionInfo?.usedTrial &&
+                          tier.tierType === "free"
+                        ? "Trial Used"
+                        : isRenewing
+                        ? tier.tierType === "free"
+                          ? "Switch to Free"
+                          : "Renew Plan"
                         : tier.ctaText ||
-                          (tier.isFree ? "Get Started" : "Subscribe")}
+                          (tier.isFree ? "Start Free Trial" : "Subscribe")}
                     </Button>
                   </CardActions>
                 </Card>

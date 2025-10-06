@@ -13,6 +13,7 @@ interface ISubscription {
   subscriptionExpiryDate: Date; // when Free Tier or Paid plan ends
   isSubscriptionActive: boolean; // true/false
   isTrial: boolean; // true if Free Tier trial is active
+  usedTrial: boolean; // true if user has used their Free Tier trial
   subscriptionRenewalDate?: Date;
   subscriptionPaymentMethod: "stripe" | "paypal" | "free";
   subscriptionPaymentId?: string; // Stripe/PayPal subscription ID
@@ -281,6 +282,7 @@ const UserSchema: Schema = new Schema<IUser>(
     stripeCustomerId: { type: String },
     paypalCustomerId: { type: String },
     subscription: {
+      usedTrial: { type: Boolean, default: false },
       subscriptionPlan: {
         type: String,
       },
