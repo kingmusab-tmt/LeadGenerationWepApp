@@ -166,19 +166,3 @@ export default async function handler(
     res.status(500).json({ error: "Internal server error" });
   }
 }
-
-// async function notifyBuyer(
-//   buyer: IBuyer,
-//   lead: Partial<ILead>,
-//   assignment: assignedto[]
-// ) {
-//   // Implement email/SMS notification here
-//   console.log(`Notifying buyer ${buyer.name} about new lead assignment`);
-
-//   // Example: Send email notification
-//   // await sendEmail({
-//   //   to: buyer.email,
-//   //   subject: 'New Lead Assignment',
-//   //   body: `You have been assigned a new lead: ${lead.name} from ${lead.company}`
-//   // });
-// }
