@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 // Define the interface for the Buyer document
 export interface IBuyer extends Document {
+  industries: any;
   _id: string;
   name: string;
   company: string;

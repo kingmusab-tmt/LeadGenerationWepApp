@@ -1,7 +1,7 @@
 import { ChatbotEngine } from "@/lib/chatbot-engine";
 import { QualificationFlow } from "@/types/chatbot";
 import dbConnect from "@/lib/connectdb";
-import { NextRequest, NextResponse } from "next/server";
+// Use Web standard Request/Response types for Next.js route handlers
 import { Lead as LeadModel } from "@/models/leads";
 
 const qualificationFlow: QualificationFlow = {
@@ -103,15 +103,18 @@ const qualificationFlow: QualificationFlow = {
 
 let chatbotEngine: ChatbotEngine;
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
+    const body = await request.json();
     const { conversationId, message, leadData } = body;
 
     if (!conversationId || !message) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        }
       );
     }
 
@@ -155,13 +158,13 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    return NextResponse.json(
-      {
+    return new Response(
+      JSON.stringify({
         response: result.response,
         nextQuestion: result.nextQuestion,
         qualificationScore: result.leadUpdate?.qualificationScore,
-      },
-      { status: 200 }
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
     );
   } catch (error) {
     console.error("Chatbot error:", error);
@@ -171,6 +174,9 @@ export async function POST(req: NextRequest) {
       error instanceof Error ? error.message : "Internal server error";
     const statusCode = errorMessage.includes("API key") ? 401 : 500;
 
-    return NextResponse.json({ error: errorMessage }, { status: statusCode });
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: statusCode,
+      headers: { "content-type": "application/json" },
+    });
   }
 }

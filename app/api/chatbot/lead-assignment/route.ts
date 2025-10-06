@@ -1,5 +1,5 @@
 // pages/api/lead-assignment/round-robin.ts
-import { NextApiRequest, NextApiResponse } from "next";
+import { NextResponse } from "next/server";
 import type { IBuyer } from "@/models/leadbuyers";
 import { ILead } from "@/models/leads";
 import { Buyer } from "@/models/leadbuyers";
@@ -109,20 +109,17 @@ class RoundRobinAssigner {
   }
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
+export async function POST(req: Request) {
   try {
     await dbConnect();
-    const { lead } = req.body;
+    const body = await req.json();
+    const { lead } = body;
 
     if (!lead) {
-      return res.status(400).json({ error: "Lead data is required" });
+      return NextResponse.json(
+        { error: "Lead data is required" },
+        { status: 400 }
+      );
     }
 
     const Buyers = await Buyer.find({ isActive: true })
@@ -136,11 +133,14 @@ export default async function handler(
     const result = assigner.assignLead(lead);
 
     if (!result.buyer) {
-      return res.status(200).json({
-        success: false,
-        message: result.reason || "No available buyers",
-        assignment: null,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: result.reason || "No available buyers",
+          assignment: null,
+        },
+        { status: 200 }
+      );
     }
 
     // In production, save assignment to database
@@ -150,19 +150,25 @@ export default async function handler(
     // Send notification to buyer (implement email/SMS service)
     // await this.notifyBuyer(result.buyer, lead, result.assignment);
 
-    res.status(200).json({
-      success: true,
-      message: "Lead successfully assigned",
-      buyer: {
-        id: result.buyer.id,
-        name: result.buyer.name,
-        email: result.buyer.email,
-        company: result.buyer.company,
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Lead successfully assigned",
+        buyer: {
+          id: result.buyer.id,
+          name: result.buyer.name,
+          email: result.buyer.email,
+          company: result.buyer.company,
+        },
+        assignment: result.assignment,
       },
-      assignment: result.assignment,
-    });
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Assignment error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
