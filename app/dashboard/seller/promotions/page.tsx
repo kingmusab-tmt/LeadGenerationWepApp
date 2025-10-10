@@ -5,7 +5,7 @@ import UserDashboard from "../layout";
 const Promotionpage = () => {
   return (
     <UserDashboard>
-      <Container>
+      <Container sx={{ mt: 6, mb: 4 }}>
         <Typography variant="h4">Promotions</Typography>
         {/* Add Promotions Details */}
       </Container>

@@ -238,7 +238,7 @@ const TransactionHistory: React.FC = () => {
   }
 
   return (
-    <Container sx={{ mt: 6 }}>
+    <Container sx={{ mt: 10 }}>
       <Typography variant="h6" align="center" sx={{ mb: 2 }}>
         Transaction History
       </Typography>

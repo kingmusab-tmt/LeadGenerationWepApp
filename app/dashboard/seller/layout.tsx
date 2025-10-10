@@ -447,7 +447,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
             </Tooltip>
             <ListItemText primary="Lead Manual Assignment" />
           </ListItem>
-          <ListItem
+          {/* <ListItem
             component="button"
             onClick={() => handleNavigation("promotions")}
             sx={{
@@ -469,7 +469,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               </ListItemIcon>
             </Tooltip>
             <ListItemText primary="Promotions" />
-          </ListItem>
+          </ListItem> */}
           <ListItem
             component="button"
             onClick={() => handleNavigation("calltrackingsetting")}

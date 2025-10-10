@@ -186,7 +186,7 @@ const AssignLeads = () => {
   const isLoadingData = isFetching.leads || isFetching.buyers;
 
   return (
-    <Paper sx={{ p: 2 }}>
+    <Paper sx={{ mt: 6, p: 2 }}>
       <Typography variant="h5" gutterBottom>
         Assign Leads
       </Typography>

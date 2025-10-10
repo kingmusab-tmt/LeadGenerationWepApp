@@ -474,7 +474,7 @@ const TransactionHistory = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 2, mb: 4, p: isMobile ? 1 : 2 }}>
+    <Container maxWidth="lg" sx={{ mt: 6, mb: 4, p: isMobile ? 1 : 2 }}>
       <Stack spacing={isMobile ? 2 : 3}>
         <Box
           display="flex"

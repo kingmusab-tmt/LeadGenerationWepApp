@@ -304,7 +304,7 @@ const BuyerLeads: React.FC = () => {
   }
 
   return (
-    <Container sx={{ mt: 6, mb: 4 }}>
+    <Container sx={{ mt: 8, mb: 4 }}>
       <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold", mb: 3 }}>
         Lead Marketplace
       </Typography>
