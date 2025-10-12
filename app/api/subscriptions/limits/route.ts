@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
           twilioActivated: 1,
           "subscription.subscriptionLimits": 1,
           "subscription.subscriptionTierId": 1,
-          buyerCount: { $size: "$buyers" },
+          buyerCount: { $size: { $ifNull: ["$buyers", []] } },
         },
       },
     ]);

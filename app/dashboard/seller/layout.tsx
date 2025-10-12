@@ -18,8 +18,14 @@ import {
   Tooltip,
   CssBaseline,
   CircularProgress,
-  Popover,
   Backdrop,
+  Chip,
+  Divider,
+  useTheme,
+  useMediaQuery,
+  alpha,
+  Badge,
+  Popover,
 } from "@mui/material";
 import {
   Dashboard,
@@ -29,18 +35,21 @@ import {
   HelpOutline,
   Menu as MenuIcon,
   Verified,
-  Discount,
   Call,
   Receipt,
   FormatListBulleted,
   People,
   Person,
   Build,
+  Logout,
+  KeyboardArrowDown,
+  KeyboardArrowRight,
+  ChevronLeft,
+  Notifications,
+  Email,
 } from "@mui/icons-material";
-import { useTheme } from "@mui/material/styles";
-import { useMediaQuery } from "@mui/material";
 import { useSession } from "next-auth/react";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import InactivityLogout from "@/app/components/generalComponent/InactivityLogout";
 
@@ -52,7 +61,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const { data: session } = useSession();
   const [image, setImage] = useState(session?.user?.image || "");
   const [name, setName] = useState(session?.user?.name || "");
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [subMenuAnchorEl, setSubMenuAnchorEl] = useState<null | HTMLElement>(
     null
@@ -61,6 +70,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [leadManagementOpen, setLeadManagementOpen] = useState(false);
   const [subMenuVisible, setSubMenuVisible] = useState(false);
   let subMenuTimeout: NodeJS.Timeout;
 
@@ -71,10 +81,15 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     }
   }, [session]);
 
-  const handleNavigation = (path: string) => {
+  const handleNavigation = (path?: string) => {
+    if (!path) return;
     setLoading(true);
     try {
       router.push(`/dashboard/seller/${path}`, { scroll: false });
+      if (isMobile) {
+        setMenuOpen(false);
+      }
+      setSubMenuVisible(false);
     } finally {
       setLoading(false);
     }
@@ -103,182 +118,336 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     setAnchorEl(null);
   };
 
+  const toggleLeadManagement = () => {
+    setLeadManagementOpen((prev) => !prev);
+  };
+
   const handleSubMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    clearTimeout(subMenuTimeout);
-    setSubMenuAnchorEl(event.currentTarget);
-    setSubMenuVisible(true);
+    if (!menuOpen && !isMobile) {
+      clearTimeout(subMenuTimeout);
+      setSubMenuAnchorEl(event.currentTarget);
+      setSubMenuVisible(true);
+    }
   };
 
   const handleSubMenuClose = () => {
-    subMenuTimeout = setTimeout(() => {
-      setSubMenuVisible(false);
-      setSubMenuAnchorEl(null);
-    }, 300); // Adjust the delay as needed
+    if (!menuOpen && !isMobile) {
+      subMenuTimeout = setTimeout(() => {
+        setSubMenuVisible(false);
+        setSubMenuAnchorEl(null);
+      }, 300);
+    }
   };
 
-  const subMenuOpen = Boolean(subMenuAnchorEl);
+  const menuItems = [
+    { icon: <Dashboard />, text: "Overview", path: "overview" },
+    {
+      icon: <Person />,
+      text: "Buyers Management",
+      path: "lead_buyers_management",
+    },
+    {
+      icon: <Group />,
+      text: "Lead Management",
+      hasSubmenu: true,
+      subItems: [
+        { icon: <Group />, text: "Leads", path: "lead_management" },
+        {
+          icon: <Build />,
+          text: "Form Builder",
+          path: "lead_management/formbuilder",
+        },
+        {
+          icon: <FormatListBulleted />,
+          text: "Forms",
+          path: "lead_management/forms",
+        },
+        {
+          icon: <Receipt />,
+          text: "Transactions",
+          path: "lead_management/transactions",
+        },
+        {
+          icon: <People />,
+          text: "Call Leads",
+          path: "lead_management/leadbuyers",
+        },
+      ],
+    },
+    { icon: <Campaign />, text: "Campaigns", path: "campaigns" },
+    {
+      icon: <Verified />,
+      text: "Lead Manual Assignment",
+      path: "lead_verification",
+    },
+    { icon: <Call />, text: "Call Track Setting", path: "calltrackingsetting" },
+  ];
+
+  const bottomMenuItems = [
+    { icon: <HelpOutline />, text: "Help", path: "help" },
+    { icon: <Settings />, text: "Settings", path: "settings" },
+  ];
 
   return (
-    <Box sx={{ display: "flex", height: "100vh" }}>
+    <Box sx={{ display: "flex", height: "100vh", backgroundColor: "#f5f5f5" }}>
       <CssBaseline />
       <InactivityLogout />
-      <AppBar position="fixed">
-        <Toolbar>
-          <IconButton
-            edge="start"
-            color="inherit"
-            aria-label="menu"
-            sx={{ mr: 2 }}
-            onClick={toggleMenu}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Dashboard
-          </Typography>
+
+      {/* AppBar with original blue color */}
+      <AppBar
+        position="fixed"
+        elevation={2}
+        sx={{
+          backgroundColor: "#1976d2",
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+        }}
+      >
+        <Toolbar
+          sx={{ justifyContent: "space-between", minHeight: "64px!important" }}
+        >
           <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Avatar
-              src={image}
-              alt={`${name}'s profile picture`}
-              onClick={handleMenuOpen}
-              sx={{ cursor: "pointer" }}
-            />
+            <IconButton
+              edge="start"
+              color="inherit"
+              aria-label="menu"
+              onClick={toggleMenu}
+              sx={{ mr: 2 }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
+              Seller Dashboard
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {/* <Tooltip title="Notifications">
+              <IconButton color="inherit">
+                <Badge badgeContent={3} color="error">
+                  <Notifications />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Messages">
+              <IconButton color="inherit">
+                <Badge badgeContent={1} color="error">
+                  <Email />
+                </Badge>
+              </IconButton>
+            </Tooltip> */}
+
+            <Tooltip title="Account">
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  cursor: "pointer",
+                  p: 1,
+                  borderRadius: 1,
+                  "&:hover": {
+                    backgroundColor: alpha("#fff", 0.1),
+                  },
+                }}
+                onClick={handleMenuOpen}
+              >
+                <Avatar
+                  src={image}
+                  alt={`${name}'s profile picture`}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                  }}
+                />
+                <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                  <Typography variant="body2" fontWeight="500">
+                    {name}
+                  </Typography>
+                </Box>
+                <KeyboardArrowDown />
+              </Box>
+            </Tooltip>
+
             <Menu
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
+              PaperProps={{
+                elevation: 3,
+                sx: {
+                  mt: 1.5,
+                  minWidth: 160,
+                  "& .MuiMenuItem-root": {
+                    px: 2,
+                    py: 1,
+                  },
+                },
+              }}
             >
               <MenuItem onClick={() => handleNavigation("settings")}>
+                <ListItemIcon>
+                  <Settings fontSize="small" />
+                </ListItemIcon>
                 Settings
               </MenuItem>
-              <MenuItem onClick={() => onSignOut()}>
-                {loading ? (
-                  <CircularProgress size={24} style={{ color: "white" }} />
-                ) : (
-                  loading || "Sign Out"
-                )}
+              <Divider />
+              <MenuItem onClick={onSignOut}>
+                <ListItemIcon>
+                  <Logout fontSize="small" />
+                </ListItemIcon>
+                Sign Out
               </MenuItem>
             </Menu>
           </Box>
         </Toolbar>
       </AppBar>
 
+      {/* Sidebar with original blue color scheme */}
       <Drawer
         variant={isMobile ? "temporary" : "permanent"}
         open={menuOpen}
         onClose={toggleMenu}
         sx={{
-          width: menuOpen ? 240 : 60,
+          width: menuOpen ? 240 : 10,
+          flexShrink: 0,
           [`& .MuiDrawer-paper`]: {
             width: menuOpen ? 240 : 60,
             boxSizing: "border-box",
-            transition: "width 0.3s",
-            mt: 8,
+            transition: "width 0.3s ease",
+            mt: "64px",
+            backgroundColor: "white",
+            overflowX: "hidden",
           },
         }}
       >
-        <List sx={{ backgroundColor: "white" }}>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("overview")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Overview" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Dashboard />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Overview" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("lead_buyers_management")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
+        <Box sx={{ p: 1, display: "flex", justifyContent: "flex-end" }}>
+          {menuOpen && (
+            <IconButton
+              onClick={toggleMenu}
+              size="small"
+              sx={{ color: "blue" }}
+            >
+              <ChevronLeft />
+            </IconButton>
+          )}
+        </Box>
 
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Buyers Management" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Person />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Buyers Management" />
-          </ListItem>
+        <List sx={{ p: 0 }}>
+          {menuItems.map((item) => (
+            <React.Fragment key={item.text}>
+              {item.hasSubmenu ? (
+                <>
+                  <ListItem
+                    component="button"
+                    onClick={menuOpen ? toggleLeadManagement : undefined}
+                    onMouseEnter={handleSubMenuOpen}
+                    onMouseLeave={handleSubMenuClose}
+                    sx={{
+                      width: "100%",
+                      textAlign: "left",
+                      color: "blue",
+                      backgroundColor: "white",
+                      border: "none",
+                      py: 2,
+                      px: 2,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      "&:hover": {
+                        backgroundColor: "blue",
+                        color: "white",
+                        "& .MuiListItemIcon-root": {
+                          color: "white",
+                        },
+                      },
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 40,
+                          color: "blue",
+                        }}
+                      >
+                        {item.icon}
+                      </ListItemIcon>
+                      {menuOpen && <ListItemText primary={item.text} />}
+                    </Box>
+                    {menuOpen && (
+                      <KeyboardArrowRight
+                        sx={{
+                          transform: leadManagementOpen
+                            ? "rotate(90deg)"
+                            : "none",
+                          transition: "transform 0.2s",
+                        }}
+                      />
+                    )}
+                  </ListItem>
 
-          <ListItem
-            component="button"
-            onMouseEnter={handleSubMenuOpen}
-            onMouseLeave={handleSubMenuClose}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Lead Management" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Group />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Lead Management" />
-          </ListItem>
-
-          <Popover
-            open={subMenuVisible}
-            anchorEl={subMenuAnchorEl}
-            onClose={handleSubMenuClose}
-            anchorOrigin={{
-              vertical: "top",
-              horizontal: "right",
-            }}
-            transformOrigin={{
-              vertical: "top",
-              horizontal: "left",
-            }}
-            sx={{
-              pointerEvents: "auto",
-            }}
-            disableRestoreFocus
-            onMouseEnter={() => clearTimeout(subMenuTimeout)}
-            onMouseLeave={handleSubMenuClose}
-          >
-            <Box sx={{ p: 2, backgroundColor: "white" }}>
-              <List>
+                  {/* Expanded submenu when sidebar is open */}
+                  {leadManagementOpen && menuOpen && (
+                    <Box sx={{ pl: 3 }}>
+                      {item.subItems.map((subItem) => (
+                        <ListItem
+                          key={subItem.text}
+                          component="button"
+                          onClick={() => handleNavigation(subItem.path)}
+                          sx={{
+                            width: "100%",
+                            textAlign: "left",
+                            color: "blue",
+                            backgroundColor: "white",
+                            border: "none",
+                            py: 2,
+                            px: 2,
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            display: "flex",
+                            alignItems: "center",
+                            "&:hover": {
+                              backgroundColor: "blue",
+                              color: "white",
+                              "& .MuiListItemIcon-root": {
+                                color: "white",
+                              },
+                            },
+                          }}
+                        >
+                          <ListItemIcon
+                            sx={{
+                              minWidth: 36,
+                              color: "blue",
+                            }}
+                          >
+                            {subItem.icon}
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={subItem.text}
+                            primaryTypographyProps={{ fontSize: "0.85rem" }}
+                          />
+                        </ListItem>
+                      ))}
+                    </Box>
+                  )}
+                </>
+              ) : (
                 <ListItem
                   component="button"
-                  onClick={() => handleNavigation("lead_management")}
+                  onClick={() => handleNavigation(item.path)}
                   sx={{
+                    width: "100%",
+                    textAlign: "left",
                     color: "blue",
                     backgroundColor: "white",
                     border: "none",
+                    py: 2,
+                    px: 2,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
                     "&:hover": {
                       backgroundColor: "blue",
                       color: "white",
@@ -288,265 +457,154 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
                     },
                   }}
                 >
-                  <Tooltip title="Leads" placement="right">
-                    <ListItemIcon sx={{ color: "blue" }}>
-                      <Group />
-                    </ListItemIcon>
-                  </Tooltip>
-                  <ListItemText primary="Leads" />
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 40,
+                      color: "blue",
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  {menuOpen && <ListItemText primary={item.text} />}
                 </ListItem>
-
-                <ListItem
-                  component="button"
-                  onClick={() =>
-                    handleNavigation("lead_management/formbuilder")
-                  }
-                  sx={{
-                    color: "blue",
-                    backgroundColor: "white",
-                    border: "none",
-                    "&:hover": {
-                      backgroundColor: "blue",
-                      color: "white",
-                      "& .MuiListItemIcon-root": {
-                        color: "white",
-                      },
-                    },
-                  }}
-                >
-                  <Tooltip title="Form Builder" placement="right">
-                    <ListItemIcon sx={{ color: "blue" }}>
-                      <Build />
-                    </ListItemIcon>
-                  </Tooltip>
-                  <ListItemText primary="Form Builder" />
-                </ListItem>
-
-                <ListItem
-                  component="button"
-                  onClick={() => handleNavigation("lead_management/forms")}
-                  sx={{
-                    color: "blue",
-                    backgroundColor: "white",
-                    border: "none",
-                    "&:hover": {
-                      backgroundColor: "blue",
-                      color: "white",
-                      "& .MuiListItemIcon-root": {
-                        color: "white",
-                      },
-                    },
-                  }}
-                >
-                  <Tooltip title="Forms" placement="right">
-                    <ListItemIcon sx={{ color: "blue" }}>
-                      <FormatListBulleted />
-                    </ListItemIcon>
-                  </Tooltip>
-                  <ListItemText primary="Forms" />
-                </ListItem>
-
-                <ListItem
-                  component="button"
-                  onClick={() =>
-                    handleNavigation("lead_management/transactions")
-                  }
-                  sx={{
-                    color: "blue",
-                    backgroundColor: "white",
-                    border: "none",
-                    "&:hover": {
-                      backgroundColor: "blue",
-                      color: "white",
-                      "& .MuiListItemIcon-root": {
-                        color: "white",
-                      },
-                    },
-                  }}
-                >
-                  <Tooltip title="Transactions" placement="right">
-                    <ListItemIcon sx={{ color: "blue" }}>
-                      <Receipt />
-                    </ListItemIcon>
-                  </Tooltip>
-                  <ListItemText primary="Transactions" />
-                </ListItem>
-
-                <ListItem
-                  component="button"
-                  onClick={() => handleNavigation("lead_management/leadbuyers")}
-                  sx={{
-                    color: "blue",
-                    backgroundColor: "white",
-                    mt: 1,
-                    border: "none",
-                    "&:hover": {
-                      backgroundColor: "blue",
-                      color: "white",
-                      "& .MuiListItemIcon-root": {
-                        color: "white",
-                      },
-                    },
-                  }}
-                >
-                  <Tooltip title="Call Leads " placement="right">
-                    <ListItemIcon sx={{ color: "blue" }}>
-                      <People />
-                    </ListItemIcon>
-                  </Tooltip>
-                  <ListItemText primary="Call Leads" />
-                </ListItem>
-              </List>
-            </Box>
-          </Popover>
-
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("campaigns")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Campaigns" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Campaign />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Campaigns" />
-          </ListItem>
-
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("lead_verification")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Lead Manual Assignment" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Verified />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Lead Manual Assignment" />
-          </ListItem>
-          {/* <ListItem
-            component="button"
-            onClick={() => handleNavigation("promotions")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Promotions" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Discount />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Promotions" />
-          </ListItem> */}
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("calltrackingsetting")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Call Track Setting" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Call />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Call Track Setting" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("help")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Help" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <HelpOutline />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Help" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("settings")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Settings" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Settings />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Settings" />
-          </ListItem>
+              )}
+            </React.Fragment>
+          ))}
         </List>
+
+        {/* Hover submenu popover for collapsed sidebar */}
+        <Popover
+          open={subMenuVisible && !menuOpen && !isMobile}
+          anchorEl={subMenuAnchorEl}
+          onClose={handleSubMenuClose}
+          anchorOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "left",
+          }}
+          sx={{
+            pointerEvents: "auto",
+            ml: 1,
+          }}
+          disableRestoreFocus
+          onMouseEnter={() => clearTimeout(subMenuTimeout)}
+          onMouseLeave={handleSubMenuClose}
+        >
+          <Box sx={{ p: 1, backgroundColor: "white", minWidth: 200 }}>
+            <List sx={{ p: 0 }}>
+              {(menuItems.find((item) => item.hasSubmenu)?.subItems ?? []).map(
+                (subItem) => (
+                  <ListItem
+                    key={subItem.text}
+                    component="button"
+                    onClick={() => handleNavigation(subItem.path)}
+                    sx={{
+                      width: "100%",
+                      textAlign: "left",
+                      color: "blue",
+                      backgroundColor: "white",
+                      border: "none",
+                      py: 1,
+                      px: 2,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      display: "flex",
+                      alignItems: "center",
+                      "&:hover": {
+                        backgroundColor: "blue",
+                        color: "white",
+                        "& .MuiListItemIcon-root": {
+                          color: "white",
+                        },
+                      },
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 36,
+                        color: "blue",
+                      }}
+                    >
+                      {subItem.icon}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={subItem.text}
+                      primaryTypographyProps={{ fontSize: "0.9rem" }}
+                    />
+                  </ListItem>
+                )
+              )}
+            </List>
+          </Box>
+        </Popover>
+
+        <Box sx={{ p: 0 }}>
+          <Divider sx={{ my: 1 }} />
+          <List sx={{ p: 0 }}>
+            {bottomMenuItems.map((item) => (
+              <ListItem
+                key={item.text}
+                component="button"
+                onClick={() => handleNavigation(item.path)}
+                sx={{
+                  width: "100%",
+                  textAlign: "left",
+                  color: "blue",
+                  backgroundColor: "white",
+                  border: "none",
+                  py: 1.2,
+                  px: 2,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    backgroundColor: "blue",
+                    color: "white",
+                    "& .MuiListItemIcon-root": {
+                      color: "white",
+                    },
+                  },
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    minWidth: 40,
+                    color: "blue",
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                {menuOpen && <ListItemText primary={item.text} />}
+              </ListItem>
+            ))}
+          </List>
+        </Box>
       </Drawer>
 
-      <Box component="main" sx={{ flexGrow: 1, mt: 3 }}>
+      {/* Main Content with reduced margins */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          mt: "10px",
+          // p: 2,
+          transition: "margin-left 0.3s ease",
+          marginLeft: menuOpen && !isMobile ? "10px" : "5px",
+          backgroundColor: "#f5f5f5",
+          minHeight: "calc(100vh - 64px)",
+        }}
+      >
         {children}
       </Box>
+
+      {/* Loading Backdrop */}
       <Backdrop
-        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        sx={{
+          color: "#fff",
+          zIndex: (theme) => theme.zIndex.drawer + 2,
+        }}
         open={loading}
       >
         <CircularProgress color="inherit" />

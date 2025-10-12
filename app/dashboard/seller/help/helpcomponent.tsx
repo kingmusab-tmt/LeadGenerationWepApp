@@ -159,7 +159,11 @@ const HelpSection = () => {
   return (
     <UserDashboard>
       <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
+        <Typography
+          variant="h5"
+          gutterBottom
+          sx={{ fontWeight: "bold", mb: 2, mt: 4, color: "primary.main" }}
+        >
           Help Center
         </Typography>
         <Typography variant="subtitle1" color="text.secondary" gutterBottom>

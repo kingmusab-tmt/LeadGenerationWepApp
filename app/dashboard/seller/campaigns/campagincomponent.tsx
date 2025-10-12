@@ -105,8 +105,12 @@ const CampaignManagement: React.FC = () => {
 
   return (
     <UserDashboard>
-      <Container>
-        <Typography variant="h4" gutterBottom sx={{ marginTop: 4 }}>
+      <Container sx={{ padding: { xs: 2, sm: 4 } }}>
+        <Typography
+          variant="h5"
+          gutterBottom
+          sx={{ marginTop: 4, fontWeight: "bold", color: "primary.main" }}
+        >
           Campaigns Management
         </Typography>
         <Button

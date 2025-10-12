@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Container,
 } from "@mui/material";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
@@ -186,8 +187,13 @@ const AssignLeads = () => {
   const isLoadingData = isFetching.leads || isFetching.buyers;
 
   return (
-    <Paper sx={{ mt: 6, p: 2 }}>
-      <Typography variant="h5" gutterBottom>
+    <Container sx={{ padding: { xs: 2, sm: 4 } }}>
+      {/* <Paper sx={{ mt: 6, p: 2 }}> */}
+      <Typography
+        variant="h5"
+        gutterBottom
+        sx={{ marginTop: 4, fontWeight: "bold", color: "primary.main" }}
+      >
         Assign Leads
       </Typography>
 
@@ -346,7 +352,8 @@ const AssignLeads = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Paper>
+      {/* </Paper> */}
+    </Container>
   );
 };
 

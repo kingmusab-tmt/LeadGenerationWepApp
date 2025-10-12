@@ -232,9 +232,13 @@ const FormBuilder = () => {
       <Typography
         variant="h4"
         gutterBottom
-        sx={{ fontSize: { xs: "1.5rem", sm: "2rem" } }}
+        sx={{ fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: "bold" }}
       >
         Lead Generation Form Builder
+      </Typography>
+      <Typography variant="body1" sx={{ mb: 4 }}>
+        Add field Label and click the field to Create your custom form. Preview
+        your form in real-time.
       </Typography>
       <Grid container spacing={2}>
         <Grid item xs={12} sm={4}>

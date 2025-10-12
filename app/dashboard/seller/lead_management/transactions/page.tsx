@@ -484,9 +484,9 @@ const TransactionHistory = () => {
           gap={isMobile ? 2 : 0}
         >
           <Typography
-            variant={isMobile ? "h5" : "h4"}
+            variant={isMobile ? "h5" : "h5"}
             component="h1"
-            sx={{ mt: 5 }}
+            sx={{ mt: 5, mb: 1, fontWeight: "bold", color: "primary.main" }}
           >
             Transaction History
           </Typography>

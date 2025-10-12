@@ -239,7 +239,11 @@ const TransactionHistory: React.FC = () => {
 
   return (
     <Container sx={{ mt: 10 }}>
-      <Typography variant="h6" align="center" sx={{ mb: 2 }}>
+      <Typography
+        variant="h6"
+        align="center"
+        sx={{ mt: 5, mb: 1, fontWeight: "bold", color: "primary.main" }}
+      >
         Transaction History
       </Typography>
       {/* Filter by Transaction Type */}

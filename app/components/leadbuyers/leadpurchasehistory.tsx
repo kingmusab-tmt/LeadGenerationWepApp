@@ -177,7 +177,11 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
 
   return (
     <Container sx={{ mt: 6 }}>
-      <Typography variant="h6" align="center" sx={{ mb: 2 }}>
+      <Typography
+        variant="h6"
+        align="center"
+        sx={{ mt: 5, mb: 1, fontWeight: "bold", color: "primary.main" }}
+      >
         Transaction History
       </Typography>
       <FormControl fullWidth sx={{ mb: 2 }}>

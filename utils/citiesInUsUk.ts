@@ -1,5 +1,5 @@
 // Array of cities for the location dropdown
-export const cities = [
+export const usCities = [
   // US Cities
   "New York, NY",
   "Los Angeles, CA",

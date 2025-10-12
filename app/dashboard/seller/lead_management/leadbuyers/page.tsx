@@ -291,7 +291,12 @@ export default function LeadTracking() {
           gap: 2,
         }}
       >
-        <Typography variant="h5" sx={{ fontWeight: "bold", mt: 4 }}>
+        <Typography
+          variant="h5"
+          sx={{ fontWeight: "bold", mt: 4, mb: 1 }}
+          component="h1"
+          color="primary"
+        >
           Call Tracking
         </Typography>
 

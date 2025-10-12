@@ -102,9 +102,9 @@ export default function SellerForms() {
     <UserDashboard>
       <Container sx={{ padding: { xs: 2, sm: 4 } }}>
         <Typography
-          variant="h4"
+          variant="h5"
           gutterBottom
-          sx={{ textAlign: "center", mb: 4, mt: 4 }}
+          sx={{ mb: 4, mt: 4, fontWeight: "bold", color: "primary.main" }}
         >
           My Forms
         </Typography>

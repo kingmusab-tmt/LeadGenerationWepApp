@@ -139,9 +139,6 @@ function InstallPrompt() {
 const Home: React.FC = () => {
   return (
     <div>
-      {/* <SignIn /> */}
-      {/* <PushNotificationManager />
-      <InstallPrompt /> */}
       <HomePage />
     </div>
   );
