@@ -62,7 +62,7 @@ export interface ILead extends Document {
 
 const LeadSchema = new Schema<ILead>(
   {
-    conversationId: { type: String, required: true, unique: true, default: "" },
+    conversationId: { type: String, unique: true, default: "" },
     name: { type: String, default: "" },
     email: { type: String, default: "" },
     phone: { type: String, default: "" },

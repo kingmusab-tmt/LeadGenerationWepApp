@@ -217,7 +217,7 @@ const Overview: React.FC = () => {
 
   return (
     <UserDashboard>
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="lg" sx={{ mt: 6, mb: 6 }}>
         {/* Profile Section */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} md={4}>
@@ -372,7 +372,7 @@ const Overview: React.FC = () => {
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={3}>
           {stats.slice(4).map((stat) => (
-            <Grid item xs={6} sm={4} md={3} key={stat.id}>
+            <Grid item xs={6} sm={4} md={3} key={stat.id} sx={{ mb: 6 }}>
               <StatCard>
                 <StatCardContent>
                   {statIcons[stat.id]}

@@ -379,7 +379,9 @@ const CheckoutContent = () => {
 
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
-    router.push(`/dashboard/${session?.user?.role}/overview`);
+    if (session) {
+      router.push(`/dashboard/${session?.user?.role}/overview`);
+    }
   };
 
   const handleCloseFailureModal = () => {

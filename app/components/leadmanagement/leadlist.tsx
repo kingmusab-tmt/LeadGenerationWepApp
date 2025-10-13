@@ -197,7 +197,7 @@ const LeadList: React.FC<LeadListProps> = ({
           gap: isMobile ? 2 : 0,
         }}
       >
-        <Button
+        {/* <Button
           variant="contained"
           color="primary"
           startIcon={<Add />}
@@ -205,7 +205,7 @@ const LeadList: React.FC<LeadListProps> = ({
           fullWidth={isMobile}
         >
           Add Lead
-        </Button>
+        </Button> */}
         <Button
           variant="contained"
           color="primary"
