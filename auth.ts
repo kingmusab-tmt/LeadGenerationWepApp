@@ -14,8 +14,8 @@ export const authOptions = {
 
   session: {
     strategy: "jwt",
-    maxAge: 2 * 24 * 60 * 60, // 2 days in seconds (this value is also the default)
-    updateAge: 12 * 60 * 60, // Re-issue token every 24 hours
+    maxAge: 1 * 24 * 60 * 60, // 1 days in seconds (this value is also the default)
+    updateAge: 60 * 60, // Re-issue token every 24 hours
   },
   pages: {
     signIn: "/auth/sign-in",

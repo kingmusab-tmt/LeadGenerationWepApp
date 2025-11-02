@@ -34,6 +34,7 @@ import Footer from "../components/generalComponent/Footer";
 import logo from "../../public/BRIXCOT.png";
 import Image from "next/image";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import { Description } from "@mui/icons-material";
 
 interface Tier {
   _id: string;
@@ -85,10 +86,63 @@ const LandingPage = () => {
     {
       icon: <PhoneIcon color="primary" />,
       text: "Twilio Phone Number Integration",
+      description:
+        "Enable seamless calling, and lead communication directly within the platform using Twilio.",
     },
-    { icon: <PeopleIcon color="primary" />, text: "Lead Buyer Management" },
-    { icon: <MonetizationOnIcon color="primary" />, text: "Lead Marketplace" },
-    { icon: <BuildIcon color="primary" />, text: "Custom Form Builder" },
+    {
+      icon: <PeopleIcon color="primary" />,
+      text: "Lead Buyer Management",
+      description:
+        "Easily manage and categorize your lead buyers for targeted lead distribution.",
+    },
+    {
+      icon: <MonetizationOnIcon color="primary" />,
+      text: "Lead Marketplace",
+      description:
+        "Access a wide range of lead sources and sell your leads in our integrated marketplace.",
+    },
+    {
+      icon: <BuildIcon color="primary" />,
+      text: "Custom Form Builder",
+      description:
+        "Create and customize lead capture forms to fit your business needs.",
+    },
+    {
+      icon: <Description color="primary" />,
+      text: "Detailed Reporting & Analytics",
+      description:
+        "Gain insights into your lead performance with comprehensive reports and analytics.",
+    },
+    {
+      icon: <CheckCircleIcon color="primary" />,
+      text: "Automated Lead Distribution",
+      description:
+        "Set up rules to automatically distribute leads to the right buyers based on your criteria.",
+    },
+    {
+      icon: <MonetizationOnIcon color="primary" />,
+      text: "Flexible Pricing Plans",
+      description:
+        "Choose from a variety of pricing plans to suit your business size and needs.",
+    },
+    {
+      icon: <BuildIcon color="primary" />,
+      text: "24/7 Customer Support",
+      description:
+        "Get assistance whenever you need it with our dedicated support team.",
+    },
+    // {
+    //   icon: <PeopleIcon color="primary" />,
+    //   text: "CRM Integration",
+    //   description:
+    //     "Seamlessly integrate with popular CRM systems to streamline your lead management process.",
+    // },
+    // {
+    //   icon: <PhoneIcon color="primary" />,
+    //   text: "Multi-Channel Lead Capture",
+    //   description:
+    //     "Capture leads from various channels including web forms, social media, and more.",
+    // },
   ];
 
   const testimonials = [
@@ -142,7 +196,7 @@ const LandingPage = () => {
                   Capture, manage, and distribute leads efficiently with our
                   all-in-one platform
                 </Typography>
-                <Stack direction="row" spacing={2} mt={4}>
+                <Stack direction="row" spacing={2} mt={3}>
                   <Button
                     variant="contained"
                     color="secondary"
@@ -194,25 +248,30 @@ const LandingPage = () => {
       </Slide>
 
       {/* Features Section with Staggered Grow animations */}
-      <Box py={10} bgcolor="background.paper" id="features">
+      <Box py={8} bgcolor="background.paper" id="features">
         <Container maxWidth="lg">
           <Fade in={checked}>
             <Box>
-              <Typography variant="h3" align="center" gutterBottom>
+              <Typography
+                variant="h3"
+                align="center"
+                fontWeight="bold"
+                gutterBottom
+                color="primary.main"
+              >
                 Powerful Features
               </Typography>
               <Typography
                 variant="subtitle1"
                 align="center"
                 color="text.secondary"
-                paragraph
               >
                 Everything you need to manage your leads effectively
               </Typography>
             </Box>
           </Fade>
 
-          <Grid container spacing={4} mt={6}>
+          <Grid container spacing={4} mt={2}>
             {features.map((feature, index) => (
               <Grid item xs={12} sm={6} md={3} key={index}>
                 <Grow
@@ -237,9 +296,12 @@ const LandingPage = () => {
                       </Avatar>
                       <Typography variant="h6">{feature.text}</Typography>
                     </Box>
-                    <Typography variant="body2" color="text.secondary">
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-                      Sed do eiusmod tempor incididunt ut labore.
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      textAlign="justify"
+                    >
+                      {feature.description}
                     </Typography>
                   </Paper>
                 </Grow>
