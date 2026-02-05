@@ -5,7 +5,7 @@ import dbConnect from "@/lib/connectdb";
 import { Transaction } from "@/models/transactions";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-02-24.acacia",
+  apiVersion: "2025-12-15.clover",
 });
 
 export async function GET(req: Request) {
@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   if (!sessionId) {
     return NextResponse.json(
       { error: "sessionId is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 

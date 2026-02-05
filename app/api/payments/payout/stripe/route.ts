@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import dbConnect from "@/lib/connectdb";
-import { User } from "@/models/user";
+import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Transaction } from "@/models/transactions";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-02-24.acacia",
+  apiVersion: "2025-12-15.clover",
 });
 
 interface StripePayoutRequest {
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     if (req.method !== "POST") {
       return NextResponse.json(
         { message: "Method not allowed" },
-        { status: 405 }
+        { status: 405 },
       );
     }
     const session = await getServerSession(authOptions);
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     if (!body.amount || !body.currency) {
       return NextResponse.json(
         { message: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     await dbConnect();
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
           message:
             "Seller not found or Stripe account not linked or Insufficient Balance",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -70,13 +70,13 @@ export async function POST(req: Request) {
     //("Available:", balance.available);
 
     const availableBalance = balance.available.find(
-      (bal) => bal.currency.toLowerCase() === body.currency.toLowerCase()
+      (bal) => bal.currency.toLowerCase() === body.currency.toLowerCase(),
     );
 
     if (!availableBalance || availableBalance.amount < amountInCents) {
       return NextResponse.json(
         { message: "Insufficient funds in platform Stripe account" },
-        { status: 402 }
+        { status: 402 },
       );
     }
 
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
     const updatedSeller = await User.findByIdAndUpdate(
       session.user.id,
       { $inc: { walletBalance: -body.amount } },
-      { new: true }
+      { new: true },
     );
     // Save transaction record
     const transaction = new Transaction({
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
     });
 
     const availableUsd = userbalance.available.find(
-      (b) => b.currency === "usd"
+      (b) => b.currency === "usd",
     );
 
     if (!availableUsd || availableUsd.amount < amountInCents) {
@@ -129,7 +129,7 @@ export async function POST(req: Request) {
           success: false,
           message: "Transferred funds not yet available for payout.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
       },
       {
         stripeAccount: seller.stripeAccountId,
-      }
+      },
     );
 
     return NextResponse.json({
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
         error:
           process.env.NODE_ENV === "development" ? error.message : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

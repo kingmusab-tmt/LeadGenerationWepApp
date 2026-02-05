@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import UserDashboard from "../layout";
 import {
   Box,
   Typography,
@@ -84,18 +83,30 @@ const HelpSection = () => {
         setLoading(true);
         const [videosResponse, faqsResponse, userTawkinformation] =
           await Promise.all([
-            axios.get("/api/help/videos"),
-            axios.get("/api/help/faqs"),
+            axios.get("/api/support/help/videos"),
+            axios.get("/api/support/help/faqs"),
             axios.get("/api/settings/sellerlivechat"),
           ]);
 
-        setVideos(videosResponse.data);
-        setFaqs(faqsResponse.data);
-        setPropertyId(userTawkinformation.data.propertyId);
-        setWidgetId(userTawkinformation.data.widgetId);
+        // API returns { success: true, data: { videos: [...] } } structure
+        const videosData =
+          videosResponse.data?.data?.videos ||
+          videosResponse.data?.videos ||
+          videosResponse.data ||
+          [];
+        const faqsData =
+          faqsResponse.data?.data?.faqs ||
+          faqsResponse.data?.faqs ||
+          faqsResponse.data ||
+          [];
 
-        if (videosResponse.data.length > 0) {
-          setSelectedVideo(videosResponse.data[0]);
+        setVideos(Array.isArray(videosData) ? videosData : []);
+        setFaqs(Array.isArray(faqsData) ? faqsData : []);
+        setPropertyId(userTawkinformation.data?.propertyId || "");
+        setWidgetId(userTawkinformation.data?.widgetId || "");
+
+        if (Array.isArray(videosData) && videosData.length > 0) {
+          setSelectedVideo(videosData[0]);
         }
       } catch (err) {
         setError("Failed to load help content. Please try again later.");
@@ -111,13 +122,13 @@ const HelpSection = () => {
   const filteredVideos = videos.filter(
     (video) =>
       video.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      video.description.toLowerCase().includes(searchTerm.toLowerCase())
+      video.description.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const filteredFaqs = faqs.filter(
     (faq) =>
       faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
+      faq.answer.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const extractYoutubeId = (url: string) => {
@@ -157,7 +168,7 @@ const HelpSection = () => {
   };
 
   return (
-    <UserDashboard>
+    <Box sx={{ width: "100%" }}>
       <Box sx={{ p: 3 }}>
         <Typography
           variant="h5"
@@ -234,7 +245,7 @@ const HelpSection = () => {
                             height: "100%",
                           }}
                           src={`https://www.youtube.com/embed/${extractYoutubeId(
-                            selectedVideo.url
+                            selectedVideo.url,
                           )}`}
                           frameBorder="0"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -249,7 +260,7 @@ const HelpSection = () => {
                         Duration: {selectedVideo.duration} | Uploaded:{" "}
                         {selectedVideo.uploadDate
                           ? new Date(
-                              selectedVideo.uploadDate
+                              selectedVideo.uploadDate,
                             ).toLocaleDateString()
                           : "Unknown"}
                       </Typography>
@@ -395,7 +406,7 @@ const HelpSection = () => {
 
       {/* Tawk Chat Widget */}
       <TawkChatWidget open={true} propertyId={propertyId} widgetId={widgetId} />
-    </UserDashboard>
+    </Box>
   );
 };
 

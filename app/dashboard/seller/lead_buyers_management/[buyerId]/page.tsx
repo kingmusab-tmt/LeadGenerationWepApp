@@ -28,7 +28,7 @@ const BuyerDetailsPage: React.FC = () => {
   const buyerId =
     typeof params.buyerId === "string"
       ? params.buyerId
-      : params.buyerId?.[0] ?? ""; // Ensure it's always a string
+      : (params.buyerId?.[0] ?? ""); // Ensure it's always a string
 
   // Fetch buyer details when component loads
   useEffect(() => {
@@ -153,20 +153,20 @@ const BuyerDetailsPage: React.FC = () => {
             }}
           >
             {/* ✅ Buyer Profile - Full Width on Small Screens, Left Side on Large */}
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <BuyerProfile buyer={buyer} />
             </Grid>
 
             {/* ✅ Purchase History & Payment History - Right Side on Large */}
-            <Grid item xs={12} md={8} container spacing={3}>
-              <Grid item xs={12}>
+            <Grid container spacing={3} size={{ xs: 12, md: 8 }}>
+              <Grid size={{ xs: 12 }}>
                 {/* <Typography variant="h6" sx={{ mb: 1 }}>
                   Purchase History
                 </Typography> */}
                 <LeadPurchaseHistory id={buyerId} />
               </Grid>
 
-              {/* <Grid item xs={12}>
+              {/* <Grid size={{xs:12}}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
                   Payment History
                 </Typography>
@@ -175,7 +175,7 @@ const BuyerDetailsPage: React.FC = () => {
             </Grid>
 
             {/* ✅ Feedback - Full Width on Small Screens, Stacked Below */}
-            {/* <Grid item xs={12}>
+            {/* <Grid size={{xs:12}}>
               <Typography variant="h6" sx={{ mb: 1 }}>
                 Feedback
               </Typography>

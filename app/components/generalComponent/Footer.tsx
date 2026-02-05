@@ -23,7 +23,7 @@ const Footer = () => {
     <Box component="footer" bgcolor="background.paper" py={6}>
       <Container maxWidth="lg">
         <Grid container spacing={4}>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box display="flex" alignItems="center" mb={2}>
               <Image
                 src={logo} // Update this path to your actual logo
@@ -38,35 +38,43 @@ const Footer = () => {
               The complete solution for modern lead management and distribution.
             </Typography>
           </Grid>
-          <Grid item xs={6} md={2}>
+          <Grid size={{ xs: 6, md: 2 }}>
             <Typography variant="subtitle1" gutterBottom>
               Product
             </Typography>
             <List dense>
               {["Features", "Pricing", "Integrations"].map((text) => (
                 <ListItem key={text} disableGutters>
-                  <Link href={`/${text.toLowerCase()}`} passHref>
-                    <MuiLink color="text.secondary">{text}</MuiLink>
-                  </Link>
+                  <MuiLink
+                    component={Link}
+                    href={`/${text.toLowerCase()}`}
+                    color="text.secondary"
+                  >
+                    {text}
+                  </MuiLink>
                 </ListItem>
               ))}
             </List>
           </Grid>
-          <Grid item xs={6} md={2}>
+          <Grid size={{ xs: 6, md: 2 }}>
             <Typography variant="subtitle1" gutterBottom>
               Resources
             </Typography>
             <List dense>
               {["Documentation", "Blog", "Support"].map((text) => (
                 <ListItem key={text} disableGutters>
-                  <Link href={`/${text.toLowerCase()}`} passHref>
-                    <MuiLink color="text.secondary">{text}</MuiLink>
-                  </Link>
+                  <MuiLink
+                    component={Link}
+                    href={`/${text.toLowerCase()}`}
+                    color="text.secondary"
+                  >
+                    {text}
+                  </MuiLink>
                 </ListItem>
               ))}
             </List>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Typography variant="subtitle1" gutterBottom>
               Contact Us
             </Typography>

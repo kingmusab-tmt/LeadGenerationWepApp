@@ -144,7 +144,7 @@ export default function Home() {
 
         <Grid container spacing={3}>
           {/* Current Lead Info */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Paper
               elevation={3}
               sx={{
@@ -198,11 +198,11 @@ export default function Home() {
                       <Box component="span" fontWeight="500">
                         Score:
                       </Box>{" "}
-                      {currentLead.qualificationScore || 0}/100
+                      {currentLead.aiQualityScore || 0}/100
                     </Typography>
                     <LinearProgress
                       variant="determinate"
-                      value={currentLead.qualificationScore || 0}
+                      value={currentLead.aiQualityScore || 0}
                       sx={{
                         height: 8,
                         borderRadius: 4,
@@ -232,7 +232,7 @@ export default function Home() {
           </Grid>
 
           {/* Qualified Leads */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Paper
               elevation={3}
               sx={{
@@ -298,14 +298,14 @@ export default function Home() {
                                 }}
                               >
                                 <Chip
-                                  label={`${lead.qualificationScore}/100`}
+                                  label={`${lead.aiQualityScore}/100`}
                                   size="small"
                                   color={
-                                    (lead.qualificationScore || 0) >= 75
+                                    (lead.aiQualityScore || 0) >= 75
                                       ? "success"
-                                      : (lead.qualificationScore || 0) >= 50
-                                      ? "warning"
-                                      : "error"
+                                      : (lead.aiQualityScore || 0) >= 50
+                                        ? "warning"
+                                        : "error"
                                   }
                                   sx={{ height: 24 }}
                                 />
@@ -354,7 +354,7 @@ export default function Home() {
           </Grid>
 
           {/* Assignment Statistics */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Paper
               elevation={3}
               sx={{
@@ -389,7 +389,8 @@ export default function Home() {
                       secondary={
                         qualifiedLeads.length > 0
                           ? `${Math.round(
-                              (assignments.length / qualifiedLeads.length) * 100
+                              (assignments.length / qualifiedLeads.length) *
+                                100,
                             )}%`
                           : "0%"
                       }
@@ -404,10 +405,9 @@ export default function Home() {
                         qualifiedLeads.length > 0
                           ? Math.round(
                               qualifiedLeads.reduce(
-                                (sum, lead) =>
-                                  sum + (lead.qualificationScore || 0),
-                                0
-                              ) / qualifiedLeads.length
+                                (sum, lead) => sum + (lead.aiQualityScore || 0),
+                                0,
+                              ) / qualifiedLeads.length,
                             )
                           : 0
                       }
@@ -427,7 +427,7 @@ export default function Home() {
                     <List dense>
                       {assignments.slice(-3).map((assignment) => {
                         const lead = qualifiedLeads.find(
-                          (l) => l.id === assignment.leadId
+                          (l) => l.id === assignment.leadId,
                         );
                         return (
                           <ListItem key={assignment.id} sx={{ py: 0.5 }}>

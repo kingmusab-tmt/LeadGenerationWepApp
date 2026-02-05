@@ -1,0 +1,563 @@
+import mongoose, { Schema, Document, Model } from "mongoose";
+
+// Email Campaign Types
+export interface IEmailTemplate {
+  _id?: mongoose.Types.ObjectId;
+  name: string;
+  subject: string;
+  htmlContent: string;
+  textContent: string;
+  previewText: string;
+  variables: string[]; // e.g., {{firstName}}, {{companyName}}
+  category:
+    | "welcome"
+    | "promotional"
+    | "newsletter"
+    | "lead_notification"
+    | "custom";
+  createdAt?: Date;
+}
+
+export interface IEmailSegment {
+  _id?: mongoose.Types.ObjectId;
+  name: string;
+  description?: string;
+  filters: {
+    role?: "seller" | "buyer" | "business-admin";
+    status?: "active" | "suspended";
+    industryFilter?: string[];
+    minLeads?: number;
+    maxLeads?: number;
+    subscriptionTier?: string[];
+    regions?: string[];
+    customTags?: string[];
+  };
+  recipientCount?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IEmailSchedule {
+  type: "immediate" | "scheduled" | "recurring";
+  scheduledTime?: Date;
+  recurring?: {
+    frequency: "daily" | "weekly" | "monthly" | "custom";
+    daysOfWeek?: number[]; // 0-6, Sunday=0
+    dayOfMonth?: number;
+    customCron?: string;
+    endDate?: Date;
+  };
+  timezone?: string;
+}
+
+export interface IEmailAnalytics {
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  unsubscribed: number;
+  bounced: number;
+  complained: number;
+  conversions: number;
+  revenue?: number;
+  updatedAt?: Date;
+}
+
+export interface IEmailCampaign extends Document {
+  userId: mongoose.Schema.Types.ObjectId; // Seller/User ID
+  name: string;
+  description?: string;
+  templateId: mongoose.Schema.Types.ObjectId;
+  segmentId: mongoose.Schema.Types.ObjectId;
+  subject: string;
+  previewText?: string;
+
+  // Campaign Content
+  htmlContent: string;
+  textContent: string;
+  fromName: string;
+  fromEmail: string;
+  replyTo?: string;
+
+  // Campaign Settings
+  schedule: IEmailSchedule;
+  status: "draft" | "scheduled" | "sending" | "paused" | "completed" | "failed";
+  priority: "low" | "normal" | "high";
+
+  // Content Personalization
+  personalizationVariables?: {
+    [key: string]: string | number;
+  };
+
+  // Tracking & Analytics
+  trackingPixel: boolean;
+  trackLinks: boolean;
+  analytics: IEmailAnalytics;
+
+  // Recipient Management
+  recipientEmails?: string[]; // Manual recipient list
+  totalRecipients: number;
+  sentCount?: number;
+
+  // A/B Testing
+  abTesting?: {
+    enabled: boolean;
+    variant: "A" | "B" | "control";
+    variantSubject?: string;
+    variantContent?: string;
+    splitPercentage?: number;
+    winningVariant?: "A" | "B";
+  };
+
+  // Unsubscribe Management
+  unsubscribeLink: boolean;
+  includePreferenceCenter: boolean;
+
+  // Performance Goals
+  goals?: {
+    targetOpenRate?: number;
+    targetClickRate?: number;
+    targetConversionRate?: number;
+  };
+
+  // Error Handling
+  lastError?: string;
+  failureReason?: string;
+  retryCount?: number;
+
+  // Metadata
+  tags?: string[];
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  sentAt?: Date;
+  completedAt?: Date;
+}
+
+export interface IEmailQueue extends Document {
+  campaignId: mongoose.Schema.Types.ObjectId;
+  recipientEmail: string;
+  recipientId?: mongoose.Schema.Types.ObjectId;
+  status: "pending" | "sending" | "sent" | "failed" | "bounced";
+  messageId?: string;
+  attemptCount: number;
+  lastAttempt?: Date;
+  error?: string;
+  personalizationData?: {
+    [key: string]: string | number;
+  };
+  trackingToken?: string;
+  openedAt?: Date;
+  clickedAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IEmailTrackingEvent extends Document {
+  queueId: mongoose.Schema.Types.ObjectId;
+  campaignId: mongoose.Schema.Types.ObjectId;
+  eventType:
+    | "sent"
+    | "delivered"
+    | "opened"
+    | "clicked"
+    | "unsubscribed"
+    | "complained"
+    | "bounced";
+  timestamp: Date;
+  metadata?: {
+    ip?: string;
+    userAgent?: string;
+    linkUrl?: string;
+    linkText?: string;
+    city?: string;
+    country?: string;
+    device?: string;
+    browser?: string;
+  };
+}
+
+// ===================== SCHEMAS =====================
+
+// Email Campaign Schema
+const EmailCampaignSchema = new Schema<IEmailCampaign>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    description: String,
+    templateId: {
+      type: Schema.Types.ObjectId,
+      ref: "EmailTemplate",
+    },
+    segmentId: {
+      type: Schema.Types.ObjectId,
+      ref: "EmailSegment",
+    },
+    subject: {
+      type: String,
+      required: true,
+    },
+    previewText: {
+      type: String,
+      maxlength: 150,
+    },
+    htmlContent: {
+      type: String,
+      required: true,
+    },
+    textContent: {
+      type: String,
+    },
+    fromName: {
+      type: String,
+      required: true,
+    },
+    fromEmail: {
+      type: String,
+      required: true,
+    },
+    replyTo: String,
+    schedule: {
+      type: {
+        type: String,
+        enum: ["immediate", "scheduled", "recurring"],
+        default: "immediate",
+      },
+      scheduledTime: Date,
+      recurring: {
+        frequency: {
+          type: String,
+          enum: ["daily", "weekly", "monthly", "custom"],
+        },
+        daysOfWeek: [Number], // 0-6
+        dayOfMonth: Number,
+        customCron: String,
+        endDate: Date,
+      },
+      timezone: {
+        type: String,
+        default: "UTC",
+      },
+    },
+    status: {
+      type: String,
+      enum: ["draft", "scheduled", "sending", "paused", "completed", "failed"],
+      default: "draft",
+      index: true,
+    },
+    priority: {
+      type: String,
+      enum: ["low", "normal", "high"],
+      default: "normal",
+    },
+    personalizationVariables: mongoose.Schema.Types.Mixed,
+    trackingPixel: {
+      type: Boolean,
+      default: true,
+    },
+    trackLinks: {
+      type: Boolean,
+      default: true,
+    },
+    analytics: {
+      sent: {
+        type: Number,
+        default: 0,
+      },
+      delivered: {
+        type: Number,
+        default: 0,
+      },
+      opened: {
+        type: Number,
+        default: 0,
+      },
+      clicked: {
+        type: Number,
+        default: 0,
+      },
+      unsubscribed: {
+        type: Number,
+        default: 0,
+      },
+      bounced: {
+        type: Number,
+        default: 0,
+      },
+      complained: {
+        type: Number,
+        default: 0,
+      },
+      conversions: {
+        type: Number,
+        default: 0,
+      },
+      revenue: Number,
+      updatedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+    recipientEmails: [String],
+    totalRecipients: {
+      type: Number,
+      default: 0,
+    },
+    sentCount: {
+      type: Number,
+      default: 0,
+    },
+    abTesting: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      variant: {
+        type: String,
+        enum: ["A", "B", "control"],
+      },
+      variantSubject: String,
+      variantContent: String,
+      splitPercentage: Number,
+      winningVariant: {
+        type: String,
+        enum: ["A", "B"],
+      },
+    },
+    unsubscribeLink: {
+      type: Boolean,
+      default: true,
+    },
+    includePreferenceCenter: {
+      type: Boolean,
+      default: false,
+    },
+    goals: {
+      targetOpenRate: Number,
+      targetClickRate: Number,
+      targetConversionRate: Number,
+    },
+    lastError: String,
+    failureReason: String,
+    retryCount: {
+      type: Number,
+      default: 0,
+    },
+    tags: [String],
+    notes: String,
+    sentAt: Date,
+    completedAt: Date,
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Email Template Schema
+const EmailTemplateSchema = new Schema<IEmailTemplate>(
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    subject: {
+      type: String,
+      required: true,
+    },
+    htmlContent: {
+      type: String,
+      required: true,
+    },
+    textContent: String,
+    previewText: {
+      type: String,
+      maxlength: 150,
+    },
+    variables: [String],
+    category: {
+      type: String,
+      enum: [
+        "welcome",
+        "promotional",
+        "newsletter",
+        "lead_notification",
+        "custom",
+      ],
+      default: "custom",
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Email Segment Schema
+const EmailSegmentSchema = new Schema<IEmailSegment>(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
+    description: String,
+    filters: {
+      role: {
+        type: String,
+        enum: ["seller", "buyer", "business-admin"],
+      },
+      status: {
+        type: String,
+        enum: ["active", "suspended"],
+      },
+      industryFilter: [String],
+      minLeads: Number,
+      maxLeads: Number,
+      subscriptionTier: [String],
+      regions: [String],
+      customTags: [String],
+    },
+    recipientCount: Number,
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Email Queue Schema
+const EmailQueueSchema = new Schema<IEmailQueue>(
+  {
+    campaignId: {
+      type: Schema.Types.ObjectId,
+      ref: "EmailCampaign",
+      required: true,
+      index: true,
+    },
+    recipientEmail: {
+      type: String,
+      required: true,
+    },
+    recipientId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    status: {
+      type: String,
+      enum: ["pending", "sending", "sent", "failed", "bounced"],
+      default: "pending",
+      index: true,
+    },
+    messageId: String,
+    attemptCount: {
+      type: Number,
+      default: 0,
+    },
+    lastAttempt: Date,
+    error: String,
+    personalizationData: mongoose.Schema.Types.Mixed,
+    trackingToken: {
+      type: String,
+      index: true,
+    },
+    openedAt: Date,
+    clickedAt: Date,
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Email Tracking Event Schema
+const EmailTrackingEventSchema = new Schema<IEmailTrackingEvent>(
+  {
+    queueId: {
+      type: Schema.Types.ObjectId,
+      ref: "EmailQueue",
+      required: true,
+      index: true,
+    },
+    campaignId: {
+      type: Schema.Types.ObjectId,
+      ref: "EmailCampaign",
+      required: true,
+      index: true,
+    },
+    eventType: {
+      type: String,
+      enum: [
+        "sent",
+        "delivered",
+        "opened",
+        "clicked",
+        "unsubscribed",
+        "complained",
+        "bounced",
+      ],
+      index: true,
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
+    metadata: {
+      ip: String,
+      userAgent: String,
+      linkUrl: String,
+      linkText: String,
+      city: String,
+      country: String,
+      device: String,
+      browser: String,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Create Indexes for Performance
+EmailCampaignSchema.index({ userId: 1, createdAt: -1 });
+EmailCampaignSchema.index({ status: 1, schedule: 1 });
+EmailQueueSchema.index({
+  campaignId: 1,
+  status: 1,
+});
+EmailQueueSchema.index({ createdAt: 1 });
+EmailTrackingEventSchema.index({
+  campaignId: 1,
+  eventType: 1,
+  timestamp: -1,
+});
+
+// ===================== MODELS =====================
+
+export const EmailCampaign: Model<IEmailCampaign> =
+  mongoose.models.EmailCampaign ||
+  mongoose.model<IEmailCampaign>("EmailCampaign", EmailCampaignSchema);
+
+export const EmailTemplate: Model<IEmailTemplate> =
+  mongoose.models.EmailTemplate ||
+  mongoose.model<IEmailTemplate>("EmailTemplate", EmailTemplateSchema);
+
+export const EmailSegment: Model<IEmailSegment> =
+  mongoose.models.EmailSegment ||
+  mongoose.model<IEmailSegment>("EmailSegment", EmailSegmentSchema);
+
+export const EmailQueue: Model<IEmailQueue> =
+  mongoose.models.EmailQueue ||
+  mongoose.model<IEmailQueue>("EmailQueue", EmailQueueSchema);
+
+export const EmailTrackingEvent: Model<IEmailTrackingEvent> =
+  mongoose.models.EmailTrackingEvent ||
+  mongoose.model<IEmailTrackingEvent>(
+    "EmailTrackingEvent",
+    EmailTrackingEventSchema
+  );

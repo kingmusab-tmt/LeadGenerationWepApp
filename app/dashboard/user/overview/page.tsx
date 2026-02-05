@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import dbConnect from "@/lib/connectdb";
+import { User } from "@/models";
 
 export default async function OverviewRedirect() {
   const session = await getServerSession(authOptions);
@@ -9,8 +11,19 @@ export default async function OverviewRedirect() {
     redirect("/auth/sign-in");
   }
 
-  const userRole = session.user?.role;
-  const isSubActive = session.user?.isSubActive;
+  // Fetch fresh user data from database to get current role and subscription status
+  // This avoids stale session data issues
+  await dbConnect();
+  const dbUser = await User.findOne({ email: session.user?.email })
+    .select("role subscription")
+    .lean();
+
+  if (!dbUser) {
+    redirect("/auth/sign-in");
+  }
+
+  const userRole = dbUser.role;
+  const isSubActive = dbUser.subscription?.isSubscriptionActive || false;
 
   // Role-based redirection with subscription check
   switch (userRole) {

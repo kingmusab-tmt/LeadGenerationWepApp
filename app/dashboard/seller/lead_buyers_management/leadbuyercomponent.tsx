@@ -21,14 +21,13 @@ import {
 } from "@mui/material";
 import { ContentCopy } from "@mui/icons-material";
 import BuyerTable from "@/app/components/leadbuyers/buyertable";
-import BuyerForm from "@/app/components/leadbuyers/BuyerForm";
+import BuyerFormEnhanced from "@/app/components/leadbuyers/BuyerFormEnhanced";
 import { IBuyer } from "@/models/leadbuyers";
-import UserDashboard from "../layout";
-import { useSession } from "next-auth/react";
+import { useInitializeUser } from "@/lib/hooks";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
 const BuyersPage: React.FC = () => {
-  const { data: session } = useSession();
+  const { currentUser } = useInitializeUser();
   const [buyers, setBuyers] = useState<IBuyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +35,7 @@ const BuyersPage: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [selectedBuyer, setSelectedBuyer] = useState<Partial<IBuyer> | null>(
-    null
+    null,
   );
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -48,7 +47,7 @@ const BuyersPage: React.FC = () => {
     maxAllowed: 0,
   });
 
-  const sellerId = session?.user?.id || "";
+  const sellerId = currentUser?.id || "";
   const [registrationLink, setRegistrationLink] = useState("");
   const [iframeCode, setIframeCode] = useState("");
 
@@ -65,14 +64,14 @@ const BuyersPage: React.FC = () => {
 
       // Fetch subscription limits
       const limitsResponse = await fetch(
-        `/api/subscriptions/limits?sellerId=${sellerId}`
+        `/api/subscriptions/limits?sellerId=${sellerId}`,
       );
       if (!limitsResponse.ok)
         throw new Error("Failed to fetch subscription limits");
       const limitsData = await limitsResponse.json();
       setSubscriptionLimits({
         currentCount: buyersData.length,
-        maxAllowed: limitsData.subscriptionLimits.buyers || 0,
+        maxAllowed: limitsData.data?.subscriptionLimits?.buyers || 0,
       });
 
       if (buyersData.length === 0) {
@@ -200,109 +199,103 @@ const BuyersPage: React.FC = () => {
     subscriptionLimits.currentCount >= subscriptionLimits.maxAllowed;
 
   return (
-    <UserDashboard>
-      <Container sx={{ mt: isMobile ? "4rem" : "4rem", maxWidth: "1200px" }}>
-        <Typography
-          variant="h5"
-          gutterBottom
-          sx={{ textAlign: "center", mb: 4 }}
-        >
-          Lead Buyer Management
-        </Typography>
+    <Box sx={{ width: "100%" }}>
+      <Typography variant="h5" gutterBottom sx={{ textAlign: "center", mb: 4 }}>
+        Lead Buyer Management
+      </Typography>
 
-        {/* Subscription Limit Info */}
-        {subscriptionLimits.currentCount === subscriptionLimits.maxAllowed && (
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6">
-                Buyer Limit: {subscriptionLimits.currentCount}/
-                {subscriptionLimits.maxAllowed}
-              </Typography>
-              <Typography color="error" sx={{ mt: 1 }}>
-                You've reached your buyer limit. Upgrade to add more buyers.
-                Kindly go to Settings to upgrade your subscription.
-              </Typography>
-            </CardContent>
-          </Card>
-        )}
+      {/* Subscription Limit Info */}
+      {subscriptionLimits.currentCount === subscriptionLimits.maxAllowed && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6">
+              Buyer Limit: {subscriptionLimits.currentCount}/
+              {subscriptionLimits.maxAllowed}
+            </Typography>
+            <Typography color="error" sx={{ mt: 1 }}>
+              You've reached your buyer limit. Upgrade to add more buyers.
+              Kindly go to Settings to upgrade your subscription.
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Action Buttons */}
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          mb={3}
-          flexWrap="wrap"
-          gap={2}
+      {/* Action Buttons */}
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        mb={3}
+        flexWrap="wrap"
+        gap={2}
+      >
+        <Button
+          variant="contained"
+          onClick={handleAddNewBuyer}
+          disabled={isLimitReached}
         >
+          Add New Buyer
+        </Button>
+
+        <Box display="flex" gap={2} flexWrap="wrap">
           <Button
-            variant="contained"
-            onClick={handleAddNewBuyer}
+            variant="outlined"
+            onClick={() => copyToClipboard(registrationLink)}
             disabled={isLimitReached}
+            startIcon={<ContentCopy />}
           >
-            Add New Buyer
+            Copy Registration Link
           </Button>
-
-          <Box display="flex" gap={2} flexWrap="wrap">
-            <Button
-              variant="outlined"
-              onClick={() => copyToClipboard(registrationLink)}
-              disabled={isLimitReached}
-              startIcon={<ContentCopy />}
-            >
-              Copy Registration Link
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => copyToClipboard(iframeCode)}
-              disabled={isLimitReached}
-              startIcon={<ContentCopy />}
-            >
-              Copy Iframe Code
-            </Button>
-          </Box>
+          <Button
+            variant="outlined"
+            onClick={() => copyToClipboard(iframeCode)}
+            disabled={isLimitReached}
+            startIcon={<ContentCopy />}
+          >
+            Copy Iframe Code
+          </Button>
         </Box>
+      </Box>
 
-        {/* Buyer Table */}
-        {loading ? (
-          <LoadingComponent />
-        ) : error ? (
-          <Alert severity="error">{error}</Alert>
-        ) : buyers.length === 0 ? (
-          <Alert severity="info">No buyers registered yet.</Alert>
-        ) : (
-          <BuyerTable
-            buyers={buyers}
-            onDelete={handleDelete}
-            onEdit={handleEditBuyer}
-          />
-        )}
+      {/* Buyer Table */}
+      {loading ? (
+        <LoadingComponent />
+      ) : error ? (
+        <Alert severity="error">{error}</Alert>
+      ) : buyers.length === 0 ? (
+        <Alert severity="info">No buyers registered yet.</Alert>
+      ) : (
+        <BuyerTable
+          buyers={buyers}
+          onDelete={handleDelete}
+          onEdit={handleEditBuyer}
+        />
+      )}
 
-        {/* Buyer Form Modal */}
-        <Dialog
+      {/* Buyer Form Modal */}
+      <Dialog
+        open={openBuyerForm}
+        onClose={() => setOpenBuyerForm(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <BuyerFormEnhanced
           open={openBuyerForm}
           onClose={() => setOpenBuyerForm(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <BuyerForm
-            open={openBuyerForm}
-            onClose={() => setOpenBuyerForm(false)}
-            onSave={handleSaveBuyer}
-            initialValues={selectedBuyer || undefined}
-            sellerId={sellerId}
-          />
-        </Dialog>
+          onSave={handleSaveBuyer}
+          initialValues={selectedBuyer || undefined}
+          sellerId={sellerId}
+        />
+      </Dialog>
 
-        {/* Snackbar */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        >
-          <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
-        </Snackbar>
-      </Container>
-    </UserDashboard>
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+      >
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+      </Snackbar>
+    </Box>
   );
 };
 

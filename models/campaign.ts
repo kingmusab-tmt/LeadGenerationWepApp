@@ -35,8 +35,11 @@ const CampaignSchema = new Schema<ICampaign>(
   },
   {
     timestamps: true, // Automatically manage createdAt and updatedAt fields
-  }
+  },
 );
+
+CampaignSchema.index({ userId: 1 }); // PHASE 3: Index for user campaigns
+CampaignSchema.index({ targetLeads: 1 }); // PHASE 3: Index for lead campaigns
 export const Campaign: Model<ICampaign> =
   mongoose.models.Campaign ||
   mongoose.model<ICampaign>("Campaign", CampaignSchema);

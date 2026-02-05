@@ -118,7 +118,7 @@ const TierManagement = () => {
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   useEffect(() => {
@@ -128,7 +128,7 @@ const TierManagement = () => {
   const fetchTiers = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/adminapi/tier");
+      const response = await fetch("/api/admin/tier");
       if (!response.ok) throw new Error("Failed to fetch tiers");
       const data = await response.json();
       // Ensure tierType is properly set based on price and add default limits if missing
@@ -140,7 +140,7 @@ const TierManagement = () => {
       setTiers(processedTiers);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "An unknown error occurred"
+        err instanceof Error ? err.message : "An unknown error occurred",
       );
       setSnackbar({
         open: true,
@@ -282,8 +282,8 @@ const TierManagement = () => {
 
       const method = currentTier._id ? "PUT" : "POST";
       const url = currentTier._id
-        ? `/api/adminapi/tier?id=${currentTier._id}`
-        : "/api/adminapi/tier";
+        ? `/api/admin/tier?id=${currentTier._id}`
+        : "/api/admin/tier";
 
       const response = await fetch(url, {
         method,
@@ -311,7 +311,7 @@ const TierManagement = () => {
 
   const handleDeleteTier = async (id: string) => {
     try {
-      const response = await fetch(`/api/adminapi/tier/?id=${id}`, {
+      const response = await fetch(`/api/admin/tier/?id=${id}`, {
         method: "DELETE",
       });
 
@@ -343,13 +343,13 @@ const TierManagement = () => {
       (tier, index) => ({
         ...tier,
         order: index + 1,
-      })
+      }),
     );
 
     setTiers(updatedTiers);
 
     try {
-      await fetch("/api/adminapi/tier/reorder", {
+      await fetch("/api/admin/tier/reorder", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tiers: updatedTiers }),
@@ -531,7 +531,7 @@ const TierManagement = () => {
         <DialogContent>
           {currentTier && (
             <Grid container spacing={3} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <TextField
                   fullWidth
                   label="Tier Name"
@@ -682,7 +682,7 @@ const TierManagement = () => {
                       Tier Limits
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <TextField
                           fullWidth
                           label="Max Leads"
@@ -693,7 +693,7 @@ const TierManagement = () => {
                           margin="normal"
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <TextField
                           fullWidth
                           label="Max Twilio Numbers"
@@ -704,7 +704,7 @@ const TierManagement = () => {
                           margin="normal"
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <TextField
                           fullWidth
                           label="Max Numbers"
@@ -715,7 +715,7 @@ const TierManagement = () => {
                           margin="normal"
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <TextField
                           fullWidth
                           label="Max Call Seconds"
@@ -726,7 +726,7 @@ const TierManagement = () => {
                           margin="normal"
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <TextField
                           fullWidth
                           label="Max Forms"
@@ -737,7 +737,7 @@ const TierManagement = () => {
                           margin="normal"
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <TextField
                           fullWidth
                           label="Max Buyers"
@@ -748,7 +748,7 @@ const TierManagement = () => {
                           margin="normal"
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <TextField
                           fullWidth
                           label="Max Industries"
@@ -759,7 +759,7 @@ const TierManagement = () => {
                           margin="normal"
                         />
                       </Grid>
-                      <Grid item xs={12}>
+                      <Grid size={{ xs: 12 }}>
                         <FormControlLabel
                           control={
                             <Switch
@@ -797,7 +797,7 @@ const TierManagement = () => {
                   </Box>
                 )}
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h6" gutterBottom>
                   Features
                 </Typography>
@@ -856,9 +856,9 @@ const TierManagement = () => {
                         {currentTier.tierType === "free"
                           ? "0"
                           : currentTier.discountPercentage &&
-                            currentTier.discountPercentage > 0
-                          ? calculateDiscountedPrice()
-                          : currentTier.price}
+                              currentTier.discountPercentage > 0
+                            ? calculateDiscountedPrice()
+                            : currentTier.price}
                         /mo
                         <Typography
                           component="span"
@@ -896,7 +896,7 @@ const TierManagement = () => {
                                 - renews at $
                                 {currentTier.renewalPrice ||
                                   (parseFloat(currentTier.price) * 12).toFixed(
-                                    2
+                                    2,
                                   )}
                                 /year
                               </Box>

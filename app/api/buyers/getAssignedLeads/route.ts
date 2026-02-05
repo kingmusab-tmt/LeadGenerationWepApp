@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch the buyerId using the email from the session
     const buyer = await Buyer.findOne({ email: session.user.email }).select(
-      "_id"
+      "_id",
     );
 
     if (!buyer) {
@@ -34,18 +34,34 @@ export async function GET(req: NextRequest) {
       assignedTo: { $elemMatch: { buyerId: buyerId } },
     });
 
-    // Filter leads based on their status
+    // Filter leads based on their status and buyer assignment
     const filteredLeads = leads.map((lead) => {
-      if (lead.status === "sold") {
-        // If the lead is sold, return all fields (including contact information)
-        return lead;
-      } else {
-        // If the lead is not sold, filter out sensitive fields (email, phone, address, postcode)
-        const filteredFields = lead.fields.filter(
-          (field) => !/email|phone|address|postcode/i.test(field.label)
-        );
-        return { ...lead.toObject(), fields: filteredFields };
+      const assignment = lead.assignedTo?.find(
+        (a: any) => a.buyerId.toString() === buyerId.toString(),
+      );
+      const canRespond =
+        !!assignment && !assignment.accepted && !assignment.rejected;
+      const hasAccepted = !!assignment?.accepted;
+
+      if (lead.status === "sold" || hasAccepted) {
+        // If the lead is sold or accepted by this buyer, return all fields
+        return {
+          ...lead.toObject(),
+          assignment,
+          canRespond,
+        };
       }
+
+      // If the lead is not sold/accepted, filter out sensitive fields
+      const filteredFields = lead.fields.filter(
+        (field) => !/email|phone|address|postcode/i.test(field.label),
+      );
+      return {
+        ...lead.toObject(),
+        fields: filteredFields,
+        assignment,
+        canRespond,
+      };
     });
 
     return NextResponse.json({ leads: filteredLeads }, { status: 200 });
@@ -53,7 +69,7 @@ export async function GET(req: NextRequest) {
     console.error(error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

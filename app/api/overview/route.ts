@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
-import { User } from "../../../models/user";
+import { User } from "@/models";
 import { Campaign } from "../../../models/campaign";
 import { Lead } from "@/models/leads";
 import { Buyer } from "@/models/leadbuyers";
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     if (!session || !session.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized: No valid session found" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
         acc[curr._id] = curr.count;
         return acc;
       },
-      { new: 0, available: 0, sold: 0, assigned: 0 }
+      { new: 0, available: 0, sold: 0, assigned: 0 },
     );
     //(`new: ${leadStatusCounts.new}`);
     //(`Avaiable Leads: ${leadStatusCounts.available}`);
@@ -386,8 +386,8 @@ export async function GET(req: NextRequest) {
         ? ((currentPeriodLeads - previousPeriodLeads) / previousPeriodLeads) *
           100
         : currentPeriodLeads > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     // Calculate revenue trend
     const currentPeriodRevenue = await Transaction.aggregate([
@@ -421,8 +421,8 @@ export async function GET(req: NextRequest) {
             previousPeriodRevenue[0]?.revenue) *
           100
         : currentPeriodRevenue[0]?.revenue > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     // 12. CALL METRICS
     const callMetrics = await Call.aggregate([
@@ -633,7 +633,7 @@ export async function GET(req: NextRequest) {
         ([status, count]) => ({
           status,
           count,
-        })
+        }),
       ),
       topPerformingCampaigns,
       leadQualityMetrics: {
@@ -671,7 +671,7 @@ export async function GET(req: NextRequest) {
           name: buyer.name,
           leadsPurchased: buyer.leadsPurchased,
           totalSpend: buyer.totalSpent,
-        })
+        }),
       ),
       salesPerformance: {
         daily: dailySales.map((ds: { _id: any; sales: any }) => ({
@@ -704,7 +704,7 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching overview data:", error);
     return NextResponse.json(
       { error: "Failed to fetch overview data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

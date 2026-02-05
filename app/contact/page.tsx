@@ -81,8 +81,13 @@ const ContactPage = () => {
         phone: "",
         subject: "",
         message: "",
-        agreeTerms: true,
+        agreeTerms: false,
       });
+
+      // Reset success message after 3 seconds
+      setTimeout(() => {
+        setSubmitSuccess(false);
+      }, 3000);
     }, 1500);
   };
 
@@ -172,7 +177,7 @@ const ContactPage = () => {
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Grid container spacing={6}>
           {/* Contact Methods */}
-          <Grid item xs={12} md={5}>
+          <Grid size={{ xs: 12, md: 5 }}>
             <Typography variant="h4" gutterBottom>
               Contact Options
             </Typography>
@@ -182,7 +187,7 @@ const ContactPage = () => {
 
             <Grid container spacing={3} mt={2}>
               {contactMethods.map((method, index) => (
-                <Grid item xs={12} sm={6} key={index}>
+                <Grid size={{ xs: 12, sm: 6 }} key={index}>
                   <Card
                     elevation={3}
                     sx={{
@@ -267,7 +272,7 @@ const ContactPage = () => {
           </Grid>
 
           {/* Contact Form */}
-          <Grid item xs={12} md={7}>
+          <Grid size={{ xs: 12, md: 7 }}>
             <Card elevation={3}>
               <Tabs
                 value={activeTab}
@@ -317,7 +322,7 @@ const ContactPage = () => {
                 ) : (
                   <form onSubmit={handleSubmit}>
                     <Grid container spacing={3}>
-                      <Grid item xs={12} sm={6}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField
                           fullWidth
                           label="Your Name"
@@ -327,7 +332,7 @@ const ContactPage = () => {
                           required
                         />
                       </Grid>
-                      <Grid item xs={12} sm={6}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField
                           fullWidth
                           label="Email Address"
@@ -338,7 +343,7 @@ const ContactPage = () => {
                           required
                         />
                       </Grid>
-                      <Grid item xs={12}>
+                      <Grid size={{ xs: 12 }}>
                         <TextField
                           fullWidth
                           label="Phone Number"
@@ -355,7 +360,7 @@ const ContactPage = () => {
                         />
                       </Grid>
                       {activeTab === 3 && (
-                        <Grid item xs={12}>
+                        <Grid size={{ xs: 12 }}>
                           <TextField
                             fullWidth
                             label="Subject"
@@ -366,7 +371,7 @@ const ContactPage = () => {
                           />
                         </Grid>
                       )}
-                      <Grid item xs={12}>
+                      <Grid size={{ xs: 12 }}>
                         <TextField
                           fullWidth
                           label="Your Message"
@@ -378,7 +383,7 @@ const ContactPage = () => {
                           required
                         />
                       </Grid>
-                      <Grid item xs={12}>
+                      <Grid size={{ xs: 12 }}>
                         <FormControlLabel
                           control={
                             <Checkbox
@@ -392,7 +397,7 @@ const ContactPage = () => {
                           label="I agree to the terms and conditions"
                         />
                       </Grid>
-                      <Grid item xs={12}>
+                      <Grid size={{ xs: 12 }}>
                         <Button
                           type="submit"
                           variant="contained"
@@ -484,7 +489,7 @@ const ContactPage = () => {
                 avatar: "/team/3.jpg",
               },
             ].map((member, index) => (
-              <Grid item xs={12} sm={4} key={index}>
+              <Grid size={{ xs: 12, sm: 4 }} key={index}>
                 <Card elevation={3} sx={{ textAlign: "center", p: 3 }}>
                   <Avatar
                     src={member.avatar}

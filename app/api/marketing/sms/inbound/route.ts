@@ -1,0 +1,32 @@
+import { NextRequest, NextResponse } from "next/server";
+import { smsMarketingEngine } from "@/lib/smsMarketingEngine";
+import dbConnect from "@/lib/connectdb";
+import { User } from "@/models";
+import twilio from "twilio";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(req: NextRequest) {
+  await dbConnect();
+  const formData = await req.formData();
+  const from = (formData.get("From") as string) || "";
+  const to = (formData.get("To") as string) || "";
+  const body = (formData.get("Body") as string) || "";
+
+  // Find the seller by 'to' number
+  const seller = await User.findOne({ "apiSettings.twilioPhoneNumber": to });
+  const userId = seller?._id?.toString() || "";
+
+  const { reply } = await smsMarketingEngine.handleInboundMessage(
+    userId,
+    from,
+    body,
+  );
+
+  const twiml = new twilio.twiml.MessagingResponse();
+  twiml.message(reply);
+  return new NextResponse(twiml.toString(), {
+    status: 200,
+    headers: { "Content-Type": "text/xml" },
+  });
+}

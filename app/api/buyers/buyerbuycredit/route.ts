@@ -4,7 +4,7 @@ import dbConnect from "@/lib/connectdb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Buyer } from "@/models/leadbuyers";
-import { User } from "@/models/user";
+import { User } from "@/models";
 import { decryptData } from "@/lib/encryption"; // Implement decryption utility
 
 export async function POST(req: NextRequest) {
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       // Check if the user is authenticated
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!buyer || !buyer.registeredWith) {
       return NextResponse.json(
         { success: false, message: "Buyer or registered seller not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (!leadSeller) {
       return NextResponse.json(
         { success: false, message: "Lead seller not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -56,16 +56,28 @@ export async function POST(req: NextRequest) {
             success: false,
             message: "Stripe payment is not available for this seller",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       // Decrypt the Stripe secret key
-      const stripeSecretKey = decryptData(encryptedStripeSecretKey);
+      let stripeSecretKey: string;
+      try {
+        stripeSecretKey = decryptData(encryptedStripeSecretKey);
+      } catch (error) {
+        console.error("Failed to decrypt Stripe secret key:", error);
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Payment configuration error. Please contact the seller.",
+          },
+          { status: 500 },
+        );
+      }
 
       // Initialize Stripe with the seller's secret key
       const stripe = new Stripe(stripeSecretKey, {
-        apiVersion: "2025-02-24.acacia",
+        apiVersion: "2025-12-15.clover",
       });
 
       // Create a payment intent
@@ -79,7 +91,7 @@ export async function POST(req: NextRequest) {
       if (paymentIntent.status !== "succeeded") {
         return NextResponse.json(
           { success: false, message: "Stripe payment failed" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -94,12 +106,24 @@ export async function POST(req: NextRequest) {
             success: false,
             message: "PayPal payment is not available for this seller",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       // Decrypt the PayPal access token
-      const paypalAccessToken = decryptData(encryptedPaypalAccessToken);
+      let paypalAccessToken: string;
+      try {
+        paypalAccessToken = decryptData(encryptedPaypalAccessToken);
+      } catch (error) {
+        console.error("Failed to decrypt PayPal access token:", error);
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Payment configuration error. Please contact the seller.",
+          },
+          { status: 500 },
+        );
+      }
 
       // Verify the PayPal order
       const verifyResponse = await fetch(
@@ -110,14 +134,14 @@ export async function POST(req: NextRequest) {
             "Content-Type": "application/json",
             Authorization: `Bearer ${paypalAccessToken}`,
           },
-        }
+        },
       );
 
       const verifyData = await verifyResponse.json();
       if (verifyData.status !== "COMPLETED") {
         return NextResponse.json(
           { success: false, message: "PayPal payment not completed" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -126,7 +150,7 @@ export async function POST(req: NextRequest) {
     else {
       return NextResponse.json(
         { success: false, message: "Unsupported payment method" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -142,7 +166,7 @@ export async function POST(req: NextRequest) {
     console.error("Error processing payment:", error);
     return NextResponse.json(
       { success: false, message: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

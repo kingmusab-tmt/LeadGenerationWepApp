@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
-import { User } from "@/models/user";
+import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     if (!session) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       if (!buyer || !buyer.registeredWith) {
         return NextResponse.json(
           { success: false, message: "Buyer or associated seller not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       if (!seller) {
         return NextResponse.json(
           { success: false, message: "Seller user not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       //("property ID", seller.tawkPropertyId);
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
           widgetId:
             seller.tawkWidgetId || process.env.NEXT_PUBLIC_TAWKWIDGETID!,
         },
-        { status: 200 }
+        { status: 200 },
       );
     } else if (session.user.role === "seller") {
       //("Property", process.env.NEXT_PUBLIC_TAWKPROPERTYID!);
@@ -59,13 +59,13 @@ export async function GET(req: NextRequest) {
           propertyId: process.env.NEXT_PUBLIC_TAWKPROPERTYID!,
           widgetId: process.env.NEXT_PUBLIC_TAWKWIDGETID!,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message || "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     if (!session || !session.user || session.user.role !== "seller") {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
     await dbConnect();
@@ -87,24 +87,24 @@ export async function POST(req: NextRequest) {
     if (!tawkPropertyId || !tawkWidgetId) {
       return NextResponse.json(
         { success: false, message: "Missing fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const updatedSeller = await User.findOneAndUpdate(
       { email: session.user.email },
       { tawkPropertyId, tawkWidgetId },
-      { new: true, upsert: true }
+      { new: true, upsert: true },
     );
 
     return NextResponse.json(
       { success: true, seller: updatedSeller },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message || "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

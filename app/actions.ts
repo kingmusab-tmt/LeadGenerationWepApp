@@ -6,9 +6,9 @@ import Subscription from "@/models/subscription";
 import dbConnect from "@/lib/connectdb";
 
 webpush.setVapidDetails(
-  "mailto:musab.buraimoh@gmail.com",
+  `mailto:${process.env.VAPID_EMAIL!}`,
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
+  process.env.VAPID_PRIVATE_KEY!,
 );
 
 // let subscription: PushSubscription | null = null;
@@ -69,7 +69,7 @@ export async function sendNotification(message: any) {
           title: "New Notification",
           body: message,
           icon: image,
-        })
+        }),
       );
     }
 

@@ -1,53 +1,55 @@
-// app/api/tiers/route.ts
-import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import dbConnect from "@/lib/connectdb";
-import { ObjectId } from "mongodb"; // Import ObjectId for proper ID handling
 import { Tier } from "@/models/tier";
+import { ZodError } from "zod";
+import { mongoIdParamSchema } from "@/lib/validation/schemas";
+import {
+  successResponse,
+  badRequest,
+  notFound,
+  internalError,
+  handleValidationError,
+} from "@/lib/api/error-handler";
 
+/**
+ * GET /api/subscriptions/tiers?tierId=<id>
+ * Get tier details by ID
+ */
 export async function GET(req: NextRequest) {
   try {
-    // Get tierId from query parameters
     const { searchParams } = new URL(req.url);
     const tierId = searchParams.get("tierId");
 
+    // Validate tierId parameter
     if (!tierId) {
-      return NextResponse.json(
-        { error: "Tier ID is required" },
-        { status: 400 }
-      );
+      return badRequest("Tier ID is required");
     }
 
-    // Connect to database
+    // Validate tierId format
+    try {
+      mongoIdParamSchema.parse(tierId);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid Tier ID format");
+    }
+
     await dbConnect();
 
-    // Validate and convert to ObjectId
-    let objectId;
-    try {
-      objectId = new ObjectId(tierId);
-    } catch (err) {
-      return NextResponse.json(
-        { error: "Invalid Tier ID format" },
-        { status: 400 }
-      );
-    }
-
-    // Find the tier in database using the model
+    // Find the tier in database
     const tier = await Tier.findOne({
-      _id: objectId,
+      _id: tierId,
       isActive: true,
-    }).lean(); // Use lean() for better performance
+    }).lean();
 
     if (!tier) {
-      return NextResponse.json(
-        { error: "Tier not found or not available" },
-        { status: 404 }
-      );
+      return notFound("Tier not found or not available");
     }
 
-    // Return the tier data with proper typing
-    const responseData = {
-      _id: tier._id.toString(), // Convert ObjectId to string
+    // Return the tier data
+    return successResponse({
+      _id: tier._id.toString(),
       name: tier.name,
       price: tier.price,
       description: tier.description,
@@ -61,14 +63,9 @@ export async function GET(req: NextRequest) {
       discountedPrice: tier.discountedPrice,
       renewalPrice: tier.renewalPrice,
       annualPrice: tier.annualPrice,
-    };
-
-    return NextResponse.json(responseData);
+    });
   } catch (error) {
-    console.error("Error fetching tier:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    console.error("[GET /api/subscriptions/tiers]", error);
+    return internalError("Failed to fetch tier");
   }
 }

@@ -49,17 +49,17 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
         <Grid container spacing={2}>
           {/* Common Fields */}
           {metadata.buyerId && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Buyer ID
               </Typography>
               <Typography variant="body2" noWrap>
-                {metadata.buyerId}
+                {metadata.buyerId.toString()}
               </Typography>
             </Grid>
           )}
           {metadata.userEmail && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 User Email
               </Typography>
@@ -69,7 +69,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
             </Grid>
           )}
           {metadata.tierName && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Tier Name
               </Typography>
@@ -77,7 +77,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
             </Grid>
           )}
           {metadata.tierType && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Tier Type
               </Typography>
@@ -87,17 +87,17 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
           {/* Lead Purchase */}
           {metadata.leadId && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Lead ID
               </Typography>
               <Typography variant="body2" noWrap>
-                {metadata.leadId}
+                {metadata.leadId.toString()}
               </Typography>
             </Grid>
           )}
           {metadata.unitsPurchased && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Units Purchased
               </Typography>
@@ -107,17 +107,17 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
           {/* Seller Income */}
           {metadata.sellerId && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Seller ID
               </Typography>
               <Typography variant="body2" noWrap>
-                {metadata.sellerId}
+                {metadata.sellerId.toString()}
               </Typography>
             </Grid>
           )}
           {metadata.payoutId && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Payout ID
               </Typography>
@@ -129,7 +129,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
           {/* Subscription */}
           {metadata.subscriptionPlan && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Subscription Plan
               </Typography>
@@ -139,7 +139,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
             </Grid>
           )}
           {metadata.subscriptionDuration && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Subscription Duration
               </Typography>
@@ -149,7 +149,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
             </Grid>
           )}
           {metadata.subscriptionYears && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Subscription Years
               </Typography>
@@ -159,7 +159,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
             </Grid>
           )}
           {metadata.tierRenewalDate && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Renewal Date
               </Typography>
@@ -171,7 +171,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
           {/* Refund */}
           {metadata.refund && (
-            <Grid item xs={gridItemSize}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Refund Status
               </Typography>
@@ -183,7 +183,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
             </Grid>
           )}
           {metadata.refundReason && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Refund Reason
               </Typography>
@@ -193,7 +193,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
           {/* Admin Adjustment */}
           {metadata.adminNote && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Typography variant="subtitle2" color="textSecondary">
                 Admin Note
               </Typography>
@@ -254,13 +254,13 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
         </Box>
 
         <Grid container spacing={2}>
-          <Grid item xs={mainGridItemSize}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography variant="subtitle2" color="textSecondary">
               Type
             </Typography>
             <Typography variant="body2">{transaction.type}</Typography>
           </Grid>
-          <Grid item xs={mainGridItemSize}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography variant="subtitle2" color="textSecondary">
               Status
             </Typography>
@@ -271,12 +271,12 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                 transaction.status === "completed"
                   ? "success"
                   : transaction.status === "failed"
-                  ? "error"
-                  : "warning"
+                    ? "error"
+                    : "warning"
               }
             />
           </Grid>
-          <Grid item xs={mainGridItemSize}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography variant="subtitle2" color="textSecondary">
               Amount
             </Typography>
@@ -284,7 +284,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
               {formatCurrency(transaction.amount)}
             </Typography>
           </Grid>
-          <Grid item xs={mainGridItemSize}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography variant="subtitle2" color="textSecondary">
               Date
             </Typography>
@@ -300,7 +300,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
           Balance Information
         </Typography>
         <Grid container spacing={2}>
-          <Grid item xs={mainGridItemSize}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography variant="subtitle2" color="textSecondary">
               Previous Balance
             </Typography>
@@ -308,7 +308,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
               {formatCurrency(transaction.previousBalance)}
             </Typography>
           </Grid>
-          <Grid item xs={mainGridItemSize}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography variant="subtitle2" color="textSecondary">
               Current Balance
             </Typography>

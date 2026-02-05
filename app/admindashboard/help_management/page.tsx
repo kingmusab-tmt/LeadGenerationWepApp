@@ -235,7 +235,7 @@ const HelpManagement = () => {
       ) : (
         <Grid container spacing={3}>
           {/* Form Column - Left on large screens, full width on small */}
-          <Grid item xs={12} md={5} lg={4}>
+          <Grid size={{ xs: 12, md: 5, lg: 4 }}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
@@ -244,8 +244,8 @@ const HelpManagement = () => {
                       ? "Edit Video"
                       : "Add New Video"
                     : editingItem
-                    ? "Edit FAQ"
-                    : "Add New FAQ"}
+                      ? "Edit FAQ"
+                      : "Add New FAQ"}
                 </Typography>
                 {tabValue === 0 ? (
                   <Box
@@ -382,7 +382,7 @@ const HelpManagement = () => {
           </Grid>
 
           {/* List Column - Right on large screens, full width on small */}
-          <Grid item xs={12} md={7} lg={8}>
+          <Grid size={{ xs: 12, md: 7, lg: 8 }}>
             <Typography variant="h6" gutterBottom>
               {tabValue === 0 ? "Existing Videos" : "Existing FAQs"}
             </Typography>

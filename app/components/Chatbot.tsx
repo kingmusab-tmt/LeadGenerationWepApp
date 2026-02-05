@@ -46,7 +46,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId] = useState(
-    () => `conv_${Date.now()}_${Math.random()}`
+    () => `conv_${Date.now()}_${Math.random()}`,
   );
   const [leadData, setLeadData] = useState<Partial<ILead>>({});
   const [isMinimized, setIsMinimized] = useState(true);
@@ -123,10 +123,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
         onLeadUpdate?.(updatedLead);
 
         // Check if qualification is complete
-        if (
-          result.leadUpdate.qualificationScore >= 70 &&
-          !result.nextQuestion
-        ) {
+        if (result.leadUpdate.aiQualityScore >= 70 && !result.nextQuestion) {
           onQualificationComplete?.(updatedLead as ILead);
           // Add completion message
           setMessages((prev) => [
@@ -253,7 +250,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <LinearProgress
                 variant="determinate"
-                value={leadData.qualificationScore || 0}
+                value={leadData.aiQualityScore || 0}
                 sx={{
                   width: 100,
                   height: 6,
@@ -265,7 +262,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 }}
               />
               <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                {leadData.qualificationScore || 0}/100
+                {leadData.aiQualityScore || 0}/100
               </Typography>
             </Box>
           </Box>

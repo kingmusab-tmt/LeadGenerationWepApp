@@ -1,78 +1,72 @@
-// app/api/subscription/limits/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
-import { User } from "@/models/user";
-import mongoose from "mongoose";
+import { User } from "@/models";
+import { ZodError } from "zod";
+import { mongoIdParamSchema } from "@/lib/validation/schemas";
+import {
+  successResponse,
+  unauthorized,
+  forbidden,
+  badRequest,
+  notFound,
+  internalError,
+  handleValidationError,
+} from "@/lib/api/error-handler";
 
+/**
+ * GET /api/subscriptions/limits?sellerId=<id>
+ * Get subscription limits for a seller
+ */
 export async function GET(req: NextRequest) {
   try {
-    // Verify authentication
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized - Please log in" },
-        { status: 401 }
-      );
+      return unauthorized("Authentication required");
     }
 
+    // Validate sellerId parameter
     const { searchParams } = new URL(req.url);
     const sellerId = searchParams.get("sellerId");
 
-    // Validate sellerId parameter
     if (!sellerId) {
-      return NextResponse.json(
-        { error: "Seller ID is required" },
-        { status: 400 }
-      );
+      return badRequest("Seller ID is required");
+    }
+
+    // Validate sellerId format
+    try {
+      mongoIdParamSchema.parse(sellerId);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid seller ID format");
     }
 
     // Authorization check
     if (session.user.id !== sellerId && session.user.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden - You can only access your own data" },
-        { status: 403 }
-      );
+      return forbidden("You can only access your own data");
     }
 
-    // Connect to database
     await dbConnect();
 
-    // Convert string ID to ObjectId
-    let sellerObjectId;
-    try {
-      sellerObjectId = new mongoose.Types.ObjectId(sellerId);
-    } catch (err) {
-      return NextResponse.json(
-        { error: "Invalid seller ID format" },
-        { status: 400 }
-      );
-    }
-
     // Find user with subscription data
-    const user = await User.aggregate([
-      { $match: { _id: sellerObjectId } },
-      {
-        $project: {
-          twilioActivated: 1,
-          "subscription.subscriptionLimits": 1,
-          "subscription.subscriptionTierId": 1,
-          buyerCount: { $size: { $ifNull: ["$buyers", []] } },
-        },
-      },
-    ]);
+    const user = await User.findById(sellerId)
+      .select("subscription buyers")
+      .lean();
 
-    if (!user || user.length === 0) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (!user) {
+      return notFound("User not found");
     }
 
-    const userData = user[0];
+    // Calculate current buyer count
+    const buyerCount = user.buyers?.length || 0;
 
     // Prepare response
-    return NextResponse.json({
-      currentCount: userData.buyerCount || 0,
-      subscriptionLimits: userData.subscription?.subscriptionLimits || {
+    return successResponse({
+      currentCount: buyerCount,
+      subscriptionLimits: user.subscription?.subscriptionLimits || {
         leads: 0,
         twilioNumbers: 0,
         numbers: 0,
@@ -84,13 +78,10 @@ export async function GET(req: NextRequest) {
         liveSupport: false,
         industries: 0,
       },
-      tierId: userData.subscription?.subscriptionTierId || null,
+      tierId: user.subscription?.subscriptionTierId || null,
     });
   } catch (error) {
-    console.error("Error in GET /api/subscription/limits:", error);
-    return NextResponse.json(
-      { error: "An internal server error occurred" },
-      { status: 500 }
-    );
+    console.error("[GET /api/subscriptions/limits]", error);
+    return internalError("Failed to get subscription limits");
   }
 }

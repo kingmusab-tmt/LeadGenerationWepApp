@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import {
   Button,
@@ -28,8 +28,17 @@ export const SignInPage: React.FC<SignInPageProps> = () => {
   const [loading, setLoading] = useState(false);
   const [openTerms, setOpenTerms] = useState(false);
   const [openPrivacy, setOpenPrivacy] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobileQuery = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // Use a state for isMobile that only updates after mount to prevent hydration mismatch
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    setIsMobile(isMobileQuery);
+  }, [isMobileQuery]);
 
   const handleGoogleSignIn = () => {
     setLoading(true);

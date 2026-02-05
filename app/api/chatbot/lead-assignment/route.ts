@@ -7,6 +7,7 @@ import dbConnect from "@/lib/connectdb";
 
 class RoundRobinAssigner {
   private buyers: IBuyer[];
+  private lead: Partial<ILead> | null = null;
 
   constructor(buyers: IBuyer[]) {
     this.buyers = buyers;
@@ -17,6 +18,8 @@ class RoundRobinAssigner {
     assignment: ILead["assignedTo"] | null;
     reason?: string;
   } {
+    this.lead = lead; // Store lead for use in sorting
+
     // Filter eligible buyers
     const eligibleBuyers = this.getEligibleBuyers(lead);
 
@@ -60,7 +63,7 @@ class RoundRobinAssigner {
       if (buyer.currentLeadsToday >= buyer.maxLeadsPerDay) return false;
 
       // Check qualification score minimum
-      if ((lead.qualificationScore || 0) < buyer.qualificationScoreMinimum)
+      if ((lead.aiQualityScore || 0) < buyer.qualificationScoreMinimum)
         return false;
 
       // Check industry match
@@ -72,6 +75,24 @@ class RoundRobinAssigner {
         return false;
       }
 
+      // *** LOCATION-BASED ROUTING ***
+      // Check location match if buyer has service locations configured
+      if (
+        buyer.serviceLocations &&
+        buyer.serviceLocations.length > 0 &&
+        lead.location
+      ) {
+        const matchesLocation = this.matchesServiceLocation(buyer, lead);
+
+        // If strict matching is enabled, reject leads outside service area
+        if (buyer.locationMatchingStrict && !matchesLocation) {
+          return false;
+        }
+
+        // Even if not strict, we'll prioritize buyers with matching locations
+        // This is handled in the sorting function
+      }
+
       // Check working hours (basic check - can be enhanced)
       if (!this.isInWorkingHours(buyer)) return false;
 
@@ -79,14 +100,63 @@ class RoundRobinAssigner {
     });
   }
 
+  private matchesServiceLocation(buyer: IBuyer, lead: Partial<ILead>): boolean {
+    if (!lead.location || !buyer.serviceLocations) return false;
+
+    return buyer.serviceLocations.some((serviceLocation) => {
+      // Check city match (case-insensitive)
+      if (lead.location?.city && serviceLocation.city) {
+        if (
+          lead.location.city.toLowerCase() ===
+          serviceLocation.city.toLowerCase()
+        ) {
+          return true;
+        }
+      }
+
+      // Check state match
+      if (lead.location?.state && serviceLocation.state) {
+        if (
+          lead.location.state.toLowerCase() ===
+          serviceLocation.state.toLowerCase()
+        ) {
+          return true;
+        }
+      }
+
+      // Check zip code match
+      if (
+        lead.location?.zipCode &&
+        serviceLocation.zipCodes &&
+        serviceLocation.zipCodes.length > 0
+      ) {
+        if (serviceLocation.zipCodes.includes(lead.location.zipCode)) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  }
+
   private sortBuyersForRoundRobin(buyers: IBuyer[]): IBuyer[] {
     return buyers.sort((a, b) => {
-      // First sort by priority (higher priority first)
+      // *** LOCATION-BASED PRIORITY ***
+      // First, prioritize buyers with matching service locations
+      if (this.lead?.location) {
+        const aMatchesLocation = this.matchesServiceLocation(a, this.lead);
+        const bMatchesLocation = this.matchesServiceLocation(b, this.lead);
+
+        if (aMatchesLocation && !bMatchesLocation) return -1;
+        if (!aMatchesLocation && bMatchesLocation) return 1;
+      }
+
+      // Then sort by priority (higher priority first)
       if (a.priority !== b.priority) {
         return b.priority - a.priority;
       }
 
-      // Then sort by last assigned time (oldest first for round-robin)
+      // Finally sort by last assigned time (oldest first for round-robin)
       return a.lastAssignedAt.getTime() - b.lastAssignedAt.getTime();
     });
   }
@@ -118,7 +188,7 @@ export async function POST(req: Request) {
     if (!lead) {
       return NextResponse.json(
         { error: "Lead data is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -139,7 +209,7 @@ export async function POST(req: Request) {
           message: result.reason || "No available buyers",
           assignment: null,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -162,13 +232,13 @@ export async function POST(req: Request) {
         },
         assignment: result.assignment,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Assignment error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

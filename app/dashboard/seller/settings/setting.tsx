@@ -10,8 +10,6 @@ import {
   Tabs,
   Tab,
   Grid,
-  Snackbar,
-  Alert,
   CircularProgress,
 } from "@mui/material";
 import UnitPricingComponent from "./unitsetting/page";
@@ -20,6 +18,12 @@ import TawkSetupForm from "./tawksetting/page";
 import { useRouter } from "next/navigation";
 import StripeOnboardingPage from "./stripeonboarding/page";
 import PaypalPayOutPage from "./paypalpayout/page";
+import LeadDistributionSettings from "./leadsellersetting/page";
+import EmailSettingsPage from "./emailsetting/page";
+import APISettingsPage from "./apisetting/page";
+import { useInitializeUser, useAppDispatch } from "@/lib/hooks";
+import { updateUser } from "@/lib/userSlice";
+import { useNotification } from "@/lib/useNotification";
 
 // Interface for the minimal user data needed
 interface BasicUserInfo {
@@ -46,16 +50,17 @@ interface UpdateUserPayload {
 }
 
 const AccountSettings = () => {
+  const dispatch = useAppDispatch();
+  const notify = useNotification();
+  const {
+    currentUser,
+    loading: userLoading,
+    refreshUser,
+  } = useInitializeUser();
   const [tabValue, setTabValue] = useState(0);
   const [darkMode, setDarkMode] = useState(false);
-  const [user, setUser] = useState<BasicUserInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [editableUser, setEditableUser] = useState<BasicUserInfo | null>(null);
   const [saving, setSaving] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success" as "success" | "error" | "warning" | "info",
-  });
   const [fieldErrors, setFieldErrors] = useState<{
     name?: string;
     username?: string;
@@ -65,8 +70,11 @@ const AccountSettings = () => {
   const router = useRouter();
   const tabMap = [
     "general",
+    "lead-distribution",
     "units-settings",
     "live-chat-setup",
+    "email-settings",
+    "api-settings",
     "stripe-onboarding",
     "paypal-payout",
   ];
@@ -78,47 +86,35 @@ const AccountSettings = () => {
     setTabValue(index >= 0 ? index : 0);
   }, []);
 
-  // Fetch only the necessary user data
   useEffect(() => {
-    const fetchUserDetails = async () => {
-      try {
-        const response = await axios.get("/api/getSingleUser");
+    if (currentUser) {
+      const basicUserInfo: BasicUserInfo = {
+        _id: currentUser.id || "",
+        name: currentUser.name || "",
+        username: currentUser.username || "",
+        email: currentUser.email || "",
+        mobileNumber: currentUser.mobileNumber || currentUser.mobile || "",
+        image: currentUser.image || "",
+      };
+      setEditableUser(basicUserInfo);
+    }
+  }, [currentUser]);
 
-        // Extract only the fields we need for the form
-        const userData = response.data;
-        const basicUserInfo: BasicUserInfo = {
-          _id: userData._id,
-          name: userData.name || "",
-          username: userData.username || "",
-          email: userData.email || "",
-          mobileNumber: userData.mobileNumber || "",
-          image: userData.image || "",
-        };
-
-        setUser(basicUserInfo);
-      } catch (error) {
-        console.error("Error fetching user details", error);
-        showSnackbar("Error loading user data", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUserDetails();
-  }, []);
+  useEffect(() => {
+    if (!currentUser && !userLoading) {
+      refreshUser();
+    }
+  }, [currentUser, userLoading, refreshUser]);
 
   const showSnackbar = (
     message: string,
-    severity: "success" | "error" | "warning" | "info"
+    severity: "success" | "error" | "warning" | "info",
   ) => {
-    setSnackbar({
-      open: true,
-      message,
-      severity,
-    });
+    notify(message, severity);
   };
 
   const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+    // Notifications are auto-managed by NotificationManager
   };
 
   const clearFieldErrors = () => {
@@ -135,8 +131,8 @@ const AccountSettings = () => {
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setUser((prevUser) =>
-      prevUser ? ({ ...prevUser, [name]: value } as BasicUserInfo) : null
+    setEditableUser((prevUser) =>
+      prevUser ? ({ ...prevUser, [name]: value } as BasicUserInfo) : null,
     );
 
     // Clear field-specific errors when user starts typing
@@ -168,7 +164,7 @@ const AccountSettings = () => {
   };
 
   const handleSaveChanges = async () => {
-    if (!user) return;
+    if (!editableUser) return;
 
     setSaving(true);
     clearFieldErrors();
@@ -176,9 +172,9 @@ const AccountSettings = () => {
     try {
       // Create payload with only the allowed fields
       const updatePayload: UpdateUserPayload = {
-        name: user.name,
-        username: user.username,
-        mobileNumber: user.mobileNumber,
+        name: editableUser.name,
+        username: editableUser.username,
+        mobileNumber: editableUser.mobileNumber,
       };
 
       // Remove undefined fields
@@ -195,12 +191,21 @@ const AccountSettings = () => {
         return;
       }
 
-      const response = await axios.put("/api/updateuser", updatePayload);
+      const response = await axios.put("/api/users/profile", updatePayload);
 
       if (response.data.success) {
         showSnackbar(
           response.data.message || "Profile updated successfully!",
-          "success"
+          "success",
+        );
+
+        dispatch(
+          updateUser({
+            name: editableUser.name,
+            username: editableUser.username,
+            mobile: editableUser.mobileNumber,
+            mobileNumber: editableUser.mobileNumber,
+          }),
         );
 
         // Update local state with any sanitized data from the response if needed
@@ -210,7 +215,7 @@ const AccountSettings = () => {
         // Handle API response that indicates failure but didn't throw error
         showSnackbar(
           response.data.message || "Failed to update profile",
-          "error"
+          "error",
         );
         if (response.data.errors) {
           const fieldSpecificErrors = extractFieldErrors(response.data.errors);
@@ -239,18 +244,20 @@ const AccountSettings = () => {
       } else if (error.code === "NETWORK_ERROR") {
         showSnackbar(
           "Network error. Please check your connection and try again.",
-          "error"
+          "error",
         );
       } else {
         showSnackbar(
           "An unexpected error occurred. Please try again.",
-          "error"
+          "error",
         );
       }
     } finally {
       setSaving(false);
     }
   };
+
+  const isProfileLoading = userLoading || !editableUser;
 
   return (
     <Box
@@ -279,13 +286,16 @@ const AccountSettings = () => {
         sx={{ borderBottom: 1, borderColor: "divider" }}
       >
         <Tab label="General" />
+        <Tab label="Lead Distribution" />
         <Tab label="Units Settings" />
         <Tab label="Live Chat Setup" />
+        <Tab label="Email Settings" />
+        <Tab label="API Settings" />
         <Tab label="Stripe Onboarding" />
         <Tab label="Paypal Payout" />
       </Tabs>
 
-      {loading ? (
+      {isProfileLoading ? (
         <Box
           display="flex"
           justifyContent="center"
@@ -299,7 +309,7 @@ const AccountSettings = () => {
           {tabValue === 0 && (
             <Box sx={{ mt: 3 }}>
               <Grid container spacing={3}>
-                <Grid item xs={12} sm={4}>
+                <Grid size={{ xs: 12, sm: 4 }}>
                   <Box
                     sx={{
                       display: "flex",
@@ -309,7 +319,7 @@ const AccountSettings = () => {
                   >
                     <Avatar
                       sx={{ width: 80, height: 80, mb: 2 }}
-                      src={user?.image}
+                      src={editableUser?.image}
                       alt="Profile"
                     />
                     <Typography variant="body2" color="textSecondary">
@@ -317,14 +327,14 @@ const AccountSettings = () => {
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={8}>
+                <Grid size={{ xs: 12, sm: 8 }}>
                   <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                       <TextField
                         fullWidth
                         label="Full Name"
                         name="name"
-                        value={user?.name || ""}
+                        value={editableUser?.name || ""}
                         onChange={handleInputChange}
                         error={!!fieldErrors.name}
                         helperText={fieldErrors.name || "Your display name"}
@@ -332,12 +342,12 @@ const AccountSettings = () => {
                         placeholder="Enter your full name"
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
                         fullWidth
                         label="Username"
                         name="username"
-                        value={user?.username || ""}
+                        value={editableUser?.username || ""}
                         onChange={handleInputChange}
                         error={!!fieldErrors.username}
                         helperText={
@@ -347,12 +357,12 @@ const AccountSettings = () => {
                         placeholder="Choose a username"
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
                         fullWidth
                         label="Phone Number"
                         name="mobileNumber"
-                        value={user?.mobileNumber || ""}
+                        value={editableUser?.mobileNumber || ""}
                         onChange={handleInputChange}
                         error={!!fieldErrors.mobileNumber}
                         helperText={
@@ -362,12 +372,12 @@ const AccountSettings = () => {
                         placeholder="+1234567890"
                       />
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                       <TextField
                         fullWidth
                         label="Email Address"
                         name="email"
-                        value={user?.email || ""}
+                        value={editableUser?.email || ""}
                         disabled
                         helperText="Email cannot be changed"
                       />
@@ -387,27 +397,26 @@ const AccountSettings = () => {
                 <Button
                   variant="outlined"
                   onClick={() => {
-                    // Reset form to original values
-                    const fetchCurrentData = async () => {
-                      try {
-                        const response = await axios.get("/api/getSingleUser");
-                        const userData = response.data;
-                        const basicUserInfo: BasicUserInfo = {
-                          _id: userData._id,
-                          name: userData.name || "",
-                          username: userData.username || "",
-                          email: userData.email || "",
-                          mobileNumber: userData.mobileNumber || "",
-                          image: userData.image || "",
-                        };
-                        setUser(basicUserInfo);
+                    const resetToCurrentUser = async () => {
+                      const latest = await refreshUser(true);
+                      if (latest) {
+                        setEditableUser({
+                          _id: latest.id || "",
+                          name: latest.name || "",
+                          username: latest.username || "",
+                          email: latest.email || "",
+                          mobileNumber:
+                            latest.mobileNumber || latest.mobile || "",
+                          image: latest.image || "",
+                        });
                         clearFieldErrors();
                         showSnackbar("Changes discarded", "info");
-                      } catch (error) {
+                      } else {
                         showSnackbar("Error resetting form", "error");
                       }
                     };
-                    fetchCurrentData();
+
+                    resetToCurrentUser();
                   }}
                   disabled={saving}
                 >
@@ -428,27 +437,13 @@ const AccountSettings = () => {
         </>
       )}
 
-      {tabValue === 1 && <UnitPricingComponent />}
-      {tabValue === 2 && <TawkSetupForm />}
-      {tabValue === 3 && <StripeOnboardingPage />}
-      {tabValue === 4 && <PaypalPayOutPage />}
-
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-          variant="filled"
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      {tabValue === 1 && <LeadDistributionSettings />}
+      {tabValue === 2 && <UnitPricingComponent />}
+      {tabValue === 3 && <TawkSetupForm />}
+      {tabValue === 4 && <EmailSettingsPage />}
+      {tabValue === 5 && <APISettingsPage />}
+      {tabValue === 6 && <StripeOnboardingPage />}
+      {tabValue === 7 && <PaypalPayOutPage />}
     </Box>
   );
 };

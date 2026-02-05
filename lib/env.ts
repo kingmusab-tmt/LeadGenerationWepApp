@@ -20,6 +20,7 @@ const envSchema = z.object({
   EMAIL_PASSWORD: z.string(),
   EMAIL_PORT: z.number(),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string(),
+  VAPID_EMAIL: z.string().email(),
   NEXT_PUBLIC_VT_TOKEN: z.string(),
   NEXT_PUBLIC_DOMAIN: z.string(),
   NEXT_SECRET_VT_SECRET: z.string(),
@@ -33,5 +34,7 @@ const envSchema = z.object({
   PAYPAL_CLIENT_ID: z.string(),
   PAYPAL_CLIENT_SECRET: z.string(),
   STRIPE_SECRET_KEY: z.string(),
+  NEXT_PUBLIC_RECAPTCHA_SITE_KEY: z.string().optional(),
+  RECAPTCHA_SECRET_KEY: z.string().optional(),
 });
 export const env = envSchema.parse(process.env);

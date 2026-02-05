@@ -13,6 +13,7 @@ import {
   IconButton,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { LEAD_SOURCES } from "@/utils/leadSources";
 import { TrackingNumber } from "@/types/trackingNumbers";
 
 interface CallMethodFormProps {
@@ -44,19 +45,19 @@ export default function CallMethodForm({
   onUpdateForwarding,
 }: CallMethodFormProps) {
   const [selectedNumber, setSelectedNumber] = useState(
-    initialValues?.phoneNumber || ""
+    initialValues?.phoneNumber || "",
   );
   const [forwardingType, setForwardingType] = useState(
-    initialValues?.forwardingType || "direct"
+    initialValues?.forwardingType || "direct",
   );
   const [welcomeMessage, setWelcomeMessage] = useState(
-    initialValues?.welcomeMessage || ""
+    initialValues?.welcomeMessage || "",
   );
   const [callWhisper, setCallWhisper] = useState(
-    initialValues?.callWhisper || ""
+    initialValues?.callWhisper || "",
   );
   const [requireResponse, setRequireResponse] = useState(
-    initialValues?.requireResponse || false
+    initialValues?.requireResponse || false,
   );
   const [buyerResponses, setBuyerResponses] = useState<
     { message: string; digit: string }[]
@@ -65,23 +66,23 @@ export default function CallMethodForm({
     { message: string; digit: string }[]
   >(initialValues?.leadResponses || []);
   const [recordCall, setRecordCall] = useState(
-    initialValues?.recordCall || false
+    initialValues?.recordCall || false,
   );
   const [reconnectCaller, setReconnectCaller] = useState(
-    initialValues?.reconnectCaller || false
+    initialValues?.reconnectCaller || false,
   );
   const [passCallerId, setPassCallerId] = useState(
-    initialValues?.passCallerId || false
+    initialValues?.passCallerId || false,
   );
   const [leadSource, setLeadSource] = useState(initialValues?.leadSource || "");
   const [forwardingNumbers, setForwardingNumbers] = useState(
-    initialValues?.forwardingNumbers || [""]
+    initialValues?.forwardingNumbers || [""],
   );
   const [leadBuyers, setLeadBuyers] = useState<{ id: string; name: string }[]>(
     initialValues?.leadBuyers?.map((buyer) => ({
       id: buyer.id,
       name: buyer.name,
-    })) || []
+    })) || [],
   );
   const [selectedLeadBuyers, setSelectedLeadBuyers] = useState<string[]>([]);
 
@@ -101,14 +102,14 @@ export default function CallMethodForm({
       setForwardingNumbers(initialValues.forwardingNumbers || [""]);
       setLeadBuyers(initialValues.leadBuyers || []);
       setSelectedLeadBuyers(
-        initialValues.leadBuyers?.map((buyer) => buyer.id) || []
+        initialValues.leadBuyers?.map((buyer) => buyer.id) || [],
       );
     }
   }, [initialValues]);
 
   useEffect(() => {
     if (forwardingType === "specific_lead") {
-      fetch(`/api/call_twillo/get_lead_buyers?sellerId=${sellerId}`)
+      fetch(`/api/calls/twilio/get_lead_buyers?sellerId=${sellerId}`)
         .then((res) => res.json())
         .then((data: { id: string; name: string }[]) => setLeadBuyers(data))
         .catch(() => setLeadBuyers([]));
@@ -420,11 +421,11 @@ export default function CallMethodForm({
           onChange={(e) => setLeadSource(e.target.value as string)}
           label="Lead Source"
         >
-          <MenuItem value="website">Website</MenuItem>
-          <MenuItem value="advertisement">Advertisement</MenuItem>
-          <MenuItem value="referral">Referral</MenuItem>
-          <MenuItem value="social_media">Social Media</MenuItem>
-          <MenuItem value="other">Other</MenuItem>
+          {LEAD_SOURCES.map((source) => (
+            <MenuItem key={source.value} value={source.value}>
+              {source.label}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
 

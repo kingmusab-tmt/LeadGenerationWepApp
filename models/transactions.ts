@@ -20,13 +20,14 @@ export interface ITransaction extends Document {
   currentBalance: number; // Current balance after the transaction
   currency: string;
   stripeAccountId?: string; // For seller_payout (Stripe account ID of the seller)
+  relatedInvoices?: mongoose.Types.ObjectId[]; // PHASE 3: Link to related invoices
   metadata: {
-    leadId?: string; // For lead_purchase
+    leadId?: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref
     unitsPurchased?: number; // For units_purchase
-    sellerId?: string; // For seller_income (ID of the seller earning income)
-    buyerId: String;
+    sellerId?: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref (ID of the seller earning income)
+    buyerId: mongoose.Types.ObjectId; // PHASE 1: Changed from String to ObjectId ref
     refund: boolean;
-    tierId: string;
+    tierId: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref
     stripeTransferId: string; // For seller_payout (ID from Stripe transfer)
     tierName: string;
     tierRenewalDate?: Date; // For subscription_renewal (renewal date of the subscription)
@@ -78,6 +79,12 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
     stripeAccountId: {
       type: String, // For seller payouts, the Stripe account ID of the seller
     },
+    relatedInvoices: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Invoice",
+      },
+    ], // PHASE 3: Link to related invoices
     previousBalance: { type: Number }, // Previous balance before the transaction
     currentBalance: { type: Number }, // Current balance after the transaction
     currency: {
@@ -89,7 +96,8 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
       transferVerified: { type: Boolean },
       transferAmount: { type: Number },
       tierId: {
-        type: String,
+        type: Schema.Types.ObjectId, // PHASE 1: Changed from String to ObjectId ref
+        ref: "Tier", // Reference to Tier model
       },
       stripeTransferId: {
         type: String,
@@ -110,16 +118,19 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
         type: String,
       },
       leadId: {
-        type: String,
+        type: Schema.Types.ObjectId, // PHASE 1: Changed from String to ObjectId ref
+        ref: "Lead", // Reference to Lead model
       },
       unitsPurchased: {
         type: Number,
       },
       sellerId: {
-        type: String,
+        type: Schema.Types.ObjectId, // PHASE 1: Changed from String to ObjectId ref
+        ref: "User", // Reference to User model
       },
       buyerId: {
-        type: String,
+        type: Schema.Types.ObjectId, // PHASE 1: Changed from String to ObjectId ref
+        ref: "Buyer", // Reference to Buyer model
       },
       refund: {
         type: Boolean,
@@ -157,7 +168,7 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
   },
   {
     timestamps: true, // Automatically manage createdAt and updatedAt
-  }
+  },
 );
 
 // Indexes
@@ -166,6 +177,10 @@ TransactionSchema.index({ type: 1 }); // Index on type field for faster queries
 TransactionSchema.index({ status: 1 }); // Index on status field for faster queries
 TransactionSchema.index({ "metadata.sellerId": 1 }); // Index on sellerId for faster queries
 TransactionSchema.index({ "metadata.subscriptionId": 1 }); // Index on subscriptionId for faster queries
+TransactionSchema.index({ "metadata.buyerId": 1 }); // PHASE 1: Index on buyerId for faster queries
+TransactionSchema.index({ "metadata.leadId": 1 }); // PHASE 1: Index on leadId for faster queries
+TransactionSchema.index({ "metadata.tierId": 1 }); // PHASE 1: Index on tierId for faster queries
+TransactionSchema.index({ relatedInvoices: 1 }); // PHASE 3: Index on relatedInvoices for faster queries
 
 // Create and export the Mongoose model
 export const Transaction: Model<ITransaction> =

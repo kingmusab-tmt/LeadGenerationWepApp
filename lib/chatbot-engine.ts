@@ -1,5 +1,6 @@
 import { Lead, QualificationFlow, Question } from "@/types/chatbot";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { analyzeSentiment } from "./sentimentEngine";
 
 interface ConversationState {
   currentQuestionIndex: number;
@@ -21,7 +22,7 @@ export class ChatbotEngine {
   async processMessage(
     conversationId: string,
     userMessage: string,
-    leadData: Partial<Lead>
+    leadData: Partial<Lead>,
   ): Promise<{
     response: string;
     nextQuestion?: Question;
@@ -33,6 +34,9 @@ export class ChatbotEngine {
     const extractedInfo = await this.extractInformation(userMessage, leadData);
     const updatedLead = { ...leadData, ...extractedInfo };
 
+    // Sentiment analysis
+    const sentiment = analyzeSentiment(userMessage);
+
     // Update conversation state
     this.updateConversationState(conversationId, state, userMessage);
 
@@ -40,17 +44,21 @@ export class ChatbotEngine {
     const score = this.calculateScore(state.responses, updatedLead);
     const nextQuestion = this.determineNextQuestion(state, updatedLead);
 
-    // Generate AI response
+    // Generate AI response with sentiment
     const response = await this.generateAIResponse(
       userMessage,
       nextQuestion,
-      updatedLead
+      updatedLead,
+      sentiment,
     );
 
     return {
       response,
       nextQuestion,
-      leadUpdate: { ...updatedLead, qualificationScore: score },
+      leadUpdate: {
+        ...updatedLead,
+        qualificationScore: score,
+      },
     };
   }
 
@@ -67,7 +75,7 @@ export class ChatbotEngine {
   private updateConversationState(
     conversationId: string,
     state: ConversationState,
-    userMessage: string
+    userMessage: string,
   ): void {
     state.responses[`message_${Date.now()}`] = userMessage;
     state.currentQuestionIndex++;
@@ -76,7 +84,7 @@ export class ChatbotEngine {
 
   private async extractInformation(
     message: string,
-    currentLead: Partial<Lead>
+    currentLead: Partial<Lead>,
   ): Promise<Partial<Lead>> {
     const prompt = `
     Analyze this message from a potential lead: "${message}"
@@ -119,7 +127,7 @@ export class ChatbotEngine {
 
   private calculateScore(
     responses: Record<string, any>,
-    leadData: Partial<Lead>
+    leadData: Partial<Lead>,
   ): number {
     let score = 0;
 
@@ -158,7 +166,7 @@ export class ChatbotEngine {
 
   private determineNextQuestion(
     state: ConversationState,
-    leadData: Partial<Lead>
+    leadData: Partial<Lead>,
   ): Question | undefined {
     const questions = this.qualificationFlow.questions || [];
 
@@ -170,7 +178,7 @@ export class ChatbotEngine {
         this.evaluateQuestionCondition(
           question.condition,
           leadData,
-          state.responses
+          state.responses,
         )
       ) {
         return question;
@@ -183,7 +191,7 @@ export class ChatbotEngine {
   private evaluateQuestionCondition(
     condition: string,
     leadData: Partial<Lead>,
-    responses: Record<string, any>
+    responses: Record<string, any>,
   ): boolean {
     if (!condition) return true;
 
@@ -191,17 +199,28 @@ export class ChatbotEngine {
       // Simple condition evaluation - consider using a safer eval alternative in production
       return new Function("lead", "responses", `return ${condition}`)(
         leadData,
-        responses
+        responses,
       );
     } catch {
       return true; // Default to showing question if condition parsing fails
     }
   }
 
+  private getModelName(): string {
+    // Always use Gemini 2.5 Pro if available, fallback to 1.5 Pro
+    return "gemini-2.5-pro";
+  }
+
   private async generateAIResponse(
     userMessage: string,
     nextQuestion: Question | undefined,
-    leadData: Partial<Lead>
+    leadData: Partial<Lead>,
+    sentiment?: {
+      score: number;
+      comparative: number;
+      positive: string[];
+      negative: string[];
+    },
   ): Promise<string> {
     const context = `
     Role: Lead qualification assistant for ${
@@ -216,6 +235,23 @@ export class ChatbotEngine {
         ? `- Next question to ask: "${nextQuestion.text}"`
         : "- Qualification complete"
     }
+    - Sentiment score: ${sentiment?.score ?? 0} (${
+      sentiment?.score && sentiment.score > 0
+        ? "positive"
+        : sentiment?.score && sentiment.score < 0
+          ? "negative"
+          : "neutral"
+    })
+    ${
+      sentiment?.positive?.length
+        ? `- Positive keywords: ${sentiment.positive.join(", ")}`
+        : ""
+    }
+    ${
+      sentiment?.negative?.length
+        ? `- Negative keywords: ${sentiment.negative.join(", ")}`
+        : ""
+    }
     
     Your Task:
     1. Acknowledge the user's input naturally
@@ -224,7 +260,7 @@ export class ChatbotEngine {
         ? "Transition to the next question"
         : "Provide appropriate closing"
     }
-    3. Maintain professional yet friendly tone
+    3. Adapt your tone to match the user's sentiment (more upbeat if positive, more empathetic if negative)
     4. Keep response to 1-2 sentences
     
     Response Requirements:
@@ -235,7 +271,7 @@ export class ChatbotEngine {
 
     try {
       const model = this.genAI.getGenerativeModel({
-        model: "gemini-1.5-pro",
+        model: this.getModelName(),
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 150,

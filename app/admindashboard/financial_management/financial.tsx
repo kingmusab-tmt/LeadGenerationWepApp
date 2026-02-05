@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useInitializeUser } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
 import {
   Box,
@@ -87,7 +87,7 @@ interface Payout {
 }
 
 const FinancialManagement = () => {
-  const { data: session } = useSession();
+  const { currentUser } = useInitializeUser();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -106,7 +106,7 @@ const FinancialManagement = () => {
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   useEffect(() => {
-    if (!session || session.user.role !== "admin") {
+    if (!currentUser || currentUser.role !== "admin") {
       router.push("/auth/sign-in");
       return;
     }
@@ -115,7 +115,7 @@ const FinancialManagement = () => {
       try {
         setLoading(true);
         const [transactionsRes] = await Promise.all([
-          fetch("/api/adminapi/financial/transactions"),
+          fetch("/api/admin/financial/transactions"),
           // fetch("/api/adminapi/financial/payouts"),
         ]);
 
@@ -132,7 +132,7 @@ const FinancialManagement = () => {
     };
 
     fetchData();
-  }, [session]);
+  }, [currentUser, router]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -147,7 +147,7 @@ const FinancialManagement = () => {
   };
 
   const handleRowsPerPageChange = (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setTransactionPage(0);
@@ -178,14 +178,14 @@ const FinancialManagement = () => {
         `/api/admin/financial/payouts/${payoutId}/process`,
         {
           method: "PUT",
-        }
+        },
       );
       const updatedPayout = await response.json();
 
       setPayouts(
         payouts.map((payout) =>
-          payout.id === payoutId ? { ...payout, status: "processed" } : payout
-        )
+          payout.id === payoutId ? { ...payout, status: "processed" } : payout,
+        ),
       );
 
       if (selectedPayout?.id === payoutId) {
@@ -217,12 +217,12 @@ const FinancialManagement = () => {
 
   const paginatedTransactions = filteredTransactions.slice(
     transactionPage * rowsPerPage,
-    transactionPage * rowsPerPage + rowsPerPage
+    transactionPage * rowsPerPage + rowsPerPage,
   );
 
   const paginatedPayouts = filteredPayouts.slice(
     payoutPage * rowsPerPage,
-    payoutPage * rowsPerPage + rowsPerPage
+    payoutPage * rowsPerPage + rowsPerPage,
   );
 
   const getTransactionTypeLabel = (type: string) => {
@@ -423,10 +423,10 @@ const FinancialManagement = () => {
                             transaction.status === "completed"
                               ? "success"
                               : transaction.status === "failed"
-                              ? "error"
-                              : transaction.status === "refunded"
-                              ? "warning"
-                              : "default"
+                                ? "error"
+                                : transaction.status === "refunded"
+                                  ? "warning"
+                                  : "default"
                           }
                         />
                       </TableCell>
@@ -507,8 +507,8 @@ const FinancialManagement = () => {
                             payout.status === "processed"
                               ? "success"
                               : payout.status === "failed"
-                              ? "error"
-                              : "default"
+                                ? "error"
+                                : "default"
                           }
                         />
                       </TableCell>
@@ -598,7 +598,7 @@ const FinancialManagement = () => {
                   <ListItemText
                     primary="Type"
                     secondary={getTransactionTypeLabel(
-                      selectedTransaction.type
+                      selectedTransaction.type,
                     )}
                   />
                 </ListItem>
@@ -626,10 +626,10 @@ const FinancialManagement = () => {
                           selectedTransaction.status === "completed"
                             ? "success"
                             : selectedTransaction.status === "failed"
-                            ? "error"
-                            : selectedTransaction.status === "refunded"
-                            ? "warning"
-                            : "default"
+                              ? "error"
+                              : selectedTransaction.status === "refunded"
+                                ? "warning"
+                                : "default"
                         }
                       />
                     }
@@ -647,7 +647,7 @@ const FinancialManagement = () => {
                   <ListItemText
                     primary="Date"
                     secondary={new Date(
-                      selectedTransaction.createdAt
+                      selectedTransaction.createdAt,
                     ).toLocaleString()}
                   />
                 </ListItem>
@@ -673,7 +673,7 @@ const FinancialManagement = () => {
                             {JSON.stringify(
                               selectedTransaction.metadata,
                               null,
-                              2
+                              2,
                             )}
                           </Box>
                         }
@@ -737,8 +737,8 @@ const FinancialManagement = () => {
                           selectedPayout.status === "processed"
                             ? "success"
                             : selectedPayout.status === "failed"
-                            ? "error"
-                            : "default"
+                              ? "error"
+                              : "default"
                         }
                       />
                     }
@@ -756,7 +756,7 @@ const FinancialManagement = () => {
                   <ListItemText
                     primary="Created"
                     secondary={new Date(
-                      selectedPayout.createdAt
+                      selectedPayout.createdAt,
                     ).toLocaleString()}
                   />
                 </ListItem>

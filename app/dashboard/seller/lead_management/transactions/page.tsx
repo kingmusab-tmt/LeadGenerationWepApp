@@ -70,7 +70,7 @@ const TransactionHistory = () => {
     const fetchTransactions = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("/api/transactions");
+        const response = await axios.get("/api/payments/transactions");
         setTransactions(response.data.data);
         setFilteredTransactions(response.data.data);
       } catch (err) {
@@ -136,7 +136,7 @@ const TransactionHistory = () => {
   const handleRefresh = () => {
     setLoading(true);
     axios
-      .get("/api/transactions")
+      .get("/api/payments/transactions")
       .then((response) => {
         setTransactions(response.data.data);
         setFilteredTransactions(response.data.data);
@@ -149,7 +149,7 @@ const TransactionHistory = () => {
 
   const handleMenuClick = (
     event: React.MouseEvent<HTMLElement>,
-    transaction: ITransaction
+    transaction: ITransaction,
   ) => {
     setAnchorEl(event.currentTarget);
     setSelectedTransaction(transaction);
@@ -307,7 +307,7 @@ const TransactionHistory = () => {
         URL.revokeObjectURL(url);
       },
       "image/jpeg",
-      0.9
+      0.9,
     );
   };
 
@@ -474,7 +474,7 @@ const TransactionHistory = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 6, mb: 4, p: isMobile ? 1 : 2 }}>
+    <Container maxWidth="lg" sx={{ mt: 3, mb: 4, p: isMobile ? 1 : 2 }}>
       <Stack spacing={isMobile ? 2 : 3}>
         <Box
           display="flex"
@@ -486,7 +486,7 @@ const TransactionHistory = () => {
           <Typography
             variant={isMobile ? "h5" : "h5"}
             component="h1"
-            sx={{ mt: 5, mb: 1, fontWeight: "bold", color: "primary.main" }}
+            sx={{ mt: 4, mb: 1, fontWeight: "bold", color: "primary.main" }}
           >
             Transaction History
           </Typography>
@@ -525,7 +525,7 @@ const TransactionHistory = () => {
         ) : isMobile ? (
           <Stack spacing={2}>
             {filteredTransactions.map((transaction) =>
-              renderMobileTransaction(transaction)
+              renderMobileTransaction(transaction),
             )}
           </Stack>
         ) : isTablet ? (
@@ -543,7 +543,7 @@ const TransactionHistory = () => {
                 </TableHead>
                 <TableBody>
                   {filteredTransactions.map((transaction) =>
-                    renderTabletTransaction(transaction)
+                    renderTabletTransaction(transaction),
                   )}
                 </TableBody>
               </Table>
@@ -580,7 +580,7 @@ const TransactionHistory = () => {
                 </TableHead>
                 <TableBody>
                   {filteredTransactions.map((transaction) =>
-                    renderDesktopTransaction(transaction)
+                    renderDesktopTransaction(transaction),
                   )}
                 </TableBody>
               </Table>

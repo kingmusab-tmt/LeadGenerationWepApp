@@ -1,5 +1,5 @@
-import { User } from "@/models/user";
-import { Notification } from "@/models/notifications";
+import { User } from "@/models";
+import { Notification } from "@/models/notificationModel";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "./connectdb";
 import { getServerSession } from "next-auth";
@@ -33,7 +33,7 @@ export async function sendNotification({
 
     // Send email if user has email notifications enabled
     const user = await User.findById(userId);
-    if (user?.notificationPreferences?.includes("email")) {
+    if (user?.notificationPreferences?.includes("Email")) {
       await sendEmailNotification(user.email, title, message);
     }
 
@@ -42,7 +42,7 @@ export async function sendNotification({
       await sendPushNotification(user.pushToken, title, message);
     }
 
-    if (user?.notificationPreferences?.includes("sms")) {
+    if (user?.notificationPreferences?.includes("SMS")) {
       await sendSmsNotification(user.mobileNumber, message);
     }
 
@@ -56,7 +56,7 @@ export async function sendNotification({
 async function sendEmailNotification(
   email: string,
   subject: string,
-  body: string
+  body: string,
 ) {
   await dbConnect();
 
@@ -94,7 +94,7 @@ async function sendEmailNotification(
 async function sendPushNotification(
   pushToken: string,
   title: string,
-  body: string
+  body: string,
 ) {
   // Implementation using Firebase Cloud Messaging or similar
   // ...

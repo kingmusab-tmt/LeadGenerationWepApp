@@ -71,7 +71,7 @@ const LandingPage = () => {
         setTiers(data.filter((tier: Tier) => tier.isActive));
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "An unknown error occurred"
+          err instanceof Error ? err.message : "An unknown error occurred",
         );
       } finally {
         setLoading(false);
@@ -188,7 +188,7 @@ const LandingPage = () => {
         <Box bgcolor={theme.palette.primary.main} color="white" py={10}>
           <Container maxWidth="lg">
             <Grid container spacing={6} alignItems="center">
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="h2" component="h1" gutterBottom>
                   Transform Your Lead Management
                 </Typography>
@@ -215,7 +215,7 @@ const LandingPage = () => {
                   </Button>
                 </Stack>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Zoom
                   in={checked}
                   style={{ transitionDelay: checked ? "300ms" : "0ms" }}
@@ -273,7 +273,7 @@ const LandingPage = () => {
 
           <Grid container spacing={4} mt={2}>
             {features.map((feature, index) => (
-              <Grid item xs={12} sm={6} md={3} key={index}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} key={index}>
                 <Grow
                   in={checked}
                   style={{ transformOrigin: "0 0 0" }}
@@ -330,7 +330,7 @@ const LandingPage = () => {
             {tiers.length > 0 ? (
               <Grid container spacing={4} mt={6} alignItems="stretch">
                 {tiers.map((tier, index) => (
-                  <Grid item xs={12} md={4} key={tier._id}>
+                  <Grid size={{ xs: 12, md: 4 }} key={tier._id}>
                     <Grow
                       in={checked}
                       style={{ transformOrigin: "0 0 0" }}
@@ -431,7 +431,7 @@ const LandingPage = () => {
                                   You pay $
                                   {(
                                     parseFloat(
-                                      tier.discountedPrice || tier.price
+                                      tier.discountedPrice || tier.price,
                                     ) * 12
                                   ).toFixed(2)}
                                 </Box>
@@ -524,7 +524,7 @@ const LandingPage = () => {
 
           <Grid container spacing={4} mt={6}>
             {testimonials.map((testimonial, index) => (
-              <Grid item xs={12} md={4} key={index}>
+              <Grid size={{ xs: 12, md: 4 }} key={index}>
                 <Slide
                   direction="up"
                   in={checked}

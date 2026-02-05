@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Buyer } from "@/models/leadbuyers";
-import { User } from "@/models/user";
+import { User } from "@/models";
 import { Lead } from "@/models/leads";
 import Call from "@/models/call";
 import { Transaction } from "@/models/transactions";
@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
     console.error("Failed to fetch overview data", error);
     return NextResponse.json(
       { message: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

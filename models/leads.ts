@@ -7,19 +7,24 @@ export interface ILead extends Document {
   email?: string;
   phone?: string;
   company?: string;
-  leadScore: number; // 0-10 scale
-  scoreFactors: {
-    completeness: number; // 0-3 points
-    responsiveness: number; // 0-3 points
-    valuePotential: number; // 0-4 points
+  // AI Quality Assessment (replaces manual scoring)
+  aiQualityScore: number; // 0-100 spam score from Gemini
+  qualityLevel: "High" | "Medium" | "Low"; // High (0-30), Medium (30-70), Low (70-100)
+  aiQualityReason: string; // Explanation from AI
+  aiQualityAssessment?: {
+    isValid: boolean;
+    spamScore: number;
+    reason: string;
+    evaluatedAt: Date;
   };
   followUps: Array<{
     date: Date;
     method: "call" | "email" | "message";
     outcome: "contacted" | "no-response" | "not-interested";
   }>;
-  formId?: string;
-  userId: string;
+  formId?: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  calls: mongoose.Types.ObjectId[]; // PHASE 3: Array of Call IDs for this lead
   fields: Array<{
     id: string;
     label: string;
@@ -33,7 +38,6 @@ export interface ILead extends Document {
     | "qualified"
     | "unqualified"
     | "transferred";
-  distributionMethod: "manual" | "round_robin" | "marketplace";
   exclusive: boolean;
   shared: boolean;
   shareNumber: number;
@@ -56,25 +60,32 @@ export interface ILead extends Document {
   leadSource: string;
   createdAt: Date;
   updatedAt: Date;
-  qualificationScore?: number; // Optional field for qualification score
   industry?: string; // Optional field for industry
+  location?: {
+    city?: string;
+    state?: string;
+    country?: string;
+    zipCode?: string;
+    address?: string;
+  };
 }
 
 const LeadSchema = new Schema<ILead>(
   {
-    conversationId: { type: String, unique: true, default: "" },
+    conversationId: { type: String, unique: true, sparse: true },
     name: { type: String, default: "" },
     email: { type: String, default: "" },
     phone: { type: String, default: "" },
     company: { type: String, default: "" },
 
-    distributionMethod: {
-      type: String,
-      enum: ["manual", "round_robin", "marketplace"],
-      default: "marketplace",
-    },
-    qualificationScore: { type: Number, min: 0, max: 100, default: 0 },
     industry: { type: String, default: "" }, // Optional field for industry
+    location: {
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      country: { type: String, default: "USA" },
+      zipCode: { type: String, default: "" },
+      address: { type: String, default: "" },
+    },
 
     leadSource: { type: String },
     shared: { type: Boolean, default: false },
@@ -82,8 +93,8 @@ const LeadSchema = new Schema<ILead>(
     shareNumber: { type: Number, default: 1 },
     exclusive: { type: Boolean, default: false },
     unit: { type: Number, default: 5 },
-    formId: { type: String, required: false },
-    userId: { type: String, required: true },
+    formId: { type: Schema.Types.ObjectId, ref: "Form", required: false },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     fields: {
       type: [
         {
@@ -93,6 +104,26 @@ const LeadSchema = new Schema<ILead>(
         },
       ],
       required: true,
+    },
+
+    // AI Quality Assessment (replaces manual scoring)
+    aiQualityScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 50, // Default to Medium
+    },
+    qualityLevel: {
+      type: String,
+      enum: ["High", "Medium", "Low"],
+      default: "Medium",
+    },
+    aiQualityReason: { type: String, default: "" },
+    aiQualityAssessment: {
+      isValid: { type: Boolean, default: true },
+      spamScore: { type: Number, default: 50 },
+      reason: { type: String, default: "" },
+      evaluatedAt: { type: Date, default: Date.now },
     },
 
     status: {
@@ -132,17 +163,6 @@ const LeadSchema = new Schema<ILead>(
       ],
       default: [],
     },
-    leadScore: {
-      type: Number,
-      min: 0,
-      max: 10,
-      default: 5,
-    },
-    scoreFactors: {
-      completeness: { type: Number, default: 0 }, // 0-3 points
-      responsiveness: { type: Number, default: 0 }, // 0-3 points
-      valuePotential: { type: Number, default: 0 }, // 0-4 points
-    },
     followUps: [
       {
         date: Date,
@@ -150,11 +170,19 @@ const LeadSchema = new Schema<ILead>(
         outcome: String, // 'contacted', 'no-response', 'not-interested'
       },
     ],
+    calls: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Call",
+      },
+    ],
   },
   {
     timestamps: true,
-  }
+  },
 );
+
+LeadSchema.index({ calls: 1 }); // PHASE 3: Index for call queries
 
 export const Lead: Model<ILead> =
   mongoose.models.Lead || mongoose.model<ILead>("Lead", LeadSchema);

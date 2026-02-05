@@ -31,7 +31,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { useSession } from "next-auth/react";
+import { useInitializeUser } from "@/lib/hooks";
 import AdminDashboard from "../layout";
 import { redirect, useRouter } from "next/navigation";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
@@ -132,26 +132,26 @@ const initialOverviewData = {
 
 const AdminOverview: React.FC = () => {
   const [overviewData, setOverviewData] = useState(initialOverviewData);
-  const { data: session } = useSession();
+  const { currentUser } = useInitializeUser();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<"daily" | "weekly" | "monthly">(
-    "monthly"
+    "monthly",
   );
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
-    if (!session || session.user.role !== "admin") {
+    if (!currentUser || currentUser.role !== "admin") {
       redirect("/auth/sign-in");
     }
-  }, [session]);
+  }, [currentUser]);
 
   useEffect(() => {
     const fetchOverviewData = async () => {
       try {
-        if (session && session.user.role === "admin") {
-          const response = await fetch("/api/adminapi/overview");
+        if (currentUser && currentUser.role === "admin") {
+          const response = await fetch("/api/admin/overview");
           if (response.ok) {
             const data = await response.json();
             setOverviewData({
@@ -266,10 +266,10 @@ const AdminOverview: React.FC = () => {
     };
 
     fetchOverviewData();
-  }, [session]);
+  }, [currentUser]);
 
   const handleTimeframeChange = (
-    event: SelectChangeEvent<"daily" | "weekly" | "monthly">
+    event: SelectChangeEvent<"daily" | "weekly" | "monthly">,
   ) => {
     setTimeframe(event.target.value as "daily" | "weekly" | "monthly");
   };
@@ -598,8 +598,8 @@ const AdminOverview: React.FC = () => {
                     cy="50%"
                     outerRadius={isMobile ? 80 : 100}
                     fill="#8884d8"
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
+                    label={({ name, percent = 0 }) =>
+                      `${name} ${((percent || 0) * 100).toFixed(0)}%`
                     }
                   >
                     {overviewData.userDistribution.map((entry, index) => (

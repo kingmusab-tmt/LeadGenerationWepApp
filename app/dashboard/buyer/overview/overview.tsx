@@ -64,7 +64,7 @@ const ProfileCard = styled(Paper)(({ theme }) => ({
   alignItems: "center",
   background: theme.palette.background.paper,
   boxShadow: theme.shadows[3],
-  borderRadius: theme.shape.borderRadius * 2,
+  borderRadius: Number(theme.shape.borderRadius) * 2,
 }));
 
 // Initial default values for the overview data
@@ -220,7 +220,7 @@ const Overview: React.FC = () => {
       <Container maxWidth="lg" sx={{ mt: 6, mb: 6 }}>
         {/* Profile Section */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <ProfileCard>
               <Avatar
                 sx={{
@@ -275,10 +275,10 @@ const Overview: React.FC = () => {
           </Grid>
 
           {/* Key Metrics */}
-          <Grid item xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <Grid container spacing={3}>
               {stats.slice(0, 4).map((stat) => (
-                <Grid item xs={6} sm={3} key={stat.id}>
+                <Grid size={{ xs: 6, sm: 3 }} key={stat.id}>
                   <StatCard>
                     <StatCardContent>
                       {statIcons[stat.id]}
@@ -314,20 +314,20 @@ const Overview: React.FC = () => {
               </Typography>
               <Divider sx={{ mb: 2 }} />
               <Grid container spacing={2}>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Typography variant="body2">Lead Conversion</Typography>
                   <Typography variant="h6" color="primary">
                     {overviewData.acceptedLeads > 0
                       ? Math.round(
                           (overviewData.acceptedLeads /
                             overviewData.purchasedLeads) *
-                            100
+                            100,
                         )
                       : 0}
                     %
                   </Typography>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Typography variant="body2">Call Answer Rate</Typography>
                   <Typography variant="h6" color="primary">
                     {overviewData.callsReceived > 0
@@ -335,26 +335,26 @@ const Overview: React.FC = () => {
                           (overviewData.callsReceived /
                             (overviewData.callsReceived +
                               overviewData.callsMissed)) *
-                            100
+                            100,
                         )
                       : 0}
                     %
                   </Typography>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Typography variant="body2">Units Remaining</Typography>
                   <Typography variant="h6" color="primary">
                     {overviewData.walletUnit}
                   </Typography>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Typography variant="body2">Lead Utilization</Typography>
                   <Typography variant="h6" color="primary">
                     {overviewData.totalUnitPurchased > 0
                       ? Math.round(
                           (overviewData.totalUnitUsed /
                             overviewData.totalUnitPurchased) *
-                            100
+                            100,
                         )
                       : 0}
                     %
@@ -372,7 +372,7 @@ const Overview: React.FC = () => {
         <Divider sx={{ mb: 3 }} />
         <Grid container spacing={3}>
           {stats.slice(4).map((stat) => (
-            <Grid item xs={6} sm={4} md={3} key={stat.id} sx={{ mb: 6 }}>
+            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={stat.id} sx={{ mb: 6 }}>
               <StatCard>
                 <StatCardContent>
                   {statIcons[stat.id]}

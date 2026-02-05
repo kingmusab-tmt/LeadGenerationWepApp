@@ -40,11 +40,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
-  },
   experimental: {
     serverActions: {
       // You can specify body size limit if needed
@@ -54,7 +49,13 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
-    domains: ["api.twilio.com"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "api.twilio.com",
+      },
+    ],
+    qualities: [100, 75, 80],
   },
 };
 

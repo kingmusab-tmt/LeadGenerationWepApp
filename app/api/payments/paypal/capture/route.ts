@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import paypal from "@paypal/checkout-server-sdk";
-import { User } from "@/models/user";
+import { User } from "@/models";
 import { Transaction } from "@/models/transactions";
+import {
+  invalidateSessionCache,
+  invalidateAllUserSessions,
+} from "@/lib/cachedSession";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { generatePayPalAccessToken } from "@/utils/paypalaccesstoken";
@@ -30,7 +34,7 @@ export async function POST(req: Request) {
     if (!tierinfor) {
       return NextResponse.json(
         { success: false, error: "Tier not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     const { tierType, name, price, renewalPrice, discountedPrice, tierLimits } =
@@ -43,7 +47,7 @@ export async function POST(req: Request) {
           success: false,
           error: "Missing required fields (orderID, tierId, durationMonths)",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
           error:
             "Invalid price format. Please provide valid numbers for tierPrice and tierRenewalPrice",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -68,7 +72,7 @@ export async function POST(req: Request) {
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -87,14 +91,14 @@ export async function POST(req: Request) {
     if (response.result.status !== "COMPLETED") {
       return NextResponse.json(
         { success: false, error: "Payment not completed" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Calculate subscription dates
     const startDate = new Date();
     const expiryDate = new Date(
-      startDate.getTime() + durationMonths * 30 * 24 * 60 * 60 * 1000
+      startDate.getTime() + durationMonths * 30 * 24 * 60 * 60 * 1000,
     ); // Assuming durationMonths is in months
 
     const subscriptionUpdate = {
@@ -128,14 +132,24 @@ export async function POST(req: Request) {
     const updatedUser = await User.findOneAndUpdate(
       { _id: new ObjectId(userId) },
       { $set: subscriptionUpdate },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedUser) {
       return NextResponse.json(
         { success: false, error: "User not found" },
-        { status: 404 }
+        { status: 404 },
       );
+    }
+
+    // Invalidate session caches so new subscription reflects immediately
+    try {
+      if (updatedUser?.email) {
+        await invalidateSessionCache(updatedUser.email);
+      }
+      await invalidateAllUserSessions(userId);
+    } catch (e) {
+      console.error("[PayPalCapture] Failed to invalidate session caches", e);
     }
 
     // Create transaction record with proper typing
@@ -182,7 +196,7 @@ export async function POST(req: Request) {
           },
         }),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -9,7 +9,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-02-24.acacia", // Use the latest Stripe API version
+  apiVersion: "2025-12-15.clover", // Use the latest Stripe API version
 });
 
 export async function POST(req: NextRequest) {
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (!call || call.paymentStatus !== "paid") {
       return new NextResponse(
         JSON.stringify({ error: "Invalid call or already refunded" }),
-        { status: 400 }
+        { status: 400 },
       );
     }
 

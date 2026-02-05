@@ -30,6 +30,7 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
+import { useInitializeUser } from "@/lib/hooks";
 import { useSession } from "next-auth/react";
 import Head from "next/head";
 import axios from "axios";
@@ -71,10 +72,13 @@ const StripeCheckoutButton = ({
     onError("");
 
     try {
-      const response = await axios.post("/api/stripeapi/stripecheckoutapi", {
-        tierId: tier._id,
-        durationMonths: duration,
-      });
+      const response = await axios.post(
+        "/api/payments/stripe/stripecheckoutapi",
+        {
+          tierId: tier._id,
+          durationMonths: duration,
+        },
+      );
 
       if (response.data.success) {
         window.location.href = response.data.sessionUrl;
@@ -189,7 +193,7 @@ const PaymentSection = ({
         const verifyPayment = async () => {
           try {
             const response = await axios.get(
-              `/api/payments/status?session_id=${sessionId}`
+              `/api/payments/status?session_id=${sessionId}`,
             );
             if (response.data.success) {
               onSuccess();
@@ -235,7 +239,8 @@ const PaymentSection = ({
 const CheckoutContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, status } = useSession();
+  const { currentUser } = useInitializeUser();
+  const { data: session, status, update: updateSession } = useSession();
 
   const [activeStep, setActiveStep] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<
@@ -254,14 +259,14 @@ const CheckoutContent = () => {
   const [showFailureModal, setShowFailureModal] = useState(false);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (!currentUser) {
       router.push(
         `/auth/sign-in?callbackUrl=${encodeURIComponent(
-          window.location.pathname
-        )}`
+          window.location.pathname,
+        )}`,
       );
     }
-  }, [status, router]);
+  }, [currentUser, router]);
 
   useEffect(() => {
     const paymentStatus = searchParams.get("payment");
@@ -280,7 +285,9 @@ const CheckoutContent = () => {
   useEffect(() => {
     const fetchPaypalClientId = async () => {
       try {
-        const response = await axios.get("/api/paypalapi/getpaypalapiclientid");
+        const response = await axios.get(
+          "/api/payments/paypal/getpaypalapiclientid",
+        );
         setPaypalClientId(response.data.clientId);
       } catch (error) {
         console.error("Failed to fetch PayPal client ID:", error);
@@ -297,7 +304,7 @@ const CheckoutContent = () => {
 
       try {
         const response = await axios.get(
-          `/api/subscriptions/tiers?tierId=${planId}`
+          `/api/subscriptions/tiers?tierId=${planId}`,
         );
         if (!response.data.isActive) {
           throw new Error("This tier is not currently available");
@@ -363,7 +370,7 @@ const CheckoutContent = () => {
     setError(null);
     try {
       const response = await axios.get(
-        `/api/payments/status?session_id=${sessionId}`
+        `/api/payments/status?session_id=${sessionId}`,
       );
       if (response.data.success) {
         handlePaymentSuccess();
@@ -377,10 +384,21 @@ const CheckoutContent = () => {
     }
   };
 
-  const handleCloseSuccessModal = () => {
+  const handleCloseSuccessModal = async () => {
     setShowSuccessModal(false);
+
+    // Force session refresh to update JWT token with new subscription status
+    console.log("[Checkout] Payment successful, refreshing session...");
+    await updateSession();
+
+    // Small delay to ensure session propagates
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     if (session) {
+      console.log("[Checkout] Session refreshed, redirecting to dashboard");
       router.push(`/dashboard/${session?.user?.role}/overview`);
+    } else if (currentUser) {
+      router.push(`/dashboard/${currentUser.role}/overview`);
     }
   };
 
@@ -430,7 +448,7 @@ const CheckoutContent = () => {
 
         {!showSuccessModal && !showFailureModal && (
           <Grid container spacing={4}>
-            <Grid item xs={12} md={7}>
+            <Grid size={{ xs: 12, md: 7 }}>
               <Paper elevation={3} sx={{ p: 3 }}>
                 {activeStep === 0 ? (
                   <>
@@ -474,7 +492,7 @@ const CheckoutContent = () => {
                             <MenuItem key={months} value={months}>
                               {months} month{months !== 1 ? "s" : ""}
                             </MenuItem>
-                          )
+                          ),
                         )}
                       </Select>
                     </FormControl>
@@ -580,7 +598,7 @@ const CheckoutContent = () => {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} md={5}>
+            <Grid size={{ xs: 12, md: 5 }}>
               <Paper elevation={3} sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   Order Summary

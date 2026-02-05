@@ -1,6 +1,23 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Alert,
+  CircularProgress,
+  List,
+  ListItem,
+  ListItemText,
+  Paper,
+  Stack,
+} from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorIcon from "@mui/icons-material/Error";
+import SendIcon from "@mui/icons-material/Send";
 
 interface StripeAccountStatus {
   detailsSubmitted: boolean;
@@ -29,7 +46,7 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
       try {
         setLoading(true);
         const response = await fetch(
-          `/api/stripeapi/account-status?email=${encodeURIComponent(userEmail)}`
+          `/api/payments/stripe/account-status?email=${encodeURIComponent(userEmail)}`,
         );
         const data = await response.json();
 
@@ -51,15 +68,15 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
     // Handle onboarding redirects
     const query = new URLSearchParams(window.location.search);
     const onboardingStatus = query.get("stripe_onboarding");
-    const accountId = query.get("account_id");
+    const accountIdParam = query.get("account_id");
 
     if (onboardingStatus === "success") {
-      setAccountId(accountId);
+      setAccountId(accountIdParam);
       checkInitialStatus();
       router.replace(window.location.pathname);
     } else if (onboardingStatus === "restart") {
       setError("Onboarding was interrupted - please try again");
-      setAccountId(accountId);
+      setAccountId(accountIdParam);
       router.replace(window.location.pathname);
     }
   }, [userEmail]);
@@ -69,7 +86,7 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
     setError(null);
 
     try {
-      const response = await fetch("/api/stripeapi/onboard", {
+      const response = await fetch("/api/payments/stripe/onboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -88,7 +105,7 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
       window.location.href = data.onboardingUrl;
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "An unknown error occurred"
+        err instanceof Error ? err.message : "An unknown error occurred",
       );
     } finally {
       setLoading(false);
@@ -112,54 +129,95 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
 
     if (!hasOutstandingRequirements) {
       return (
-        <div className="success-message">
+        <Alert
+          severity="success"
+          icon={<CheckCircleIcon />}
+          sx={{ marginTop: 2, marginBottom: 2 }}
+        >
           Your account is fully set up and ready to receive payments!
-        </div>
+        </Alert>
       );
     }
 
     return (
-      <div className="requirements">
-        <h3>Additional Information Required</h3>
-        <p>
+      <Box sx={{ marginTop: 3, marginBottom: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+          Additional Information Required
+        </Typography>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ marginBottom: 2 }}
+        >
           Your account is partially set up, but we need more information to
           enable payments:
-        </p>
+        </Typography>
 
         {accountStatus.requirements.currentlyDue.length > 0 && (
-          <div className="requirement-section">
-            <h4>Immediately Required:</h4>
-            <ul>
+          <Box sx={{ marginBottom: 2 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 600, color: "error.main", marginBottom: 1 }}
+            >
+              Immediately Required:
+            </Typography>
+            <List
+              sx={{ bgcolor: "rgba(244, 67, 54, 0.05)", borderRadius: 1, p: 1 }}
+            >
               {accountStatus.requirements.currentlyDue.map((req, i) => (
-                <li key={`current-${i}`}>{getRequirementLabel(req)}</li>
+                <ListItem key={`current-${i}`} disableGutters>
+                  <ListItemText primary={getRequirementLabel(req)} />
+                </ListItem>
               ))}
-            </ul>
-          </div>
+            </List>
+          </Box>
         )}
 
         {accountStatus.requirements.pastDue.length > 0 && (
-          <div className="requirement-section">
-            <h4>Past Due:</h4>
-            <ul>
+          <Box sx={{ marginBottom: 2 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 600, color: "warning.main", marginBottom: 1 }}
+            >
+              Past Due:
+            </Typography>
+            <List
+              sx={{ bgcolor: "rgba(255, 152, 0, 0.05)", borderRadius: 1, p: 1 }}
+            >
               {accountStatus.requirements.pastDue.map((req, i) => (
-                <li key={`past-${i}`}>{getRequirementLabel(req)}</li>
+                <ListItem key={`past-${i}`} disableGutters>
+                  <ListItemText primary={getRequirementLabel(req)} />
+                </ListItem>
               ))}
-            </ul>
-          </div>
+            </List>
+          </Box>
         )}
 
         {accountStatus.requirements.eventuallyDue.length > 0 && (
-          <div className="requirement-section">
-            <h4>Future Requirements:</h4>
-            <ul>
+          <Box sx={{ marginBottom: 2 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 600, color: "info.main", marginBottom: 1 }}
+            >
+              Future Requirements:
+            </Typography>
+            <List
+              sx={{
+                bgcolor: "rgba(33, 150, 243, 0.05)",
+                borderRadius: 1,
+                p: 1,
+              }}
+            >
               {accountStatus.requirements.eventuallyDue.map((req, i) => (
-                <li key={`eventual-${i}`}>{getRequirementLabel(req)}</li>
+                <ListItem key={`eventual-${i}`} disableGutters>
+                  <ListItemText primary={getRequirementLabel(req)} />
+                </ListItem>
               ))}
-            </ul>
-          </div>
+            </List>
+          </Box>
         )}
 
-        <button
+        <Button
           onClick={() => {
             if (!onboardingUrl) {
               createConnectedAccount();
@@ -168,11 +226,14 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
             }
           }}
           disabled={loading}
-          className="complete-button"
+          variant="contained"
+          color="success"
+          endIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
+          sx={{ marginTop: 2 }}
         >
           {loading ? "Loading..." : "Provide Missing Information"}
-        </button>
-      </div>
+        </Button>
+      </Box>
     );
   };
 
@@ -180,159 +241,159 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
     if (!accountStatus) return null;
 
     return (
-      <div className="status-summary">
-        <div className="status-item">
-          <strong>Account Status:</strong>{" "}
-          {accountStatus.chargesEnabled && accountStatus.payoutsEnabled
-            ? "Fully Connected"
-            : "Partially Connected"}
-        </div>
-        <div className="status-item">
-          <strong>Payments Enabled:</strong>{" "}
-          {accountStatus.chargesEnabled ? "Yes" : "No"}
-        </div>
-        <div className="status-item">
-          <strong>Payouts Enabled:</strong>{" "}
-          {accountStatus.payoutsEnabled ? "Yes" : "No"}
-        </div>
-        <div className="status-item">
-          <strong>TOS Accepted:</strong>{" "}
-          {accountStatus.tosAccepted ? "Yes" : "No"}
-        </div>
-      </div>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: "background.default" }}>
+        <Stack spacing={1.5}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Account Status:
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 1,
+                bgcolor:
+                  accountStatus.chargesEnabled && accountStatus.payoutsEnabled
+                    ? "success.light"
+                    : "warning.light",
+                color:
+                  accountStatus.chargesEnabled && accountStatus.payoutsEnabled
+                    ? "success.dark"
+                    : "warning.dark",
+                fontWeight: 600,
+              }}
+            >
+              {accountStatus.chargesEnabled && accountStatus.payoutsEnabled
+                ? "Fully Connected"
+                : "Partially Connected"}
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+            <Typography variant="body2">
+              <strong>Payments Enabled:</strong>
+            </Typography>
+            <Typography
+              variant="body2"
+              color={
+                accountStatus.chargesEnabled ? "success.main" : "error.main"
+              }
+            >
+              {accountStatus.chargesEnabled ? "✓ Yes" : "✗ No"}
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+            <Typography variant="body2">
+              <strong>Payouts Enabled:</strong>
+            </Typography>
+            <Typography
+              variant="body2"
+              color={
+                accountStatus.payoutsEnabled ? "success.main" : "error.main"
+              }
+            >
+              {accountStatus.payoutsEnabled ? "✓ Yes" : "✗ No"}
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+            <Typography variant="body2">
+              <strong>TOS Accepted:</strong>
+            </Typography>
+            <Typography
+              variant="body2"
+              color={accountStatus.tosAccepted ? "success.main" : "error.main"}
+            >
+              {accountStatus.tosAccepted ? "✓ Yes" : "✗ No"}
+            </Typography>
+          </Box>
+        </Stack>
+      </Paper>
     );
   };
 
   return (
-    <div className="onboarding-container">
-      <h2>Stripe Connect Onboarding</h2>
-      <p>Connect your Stripe account to start receiving payments.</p>
-
-      {error && <div className="error-message">{error}</div>}
-
-      {loading ? (
-        <div className="loading-message">Loading account status...</div>
-      ) : accountStatus ? (
-        <>
-          {renderAccountStatus()}
-          {renderRequirements()}
-        </>
-      ) : (
-        <div className="initial-setup">
-          <p>You need to connect your Stripe account to receive payments.</p>
-          <button
-            onClick={createConnectedAccount}
-            disabled={loading}
-            className="connect-button"
+    <Box sx={{ maxWidth: 700, margin: "2rem auto", padding: 2 }}>
+      <Card>
+        <CardContent>
+          <Typography
+            variant="h5"
+            component="h2"
+            gutterBottom
+            sx={{ fontWeight: 600, marginBottom: 1 }}
           >
-            {loading ? "Creating Account..." : "Connect with Stripe"}
-          </button>
-        </div>
-      )}
+            Stripe Connect Onboarding
+          </Typography>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ marginBottom: 3 }}
+          >
+            Connect your Stripe account to start receiving payments.
+          </Typography>
 
-      <style jsx>{`
-        .onboarding-container {
-          max-width: 600px;
-          margin: 2rem auto;
-          padding: 1.5rem;
-          border: 1px solid #eaeaea;
-          border-radius: 8px;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        }
-        h2 {
-          margin-top: 0;
-          color: #333;
-        }
-        .error-message {
-          color: #d32f2f;
-          margin: 1rem 0;
-          padding: 0.75rem;
-          background-color: #fdecea;
-          border-radius: 4px;
-          border-left: 4px solid #d32f2f;
-        }
-        .success-message {
-          color: #388e3c;
-          margin: 1rem 0;
-          padding: 0.75rem;
-          background-color: #ebf5eb;
-          border-radius: 4px;
-          border-left: 4px solid #388e3c;
-        }
-        .loading-message {
-          color: #666;
-          padding: 1rem;
-          text-align: center;
-        }
-        .status-summary {
-          margin: 1.5rem 0;
-          padding: 1rem;
-          background-color: #f8f9fa;
-          border-radius: 4px;
-        }
-        .status-item {
-          margin-bottom: 0.75rem;
-          padding-bottom: 0.75rem;
-          border-bottom: 1px solid #eee;
-        }
-        .status-item:last-child {
-          border-bottom: none;
-          margin-bottom: 0;
-          padding-bottom: 0;
-        }
-        .requirements {
-          margin: 1.5rem 0;
-        }
-        .requirement-section {
-          margin-bottom: 1.5rem;
-        }
-        .requirement-section h4 {
-          margin-bottom: 0.5rem;
-          color: #555;
-        }
-        .requirement-section ul {
-          margin: 0.5rem 0 1rem 1.5rem;
-          padding: 0;
-        }
-        .requirement-section li {
-          margin-bottom: 0.25rem;
-        }
-        button {
-          background-color: #635bff;
-          color: white;
-          border: none;
-          padding: 0.75rem 1.5rem;
-          font-size: 1rem;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-          margin-top: 1rem;
-          display: inline-block;
-        }
-        button:hover {
-          background-color: #4a42d6;
-        }
-        button:disabled {
-          background-color: #ccc;
-          cursor: not-allowed;
-        }
-        .connect-button {
-          background-color: #635bff;
-        }
-        .complete-button {
-          background-color: #00a86b;
-        }
-        .complete-button:hover {
-          background-color: #008a5a;
-        }
-        .initial-setup {
-          margin: 1.5rem 0;
-          padding: 1rem;
-          background-color: #f0f7ff;
-          border-radius: 4px;
-          border-left: 4px solid #635bff;
-        }
-      `}</style>
-    </div>
+          {error && (
+            <Alert
+              severity="error"
+              icon={<ErrorIcon />}
+              sx={{ marginBottom: 2 }}
+            >
+              {error}
+            </Alert>
+          )}
+
+          {loading && !accountStatus ? (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                py: 4,
+              }}
+            >
+              <CircularProgress size={40} sx={{ marginRight: 2 }} />
+              <Typography>Loading account status...</Typography>
+            </Box>
+          ) : accountStatus ? (
+            <>
+              {renderAccountStatus()}
+              {renderRequirements()}
+            </>
+          ) : (
+            <Paper
+              sx={{
+                p: 3,
+                bgcolor: "info.lighter",
+                border: "1px solid",
+                borderColor: "info.light",
+              }}
+            >
+              <Typography variant="body1" sx={{ marginBottom: 2 }}>
+                You need to connect your Stripe account to receive payments.
+              </Typography>
+              <Button
+                onClick={createConnectedAccount}
+                disabled={loading}
+                variant="contained"
+                color="primary"
+                endIcon={
+                  loading ? <CircularProgress size={20} /> : <SendIcon />
+                }
+              >
+                {loading ? "Creating Account..." : "Connect with Stripe"}
+              </Button>
+            </Paper>
+          )}
+        </CardContent>
+      </Card>
+    </Box>
   );
 }

@@ -57,13 +57,15 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
   const [modalOpen, setModalOpen] = useState(false);
 
   const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm")
+    theme.breakpoints.down("sm"),
   );
 
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const response = await axios.get(`/api/transactions?buyerId=${id}`);
+        const response = await axios.get(
+          `/api/payments/transactions?buyerId=${id}`,
+        );
 
         if (response.data && Array.isArray(response.data.data)) {
           setTransactions(response.data.data);
@@ -72,7 +74,7 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
           console.error("Unexpected API response structure:", response.data);
           showSnackbar(
             "Failed to fetch transactions: Invalid data format",
-            "error"
+            "error",
           );
         }
       } catch (error) {
@@ -88,7 +90,7 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
 
   const showSnackbar = (
     message: string,
-    severity: "success" | "error" | "info"
+    severity: "success" | "error" | "info",
   ) => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
@@ -107,14 +109,14 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
       setFilteredTransactions(transactions);
     } else {
       setFilteredTransactions(
-        transactions.filter((transaction) => transaction.type === value)
+        transactions.filter((transaction) => transaction.type === value),
       );
     }
   };
 
   const handleMenuClick = (
     event: React.MouseEvent<HTMLButtonElement>,
-    transaction: Transaction
+    transaction: Transaction,
   ) => {
     setSelectedTransaction(transaction);
     setModalOpen(true);

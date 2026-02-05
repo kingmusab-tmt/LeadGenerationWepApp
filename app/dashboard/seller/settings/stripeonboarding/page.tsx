@@ -1,11 +1,11 @@
 "use client";
 import StripeOnboarding from "@/app/components/sellerComponent/payout/stripeonboarding/StripeOnboarding";
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useInitializeUser } from "@/lib/hooks";
 
 const StripeOnboardingPage = () => {
-  const { data: session } = useSession();
-  const userEmail = session?.user?.email || "";
+  const { currentUser } = useInitializeUser();
+  const userEmail = currentUser?.email || "";
   return <StripeOnboarding userEmail={userEmail} />;
 };
 

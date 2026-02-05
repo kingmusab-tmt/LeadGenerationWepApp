@@ -91,7 +91,7 @@ const CallHistory: React.FC = () => {
         call.industry.toLowerCase().includes(searchTerm.toLowerCase()) ||
         call.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (call.feedback !== null &&
-          (call.feedback ? "good" : "bad").includes(searchTerm.toLowerCase()))
+          (call.feedback ? "good" : "bad").includes(searchTerm.toLowerCase())),
     );
     setFilteredCalls(filtered);
     setCurrentPage(1);
@@ -150,7 +150,7 @@ const CallHistory: React.FC = () => {
 
     try {
       const response = await fetch(
-        `/api/callfeedback?callId=${currentCall._id}`,
+        `/api/calls/feedback?callId=${currentCall._id}`,
         {
           method: "POST",
           headers: {
@@ -160,7 +160,7 @@ const CallHistory: React.FC = () => {
             feedback: currentFeedback,
             callDuration: currentCall.callDuration,
           }),
-        }
+        },
       );
 
       if (!response.ok) throw new Error("Failed to submit feedback");
@@ -170,8 +170,8 @@ const CallHistory: React.FC = () => {
         calls.map((call) =>
           call._id === currentCall._id
             ? { ...call, feedback: currentFeedback }
-            : call
-        )
+            : call,
+        ),
       );
 
       setFeedbackModalOpen(false);
@@ -179,7 +179,7 @@ const CallHistory: React.FC = () => {
       setError(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to submit feedback"
+        err instanceof Error ? err.message : "Failed to submit feedback",
       );
       setSnackbarOpen(true);
     }
@@ -189,9 +189,9 @@ const CallHistory: React.FC = () => {
     if (!currentAudio) return;
     window.open(
       `/api/recordings/proxy?recordingSid=${extractRecordingSid(
-        currentAudio.url
+        currentAudio.url,
       )}&format=${audioFormat}&download=true`,
-      "_blank"
+      "_blank",
     );
   };
 
@@ -211,7 +211,7 @@ const CallHistory: React.FC = () => {
 
   const paginatedCalls = filteredCalls.slice(
     (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    currentPage * PAGE_SIZE,
   );
 
   if (loading && calls.length === 0) {
@@ -412,10 +412,10 @@ const StatusChip = ({ status }: { status: string }) => (
       status === "completed"
         ? "success"
         : status === "failed"
-        ? "error"
-        : status === "in-progress"
-        ? "warning"
-        : "default"
+          ? "error"
+          : status === "in-progress"
+            ? "warning"
+            : "default"
     }
     size="small"
   />
@@ -428,8 +428,8 @@ const PaymentChip = ({ status }: { status: string }) => (
       status === "paid"
         ? "success"
         : status === "refunded"
-        ? "error"
-        : "default"
+          ? "error"
+          : "default"
     }
     size="small"
   />

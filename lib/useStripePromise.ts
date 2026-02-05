@@ -1,24 +1,8 @@
-import { useEffect, useState } from "react";
-import { loadStripe } from "@stripe/stripe-js";
+/**
+ * DEPRECATED: This file is kept for backward compatibility
+ * Please import from @/app/hooks instead:
+ *   import { useStripePromise } from "@/app/hooks";
+ */
 
-export function useStripePromise() {
-  const [stripePromise, setStripePromise] = useState<any>(null);
-
-  useEffect(() => {
-    const initializeStripe = async () => {
-      try {
-        const stripe = await loadStripe(
-          process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || ""
-        );
-        if (!stripe) throw new Error("Stripe failed to initialize");
-        setStripePromise(stripe);
-      } catch (error) {
-        console.error("Stripe initialization error:", error);
-      }
-    };
-
-    initializeStripe();
-  }, []);
-
-  return stripePromise;
-}
+// Re-export from new location for backward compatibility
+export { useStripePromise } from "@/app/hooks";

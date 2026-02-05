@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
   Box,
@@ -27,8 +26,6 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Snackbar,
-  Alert,
   FormControl,
   InputLabel,
   FormHelperText,
@@ -46,6 +43,8 @@ import {
 } from "@mui/icons-material";
 import AdminDashboard from "../../layout";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import { useNotification } from "@/lib/useNotification";
+import { useInitializeUser } from "@/lib/hooks";
 
 interface User {
   id: string;
@@ -60,7 +59,8 @@ interface User {
 }
 
 const UserManagement = () => {
-  const { data: session } = useSession();
+  const { currentUser, loading: userLoading } = useInitializeUser();
+  const notify = useNotification();
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,14 +71,13 @@ const UserManagement = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success" as "success" | "error" | "info" | "warning",
-  });
 
   useEffect(() => {
-    if (!session || session.user.role !== "admin") {
+    if (userLoading) {
+      return;
+    }
+
+    if (!currentUser || currentUser.role !== "admin") {
       router.push("/auth/sign-in");
       return;
     }
@@ -87,30 +86,30 @@ const UserManagement = () => {
       try {
         setLoading(true);
         const response = await fetch(
-          `/api/adminapi/users?search=${searchTerm}&role=${roleFilter}&status=${statusFilter}`
+          `/api/admin/users?search=${searchTerm}&role=${roleFilter}&status=${statusFilter}`,
         );
         const data = await response.json();
         setUsers(data.users);
       } catch (error) {
         console.error("Failed to fetch users:", error);
-        showSnackbar("Failed to fetch users", "error");
+        notify("Failed to fetch users", "error");
       } finally {
         setLoading(false);
       }
     };
 
     fetchUsers();
-  }, [session, searchTerm, roleFilter, statusFilter]);
+  }, [currentUser, userLoading, searchTerm, roleFilter, statusFilter]);
 
   const showSnackbar = (
     message: string,
-    severity: "success" | "error" | "info" | "warning"
+    severity: "success" | "error" | "info" | "warning",
   ) => {
-    setSnackbar({ open: true, message, severity });
+    notify(message, severity);
   };
 
   const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+    // Notifications are auto-managed by NotificationManager
   };
 
   const handleChangePage = (event: unknown, newPage: number) => {
@@ -118,7 +117,7 @@ const UserManagement = () => {
   };
 
   const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
@@ -138,7 +137,7 @@ const UserManagement = () => {
     if (!editingUser) return;
 
     try {
-      const response = await fetch(`/api/adminapi/users/${editingUser.id}`, {
+      const response = await fetch(`/api/admin/users/${editingUser.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -152,7 +151,7 @@ const UserManagement = () => {
 
       const updatedUser = await response.json();
       setUsers(
-        users.map((user) => (user.id === updatedUser.id ? updatedUser : user))
+        users.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
       );
       showSnackbar("User updated successfully", "success");
       handleCloseEditDialog();
@@ -166,7 +165,7 @@ const UserManagement = () => {
     if (!confirm("Are you sure you want to delete this user?")) return;
 
     try {
-      const response = await fetch(`/api/adminapi/users/${userId}`, {
+      const response = await fetch(`/api/admin/users/${userId}`, {
         method: "DELETE",
       });
 
@@ -184,11 +183,11 @@ const UserManagement = () => {
 
   const handleToggleStatus = async (
     userId: string,
-    currentStatus: "active" | "suspended"
+    currentStatus: "active" | "suspended",
   ) => {
     const newStatus = currentStatus === "active" ? "suspended" : "active";
     try {
-      const response = await fetch(`/api/adminapi/users/${userId}/status`, {
+      const response = await fetch(`/api/admin/users/${userId}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -202,12 +201,12 @@ const UserManagement = () => {
 
       setUsers(
         users.map((user) =>
-          user.id === userId ? { ...user, status: newStatus } : user
-        )
+          user.id === userId ? { ...user, status: newStatus } : user,
+        ),
       );
       showSnackbar(
         `User ${newStatus === "active" ? "activated" : "suspended"}`,
-        "success"
+        "success",
       );
     } catch (error) {
       console.error("Failed to update user status:", error);
@@ -227,8 +226,23 @@ const UserManagement = () => {
 
   const paginatedUsers = filteredUsers.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
+
+  if (userLoading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "50vh",
+        }}
+      >
+        <LoadingComponent />
+      </Box>
+    );
+  }
 
   if (loading) {
     return (
@@ -351,10 +365,10 @@ const UserManagement = () => {
                           user.role === "admin"
                             ? "error"
                             : user.role === "seller"
-                            ? "primary"
-                            : user.role === "buyer"
-                            ? "success"
-                            : "default"
+                              ? "primary"
+                              : user.role === "buyer"
+                                ? "success"
+                                : "default"
                         }
                       />
                     </TableCell>
@@ -523,22 +537,6 @@ const UserManagement = () => {
             </Button>
           </DialogActions>
         </Dialog>
-
-        {/* Snackbar for notifications */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          <Alert
-            onClose={handleCloseSnackbar}
-            severity={snackbar.severity}
-            sx={{ width: "100%" }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
       </Container>
     </AdminDashboard>
   );

@@ -4,6 +4,10 @@ import "./globals.css";
 import AuthProvider from "@/authprovider";
 import { NavigationProvider } from "../context/handlenavigation";
 import { ThemeProvider } from "@/context/themeprovider";
+import NotificationManager from "@/app/components/NotificationManager";
+import MuiThemeProvider from "@/lib/theme/MuiThemeProvider";
+import { Providers } from "@/app/reduxprovider";
+import { CSRFProvider } from "@/app/hooks/useCSRF";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,17 +31,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <ThemeProvider>
-        <AuthProvider>
-          <NavigationProvider>
-            <body
-              className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-            >
-              {children}
-            </body>
-          </NavigationProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <MuiThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <NavigationProvider>
+              <Providers>
+                <CSRFProvider>
+                  <body
+                    className={`${geistSans.variable} ${geistMono.variable}`}
+                  >
+                    {children}
+                    <NotificationManager />
+                  </body>
+                </CSRFProvider>
+              </Providers>
+            </NavigationProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </MuiThemeProvider>
     </html>
   );
 }

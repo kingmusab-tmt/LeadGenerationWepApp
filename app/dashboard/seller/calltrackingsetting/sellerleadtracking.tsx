@@ -45,7 +45,7 @@ export default function LeadTracking() {
   useEffect(() => {
     if (!sellerId) return;
 
-    fetch(`/api/calltracking`)
+    fetch(`/api/calls/tracking`)
       .then((res) => res.json())
       .then((data) => {
         setCalls(data);

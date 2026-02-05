@@ -5,8 +5,9 @@ import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { clearStaleTokens } from "./lib/clearStaleTokensServerAction";
 import { NextAuthOptions } from "next-auth";
 import dbConnect from "./lib/connectdb";
-import { User } from "./models/user";
+import { User } from "./models";
 import { createTransport } from "nodemailer";
+import { getCachedSession } from "./lib/cachedSession";
 
 export const authOptions = {
   adapter: MongoDBAdapter(client),
@@ -79,8 +80,9 @@ export const authOptions = {
       return url.startsWith(baseUrl) ? url : baseUrl;
     },
 
-    async jwt({ token, trigger, session, user }) {
+    async jwt({ token, trigger, session, user, account }) {
       if (user) {
+        // Initial sign in - set basic profile data
         token.email = user.email;
         token.name = user.name;
         token.id = user.id;
@@ -89,6 +91,7 @@ export const authOptions = {
         token.isSubActive = user.isSubActive;
         if (Date.now() % 10 === 0) await clearStaleTokens(); // ~10% of the time
       } else if (trigger === "update" && session?.name) {
+        // Manual session update triggered
         token.email = session.user?.email;
         token.name = session.user?.name;
         token.id = session.user?.id;
@@ -98,28 +101,57 @@ export const authOptions = {
         token.isSubActive = session.user?.isSubActive;
         if (Date.now() % 10 === 0) await clearStaleTokens();
       }
+
+      // ALWAYS fetch fresh user data from database to ensure token is up-to-date
+      // This runs on initial sign-in AND on every subsequent request
+      // This ensures changes like subscription updates are reflected immediately
+      if (token.email) {
+        await dbConnect();
+        const dbUser = await User.findOne({ email: token.email as string })
+          .select("role subscription")
+          .lean();
+
+        if (dbUser) {
+          // Update token with latest data from database
+          token.role = dbUser.role;
+          token.isSubActive =
+            dbUser.subscription?.isSubscriptionActive || false;
+          console.log("[JWT] Fetched fresh data from DB:", {
+            email: token.email,
+            role: dbUser.role,
+            isSubActive: dbUser.subscription?.isSubscriptionActive || false,
+          });
+        }
+      }
       return token;
     },
 
     async session({ session, token }) {
-      await dbConnect();
-      const userEmail = token?.email;
-      const dbUser = await User.findOne({ email: userEmail });
+      // Use Redis-backed caching for sessions
+      // This reduces database queries from 100% to ~1%
+      const userEmail = typeof token?.email === "string" ? token.email : "";
+      if (!userEmail) {
+        return null;
+      }
 
-      if (!dbUser) {
+      const cachedSessionData = await getCachedSession(userEmail, token);
+
+      if (!cachedSessionData) {
         // User deleted – invalidate session
         return null;
       }
 
+      // Use cached data as base, but ALWAYS prefer JWT token for critical auth fields
+      // The JWT callback fetches fresh data from DB on every request
       session.user = {
-        id: dbUser.id,
-        email: dbUser.email,
-        name: dbUser.name,
-        image: dbUser.image ?? null,
-        role: dbUser.role,
-        isSubActive: dbUser.subscription?.isSubscriptionActive,
+        ...cachedSessionData,
+        // Override with token data to ensure freshness for auth-critical fields
+        role: (token.role as string) || cachedSessionData.role,
+        isSubActive:
+          typeof token.isSubActive === "boolean"
+            ? token.isSubActive
+            : cachedSessionData.isSubActive,
       };
-
       return session;
     },
   },

@@ -1,6 +1,19 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Box,
+  Card,
+  CardContent,
+  TextField,
+  Button,
+  Alert,
+  CircularProgress,
+  Stack,
+  MenuItem,
+  Typography,
+} from "@mui/material";
+import SendIcon from "@mui/icons-material/Send";
 
 interface PayPalPayoutFormData {
   receiverEmail: string;
@@ -24,7 +37,7 @@ export default function PayPalPayout() {
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -55,11 +68,11 @@ export default function PayPalPayout() {
       }
 
       setSuccess(true);
-      // Refresh data or redirect as needed
+      setFormData({ receiverEmail: "", amount: 0, currency: "USD", note: "" });
       router.refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "An unknown error occurred"
+        err instanceof Error ? err.message : "An unknown error occurred",
       );
     } finally {
       setLoading(false);
@@ -67,138 +80,119 @@ export default function PayPalPayout() {
   };
 
   return (
-    <div className="payout-container">
-      <h2>PayPal Payout</h2>
-      {error && <div className="error-message">{error}</div>}
-      {success && (
-        <div className="success-message">Payout processed successfully!</div>
-      )}
-
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="paypal-receiverEmail">Receiver Email</label>
-          <input
-            type="email"
-            id="paypal-receiverEmail"
-            name="receiverEmail"
-            value={formData.receiverEmail}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="paypal-amount">Amount</label>
-          <input
-            type="number"
-            id="paypal-amount"
-            name="amount"
-            value={formData.amount}
-            onChange={handleChange}
-            min="0.01"
-            step="0.01"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="paypal-currency">Currency</label>
-          <select
-            id="paypal-currency"
-            name="currency"
-            value={formData.currency}
-            onChange={handleChange}
-            required
+    <Box
+      sx={{
+        maxWidth: 600,
+        margin: "2rem auto",
+        padding: 2,
+      }}
+    >
+      <Card>
+        <CardContent>
+          <Typography
+            variant="h5"
+            component="h2"
+            gutterBottom
+            sx={{ fontWeight: 600, marginBottom: 3 }}
           >
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="GBP">GBP</option>
-            <option value="CAD">CAD</option>
-            <option value="AUD">AUD</option>
-          </select>
-        </div>
+            PayPal Payout
+          </Typography>
 
-        <div className="form-group">
-          <label htmlFor="paypal-note">Note (Optional)</label>
-          <textarea
-            id="paypal-note"
-            name="note"
-            value={formData.note}
-            onChange={handleChange}
-            rows={3}
-          />
-        </div>
+          {error && (
+            <Alert severity="error" sx={{ marginBottom: 2 }}>
+              {error}
+            </Alert>
+          )}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Processing..." : "Send Payout"}
-        </button>
-      </form>
+          {success && (
+            <Alert severity="success" sx={{ marginBottom: 2 }}>
+              Payout processed successfully!
+            </Alert>
+          )}
 
-      <style jsx>{`
-        .payout-container {
-          max-width: 500px;
-          margin: 2rem auto;
-          padding: 1.5rem;
-          border: 1px solid #eaeaea;
-          border-radius: 8px;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        }
-        h2 {
-          margin-top: 0;
-          color: #333;
-        }
-        .form-group {
-          margin-bottom: 1rem;
-        }
-        label {
-          display: block;
-          margin-bottom: 0.5rem;
-          font-weight: 500;
-        }
-        input,
-        select,
-        textarea {
-          width: 100%;
-          padding: 0.5rem;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-size: 1rem;
-        }
-        textarea {
-          resize: vertical;
-        }
-        button {
-          background-color: #0070ba;
-          color: white;
-          border: none;
-          padding: 0.75rem 1.5rem;
-          font-size: 1rem;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        }
-        button:hover {
-          background-color: #005ea6;
-        }
-        button:disabled {
-          background-color: #ccc;
-          cursor: not-allowed;
-        }
-        .error-message {
-          color: #d32f2f;
-          margin-bottom: 1rem;
-          padding: 0.5rem;
-          background-color: #fdecea;
-          border-radius: 4px;
-        }
-        .success-message {
-          color: #388e3c;
-          margin-bottom: 1rem;
-          padding: 0.5rem;
-          background-color: #ebf5eb;
-          border-radius: 4px;
-        }
-      `}</style>
-    </div>
+          <Box component="form" onSubmit={handleSubmit} noValidate>
+            <Stack spacing={2.5}>
+              <TextField
+                fullWidth
+                label="Receiver Email"
+                type="email"
+                id="paypal-receiverEmail"
+                name="receiverEmail"
+                value={formData.receiverEmail}
+                onChange={handleChange}
+                required
+                variant="outlined"
+                placeholder="recipient@example.com"
+              />
+
+              <TextField
+                fullWidth
+                label="Amount"
+                type="number"
+                id="paypal-amount"
+                name="amount"
+                value={formData.amount}
+                onChange={handleChange}
+                inputProps={{
+                  min: "0.01",
+                  step: "0.01",
+                }}
+                required
+                variant="outlined"
+                placeholder="0.00"
+              />
+
+              <TextField
+                fullWidth
+                label="Currency"
+                select
+                id="paypal-currency"
+                name="currency"
+                value={formData.currency}
+                onChange={handleChange}
+                required
+                variant="outlined"
+              >
+                <MenuItem value="USD">USD - US Dollar</MenuItem>
+                <MenuItem value="EUR">EUR - Euro</MenuItem>
+                <MenuItem value="GBP">GBP - British Pound</MenuItem>
+                <MenuItem value="CAD">CAD - Canadian Dollar</MenuItem>
+                <MenuItem value="AUD">AUD - Australian Dollar</MenuItem>
+              </TextField>
+
+              <TextField
+                fullWidth
+                label="Note (Optional)"
+                multiline
+                rows={3}
+                id="paypal-note"
+                name="note"
+                value={formData.note}
+                onChange={handleChange}
+                variant="outlined"
+                placeholder="Add a note for this payout..."
+              />
+
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={loading}
+                endIcon={
+                  loading ? <CircularProgress size={20} /> : <SendIcon />
+                }
+                size="large"
+                sx={{
+                  marginTop: 1,
+                  fontWeight: 600,
+                }}
+              >
+                {loading ? "Processing..." : "Send Payout"}
+              </Button>
+            </Stack>
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }

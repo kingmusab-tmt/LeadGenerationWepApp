@@ -90,7 +90,7 @@ const HowItWorksPage = () => {
 
           <Grid container spacing={6}>
             {steps.map((step, index) => (
-              <Grid item xs={12} md={3} key={index}>
+              <Grid size={{ xs: 12, md: 3 }} key={index}>
                 <Paper
                   elevation={3}
                   sx={{ p: 4, height: "100%", textAlign: "center" }}
@@ -139,7 +139,7 @@ const HowItWorksPage = () => {
           <Grid container spacing={4} mt={6} justifyContent="center">
             {["Salesforce", "HubSpot", "Zapier", "Facebook", "Google Ads"].map(
               (integration) => (
-                <Grid item key={integration}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={integration}>
                   <Paper
                     elevation={2}
                     sx={{ p: 3, textAlign: "center", width: 150 }}
@@ -155,7 +155,7 @@ const HowItWorksPage = () => {
                     <Typography>{integration}</Typography>
                   </Paper>
                 </Grid>
-              )
+              ),
             )}
           </Grid>
         </Container>

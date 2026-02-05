@@ -1,42 +1,74 @@
 import Stripe from "stripe";
 import dbConnect from "@/lib/connectdb";
-import { User } from "@/models/user";
+import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import {
+  createPaymentSchema,
+  mongoIdParamSchema,
+} from "@/lib/validation/schemas";
+import {
+  successResponse,
+  unauthorized,
+  notFound,
+  internalError,
+  handleValidationError,
+  badRequest,
+} from "@/lib/api/error-handler";
+import { ZodError } from "zod";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+/**
+ * POST /api/payments
+ * Create a payment intent for a transaction
+ */
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return unauthorized();
+    }
+
+    // Validate request body
+    let validatedData;
+    try {
+      const body = await req.json();
+      validatedData = await createPaymentSchema.parseAsync(body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid request body");
+    }
+
     await dbConnect();
-    const { sellerId, buyerId } = await req.json();
 
-    const seller = await User.findById(sellerId);
-    if (!seller)
-      return new NextResponse(JSON.stringify({ error: "Seller not found" }), {
-        status: 404,
-      });
-
-    const buyer = await Buyer.findById(buyerId);
-    if (!buyer)
-      return new NextResponse(JSON.stringify({ error: "Buyer not found" }), {
-        status: 404,
-      });
-
-    // Create Payment Intent with Dynamic Amount
+    // Create Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: seller.unitPricingOptions[0].cost * 100, // Convert to cents
-      currency: "usd",
-      metadata: { buyerId },
+      amount: Math.round(validatedData.amount * 100), // Convert to cents
+      currency: validatedData.currency,
+      description: validatedData.description,
+      metadata: {
+        userId: session.user.id,
+        ...validatedData.metadata,
+      },
     });
 
-    return new NextResponse(
-      JSON.stringify({ clientSecret: paymentIntent.client_secret }),
-      { status: 200 }
+    return successResponse(
+      {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      },
+      201,
     );
-  } catch (error) {
-    return new NextResponse(JSON.stringify({ error: "Payment failed" }), {
-      status: 500,
-    });
+  } catch (error: any) {
+    console.error("[POST /api/payments]", error);
+    if (error.type === "StripeInvalidRequestError") {
+      return badRequest("Invalid payment details");
+    }
+    return internalError("Failed to create payment");
   }
 }

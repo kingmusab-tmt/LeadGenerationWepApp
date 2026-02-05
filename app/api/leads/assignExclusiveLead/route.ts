@@ -8,13 +8,18 @@ import { sendSmsNotification } from "@/utils/sms";
 import { sendPushNotification } from "@/utils/pushNotification";
 import { authOptions } from "@/auth";
 import { getServerSession } from "next-auth";
+import {
+  invalidateSessionCache,
+  invalidateLeadCache,
+  invalidateBuyerCache,
+} from "@/lib/cachedSession"; // Import cache invalidation functions
 
 export async function POST(req: NextRequest) {
   // Ensure the request is a POST request
   if (req.method !== "POST") {
     return NextResponse.json(
       { message: "Method not allowed" },
-      { status: 405 }
+      { status: 405 },
     );
   }
   const session = await getServerSession(authOptions);
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { message: "Missing or invalid leadIds or buyerIds in request body" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -54,20 +59,20 @@ export async function POST(req: NextRequest) {
     // Check if all leads and buyers exist
     if (leads.length !== leadIds.length) {
       const missingLeadIds = leadIds.filter(
-        (id) => !leads.some((lead) => (lead._id as string).toString() === id)
+        (id) => !leads.some((lead) => (lead._id as string).toString() === id),
       );
       return NextResponse.json(
         { message: `Leads not found: ${missingLeadIds.join(", ")}` },
-        { status: 404 }
+        { status: 404 },
       );
     }
     if (buyers.length !== buyerIds.length) {
       const missingBuyerIds = buyerIds.filter(
-        (id) => !buyers.some((buyer) => buyer._id.toString() === id)
+        (id) => !buyers.some((buyer) => buyer._id.toString() === id),
       );
       return NextResponse.json(
         { message: `Buyers not found: ${missingBuyerIds.join(", ")}` },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -84,7 +89,7 @@ export async function POST(req: NextRequest) {
           // Check if the buyer is already assigned
           const isAlreadyAssigned = lead.assignedTo.some(
             (assigned: { buyerId: { toString: () => string } }) =>
-              assigned.buyerId.toString() === buyer._id.toString()
+              assigned.buyerId.toString() === buyer._id.toString(),
           );
 
           if (!isAlreadyAssigned) {
@@ -101,39 +106,48 @@ export async function POST(req: NextRequest) {
           // Save the updated lead
           await lead.save();
 
+          // PHASE 1: Sync Buyer.assignedLeads array
+          await Buyer.findByIdAndUpdate(
+            buyer._id,
+            { $addToSet: { assignedLeads: lead._id } }, // $addToSet prevents duplicates
+            { new: true },
+          ).exec();
+
           // Send notification based on buyer's preference
           try {
             if (
-              buyer.notificationPreferences.includes("email") &&
-              buyer.notificationPreferences.includes("sms") &&
-              buyer.notificationPreferences.includes("dashboard")
+              buyer.notificationPreferences.includes("Email") &&
+              buyer.notificationPreferences.includes("SMS") &&
+              buyer.notificationPreferences.includes("In-App Notification")
             ) {
               await sendEmailNotification(buyer._id, lead);
               await sendSmsNotification(buyer._id, lead);
               await sendPushNotification(buyer._id, lead);
             } else if (
-              buyer.notificationPreferences.includes("email") &&
-              buyer.notificationPreferences.includes("sms")
+              buyer.notificationPreferences.includes("Email") &&
+              buyer.notificationPreferences.includes("SMS")
             ) {
               await sendEmailNotification(buyer._id, lead);
               await sendSmsNotification(buyer._id, lead);
             } else if (
-              buyer.notificationPreferences.includes("email") &&
-              buyer.notificationPreferences.includes("dashboard")
+              buyer.notificationPreferences.includes("Email") &&
+              buyer.notificationPreferences.includes("In-App Notification")
             ) {
               await sendEmailNotification(buyer._id, lead);
               await sendPushNotification(buyer._id, lead);
             } else if (
-              buyer.notificationPreferences.includes("dashboard") &&
-              buyer.notificationPreferences.includes("sms")
+              buyer.notificationPreferences.includes("In-App Notification") &&
+              buyer.notificationPreferences.includes("SMS")
             ) {
               await sendPushNotification(buyer._id, lead);
               await sendSmsNotification(buyer._id, lead);
-            } else if (buyer.notificationPreferences.includes("email")) {
+            } else if (buyer.notificationPreferences.includes("Email")) {
               await sendEmailNotification(buyer._id, lead);
-            } else if (buyer.notificationPreferences.includes("sms")) {
+            } else if (buyer.notificationPreferences.includes("SMS")) {
               await sendSmsNotification(buyer._id, lead);
-            } else if (buyer.notificationPreferences.includes("dashboard")) {
+            } else if (
+              buyer.notificationPreferences.includes("In-App Notification")
+            ) {
               await sendPushNotification(buyer._id, lead);
             } else {
               //("No notification preference set");
@@ -172,8 +186,16 @@ export async function POST(req: NextRequest) {
 
     // Check if any assignments failed
     const failedAssignments = assignmentResults.filter(
-      (result) => result.status === "failed"
+      (result) => result.status === "failed",
     );
+
+    // PHASE 1: Invalidate caches for all updated leads and buyers
+    for (const result of assignmentResults.filter(
+      (r) => r.status === "assigned",
+    )) {
+      await invalidateLeadCache(result.leadId);
+      await invalidateBuyerCache(result.buyerId);
+    }
 
     if (failedAssignments.length > 0 || notificationErrors.length > 0) {
       return NextResponse.json(
@@ -182,26 +204,26 @@ export async function POST(req: NextRequest) {
           assignmentResults,
           notificationErrors,
         },
-        { status: 207 } // 207 Multi-Status
+        { status: 207 }, // 207 Multi-Status
       );
     }
 
     return NextResponse.json(
       { message: "All leads assigned successfully", assignmentResults },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error assigning leads:", error);
     return NextResponse.json(
       {
         message: "Failed to assign leads",
-        error: error instanceof Error ? error.message : "Unknown error", // Include the error message for debugging
+        error: error instanceof Error ? error.message : "Unknown error",
         stack:
           process.env.NODE_ENV === "development" && error instanceof Error
             ? error.stack
-            : undefined, // Include stack trace in development
+            : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

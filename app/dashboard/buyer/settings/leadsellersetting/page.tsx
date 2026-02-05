@@ -14,6 +14,7 @@ import {
 import axios from "axios";
 import { styled } from "@mui/system";
 import { toast } from "react-toastify";
+import { useCSRF } from "@/app/hooks";
 
 const SettingsContainer = styled(Container)({
   marginTop: "20px",
@@ -32,6 +33,7 @@ const Section = styled(Box)({
 });
 
 const LeadSettings = () => {
+  const { csrfToken } = useCSRF();
   const [emailSettings, setEmailSettings] = useState({
     emailAddress: "",
     mailDomain: "",
@@ -48,10 +50,18 @@ const LeadSettings = () => {
 
   const handleSaveSettings = async () => {
     try {
-      await axios.post("/api/settings", {
-        emailSettings,
-        apiSettings,
-      });
+      await axios.post(
+        "/api/settings",
+        {
+          emailSettings,
+          apiSettings,
+        },
+        {
+          headers: {
+            "X-CSRF-Token": csrfToken || "",
+          },
+        },
+      );
       toast.success("Settings updated successfully");
     } catch (error) {
       toast.error("Failed to update settings");

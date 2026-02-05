@@ -10,7 +10,7 @@ import LoadingComponent from "@/app/components/generalComponent/loadingcomponent
 interface Lead {
   _id: string;
   userId: string;
-  fields: Array<{ id: string; label: string; value: string }>;
+  fields: Array<{ id: string; label: string; value: string | string[] | any }>;
   createdAt: string;
   status: "new" | "available" | "sold" | "assigned";
   distributionMethod: "manual" | "round_robin" | "marketplace";
@@ -28,18 +28,31 @@ const LeadManagement: React.FC = () => {
   const [fieldLabels, setFieldLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const extractLeads = (data: any): Lead[] => {
+    if (Array.isArray(data)) return data as Lead[];
+    if (Array.isArray(data?.leads)) return data.leads as Lead[];
+    if (Array.isArray(data?.data?.leads)) return data.data.leads as Lead[];
+    return [];
+  };
+
   // Fetch leads and initialize field labels
   useEffect(() => {
     const fetchLeads = async () => {
       try {
-        const response = await axios.get<Lead[]>("/api/leads");
-        setLeads(response.data);
+        const response = await axios.get("/api/leads");
+
+        const leadsData = extractLeads(response.data);
+        setLeads(leadsData);
 
         // Extract unique field labels
         const labelsSet = new Set<string>();
-        response.data.forEach((lead) => {
-          lead.fields.forEach((field) => labelsSet.add(field.label));
-        });
+        if (Array.isArray(leadsData)) {
+          leadsData.forEach((lead) => {
+            if (lead.fields && Array.isArray(lead.fields)) {
+              lead.fields.forEach((field) => labelsSet.add(field.label));
+            }
+          });
+        }
         setFieldLabels(Array.from(labelsSet));
       } catch (error) {
         console.error("Error fetching leads", error);
@@ -97,8 +110,8 @@ const LeadManagement: React.FC = () => {
         }
 
         // Refresh the leads list
-        const response = await axios.get<Lead[]>("/api/leads");
-        setLeads(response.data);
+        const response = await axios.get("/api/leads");
+        setLeads(extractLeads(response.data));
         handleCloseDialog();
       } catch (error) {
         console.error("Error saving lead", error);
@@ -121,8 +134,8 @@ const LeadManagement: React.FC = () => {
     try {
       setLeads((prevLeads) =>
         prevLeads.map((lead) =>
-          lead._id === leadId ? { ...lead, exclusive: !lead.exclusive } : lead
-        )
+          lead._id === leadId ? { ...lead, exclusive: !lead.exclusive } : lead,
+        ),
       );
 
       await axios.patch(`/api/exclusive?id=${leadId}`, {
@@ -177,8 +190,8 @@ const LeadManagement: React.FC = () => {
 
       if (response.data.success) {
         // Refresh the leads list
-        const leadsResponse = await axios.get<Lead[]>("/api/leads");
-        setLeads(leadsResponse.data);
+        const leadsResponse = await axios.get("/api/leads");
+        setLeads(extractLeads(leadsResponse.data));
 
         // Show success message
         alert(response.data.message);
@@ -196,7 +209,13 @@ const LeadManagement: React.FC = () => {
   };
 
   return (
-    <>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "100%",
+        overflowX: "hidden",
+      }}
+    >
       {loading ? (
         <Box
           sx={{
@@ -227,11 +246,11 @@ const LeadManagement: React.FC = () => {
         selectedLead={selectedLead}
         setSelectedLead={(lead) =>
           setSelectedLead((prev) =>
-            typeof lead === "function" ? lead(prev as Lead) : lead
+            typeof lead === "function" ? lead(prev as Lead) : lead,
           )
         }
       />
-    </>
+    </Box>
   );
 };
 

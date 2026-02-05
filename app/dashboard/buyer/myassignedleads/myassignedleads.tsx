@@ -32,6 +32,11 @@ interface ILead {
   status: string;
   unit: number;
   createdAt?: string;
+  assignment?: {
+    accepted: boolean;
+    rejected: boolean;
+  };
+  canRespond?: boolean;
 }
 
 const AssignedLeads: React.FC = () => {
@@ -43,7 +48,7 @@ const AssignedLeads: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
   const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm")
+    theme.breakpoints.down("sm"),
   );
 
   // Fetch assigned leads
@@ -90,7 +95,7 @@ const AssignedLeads: React.FC = () => {
   const handleAcceptOrReject = async (
     leadId: string,
     action: "accept" | "reject",
-    leadUnit: number
+    leadUnit: number,
   ) => {
     setProcessingLead(leadId);
     try {
@@ -147,15 +152,16 @@ const AssignedLeads: React.FC = () => {
     setWalletDialogOpen(false);
   };
 
-  const getStatusChip = (status: string) => {
-    switch (status) {
-      case "assigned":
-        return <Chip label="Assigned" color="primary" size="small" />;
-      case "sold":
-        return <Chip label="Purchased" color="success" size="small" />;
-      default:
-        return <Chip label={status} size="small" />;
+  const getStatusChip = (lead: ILead) => {
+    if (lead.status === "sold" || lead.assignment?.accepted) {
+      return <Chip label="Purchased" color="success" size="small" />;
     }
+
+    if (lead.canRespond) {
+      return <Chip label="Assigned" color="primary" size="small" />;
+    }
+
+    return <Chip label={lead.status} size="small" />;
   };
 
   if (loading) {
@@ -219,7 +225,7 @@ const AssignedLeads: React.FC = () => {
 
       <Grid container spacing={3}>
         {leads.map((lead) => (
-          <Grid item xs={12} sm={6} md={4} key={lead._id}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={lead._id}>
             <Card
               variant="outlined"
               sx={{ height: "100%", display: "flex", flexDirection: "column" }}
@@ -236,7 +242,7 @@ const AssignedLeads: React.FC = () => {
                   <Typography variant="subtitle1" fontWeight="medium">
                     Lead #{lead._id.slice(-6).toUpperCase()}
                   </Typography>
-                  {getStatusChip(lead.status)}
+                  {getStatusChip(lead)}
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
@@ -260,7 +266,7 @@ const AssignedLeads: React.FC = () => {
                 </Box>
               </CardContent>
 
-              {lead.status === "assigned" && (
+              {lead.canRespond && (
                 <Box sx={{ p: 2, display: "flex", gap: 1 }}>
                   <Button
                     variant="contained"

@@ -4,142 +4,241 @@ import dbConnect from "@/lib/connectdb";
 import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  invalidateLeadCache,
+  invalidateAllUserSessions,
+} from "@/lib/cachedSession"; // PHASE 2: Cache invalidation
+import {
+  createLeadSchema,
+  updateLeadSchema,
+  getLeadsQuerySchema,
+  mongoIdParamSchema,
+} from "@/lib/validation/schemas";
+import {
+  successResponse,
+  unauthorized,
+  notFound,
+  internalError,
+  handleValidationError,
+  badRequest,
+} from "@/lib/api/error-handler";
+import { ZodError } from "zod";
 
-// GET /api/leads - Fetch all leads
+// GET /api/leads - Fetch all leads with pagination
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized();
+    }
+
+    // Validate query parameters
+    let queryParams;
+    try {
+      queryParams = await getLeadsQuerySchema.parseAsync(
+        Object.fromEntries(new URL(req.url).searchParams),
+      );
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid query parameters");
     }
 
     await dbConnect();
+
+    const query: Record<string, any> = {};
     if (session.user.role !== "admin") {
-      const leads = await Lead.find({ userId: session.user.id });
-      return NextResponse.json(leads, { status: 200 });
+      query.userId = session.user.id;
+    }
+    if (queryParams.status) {
+      query.status = queryParams.status;
+    }
+    if (queryParams.source) {
+      query.source = queryParams.source;
     }
 
-    const leads = await Lead.find();
-    return NextResponse.json(leads, { status: 200 });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch leads." },
-      { status: 500 }
+    const skip = (queryParams.page - 1) * queryParams.limit;
+    const total = await Lead.countDocuments(query);
+    const leads = await Lead.find(query)
+      .skip(skip)
+      .limit(queryParams.limit)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return successResponse(
+      {
+        leads,
+        pagination: {
+          page: queryParams.page,
+          limit: queryParams.limit,
+          total,
+          pages: Math.ceil(total / queryParams.limit),
+        },
+      },
+      200,
     );
+  } catch (error) {
+    console.error("[GET /api/leads]", error);
+    return internalError("Failed to fetch leads");
   }
 }
 
+// POST /api/leads - Create a new lead
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized();
     }
+
+    // Validate request body
+    let validatedData;
+    try {
+      const body = await req.json();
+      validatedData = await createLeadSchema.parseAsync(body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid request body");
+    }
+
     await dbConnect();
-    const body = await req.json();
-    const newLead = new Lead(body);
+
+    const newLead = new Lead({
+      ...validatedData,
+      userId: session.user.id,
+      createdAt: new Date(),
+    });
+
     await newLead.save();
-    return NextResponse.json(
-      { message: "Lead added successfully.", lead: newLead },
-      { status: 201 }
-    );
+
+    // PHASE 2: Invalidate user cache after creating lead
+    await invalidateAllUserSessions(session.user.id);
+
+    return successResponse({ lead: newLead }, 201);
   } catch (error: any) {
-    console.error("Error adding lead:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to add lead.",
-        details: error.message,
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-      },
-      { status: 500 }
-    );
+    console.error("[POST /api/leads]", error);
+    if (error.code === 11000) {
+      return badRequest("Lead with this email already exists");
+    }
+    return internalError("Failed to create lead");
   }
 }
 
-// PUT /api/leads/:leadId - Update an existing lead
+// PUT /api/leads - Update a lead
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized();
     }
+
     const { searchParams } = new URL(req.url);
     const leadId = searchParams.get("id");
 
     if (!leadId) {
-      return NextResponse.json(
-        { error: "Lead ID is required." },
-        { status: 400 }
-      );
+      return badRequest("Lead ID is required");
+    }
+
+    // Validate ID
+    try {
+      mongoIdParamSchema.parse(leadId);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid lead ID");
+    }
+
+    // Validate body
+    let validatedData;
+    try {
+      const body = await req.json();
+      validatedData = await updateLeadSchema.parseAsync(body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid request body");
     }
 
     await dbConnect();
-    const body = await req.json();
 
-    // Ensure leadId is a valid ObjectId
-    if (!ObjectId.isValid(leadId)) {
-      return NextResponse.json({ error: "Invalid Lead ID." }, { status: 400 });
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return notFound("Lead");
     }
 
-    // Remove _id from body to prevent modifying the immutable field
-    if ("_id" in body) {
-      delete body._id;
+    // Verify ownership (unless admin)
+    if (session.user.role !== "admin" && lead.userId !== session.user.id) {
+      return unauthorized("You cannot modify this lead");
     }
 
-    const updatedLead = await Lead.findOneAndUpdate(
-      { _id: leadId }, // Correctly filter by _id
-      { $set: body }, // Use $set to prevent overwriting unintended fields
-      { new: true } // Return updated document
+    const updatedLead = await Lead.findByIdAndUpdate(
+      leadId,
+      { $set: { ...validatedData, updatedAt: new Date() } },
+      { new: true, runValidators: true },
     );
 
-    if (!updatedLead) {
-      return NextResponse.json({ error: "Lead not found." }, { status: 404 });
-    }
+    // PHASE 2: Invalidate caches after updating lead
+    await invalidateLeadCache(leadId);
+    await invalidateAllUserSessions(session.user.id);
 
-    return NextResponse.json(
-      { message: "Lead updated successfully.", lead: updatedLead },
-      { status: 200 }
-    );
+    return successResponse({ lead: updatedLead }, 200);
   } catch (error: any) {
-    console.error("Error updating lead:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to update lead.",
-        error: error.message || "Unknown error occurred.",
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-      },
-      { status: 500 }
-    );
+    console.error("[PUT /api/leads]", error);
+    return internalError("Failed to update lead");
   }
 }
 
-// DELETE /api/leads/:leadId - Remove a lead by ID
+// DELETE /api/leads - Delete a lead
 export async function DELETE(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const leadId = searchParams.get("id");
-
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized();
     }
+
+    const { searchParams } = new URL(req.url);
+    const leadId = searchParams.get("id");
+
+    if (!leadId) {
+      return badRequest("Lead ID is required");
+    }
+
+    // Validate ID
+    try {
+      mongoIdParamSchema.parse(leadId);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid lead ID");
+    }
+
     await dbConnect();
-    const deletedLead = await Lead.deleteOne({ leadId });
 
-    if (deletedLead.deletedCount === 0) {
-      return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return notFound("Lead");
     }
 
-    return NextResponse.json(
-      { message: "Lead removed successfully." },
-      { status: 200 }
-    );
+    // Verify ownership (unless admin)
+    if (session.user.role !== "admin" && lead.userId !== session.user.id) {
+      return unauthorized("You cannot delete this lead");
+    }
+
+    await Lead.findByIdAndDelete(leadId);
+
+    // PHASE 2: Invalidate caches after deleting lead
+    await invalidateLeadCache(leadId);
+    await invalidateAllUserSessions(session.user.id);
+
+    return successResponse({ message: "Lead deleted successfully" }, 200);
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to remove lead." },
-      { status: 500 }
-    );
+    console.error("[DELETE /api/leads]", error);
+    return internalError("Failed to delete lead");
   }
 }

@@ -4,6 +4,7 @@ import mongoose, { Schema, Document } from "mongoose";
 interface ICall extends Document {
   userId: string; // Lead seller ID
   buyerId?: string; // Lead buyer ID
+  leadId?: mongoose.Types.ObjectId; // PHASE 3: Reference to Lead
   callSid: string;
   from: string;
   answeredBy: string;
@@ -34,6 +35,7 @@ const CallSchema = new Schema<ICall>(
     userId: { type: String, required: true },
     callSid: { type: String, required: true },
     buyerId: { type: String },
+    leadId: { type: Schema.Types.ObjectId, ref: "Lead" }, // PHASE 3: Reference to Lead
     answeredBy: { type: String },
     callStatus: { type: String },
     from: { type: String, required: true },
@@ -64,8 +66,11 @@ const CallSchema = new Schema<ICall>(
       default: {},
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
+
+CallSchema.index({ leadId: 1 }); // PHASE 3: Index for lead queries
+CallSchema.index({ userId: 1, leadId: 1 }); // PHASE 3: Index for user's lead calls
 
 export default mongoose.models.Call ||
   mongoose.model<ICall>("Call", CallSchema);

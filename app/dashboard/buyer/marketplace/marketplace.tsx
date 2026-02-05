@@ -78,7 +78,7 @@ const BuyerLeads: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"available" | "purchased">(
-    "available"
+    "available",
   );
   const [totalLeads, setTotalLeads] = useState(0);
 
@@ -125,7 +125,7 @@ const BuyerLeads: React.FC = () => {
             limit: rowsPerPage,
             status: "available",
           },
-        }
+        },
       );
       setLeads(refreshedResponse.data.data);
       setTotalLeads(refreshedResponse.data.pagination.total);
@@ -151,7 +151,7 @@ const BuyerLeads: React.FC = () => {
 
   const handleChangePage = (
     event: React.ChangeEvent<unknown>,
-    newPage: number
+    newPage: number,
   ) => {
     setPage(newPage);
   };
@@ -167,21 +167,21 @@ const BuyerLeads: React.FC = () => {
       | "oldest-purchased"
       | "newest-available"
       | "oldest-available"
-    >
+    >,
   ) => {
     setSortOrder(
       event.target.value as
         | "newest-purchased"
         | "oldest-purchased"
         | "newest-available"
-        | "oldest-available"
+        | "oldest-available",
     );
     setPage(1);
   };
 
   const showSnackbar = (
     message: string,
-    severity: "success" | "error" | "info"
+    severity: "success" | "error" | "info",
   ) => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
@@ -216,7 +216,7 @@ const BuyerLeads: React.FC = () => {
 
   const handleMenuClick = (
     event: React.MouseEvent<HTMLElement>,
-    leadId: string
+    leadId: string,
   ) => {
     setAnchorEl(event.currentTarget);
     setSelectedLeadId(leadId);
@@ -229,7 +229,7 @@ const BuyerLeads: React.FC = () => {
 
   const handleTabChange = (
     event: React.SyntheticEvent,
-    newValue: "available" | "purchased"
+    newValue: "available" | "purchased",
   ) => {
     setActiveTab(newValue);
     setPage(1);
@@ -263,17 +263,17 @@ const BuyerLeads: React.FC = () => {
     const nameField = lead.fields.find(
       (f) =>
         f.label.toLowerCase().includes("name") ||
-        f.id.toLowerCase().includes("name")
+        f.id.toLowerCase().includes("name"),
     );
     const emailField = lead.fields.find(
       (f) =>
         f.label.toLowerCase().includes("email") ||
-        f.id.toLowerCase().includes("email")
+        f.id.toLowerCase().includes("email"),
     );
     const phoneField = lead.fields.find(
       (f) =>
         f.label.toLowerCase().includes("phone") ||
-        f.id.toLowerCase().includes("phone")
+        f.id.toLowerCase().includes("phone"),
     );
 
     return {
@@ -371,7 +371,7 @@ const BuyerLeads: React.FC = () => {
             .map((lead) => {
               const primaryFields = getPrimaryFields(lead);
               return (
-                <Grid item xs={12} sm={6} md={4} key={lead._id}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={lead._id}>
                   <Card
                     sx={{
                       height: "100%",
@@ -402,7 +402,7 @@ const BuyerLeads: React.FC = () => {
                         .filter(
                           (field) =>
                             !field.label.toLowerCase().includes("name") &&
-                            typeof field.value === "string"
+                            typeof field.value === "string",
                         )
                         .slice(0, 3)
                         .map((field) => (
@@ -480,7 +480,7 @@ const BuyerLeads: React.FC = () => {
                           <Box component="span" sx={{ display: "block" }}>
                             Purchased:{" "}
                             {new Date(
-                              lead.soldTo?.[0]?.createdAt || lead.createdAt
+                              lead.soldTo?.[0]?.createdAt || lead.createdAt,
                             ).toLocaleString()}
                           </Box>
                           <Box component="span" sx={{ display: "block" }}>
@@ -560,7 +560,7 @@ const BuyerLeads: React.FC = () => {
             <>
               <Grid container spacing={2} sx={{ mb: 2 }}>
                 {selectedLead.fields.map((field) => (
-                  <Grid item xs={12} sm={6} key={field.id}>
+                  <Grid size={{ xs: 12, sm: 6 }} key={field.id}>
                     {renderFieldValue(field)}
                   </Grid>
                 ))}

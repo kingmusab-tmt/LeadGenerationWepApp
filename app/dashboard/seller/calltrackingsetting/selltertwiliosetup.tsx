@@ -11,7 +11,6 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
-  Container,
   Link,
   Dialog,
   DialogTitle,
@@ -42,7 +41,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     "manualEntry" | "systemRequest" | null
   >(null);
   const [editingNumber, setEditingNumber] = useState<TrackingNumber | null>(
-    null
+    null,
   );
   const [twilioData, setTwilioData] = useState({
     accountSid: "",
@@ -64,7 +63,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
   const fetchUpdatedNumbers = async () => {
     try {
       const numbersResponse = await fetch(
-        `/api/call_twillo/get_numbers?sellerId=${sellerId}`
+        `/api/calls/twilio/get_numbers?sellerId=${sellerId}`,
       );
       const numbersData = await numbersResponse.json();
       setNumbers(numbersData);
@@ -90,7 +89,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
   const fetchTwilioStatus = async () => {
     try {
       const twilioStatusResponse = await fetch(
-        `/api/call_twillo/twiliostatus?sellerId=${sellerId}`
+        `/api/calls/twilio/twiliostatus?sellerId=${sellerId}`,
       );
       const twilioStatusData = await twilioStatusResponse.json();
       setTwilioActivated(twilioStatusData.twilioActivated);
@@ -125,13 +124,13 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
   }, [sellerId]);
 
   const handleTwilioToggle = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const newStatus = event.target.checked;
     const action = newStatus ? "activate" : "deactivate";
 
     try {
-      const response = await fetch("/api/call_twillo/activateTwilio", {
+      const response = await fetch("/api/calls/twilio/activateTwilio", {
         method: "POST",
         body: JSON.stringify({ sellerId, action }),
         headers: { "Content-Type": "application/json" },
@@ -189,7 +188,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     };
 
     try {
-      const response = await fetch("/api/call_twillo/register_number", {
+      const response = await fetch("/api/calls/twilio/register_number", {
         method: "POST",
         body: JSON.stringify(payload),
         headers: { "Content-Type": "application/json" },
@@ -280,14 +279,14 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
 
   const removeNumber = async (phoneNumber: string) => {
     try {
-      await fetch("/api/call_twillo/removeNumber", {
+      await fetch("/api/calls/twilio/removeNumber", {
         method: "POST",
         body: JSON.stringify({ sellerId, phoneNumber }),
         headers: { "Content-Type": "application/json" },
       });
 
       setNumbers((prev) =>
-        prev.filter((num) => num.phoneNumber !== phoneNumber)
+        prev.filter((num) => num.phoneNumber !== phoneNumber),
       );
       setSnackbar({
         open: true,
@@ -316,10 +315,10 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
   if (loading) return <LoadingComponent />;
 
   return (
-    <Container sx={{ padding: { xs: 2, sm: 4 } }}>
+    <Box sx={{ width: "100%" }}>
       <Typography
         variant="h5"
-        sx={{ fontWeight: "bold", mt: 4, mb: 1, color: "primary.main" }}
+        sx={{ fontWeight: "bold", mb: 2, color: "primary.main" }}
       >
         Call Tracking Set Up
       </Typography>
@@ -445,7 +444,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
         initialValues={editingNumber}
         onUpdateForwarding={async (payload) => {
           try {
-            await fetch("/api/call_twillo/updateForwarding", {
+            await fetch("/api/calls/twilio/updateForwarding", {
               method: "POST",
               body: JSON.stringify(payload),
               headers: { "Content-Type": "application/json" },
@@ -512,6 +511,6 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 }

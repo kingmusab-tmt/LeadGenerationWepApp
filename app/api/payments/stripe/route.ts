@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-02-24.acacia",
+  apiVersion: "2025-12-15.clover",
 });
 
 export async function POST(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
             amount: !amount ? "Missing" : "Provided",
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       .catch((stripeErr) => {
         console.error("Stripe API Error:", stripeErr);
         throw new Error(
-          `Stripe API Error: ${stripeErr.type} - ${stripeErr.message}`
+          `Stripe API Error: ${stripeErr.type} - ${stripeErr.message}`,
         );
       });
 
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
             declineCode: paymentIntent.last_payment_error?.decline_code,
             paymentError: paymentIntent.last_payment_error?.message,
           },
-          { status: 400 }
+          { status: 400 },
         );
     }
   } catch (error: any) {
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
         type: error.type || "server_error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

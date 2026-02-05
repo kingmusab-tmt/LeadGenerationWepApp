@@ -1,0 +1,132 @@
+import mongoose, { Document, Schema } from "mongoose";
+
+export interface IInvoiceLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  tax?: number;
+  total: number;
+}
+
+export interface IInvoice extends Document {
+  _id: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId; // Seller who created invoice
+  buyerId?: mongoose.Types.ObjectId; // Buyer (optional for custom invoices)
+  relatedTransactions?: mongoose.Types.ObjectId[]; // PHASE 3: Link to related transactions
+  buyerEmail?: string;
+  buyerName?: string;
+  invoiceNumber: string;
+  invoiceDate: Date;
+  dueDate: Date;
+  lineItems: IInvoiceLineItem[];
+  subtotal: number;
+  tax: number;
+  taxRate?: number; // Percentage (e.g., 8.5 for 8.5%)
+  discount?: number; // Flat amount
+  discountPercent?: number; // Percentage
+  total: number;
+  status: "draft" | "sent" | "viewed" | "paid" | "overdue" | "cancelled";
+  paymentMethod?: "stripe" | "paypal" | "bank_transfer" | "check";
+  paymentDate?: Date;
+  notes?: string;
+  termsConditions?: string;
+  currency: string;
+  isPaid: boolean;
+  pdfUrl?: string;
+  recurringEnabled: boolean;
+  recurringFrequency?: "monthly" | "quarterly" | "annually";
+  nextRecurringDate?: Date;
+  recurringEndDate?: Date;
+  parentInvoiceId?: mongoose.Types.ObjectId; // For recurring invoices
+  remindersSent: number;
+  lastReminderDate?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const invoiceLineItemSchema = new Schema({
+  description: { type: String, required: true },
+  quantity: { type: Number, required: true, min: 0.01 },
+  unitPrice: { type: Number, required: true, min: 0 },
+  tax: { type: Number },
+  total: { type: Number, required: true },
+});
+
+const invoiceSchema = new Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    buyerId: {
+      type: Schema.Types.ObjectId,
+      ref: "Buyer",
+    },
+    relatedTransactions: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Transaction",
+      },
+    ], // PHASE 3: Link to related transactions
+    buyerEmail: String,
+    buyerName: String,
+    invoiceNumber: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    invoiceDate: { type: Date, default: Date.now, index: true },
+    dueDate: { type: Date, required: true },
+    lineItems: [invoiceLineItemSchema],
+    subtotal: { type: Number, required: true, min: 0 },
+    tax: { type: Number, required: true, min: 0 },
+    taxRate: Number,
+    discount: Number,
+    discountPercent: Number,
+    total: { type: Number, required: true, min: 0, index: true },
+    status: {
+      type: String,
+      enum: ["draft", "sent", "viewed", "paid", "overdue", "cancelled"],
+      default: "draft",
+      index: true,
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["stripe", "paypal", "bank_transfer", "check"],
+    },
+    paymentDate: Date,
+    notes: String,
+    termsConditions: String,
+    currency: { type: String, default: "USD", index: true },
+    isPaid: { type: Boolean, default: false, index: true },
+    pdfUrl: String,
+    recurringEnabled: { type: Boolean, default: false },
+    recurringFrequency: {
+      type: String,
+      enum: ["monthly", "quarterly", "annually"],
+    },
+    nextRecurringDate: Date,
+    recurringEndDate: Date,
+    parentInvoiceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Invoice",
+    },
+    remindersSent: { type: Number, default: 0 },
+    lastReminderDate: Date,
+  },
+  { timestamps: true },
+);
+
+// Indexes for common queries
+invoiceSchema.index({ userId: 1, createdAt: -1 });
+invoiceSchema.index({ userId: 1, status: 1 });
+invoiceSchema.index({ userId: 1, isPaid: 1 });
+invoiceSchema.index({ buyerId: 1, createdAt: -1 });
+invoiceSchema.index({ status: 1, dueDate: 1 }); // For overdue tracking
+invoiceSchema.index({ relatedTransactions: 1 }); // PHASE 3: Transaction lookup
+
+export const Invoice =
+  mongoose.models.Invoice || mongoose.model<IInvoice>("Invoice", invoiceSchema);

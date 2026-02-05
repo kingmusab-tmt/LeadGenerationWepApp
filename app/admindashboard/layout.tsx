@@ -31,23 +31,21 @@ import {
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import { useInitializeUser } from "@/lib/hooks";
 
 interface UserDashboardProps {
   children: React.ReactNode;
 }
 
 const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
-  const { data: session } = useSession();
-  const [image, setImage] = useState(session?.user?.image || "");
-  const [name, setName] = useState(session?.user?.name || "");
+  const { currentUser, loading: userLoading } = useInitializeUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [subMenuAnchorEl, setSubMenuAnchorEl] = useState<null | HTMLElement>(
-    null
+    null,
   );
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -64,13 +62,13 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   // }, []);
 
   useEffect(() => {
-    if (session) {
-      setImage(session.user?.image || "");
-      setName(session.user?.name || "");
-    } else {
+    if (!userLoading && !currentUser) {
       router.push("/auth/sign-in");
     }
-  }, [session]);
+  }, [userLoading, currentUser, router]);
+
+  const avatarSrc = currentUser?.image || "";
+  const displayName = currentUser?.name || "User";
 
   const handleNavigation = (path: string) => {
     setLoading(true);
@@ -138,8 +136,8 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <Avatar
-              src={image}
-              alt={`${name}'s profile picture`}
+              src={avatarSrc}
+              alt={`${displayName}'s profile picture`}
               onClick={handleMenuOpen}
               sx={{ cursor: "pointer" }}
             />

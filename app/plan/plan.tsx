@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useTheme, useMediaQuery } from "@mui/material";
 import {
   Box,
@@ -23,7 +24,7 @@ import {
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningIcon from "@mui/icons-material/Warning";
-import { useSession } from "next-auth/react";
+import { useInitializeUser } from "@/lib/hooks";
 
 interface Tier {
   discountPercentage: number;
@@ -53,10 +54,12 @@ interface SubscriptionCheckResponse {
 export default function PricingSection() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
-  const { data: session, status } = useSession();
+  const { currentUser } = useInitializeUser();
+  const { data: session, update: updateSession } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [subscriptionInfo, setSubscriptionInfo] =
     useState<SubscriptionCheckResponse | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -65,11 +68,30 @@ export default function PricingSection() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
+  // First check: if session already shows active subscription, redirect immediately
+  useEffect(() => {
+    if (session?.user?.isSubActive === true && !isRedirecting) {
+      console.log(
+        "[Plan Page] Session shows active subscription, redirecting immediately",
+      );
+      setIsRedirecting(true);
+      const userRole = session?.user?.role;
+      if (userRole) {
+        router.replace(`/dashboard/${userRole}/overview`);
+      }
+    }
+  }, [session, router, isRedirecting]);
+
   useEffect(() => {
     const checkSubscriptionAndFetchTiers = async () => {
       try {
+        // Skip if already redirecting due to active subscription
+        if (session?.user?.isSubActive === true) {
+          return;
+        }
+
         // Only check subscription status if user is authenticated
-        if (status === "authenticated" && session?.user) {
+        if (currentUser) {
           // Check if user has an active subscription
           const subscriptionCheck = await fetch("/api/subscriptions/check", {
             method: "GET",
@@ -92,13 +114,22 @@ export default function PricingSection() {
               daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
             }
 
-            // If user has active subscription AND it's not expiring soon (more than 10 days), redirect
-            if (subscriptionData.isActive && daysRemaining > 10) {
+            console.log("[Plan Page] Subscription check:", {
+              isActive: subscriptionData.isActive,
+              expiryDate: subscriptionData.expiryDate,
+              daysRemaining,
+            });
+
+            // If user has active subscription, redirect to dashboard
+            if (subscriptionData.isActive) {
+              console.log(
+                "[Plan Page] Active subscription detected, redirecting...",
+              );
               setShouldRedirect(true);
-              return; // Don't fetch tiers if user is subscribed with sufficient time
+              return; // Don't fetch tiers if user is subscribed
             }
 
-            // If subscription is active but expiring soon (<=10 days) or inactive, allow access to pricing
+            // If subscription is inactive, allow access to pricing
           }
         }
 
@@ -118,14 +149,25 @@ export default function PricingSection() {
     };
 
     checkSubscriptionAndFetchTiers();
-  }, [session, status]);
+  }, [currentUser]);
 
   // Handle redirect after component render
   useEffect(() => {
-    if (shouldRedirect && session?.user?.role) {
-      router.push(`/dashboard/${session.user.role}/overview`);
+    if (shouldRedirect && !isRedirecting) {
+      // Use session role as primary source, fallback to currentUser
+      const userRole = session?.user?.role || currentUser?.role;
+      if (userRole) {
+        console.log(
+          "[Plan Page] Redirecting to dashboard with role:",
+          userRole,
+        );
+        setIsRedirecting(true);
+        router.replace(`/dashboard/${userRole}/overview`);
+      } else {
+        console.log("[Plan Page] Cannot redirect - no role found");
+      }
     }
-  }, [shouldRedirect, session, router]);
+  }, [shouldRedirect, session, currentUser, router, isRedirecting]);
 
   const handleSelectPlan = async (tier: Tier) => {
     if (isProcessing) return;
@@ -157,12 +199,24 @@ export default function PricingSection() {
             return; // Don't proceed with redirect
           }
           throw new Error(
-            responseData.error || "Failed to update subscription"
+            responseData.error || "Failed to update subscription",
           );
         }
 
-        // Redirect to dashboard after successful subscription
-        router.push(`/dashboard/${session?.user?.role}/overview`);
+        console.log(
+          "[Plan Page] Subscription updated successfully, refreshing session...",
+        );
+
+        // Force session refresh to update JWT token with new subscription status
+        // This triggers the JWT callback which fetches fresh data from the database
+        await updateSession();
+
+        // Small delay to ensure session propagates before redirect
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Redirect to dashboard after session is refreshed
+        console.log("[Plan Page] Session refreshed, redirecting to dashboard");
+        router.push(`/dashboard/${currentUser?.role}/overview`);
       } else {
         // Redirect to checkout for paid tiers
         router.push(`/checkout?plan=${tier._id}`);
@@ -172,7 +226,7 @@ export default function PricingSection() {
       // Only set generic error if it's not the specific trial error
       if (!err.message?.includes("already used your free trial")) {
         setError(
-          "Failed to process your request. Please try again or contact support."
+          "Failed to process your request. Please try again or contact support.",
         );
       }
     } finally {
@@ -208,12 +262,12 @@ export default function PricingSection() {
     ? Math.ceil(
         (new Date(subscriptionInfo.expiryDate).getTime() -
           new Date().getTime()) /
-          (1000 * 3600 * 24)
+          (1000 * 3600 * 24),
       )
     : 0;
 
-  // Show loading state while checking authentication and subscription
-  if (status === "loading" || loading) {
+  // Show loading state while checking authentication, subscription, or redirecting
+  if (loading || isRedirecting) {
     return (
       <Box py={{ xs: 6, md: 10 }} bgcolor="background.paper" id="pricing">
         <Container maxWidth="lg">
@@ -227,7 +281,7 @@ export default function PricingSection() {
           </Typography>
           <Grid container spacing={4} mt={6}>
             {[0, 1, 2].map((index) => (
-              <Grid item xs={12} sm={6} md={4} key={index}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={index}>
                 <Skeleton
                   variant="rectangular"
                   height={400}
@@ -351,10 +405,9 @@ export default function PricingSection() {
           >
             {filteredTiers.map((tier) => (
               <Grid
-                item
-                xs={12}
-                sm={6}
-                md={4}
+                size={{ xs: 12, sm: 6, md: 4 }}
+                // Changed from
+
                 key={tier._id}
                 sx={{
                   display: "flex",
@@ -479,7 +532,7 @@ export default function PricingSection() {
                             You pay $
                             {(
                               parseFloat(
-                                String(tier.discountedPrice || tier.price)
+                                String(tier.discountedPrice || tier.price),
                               ) * 12
                             ).toFixed(2)}
                           </Box>
@@ -541,14 +594,14 @@ export default function PricingSection() {
                       {isProcessing
                         ? "Processing..."
                         : subscriptionInfo?.usedTrial &&
-                          tier.tierType === "free"
-                        ? "Trial Used"
-                        : isRenewing
-                        ? tier.tierType === "free"
-                          ? "Switch to Free"
-                          : "Renew Plan"
-                        : tier.ctaText ||
-                          (tier.isFree ? "Start Free Trial" : "Subscribe")}
+                            tier.tierType === "free"
+                          ? "Trial Used"
+                          : isRenewing
+                            ? tier.tierType === "free"
+                              ? "Switch to Free"
+                              : "Renew Plan"
+                            : tier.ctaText ||
+                              (tier.isFree ? "Start Free Trial" : "Subscribe")}
                     </Button>
                   </CardActions>
                 </Card>

@@ -96,7 +96,7 @@ export default function LeadTracking() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm")
+    theme.breakpoints.down("sm"),
   );
 
   useEffect(() => {
@@ -115,10 +115,10 @@ export default function LeadTracking() {
     const fetchCalls = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/calltracking`);
+        const response = await fetch(`/api/calls/tracking`);
         if (!response.ok) throw new Error("Failed to load calls");
         const data = await response.json();
-        setCalls(data);
+        setCalls(Array.isArray(data) ? data : data.calls || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load calls");
       } finally {
@@ -147,7 +147,7 @@ export default function LeadTracking() {
       setOpenModal(true);
 
       setCurrentAudio({
-        url: `/api/calltracking/recordingproxy?recordingSid=${recordingSid}&format=${audioFormat}`,
+        url: `/api/calls/tracking/recordingproxy?recordingSid=${recordingSid}&format=${audioFormat}`,
         callSid,
         format: audioFormat,
       });
@@ -170,7 +170,7 @@ export default function LeadTracking() {
 
     try {
       const response = await fetch(
-        `/api/callfeedback?callId=${currentCall._id}`,
+        `/api/calls/feedback?callId=${currentCall._id}`,
         {
           method: "POST",
           headers: {
@@ -181,7 +181,7 @@ export default function LeadTracking() {
             approved,
             comment,
           }),
-        }
+        },
       );
 
       if (!response.ok) throw new Error("Failed to submit feedback");
@@ -190,14 +190,16 @@ export default function LeadTracking() {
 
       // Update local state
       setCalls(
-        calls.map((call) => (call._id === updatedCall._id ? updatedCall : call))
+        calls.map((call) =>
+          call._id === updatedCall._id ? updatedCall : call,
+        ),
       );
 
       setFeedbackModalOpen(false);
       setError(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to submit feedback"
+        err instanceof Error ? err.message : "Failed to submit feedback",
       );
     }
   };
@@ -205,20 +207,20 @@ export default function LeadTracking() {
   const handleDownload = () => {
     if (!currentAudio) return;
     window.open(
-      `/api/calltracking/recordingproxy?recordingSid=${extractRecordingSid(
-        currentAudio.url
+      `/api/calls/tracking/recordingproxy?recordingSid=${extractRecordingSid(
+        currentAudio.url,
       )}&format=${audioFormat}&download=true`,
-      "_blank"
+      "_blank",
     );
   };
 
   const handleRefresh = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/calltracking`);
+      const response = await fetch(`/api/calls/tracking`);
       if (!response.ok) throw new Error("Failed to refresh calls");
       const data = await response.json();
-      setCalls(data);
+      setCalls(Array.isArray(data) ? data : data.calls || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh calls");
     } finally {
@@ -226,12 +228,12 @@ export default function LeadTracking() {
     }
   };
 
-  const filteredCalls = calls.filter(
+  const filteredCalls = (calls || []).filter(
     (call) =>
       call.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
       call.to.toLowerCase().includes(searchTerm.toLowerCase()) ||
       call.industry?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      call.buyerName?.toLowerCase().includes(searchTerm.toLowerCase())
+      call.buyerName?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const sortedCalls = [...filteredCalls].sort((a, b) => {
@@ -253,7 +255,7 @@ export default function LeadTracking() {
 
   const paginatedCalls = sortedCalls.slice(
     (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE
+    page * PAGE_SIZE,
   );
 
   const extractRecordingSid = (url: string) => {
@@ -266,7 +268,7 @@ export default function LeadTracking() {
   }
 
   return (
-    <Container sx={{ mt: 6, mb: 4 }}>
+    <Container sx={{ mt: 2, mb: 2 }}>
       {/* Error notification */}
       {error && (
         <Snackbar
@@ -652,10 +654,10 @@ const StatusChip = ({ status }: { status: string }) => (
       status === "completed"
         ? "success"
         : status === "failed"
-        ? "error"
-        : status === "in-progress"
-        ? "warning"
-        : "default"
+          ? "error"
+          : status === "in-progress"
+            ? "warning"
+            : "default"
     }
     size="small"
   />

@@ -1,6 +1,19 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Box,
+  Card,
+  CardContent,
+  TextField,
+  Button,
+  Alert,
+  CircularProgress,
+  Stack,
+  MenuItem,
+  Typography,
+} from "@mui/material";
+import SendIcon from "@mui/icons-material/Send";
 
 interface StripePayoutFormData {
   amount: number;
@@ -18,7 +31,9 @@ export default function StripePayout() {
   const router = useRouter();
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e:
+      | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+      | { target: { name: string; value: string } },
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -49,11 +64,11 @@ export default function StripePayout() {
       }
 
       setSuccess(true);
-      // Refresh data or redirect as needed
+      setFormData({ amount: 0, currency: "usd" });
       router.refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "An unknown error occurred"
+        err instanceof Error ? err.message : "An unknown error occurred",
       );
     } finally {
       setLoading(false);
@@ -61,111 +76,93 @@ export default function StripePayout() {
   };
 
   return (
-    <div className="payout-container">
-      <h2>Stripe Connect Payout</h2>
-      {error && <div className="error-message">{error}</div>}
-      {success && (
-        <div className="success-message">Payout processed successfully!</div>
-      )}
-
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="stripe-amount">Amount</label>
-          <input
-            type="number"
-            id="stripe-amount"
-            name="amount"
-            value={formData.amount}
-            onChange={handleChange}
-            min="0.01"
-            step="0.01"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="stripe-currency">Currency</label>
-          <select
-            id="stripe-currency"
-            name="currency"
-            value={formData.currency}
-            onChange={handleChange}
-            required
+    <Box
+      sx={{
+        maxWidth: 600,
+        margin: "2rem auto",
+        padding: 2,
+      }}
+    >
+      <Card>
+        <CardContent>
+          <Typography
+            variant="h5"
+            component="h2"
+            gutterBottom
+            sx={{ fontWeight: 600, marginBottom: 3 }}
           >
-            <option value="usd">USD</option>
-            <option value="eur">EUR</option>
-            <option value="gbp">GBP</option>
-            <option value="cad">CAD</option>
-            <option value="aud">AUD</option>
-          </select>
-        </div>
+            Stripe Connect Payout
+          </Typography>
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Processing..." : "Send Payout"}
-        </button>
-      </form>
+          {error && (
+            <Alert severity="error" sx={{ marginBottom: 2 }}>
+              {error}
+            </Alert>
+          )}
 
-      <style jsx>{`
-        .payout-container {
-          max-width: 500px;
-          margin: 2rem auto;
-          padding: 1.5rem;
-          border: 1px solid #eaeaea;
-          border-radius: 8px;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        }
-        h2 {
-          margin-top: 0;
-          color: #333;
-        }
-        .form-group {
-          margin-bottom: 1rem;
-        }
-        label {
-          display: block;
-          margin-bottom: 0.5rem;
-          font-weight: 500;
-        }
-        input,
-        select {
-          width: 100%;
-          padding: 0.5rem;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-size: 1rem;
-        }
-        button {
-          background-color: #635bff;
-          color: white;
-          border: none;
-          padding: 0.75rem 1.5rem;
-          font-size: 1rem;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        }
-        button:hover {
-          background-color: #4a42d6;
-        }
-        button:disabled {
-          background-color: #ccc;
-          cursor: not-allowed;
-        }
-        .error-message {
-          color: #d32f2f;
-          margin-bottom: 1rem;
-          padding: 0.5rem;
-          background-color: #fdecea;
-          border-radius: 4px;
-        }
-        .success-message {
-          color: #388e3c;
-          margin-bottom: 1rem;
-          padding: 0.5rem;
-          background-color: #ebf5eb;
-          border-radius: 4px;
-        }
-      `}</style>
-    </div>
+          {success && (
+            <Alert severity="success" sx={{ marginBottom: 2 }}>
+              Payout processed successfully!
+            </Alert>
+          )}
+
+          <Box component="form" onSubmit={handleSubmit} noValidate>
+            <Stack spacing={2.5}>
+              <TextField
+                fullWidth
+                label="Amount"
+                type="number"
+                id="stripe-amount"
+                name="amount"
+                value={formData.amount}
+                onChange={handleChange}
+                inputProps={{
+                  min: "0.01",
+                  step: "0.01",
+                }}
+                required
+                variant="outlined"
+                placeholder="0.00"
+              />
+
+              <TextField
+                fullWidth
+                label="Currency"
+                select
+                id="stripe-currency"
+                name="currency"
+                value={formData.currency}
+                onChange={handleChange}
+                required
+                variant="outlined"
+              >
+                <MenuItem value="usd">USD - US Dollar</MenuItem>
+                <MenuItem value="eur">EUR - Euro</MenuItem>
+                <MenuItem value="gbp">GBP - British Pound</MenuItem>
+                <MenuItem value="cad">CAD - Canadian Dollar</MenuItem>
+                <MenuItem value="aud">AUD - Australian Dollar</MenuItem>
+              </TextField>
+
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={loading}
+                endIcon={
+                  loading ? <CircularProgress size={20} /> : <SendIcon />
+                }
+                size="large"
+                sx={{
+                  marginTop: 1,
+                  fontWeight: 600,
+                }}
+              >
+                {loading ? "Processing..." : "Send Payout"}
+              </Button>
+            </Stack>
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }

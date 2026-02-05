@@ -41,7 +41,7 @@ const UnitPurchase: React.FC = () => {
 
   const showSnackbar = (
     message: string,
-    severity: "success" | "error" | "info"
+    severity: "success" | "error" | "info",
   ) => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
@@ -61,14 +61,14 @@ const UnitPurchase: React.FC = () => {
         } else {
           showSnackbar(
             response.data.message || "Failed to fetch unit pricing options",
-            "error"
+            "error",
           );
         }
       } catch (error) {
         console.error("Error fetching unit pricing options:", error);
         showSnackbar(
           "An error occurred while fetching pricing options",
-          "error"
+          "error",
         );
       } finally {
         setLoadingOptions(false);
@@ -96,21 +96,21 @@ const UnitPurchase: React.FC = () => {
       const fetchPaypalClientId = async () => {
         try {
           const response = await axios.get(
-            "/api/paypalapi/getpaypalapiclientid"
+            "/api/payments/paypal/getpaypalapiclientid",
           );
           if (response.data.success) {
             setPaypalClientId(response.data.clientId);
           } else {
             showSnackbar(
               response.data.message || "Failed to fetch PayPal Client ID",
-              "error"
+              "error",
             );
           }
         } catch (error) {
           console.error("Error fetching PayPal Client ID:", error);
           showSnackbar(
             "An error occurred while fetching PayPal Client ID",
-            "error"
+            "error",
           );
         }
       };
@@ -145,17 +145,20 @@ const UnitPurchase: React.FC = () => {
   const handleStripePurchase = async () => {
     setLoading(true);
     try {
-      const response = await axios.post("/api/stripeapi/stripecheckoutapi", {
-        units,
-        cost,
-      });
+      const response = await axios.post(
+        "/api/payments/stripe/stripecheckoutapi",
+        {
+          units,
+          cost,
+        },
+      );
 
       if (response.data.success) {
         window.location.href = response.data.sessionUrl;
       } else {
         showSnackbar(
           response.data.message || "Failed to initiate Stripe payment",
-          "error"
+          "error",
         );
       }
     } catch (error) {
@@ -169,7 +172,7 @@ const UnitPurchase: React.FC = () => {
   const handlePayPalApprove = async (orderId: string) => {
     setLoading(true);
     try {
-      const response = await axios.post("/api/paypalapi/capture-order", {
+      const response = await axios.post("/api/payments/paypal/capture-order", {
         orderId,
         units,
         cost,
@@ -178,14 +181,14 @@ const UnitPurchase: React.FC = () => {
       if (response.data.success) {
         showSnackbar(
           "Payment successful! Your wallet has been updated.",
-          "success"
+          "success",
         );
         // Redirect to the dashboard after successful payment
         router.push("/dashboard/buyer/overview");
       } else {
         showSnackbar(
           response.data.message || "Payment failed. Please try again.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
@@ -206,7 +209,7 @@ const UnitPurchase: React.FC = () => {
           <LoadingComponent />
         ) : (
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <FormControl fullWidth>
                 <InputLabel>Select Units</InputLabel>
                 <Select
@@ -215,7 +218,7 @@ const UnitPurchase: React.FC = () => {
                     const selectedUnits = Number(e.target.value);
                     setUnits(selectedUnits);
                     const selectedOption = unitPricingOptions.find(
-                      (option) => option.units === selectedUnits
+                      (option) => option.units === selectedUnits,
                     );
                     setCost(selectedOption?.cost || 0);
                   }}
@@ -228,7 +231,7 @@ const UnitPurchase: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <FormControl fullWidth>
                 <InputLabel>Payment Method</InputLabel>
                 <Select
@@ -240,7 +243,7 @@ const UnitPurchase: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               {paymentMethod === "stripe" ? (
                 <Button
                   variant="contained"
@@ -258,7 +261,7 @@ const UnitPurchase: React.FC = () => {
                         if (cost <= 0) {
                           showSnackbar(
                             "Invalid cost. Please select a valid number of units.",
-                            "error"
+                            "error",
                           );
                           return Promise.reject("Invalid cost");
                         }
@@ -414,7 +417,7 @@ const PayPalButtons = memo(
     }, [createOrder, onApprove]);
 
     return <div id="paypal-button-container"></div>;
-  }
+  },
 );
 
 export default UnitPurchase;

@@ -1,15 +1,12 @@
 "use client";
-import { Container, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import FormBuilder from "@/app/components/leadcapture/formbuilder";
-import UserDashboard from "../../layout";
 
 const FormBuilderPage = () => {
   return (
-    <UserDashboard>
-      <Container sx={{ mt: "4rem", maxWidth: "1200px" }}>
-        <FormBuilder />
-      </Container>
-    </UserDashboard>
+    <Box sx={{ width: "100%" }}>
+      <FormBuilder />
+    </Box>
   );
 };
 

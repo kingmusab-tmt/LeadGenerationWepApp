@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useInitializeUser } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
 import {
   Box,
@@ -98,7 +98,7 @@ interface CallRecord {
 }
 
 const ContentVerification = () => {
-  const { data: session } = useSession();
+  const { currentUser } = useInitializeUser();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -114,7 +114,7 @@ const ContentVerification = () => {
   const [openLeadDialog, setOpenLeadDialog] = useState(false);
 
   useEffect(() => {
-    if (!session || session.user.role !== "admin") {
+    if (!currentUser || currentUser.role !== "admin") {
       router.push("/auth/sign-in");
       return;
     }
@@ -123,8 +123,8 @@ const ContentVerification = () => {
       try {
         setLoading(true);
         const [leadsRes, callsRes] = await Promise.all([
-          fetch("/api/adminapi/leads"),
-          fetch("/api/adminapi/calls"),
+          fetch("/api/admin/leads"),
+          fetch("/api/admin/calls"),
         ]);
 
         const leadsData = await leadsRes.json();
@@ -140,7 +140,7 @@ const ContentVerification = () => {
     };
 
     fetchData();
-  }, [session]);
+  }, [currentUser, router]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -155,7 +155,7 @@ const ContentVerification = () => {
   };
 
   const handleRowsPerPageChange = (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setLeadPage(0);
@@ -193,8 +193,8 @@ const ContentVerification = () => {
       if (type === "lead") {
         setLeads(
           leads.map((lead) =>
-            lead.id === id ? { ...lead, status: "flagged" } : lead
-          )
+            lead.id === id ? { ...lead, status: "flagged" } : lead,
+          ),
         );
         if (selectedLead?.id === id) {
           setSelectedLead({ ...selectedLead, status: "flagged" });
@@ -202,8 +202,8 @@ const ContentVerification = () => {
       } else {
         setCalls(
           calls.map((call) =>
-            call.id === id ? { ...call, status: "flagged" } : call
-          )
+            call.id === id ? { ...call, status: "flagged" } : call,
+          ),
         );
         if (selectedCall?.id === id) {
           setSelectedCall({ ...selectedCall, status: "flagged" });
@@ -218,8 +218,8 @@ const ContentVerification = () => {
     (lead) =>
       lead.seller.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.fields.some((f) =>
-        f.value.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+        f.value.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
   );
 
   const filteredCalls = calls.filter(
@@ -227,17 +227,17 @@ const ContentVerification = () => {
       call.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
       call.to.toLowerCase().includes(searchTerm.toLowerCase()) ||
       call.buyer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      call.seller?.name.toLowerCase().includes(searchTerm.toLowerCase())
+      call.seller?.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const paginatedLeads = filteredLeads.slice(
     leadPage * rowsPerPage,
-    leadPage * rowsPerPage + rowsPerPage
+    leadPage * rowsPerPage + rowsPerPage,
   );
 
   const paginatedCalls = filteredCalls.slice(
     callPage * rowsPerPage,
-    callPage * rowsPerPage + rowsPerPage
+    callPage * rowsPerPage + rowsPerPage,
   );
 
   if (loading) {
@@ -345,8 +345,8 @@ const ContentVerification = () => {
                             lead.status === "sold"
                               ? "success"
                               : lead.status === "flagged"
-                              ? "error"
-                              : "default"
+                                ? "error"
+                                : "default"
                           }
                         />
                       </TableCell>
@@ -358,8 +358,8 @@ const ContentVerification = () => {
                             lead.qualityScore >= 8
                               ? "success"
                               : lead.qualityScore >= 5
-                              ? "warning"
-                              : "error"
+                                ? "warning"
+                                : "error"
                           }
                         />
                       </TableCell>
@@ -434,8 +434,8 @@ const ContentVerification = () => {
                             call.status === "completed"
                               ? "success"
                               : call.status === "flagged"
-                              ? "error"
-                              : "default"
+                                ? "error"
+                                : "default"
                           }
                         />
                       </TableCell>
@@ -511,8 +511,8 @@ const ContentVerification = () => {
                 selectedLead?.status === "sold"
                   ? "success"
                   : selectedLead?.status === "flagged"
-                  ? "error"
-                  : "default"
+                    ? "error"
+                    : "default"
               }
               sx={{ ml: 2 }}
             />
@@ -579,7 +579,7 @@ const ContentVerification = () => {
                       <ListItemText
                         primary="Created"
                         secondary={new Date(
-                          selectedLead.createdAt
+                          selectedLead.createdAt,
                         ).toLocaleString()}
                       />
                     </ListItem>
@@ -595,8 +595,8 @@ const ContentVerification = () => {
                               selectedLead.qualityScore >= 8
                                 ? "success"
                                 : selectedLead.qualityScore >= 5
-                                ? "warning"
-                                : "error"
+                                  ? "warning"
+                                  : "error"
                             }
                           />
                         }

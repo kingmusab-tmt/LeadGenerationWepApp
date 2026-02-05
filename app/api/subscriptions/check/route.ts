@@ -1,71 +1,45 @@
-// // app/api/subscriptions/check/route.ts
-// import { NextResponse } from "next/server";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "@/auth";
-// import dbConnect from "@/lib/connectdb";
-// import { User } from "@/models/user";
-
-// export async function GET(req: Request) {
-//   try {
-//     await dbConnect();
-//     const session = await getServerSession(authOptions);
-
-//     if (!session?.user?.id) {
-//       return NextResponse.json({ isActive: false }, { status: 200 });
-//     }
-
-//     // Find user and check subscription status
-//     const user = await User.findById(session.user.id).select("subscription");
-
-//     if (!user) {
-//       return NextResponse.json({ isActive: false }, { status: 200 });
-//     }
-
-//     // Check if user has an active subscription
-//     const currentDate = new Date();
-//     const subscription = user.subscription;
-
-//     // Determine if subscription is active based on multiple factors
-//     const isSubscriptionActive =
-//       subscription?.isSubscriptionActive === true &&
-//       subscription?.subscriptionExpiryDate &&
-//       new Date(subscription.subscriptionExpiryDate) > currentDate;
-
-//     return NextResponse.json({
-//       isActive: isSubscriptionActive,
-//       expiryDate: subscription?.subscriptionExpiryDate || null,
-//     });
-//   } catch (error) {
-//     console.error("[SUBSCRIPTION_CHECK_ERROR]", error);
-//     return NextResponse.json({ isActive: false }, { status: 200 });
-//   }
-// }
-// app/api/subscriptions/check/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
-import { User } from "@/models/user";
+import { User } from "@/models";
+import {
+  successResponse,
+  unauthorized,
+  internalError,
+} from "@/lib/api/error-handler";
 
+/**
+ * GET /api/subscriptions/check
+ * Check if user's subscription is active
+ */
 export async function GET(req: Request) {
   try {
-    await dbConnect();
     const session = await getServerSession(authOptions);
-
     if (!session?.user?.id) {
-      return NextResponse.json({ isActive: false }, { status: 200 });
+      return successResponse({ isActive: false, expiryDate: null });
     }
+
+    await dbConnect();
 
     // Find user and check subscription status
     const user = await User.findById(session.user.id).select("subscription");
 
     if (!user) {
-      return NextResponse.json({ isActive: false }, { status: 200 });
+      return successResponse({ isActive: false, expiryDate: null });
     }
 
     // Check if user has an active subscription
     const currentDate = new Date();
     const subscription = user.subscription;
+
+    console.log("[Subscriptions/Check] User subscription data:", {
+      userId: session.user.id,
+      email: session.user.email,
+      isSubscriptionActive: subscription?.isSubscriptionActive,
+      subscriptionExpiryDate: subscription?.subscriptionExpiryDate,
+      currentDate: currentDate.toISOString(),
+    });
 
     // Determine if subscription is active based on multiple factors
     let isSubscriptionActive = false;
@@ -75,26 +49,34 @@ export async function GET(req: Request) {
       subscription?.subscriptionExpiryDate
     ) {
       // Check if subscription expiry date is in the future
-      if (new Date(subscription.subscriptionExpiryDate) > currentDate) {
+      const expiryDate = new Date(subscription.subscriptionExpiryDate);
+      if (expiryDate > currentDate) {
         isSubscriptionActive = true;
+        console.log("[Subscriptions/Check] Subscription is ACTIVE");
       } else {
         // Subscription has expired, update the user's subscription status
         isSubscriptionActive = false;
+        console.log("[Subscriptions/Check] Subscription has EXPIRED");
 
-        // Optionally update the user's subscription status in the database
+        // Update subscription status in the database
         await User.findByIdAndUpdate(session.user.id, {
           "subscription.isSubscriptionActive": false,
         });
       }
     }
 
-    return NextResponse.json({
+    console.log("[Subscriptions/Check] Final response:", {
+      isActive: isSubscriptionActive,
+      expiryDate: subscription?.subscriptionExpiryDate || null,
+    });
+
+    return successResponse({
       isActive: isSubscriptionActive,
       expiryDate: subscription?.subscriptionExpiryDate || null,
       usedTrial: subscription?.usedTrial || false,
     });
   } catch (error) {
-    console.error("[SUBSCRIPTION_CHECK_ERROR]", error);
-    return NextResponse.json({ isActive: false }, { status: 200 });
+    console.error("[GET /api/subscriptions/check]", error);
+    return internalError("Failed to check subscription");
   }
 }

@@ -44,7 +44,7 @@ import {
 interface Lead {
   _id: string;
   userId: string;
-  fields: Array<{ id: string; label: string; value: string }>;
+  fields: Array<{ id: string; label: string; value: string | string[] | any }>;
   createdAt: string;
   status: "new" | "available" | "sold" | "assigned";
   distributionMethod: "manual" | "round_robin" | "marketplace";
@@ -97,7 +97,7 @@ const LeadList: React.FC<LeadListProps> = ({
   };
 
   const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
@@ -105,7 +105,7 @@ const LeadList: React.FC<LeadListProps> = ({
 
   const handleMenuClick = (
     event: React.MouseEvent<HTMLElement>,
-    lead: Lead
+    lead: Lead,
   ) => {
     //("Menu Clicked - Selected Lead:", lead);
     setAnchorEl(event.currentTarget);
@@ -154,8 +154,8 @@ const LeadList: React.FC<LeadListProps> = ({
     setPage(0);
   };
 
-  const filteredLeads = leads.filter(
-    (lead) => statusFilter === "all" || lead.status === statusFilter
+  const filteredLeads = (leads || []).filter(
+    (lead) => statusFilter === "all" || lead.status === statusFilter,
   );
 
   const sortedLeads = [...filteredLeads].sort((a, b) => {
@@ -173,14 +173,20 @@ const LeadList: React.FC<LeadListProps> = ({
 
   const displayedLeads = sortedLeads.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   return (
     <Container
+      maxWidth={false}
+      disableGutters
       sx={{
-        width: isMobile ? "95vw" : "100vw",
-        mt: isMobile ? "4rem" : "6rem",
+        width: "100%",
+        maxWidth: "100%",
+        px: isMobile ? 2 : 3,
+        mt: isMobile ? "2rem" : "2rem",
+        boxSizing: "border-box",
+        overflowX: "hidden",
       }}
     >
       <Typography variant="h5" gutterBottom sx={{ mb: 4 }}>
@@ -390,7 +396,7 @@ const LeadList: React.FC<LeadListProps> = ({
         <DialogContent>
           {selectedLead ? (
             <>
-              <DialogContentText>
+              <DialogContentText component="div">
                 <strong>Status:</strong>{" "}
                 <Chip
                   label={selectedLead.status}
@@ -399,8 +405,11 @@ const LeadList: React.FC<LeadListProps> = ({
                 />
               </DialogContentText>
               {selectedLead.fields.map((field) => (
-                <DialogContentText key={field.id}>
-                  <strong>{field.label}:</strong> {field.value}
+                <DialogContentText key={field.id} component="div">
+                  <strong>{field.label}:</strong>{" "}
+                  {Array.isArray(field.value)
+                    ? field.value.join(", ")
+                    : field.value}
                 </DialogContentText>
               ))}
             </>

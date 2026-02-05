@@ -14,7 +14,7 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
-  Grid2,
+  Grid,
   Snackbar,
   Alert,
   Button,
@@ -37,9 +37,9 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { useSession } from "next-auth/react";
-import UserDashboard from "../layout";
 import { redirect, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useInitializeUser } from "@/lib/hooks";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import {
   ArrowUpward,
@@ -158,11 +158,12 @@ const initialOverviewData = {
 
 const Overview: React.FC = () => {
   const [overviewData, setOverviewData] = useState(initialOverviewData);
-  const { data: session } = useSession();
+  const { currentUser, loading: userLoading } = useInitializeUser();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<"daily" | "weekly" | "monthly">(
-    "monthly"
+    "monthly",
   );
   const [subscriptionAlert, setSubscriptionAlert] = useState<{
     open: boolean;
@@ -178,48 +179,74 @@ const Overview: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  useEffect(() => {
-    if (!session) {
-      redirect("/auth/sign-in");
-    }
-    return;
-  }, [session]);
+  // Auth redirects are handled by the seller layout - no need to duplicate here
 
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
       try {
+        console.log("[Dashboard] Starting subscription check...");
+        console.log("[Dashboard] Session data:", {
+          role: session?.user?.role,
+          isSubActive: session?.user?.isSubActive,
+        });
+
         const subscriptionCheck = await fetch("/api/subscriptions/check");
         if (subscriptionCheck.ok) {
           const { isActive, expiryDate } = await subscriptionCheck.json();
 
-          if (!isActive) {
-            // Redirect to expired subscription page if not active
-            router.push("/subscription-expired");
+          console.log("[Dashboard] API subscription check result:", {
+            isActive,
+            expiryDate,
+          });
+
+          // If subscription is active, don't do any redirects
+          if (isActive) {
+            console.log(
+              "[Dashboard] Subscription is ACTIVE - staying on dashboard",
+            );
+
+            // Only show warning if expiring soon
+            if (expiryDate) {
+              const expiry = new Date(expiryDate);
+              const today = new Date();
+              const timeDiff = expiry.getTime() - today.getTime();
+              const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+              if (daysRemaining <= 10 && daysRemaining > 0) {
+                setSubscriptionAlert({
+                  open: true,
+                  message: `Your subscription expires in ${daysRemaining} day${
+                    daysRemaining !== 1 ? "s" : ""
+                  }. Please renew to avoid service interruption.`,
+                  severity: "warning",
+                  daysRemaining,
+                });
+              }
+            }
+            return; // Exit early - subscription is active
+          }
+
+          // If user has no subscription at all, redirect to plan page to select one
+          if (!expiryDate) {
+            // If session indicates active subscription, skip redirect to plan
+            if (session?.user?.isSubActive === true) {
+              console.log(
+                "[Dashboard] No expiryDate but session shows active; staying on dashboard",
+              );
+              return;
+            }
+            console.log(
+              "[Dashboard] No subscription found, redirecting to /plan",
+            );
+            router.push("/plan");
             return;
           }
 
-          if (expiryDate) {
-            const expiry = new Date(expiryDate);
-            const today = new Date();
-            const timeDiff = expiry.getTime() - today.getTime();
-            const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-            // Show alert if subscription expires in 10 days or less
-            if (daysRemaining <= 10 && daysRemaining > 0) {
-              setSubscriptionAlert({
-                open: true,
-                message: `Your subscription expires in ${daysRemaining} day${
-                  daysRemaining !== 1 ? "s" : ""
-                }. Please renew to avoid service interruption.`,
-                severity: "warning",
-                daysRemaining,
-              });
-            } else if (daysRemaining <= 0) {
-              // Subscription expired, redirect to expired page
-              router.push("/subscription-expired");
-              return;
-            }
-          }
+          // Subscription exists but is inactive (expired)
+          console.log(
+            "[Dashboard] Subscription is expired, redirecting to /subscription-expired",
+          );
+          router.push("/subscription-expired");
         }
       } catch (error) {
         console.error("Failed to check subscription status", error);
@@ -228,7 +255,7 @@ const Overview: React.FC = () => {
 
     const fetchOverviewData = async () => {
       try {
-        if (session && session.user.role === "seller") {
+        if (currentUser && currentUser.role === "seller") {
           // First check subscription status
           await checkSubscriptionStatus();
 
@@ -411,9 +438,8 @@ const Overview: React.FC = () => {
               ],
             });
           }
-        } else {
-          router.push("/auth/sign-in");
         }
+        // Auth/role redirects are handled by the layout, not here
       } catch (error) {
         console.error("Failed to fetch overview data", error);
       } finally {
@@ -421,11 +447,14 @@ const Overview: React.FC = () => {
       }
     };
 
-    fetchOverviewData();
-  }, [session, router]);
+    // Only fetch data once auth is confirmed
+    if (status === "authenticated" && currentUser && !userLoading) {
+      fetchOverviewData();
+    }
+  }, [currentUser, router, status, userLoading]);
 
   const handleTimeframeChange = (
-    event: SelectChangeEvent<"daily" | "weekly" | "monthly">
+    event: SelectChangeEvent<"daily" | "weekly" | "monthly">,
   ) => {
     setTimeframe(event.target.value as "daily" | "weekly" | "monthly");
   };
@@ -459,7 +488,8 @@ const Overview: React.FC = () => {
 
   const COLORS = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"];
 
-  if (loading) {
+  // Show loading while auth is loading or data is loading
+  if (loading || status === "loading" || userLoading) {
     return (
       <Box
         sx={{
@@ -483,38 +513,37 @@ const Overview: React.FC = () => {
   }
 
   return (
-    <UserDashboard>
-      <Container sx={{ mt: 6, mb: 6 }}>
-        {/* Subscription Alert Snackbar */}
-        <Snackbar
-          open={subscriptionAlert.open}
-          autoHideDuration={10000}
+    <Box sx={{ width: "100%" }}>
+      {/* Subscription Alert Snackbar */}
+      <Snackbar
+        open={subscriptionAlert.open}
+        autoHideDuration={10000}
+        onClose={handleSubscriptionAlertClose}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
           onClose={handleSubscriptionAlertClose}
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          severity={subscriptionAlert.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={handleRenewSubscription}
+            >
+              RENEW
+            </Button>
+          }
         >
-          <Alert
-            onClose={handleSubscriptionAlertClose}
-            severity={subscriptionAlert.severity}
-            variant="filled"
-            sx={{ width: "100%" }}
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={handleRenewSubscription}
-              >
-                RENEW
-              </Button>
-            }
-          >
-            <Box display="flex" alignItems="center">
-              <Warning sx={{ mr: 1 }} />
-              {subscriptionAlert.message}
-            </Box>
-          </Alert>
-        </Snackbar>
+          <Box display="flex" alignItems="center">
+            <Warning sx={{ mr: 1 }} />
+            {subscriptionAlert.message}
+          </Box>
+        </Alert>
+      </Snackbar>
 
-        {/* <Typography
+      {/* <Typography
           variant="h4"
           gutterBottom
           sx={{ fontWeight: "bold", mb: 3 }}
@@ -522,394 +551,387 @@ const Overview: React.FC = () => {
           Seller Dashboard Overview
         </Typography> */}
 
-        <Grid2 container spacing={3}>
-          {/* Key Metrics Row */}
-          <Grid2 size={{ xs: 12 }}>
+      <Grid container spacing={3}>
+        {/* Key Metrics Row */}
+        <Grid size={{ xs: 12 }}>
+          <Typography
+            variant="h6"
+            gutterBottom
+            sx={{ display: "flex", alignItems: "center" }}
+          >
+            <Assessment sx={{ mr: 1 }} /> Key Performance Indicators
+          </Typography>
+        </Grid>
+
+        {/* New Leads */}
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">New Leads</Typography>
+              <People color="primary" />
+            </Box>
+            <Typography
+              variant="h4"
+              sx={{ color: "primary.main", fontWeight: "bold" }}
+            >
+              {overviewData.newLeads}
+            </Typography>
+            <TrendIndicator
+              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
+            />
+          </StyledPaper>
+        </Grid>
+        {/* Purchased Leads */}
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">Purchased Leads</Typography>
+              <People color="primary" />
+            </Box>
+            <Typography
+              variant="h4"
+              sx={{ color: "primary.main", fontWeight: "bold" }}
+            >
+              {overviewData.purchasedLeads}
+            </Typography>
+            <TrendIndicator
+              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
+            />
+          </StyledPaper>
+        </Grid>
+        {/* Total Leads */}
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">Total Leads</Typography>
+              <People color="primary" />
+            </Box>
+            <Typography
+              variant="h4"
+              sx={{ color: "primary.main", fontWeight: "bold" }}
+            >
+              {overviewData.totalLeads}
+            </Typography>
+            <TrendIndicator
+              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
+            />
+          </StyledPaper>
+        </Grid>
+        {/* Total Lead Buyers */}
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">Total Leads Buyers</Typography>
+              <People color="primary" />
+            </Box>
+            <Typography
+              variant="h4"
+              sx={{ color: "primary.main", fontWeight: "bold" }}
+            >
+              {overviewData.totalLeadBuyers}
+            </Typography>
+            <TrendIndicator
+              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
+            />
+          </StyledPaper>
+        </Grid>
+        {/* New Lead Buyers */}
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">New Leads Buyers</Typography>
+              <People color="primary" />
+            </Box>
+            <Typography
+              variant="h4"
+              sx={{ color: "primary.main", fontWeight: "bold" }}
+            >
+              {overviewData.newLeadBuyers}
+            </Typography>
+            <TrendIndicator
+              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
+            />
+          </StyledPaper>
+        </Grid>
+
+        {/* Conversion Rate */}
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">Conversion Rate</Typography>
+              <Timeline color="primary" />
+            </Box>
+            <Typography
+              variant="h4"
+              sx={{ color: "success.main", fontWeight: "bold" }}
+            >
+              {overviewData.conversionRate}%
+            </Typography>
+            <TrendIndicator
+              value={overviewData.kpiTrends?.conversionRateTrend || 0}
+            />
+          </StyledPaper>
+        </Grid>
+
+        {/* Total Revenue */}
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">Total Revenue</Typography>
+              <MonetizationOn color="primary" />
+            </Box>
+            <Typography
+              variant="h4"
+              sx={{ color: "warning.main", fontWeight: "bold" }}
+            >
+              ${overviewData.totalRevenue.toLocaleString()}
+            </Typography>
+            <TrendIndicator value={overviewData.kpiTrends?.revenueTrend || 0} />
+          </StyledPaper>
+        </Grid>
+
+        {/* ROI */}
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">Campaign ROI</Typography>
+              <LocalAtm color="primary" />
+            </Box>
+            <Typography
+              variant="h4"
+              sx={{ color: "info.main", fontWeight: "bold" }}
+            >
+              {overviewData.campaignPerformance?.roi || 0}%
+            </Typography>
+            <Typography variant="caption">Return on Investment</Typography>
+          </StyledPaper>
+        </Grid>
+
+        {/* Lead Sources */}
+        <Grid size={{ xs: 12, md: 4 }}>
+          <StyledPaper>
             <Typography
               variant="h6"
               gutterBottom
               sx={{ display: "flex", alignItems: "center" }}
             >
-              <Assessment sx={{ mr: 1 }} /> Key Performance Indicators
+              <Assessment sx={{ mr: 1 }} /> Lead Sources
             </Typography>
-          </Grid2>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={leadSourcesData}
+                  dataKey="count"
+                  nameKey="source"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={isMobile ? 60 : 80}
+                  fill="#8884d8"
+                  label={({ name, percent }) =>
+                    `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                  }
+                >
+                  {leadSourcesData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value, name, props) => [
+                    `${props.payload.source}: ${value} leads (${props.payload.conversionRate}% conversion)`,
+                  ]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </StyledPaper>
+        </Grid>
 
-          {/* New Leads */}
-          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">New Leads</Typography>
-                <People color="primary" />
-              </Box>
-              <Typography
-                variant="h4"
-                sx={{ color: "primary.main", fontWeight: "bold" }}
-              >
-                {overviewData.newLeads}
-              </Typography>
-              <TrendIndicator
-                value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-              />
-            </StyledPaper>
-          </Grid2>
-          {/* Purchased Leads */}
-          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">Purchased Leads</Typography>
-                <People color="primary" />
-              </Box>
-              <Typography
-                variant="h4"
-                sx={{ color: "primary.main", fontWeight: "bold" }}
-              >
-                {overviewData.purchasedLeads}
-              </Typography>
-              <TrendIndicator
-                value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-              />
-            </StyledPaper>
-          </Grid2>
-          {/* Total Leads */}
-          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">Total Leads</Typography>
-                <People color="primary" />
-              </Box>
-              <Typography
-                variant="h4"
-                sx={{ color: "primary.main", fontWeight: "bold" }}
-              >
-                {overviewData.totalLeads}
-              </Typography>
-              <TrendIndicator
-                value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-              />
-            </StyledPaper>
-          </Grid2>
-          {/* Total Lead Buyers */}
-          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">Total Leads Buyers</Typography>
-                <People color="primary" />
-              </Box>
-              <Typography
-                variant="h4"
-                sx={{ color: "primary.main", fontWeight: "bold" }}
-              >
-                {overviewData.totalLeadBuyers}
-              </Typography>
-              <TrendIndicator
-                value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-              />
-            </StyledPaper>
-          </Grid2>
-          {/* New Lead Buyers */}
-          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">New Leads Buyers</Typography>
-                <People color="primary" />
-              </Box>
-              <Typography
-                variant="h4"
-                sx={{ color: "primary.main", fontWeight: "bold" }}
-              >
-                {overviewData.newLeadBuyers}
-              </Typography>
-              <TrendIndicator
-                value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-              />
-            </StyledPaper>
-          </Grid2>
-
-          {/* Conversion Rate */}
-          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">Conversion Rate</Typography>
-                <Timeline color="primary" />
-              </Box>
-              <Typography
-                variant="h4"
-                sx={{ color: "success.main", fontWeight: "bold" }}
-              >
-                {overviewData.conversionRate}%
-              </Typography>
-              <TrendIndicator
-                value={overviewData.kpiTrends?.conversionRateTrend || 0}
-              />
-            </StyledPaper>
-          </Grid2>
-
-          {/* Total Revenue */}
-          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">Total Revenue</Typography>
-                <MonetizationOn color="primary" />
-              </Box>
-              <Typography
-                variant="h4"
-                sx={{ color: "warning.main", fontWeight: "bold" }}
-              >
-                ${overviewData.totalRevenue.toLocaleString()}
-              </Typography>
-              <TrendIndicator
-                value={overviewData.kpiTrends?.revenueTrend || 0}
-              />
-            </StyledPaper>
-          </Grid2>
-
-          {/* ROI */}
-          <Grid2 size={{ xs: 6, sm: 6, md: 3 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">Campaign ROI</Typography>
-                <LocalAtm color="primary" />
-              </Box>
-              <Typography
-                variant="h4"
-                sx={{ color: "info.main", fontWeight: "bold" }}
-              >
-                {overviewData.campaignPerformance?.roi || 0}%
-              </Typography>
-              <Typography variant="caption">Return on Investment</Typography>
-            </StyledPaper>
-          </Grid2>
-
-          {/* Lead Sources */}
-          <Grid2 size={{ xs: 12, md: 4 }}>
-            <StyledPaper>
-              <Typography
-                variant="h6"
-                gutterBottom
-                sx={{ display: "flex", alignItems: "center" }}
-              >
-                <Assessment sx={{ mr: 1 }} /> Lead Sources
-              </Typography>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={leadSourcesData}
-                    dataKey="count"
-                    nameKey="source"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={isMobile ? 60 : 80}
-                    fill="#8884d8"
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
-                  >
-                    {leadSourcesData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value, name, props) => [
-                      `${props.payload.source}: ${value} leads (${props.payload.conversionRate}% conversion)`,
-                    ]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </StyledPaper>
-          </Grid2>
-
-          {/* Top Lead Buyers */}
-          <Grid2 size={{ xs: 12, md: 4 }}>
-            <StyledPaper sx={{ textAlign: "left" }}>
-              <Typography
-                variant="h6"
-                gutterBottom
-                sx={{ display: "flex", alignItems: "center" }}
-              >
-                <Star sx={{ mr: 1 }} /> Top Lead Buyers
-              </Typography>
-              <Stack spacing={1}>
-                {(overviewData.topLeadBuyers || []).map((buyer, index) => (
-                  <Box key={buyer.id}>
-                    <Box display="flex" justifyContent="space-between">
-                      <Typography variant="subtitle1">
-                        #{index + 1} {buyer.name}
-                      </Typography>
-                      <Chip
-                        label={`${buyer.leadsPurchased} leads`}
-                        size="small"
-                        color="primary"
-                      />
-                    </Box>
-                    <Typography variant="body2">
-                      Total spend: ${buyer.totalSpend.toLocaleString()}
+        {/* Top Lead Buyers */}
+        <Grid size={{ xs: 12, md: 4 }}>
+          <StyledPaper sx={{ textAlign: "left" }}>
+            <Typography
+              variant="h6"
+              gutterBottom
+              sx={{ display: "flex", alignItems: "center" }}
+            >
+              <Star sx={{ mr: 1 }} /> Top Lead Buyers
+            </Typography>
+            <Stack spacing={1}>
+              {(overviewData.topLeadBuyers || []).map((buyer, index) => (
+                <Box key={buyer.id}>
+                  <Box display="flex" justifyContent="space-between">
+                    <Typography variant="subtitle1">
+                      #{index + 1} {buyer.name}
                     </Typography>
-                    <Divider sx={{ my: 1 }} />
+                    <Chip
+                      label={`${buyer.leadsPurchased} leads`}
+                      size="small"
+                      color="primary"
+                    />
                   </Box>
-                ))}
-              </Stack>
-            </StyledPaper>
-          </Grid2>
+                  <Typography variant="body2">
+                    Total spend: ${buyer.totalSpend.toLocaleString()}
+                  </Typography>
+                  <Divider sx={{ my: 1 }} />
+                </Box>
+              ))}
+            </Stack>
+          </StyledPaper>
+        </Grid>
 
-          {/* Sales Performance */}
-          <Grid2 size={{ xs: 12, md: 4 }}>
-            <StyledPaper>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
+        {/* Sales Performance */}
+        <Grid size={{ xs: 12, md: 4 }}>
+          <StyledPaper>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="subtitle1" gutterBottom>
+                Sales Performance
+              </Typography>
+              <Select
+                value={timeframe}
+                onChange={handleTimeframeChange}
+                size="small"
+                sx={{ minWidth: 120 }}
               >
-                <Typography variant="subtitle1" gutterBottom>
-                  Sales Performance
-                </Typography>
-                <Select
-                  value={timeframe}
-                  onChange={handleTimeframeChange}
-                  size="small"
-                  sx={{ minWidth: 120 }}
-                >
-                  <MenuItem value="daily">Daily</MenuItem>
-                  <MenuItem value="weekly">Weekly</MenuItem>
-                  <MenuItem value="monthly">Monthly</MenuItem>
-                </Select>
-              </Box>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart
-                  data={salesPerformanceData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey={
-                      timeframe === "daily"
-                        ? "day"
-                        : timeframe === "weekly"
+                <MenuItem value="daily">Daily</MenuItem>
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+              </Select>
+            </Box>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart
+                data={salesPerformanceData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey={
+                    timeframe === "daily"
+                      ? "day"
+                      : timeframe === "weekly"
                         ? "week"
                         : "month"
-                    }
-                  />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="sales"
-                    stroke="#8884d8"
-                    activeDot={{ r: 8 }}
-                    name="Sales ($)"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </StyledPaper>
-          </Grid2>
+                  }
+                />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="#8884d8"
+                  activeDot={{ r: 8 }}
+                  name="Sales ($)"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </StyledPaper>
+        </Grid>
 
-          {/* Charts Section */}
-          <Grid2 size={{ xs: 12 }}>
-            <Typography
-              variant="h6"
-              gutterBottom
-              sx={{ display: "flex", alignItems: "center" }}
-            >
-              <BarChartIcon sx={{ mr: 1 }} /> Lead Trends
+        {/* Charts Section */}
+        <Grid size={{ xs: 12 }}>
+          <Typography
+            variant="h6"
+            gutterBottom
+            sx={{ display: "flex", alignItems: "center" }}
+          >
+            <BarChartIcon sx={{ mr: 1 }} /> Lead Trends
+          </Typography>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 6 }} mb={4}>
+          <StyledPaper>
+            <Typography variant="subtitle1" gutterBottom>
+              Monthly Lead Volume
             </Typography>
-          </Grid2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={barChartData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="leads" fill="#8884d8" name="Leads Generated" />
+                <Bar dataKey="conversions" fill="#82ca9d" name="Conversions" />
+              </BarChart>
+            </ResponsiveContainer>
+          </StyledPaper>
+        </Grid>
 
-          <Grid2 size={{ xs: 12, md: 6 }} mb={4}>
-            <StyledPaper>
-              <Typography variant="subtitle1" gutterBottom>
-                Monthly Lead Volume
-              </Typography>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={barChartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+        {/* Lead Status Distribution */}
+        <Grid size={{ xs: 12, md: 6 }} mb={4}>
+          <StyledPaper>
+            <Typography variant="subtitle1" gutterBottom>
+              Lead Status Distribution
+            </Typography>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={pieChartData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={isMobile ? 80 : 120}
+                  fill="#8884d8"
+                  label={({ name, percent }) =>
+                    `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                  }
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="leads" fill="#8884d8" name="Leads Generated" />
-                  <Bar
-                    dataKey="conversions"
-                    fill="#82ca9d"
-                    name="Conversions"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </StyledPaper>
-          </Grid2>
-
-          {/* Lead Status Distribution */}
-          <Grid2 size={{ xs: 12, md: 6 }} mb={4}>
-            <StyledPaper>
-              <Typography variant="subtitle1" gutterBottom>
-                Lead Status Distribution
-              </Typography>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieChartData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={isMobile ? 80 : 120}
-                    fill="#8884d8"
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
-                  >
-                    {pieChartData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </StyledPaper>
-          </Grid2>
-        </Grid2>
-      </Container>
-    </UserDashboard>
+                  {pieChartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </StyledPaper>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

@@ -1,8 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import UserDashboard from "../layout";
 import {
-  Container,
+  Box,
   Typography,
   Table,
   TableBody,
@@ -38,7 +37,7 @@ const CampaignManagement: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(
-    null
+    null,
   );
 
   // Fetch campaigns from the backend
@@ -74,7 +73,7 @@ const CampaignManagement: React.FC = () => {
           // Update campaign
           await axios.put(
             `/api/campaigns/${selectedCampaign.campaignId}`,
-            selectedCampaign
+            selectedCampaign,
           );
         } else {
           // Create campaign
@@ -96,7 +95,7 @@ const CampaignManagement: React.FC = () => {
     try {
       await axios.delete(`/api/campaigns/${campaignId}`);
       setCampaigns(
-        campaigns.filter((campaign) => campaign.campaignId !== campaignId)
+        campaigns.filter((campaign) => campaign.campaignId !== campaignId),
       );
     } catch (error) {
       console.error("Error deleting campaign", error);
@@ -104,171 +103,167 @@ const CampaignManagement: React.FC = () => {
   };
 
   return (
-    <UserDashboard>
-      <Container sx={{ padding: { xs: 2, sm: 4 } }}>
-        <Typography
-          variant="h5"
-          gutterBottom
-          sx={{ marginTop: 4, fontWeight: "bold", color: "primary.main" }}
-        >
-          Campaigns Management
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<Add />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Campaign
-        </Button>
+    <Box sx={{ width: "100%" }}>
+      <Typography
+        variant="h5"
+        gutterBottom
+        sx={{ marginTop: 4, fontWeight: "bold", color: "primary.main" }}
+      >
+        Campaigns Management
+      </Typography>
+      <Button
+        variant="contained"
+        color="primary"
+        startIcon={<Add />}
+        onClick={() => handleOpenDialog()}
+      >
+        Add Campaign
+      </Button>
 
-        <TableContainer component={Paper} sx={{ marginTop: 4 }}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Start Date</TableCell>
-                <TableCell>End Date</TableCell>
-                <TableCell>Budget</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Actions</TableCell>
+      <TableContainer component={Paper} sx={{ marginTop: 4 }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Description</TableCell>
+              <TableCell>Start Date</TableCell>
+              <TableCell>End Date</TableCell>
+              <TableCell>Budget</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {campaigns.map((campaign) => (
+              <TableRow key={campaign.campaignId}>
+                <TableCell>{campaign.name}</TableCell>
+                <TableCell>{campaign.description || "N/A"}</TableCell>
+                <TableCell>
+                  {new Date(campaign.startDate).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  {campaign.endDate
+                    ? new Date(campaign.endDate).toLocaleDateString()
+                    : "N/A"}
+                </TableCell>
+                <TableCell>
+                  {campaign.budget ? `$${campaign.budget}` : "N/A"}
+                </TableCell>
+                <TableCell>{campaign.status}</TableCell>
+                <TableCell>
+                  <Tooltip title="Edit">
+                    <IconButton
+                      color="primary"
+                      onClick={() => handleOpenDialog(campaign)}
+                    >
+                      <Edit />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton
+                      color="secondary"
+                      onClick={() => handleDeleteCampaign(campaign.campaignId)}
+                    >
+                      <Delete />
+                    </IconButton>
+                  </Tooltip>
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {campaigns.map((campaign) => (
-                <TableRow key={campaign.campaignId}>
-                  <TableCell>{campaign.name}</TableCell>
-                  <TableCell>{campaign.description || "N/A"}</TableCell>
-                  <TableCell>
-                    {new Date(campaign.startDate).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    {campaign.endDate
-                      ? new Date(campaign.endDate).toLocaleDateString()
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    {campaign.budget ? `$${campaign.budget}` : "N/A"}
-                  </TableCell>
-                  <TableCell>{campaign.status}</TableCell>
-                  <TableCell>
-                    <Tooltip title="Edit">
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleOpenDialog(campaign)}
-                      >
-                        <Edit />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton
-                        color="secondary"
-                        onClick={() =>
-                          handleDeleteCampaign(campaign.campaignId)
-                        }
-                      >
-                        <Delete />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
-        <Dialog
-          open={openDialog}
-          onClose={handleCloseDialog}
-          fullWidth
-          maxWidth="sm"
-        >
-          <DialogTitle>
-            {selectedCampaign?.campaignId ? "Edit Campaign" : "Add Campaign"}
-          </DialogTitle>
-          <DialogContent>
-            <TextField
-              fullWidth
-              label="Name"
-              margin="normal"
-              value={selectedCampaign?.name || ""}
-              onChange={(e) =>
-                setSelectedCampaign((prev) => ({
-                  ...prev!,
-                  name: e.target.value,
-                }))
-              }
-            />
-            <TextField
-              fullWidth
-              label="Description"
-              margin="normal"
-              value={selectedCampaign?.description || ""}
-              onChange={(e) =>
-                setSelectedCampaign((prev) => ({
-                  ...prev!,
-                  description: e.target.value,
-                }))
-              }
-            />
-            <TextField
-              fullWidth
-              label="Start Date"
-              type="date"
-              margin="normal"
-              InputLabelProps={{ shrink: true }}
-              value={selectedCampaign?.startDate || ""}
-              onChange={(e) =>
-                setSelectedCampaign((prev) => ({
-                  ...prev!,
-                  startDate: e.target.value,
-                }))
-              }
-            />
-            <TextField
-              fullWidth
-              label="End Date"
-              type="date"
-              margin="normal"
-              InputLabelProps={{ shrink: true }}
-              value={selectedCampaign?.endDate || ""}
-              onChange={(e) =>
-                setSelectedCampaign((prev) => ({
-                  ...prev!,
-                  endDate: e.target.value,
-                }))
-              }
-            />
-            <TextField
-              fullWidth
-              label="Budget"
-              type="number"
-              margin="normal"
-              value={selectedCampaign?.budget || ""}
-              onChange={(e) =>
-                setSelectedCampaign((prev) => ({
-                  ...prev!,
-                  budget: Number(e.target.value),
-                }))
-              }
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog} color="secondary">
-              Cancel
-            </Button>
-            <Button
-              onClick={handleFormSubmit}
-              color="primary"
-              variant="contained"
-            >
-              Save
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </UserDashboard>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {selectedCampaign?.campaignId ? "Edit Campaign" : "Add Campaign"}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Name"
+            margin="normal"
+            value={selectedCampaign?.name || ""}
+            onChange={(e) =>
+              setSelectedCampaign((prev) => ({
+                ...prev!,
+                name: e.target.value,
+              }))
+            }
+          />
+          <TextField
+            fullWidth
+            label="Description"
+            margin="normal"
+            value={selectedCampaign?.description || ""}
+            onChange={(e) =>
+              setSelectedCampaign((prev) => ({
+                ...prev!,
+                description: e.target.value,
+              }))
+            }
+          />
+          <TextField
+            fullWidth
+            label="Start Date"
+            type="date"
+            margin="normal"
+            InputLabelProps={{ shrink: true }}
+            value={selectedCampaign?.startDate || ""}
+            onChange={(e) =>
+              setSelectedCampaign((prev) => ({
+                ...prev!,
+                startDate: e.target.value,
+              }))
+            }
+          />
+          <TextField
+            fullWidth
+            label="End Date"
+            type="date"
+            margin="normal"
+            InputLabelProps={{ shrink: true }}
+            value={selectedCampaign?.endDate || ""}
+            onChange={(e) =>
+              setSelectedCampaign((prev) => ({
+                ...prev!,
+                endDate: e.target.value,
+              }))
+            }
+          />
+          <TextField
+            fullWidth
+            label="Budget"
+            type="number"
+            margin="normal"
+            value={selectedCampaign?.budget || ""}
+            onChange={(e) =>
+              setSelectedCampaign((prev) => ({
+                ...prev!,
+                budget: Number(e.target.value),
+              }))
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} color="secondary">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleFormSubmit}
+            color="primary"
+            variant="contained"
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

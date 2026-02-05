@@ -1,7 +1,7 @@
 // app/api/settings/unitsettingapi/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
-import { User } from "@/models/user";
+import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 
@@ -34,13 +34,13 @@ export async function GET(req: NextRequest) {
         unitPricingOptions: user.unitPricingOptions,
         callChargeOptions: user.callChargeOptions,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error in settings API:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       ) {
         return NextResponse.json(
           { error: "Units and cost must be positive numbers." },
-          { status: 400 }
+          { status: 400 },
         );
       }
     } else if (type === "call") {
@@ -78,13 +78,13 @@ export async function POST(req: NextRequest) {
       ) {
         return NextResponse.json(
           { error: "Units and seconds must be positive numbers." },
-          { status: 400 }
+          { status: 400 },
         );
       }
     } else {
       return NextResponse.json(
         { error: "Invalid settings type." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -111,13 +111,13 @@ export async function POST(req: NextRequest) {
         unitPricingOptions: user.unitPricingOptions,
         callChargeOptions: user.callChargeOptions,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error in settings API:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -137,7 +137,7 @@ export async function PUT(req: NextRequest) {
     if (typeof index !== "number" || index < 0) {
       return NextResponse.json(
         { error: "Invalid index for edit" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -151,7 +151,7 @@ export async function PUT(req: NextRequest) {
       if (index >= user.unitPricingOptions.length) {
         return NextResponse.json(
           { error: "Invalid index for unit pricing edit" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (
@@ -162,7 +162,7 @@ export async function PUT(req: NextRequest) {
       ) {
         return NextResponse.json(
           { error: "Units and cost must be positive numbers." },
-          { status: 400 }
+          { status: 400 },
         );
       }
       user.unitPricingOptions[index] = { units: data.units, cost: data.cost! };
@@ -170,7 +170,7 @@ export async function PUT(req: NextRequest) {
       if (index >= user.callChargeOptions.length) {
         return NextResponse.json(
           { error: "Invalid index for call charge edit" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (
@@ -181,7 +181,7 @@ export async function PUT(req: NextRequest) {
       ) {
         return NextResponse.json(
           { error: "Units and seconds must be positive numbers." },
-          { status: 400 }
+          { status: 400 },
         );
       }
       user.callChargeOptions[index] = {
@@ -191,7 +191,7 @@ export async function PUT(req: NextRequest) {
     } else {
       return NextResponse.json(
         { error: "Invalid settings type." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -203,13 +203,13 @@ export async function PUT(req: NextRequest) {
         unitPricingOptions: user.unitPricingOptions,
         callChargeOptions: user.callChargeOptions,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error in settings API:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -238,7 +238,7 @@ export async function DELETE(req: NextRequest) {
       if (index < 0 || index >= user.unitPricingOptions.length) {
         return NextResponse.json(
           { error: "Invalid index for unit pricing delete" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       user.unitPricingOptions.splice(index, 1);
@@ -246,14 +246,14 @@ export async function DELETE(req: NextRequest) {
       if (index < 0 || index >= user.callChargeOptions.length) {
         return NextResponse.json(
           { error: "Invalid index for call charge delete" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       user.callChargeOptions.splice(index, 1);
     } else {
       return NextResponse.json(
         { error: "Invalid settings type." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -265,13 +265,13 @@ export async function DELETE(req: NextRequest) {
         unitPricingOptions: user.unitPricingOptions,
         callChargeOptions: user.callChargeOptions,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error in settings API:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
