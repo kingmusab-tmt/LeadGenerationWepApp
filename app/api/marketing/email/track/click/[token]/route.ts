@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
+  { params }: { params: Promise<{ token: string }> },
 ) {
   try {
     const { token } = await params;
@@ -21,12 +21,23 @@ export async function GET(
     if (!encodedUrl) {
       return NextResponse.json(
         { error: "Missing URL parameter" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Decode URL
     const originalUrl = Buffer.from(encodedUrl, "base64").toString("utf-8");
+
+    // Validate URL to prevent open redirect
+    if (
+      !originalUrl.startsWith("http://") &&
+      !originalUrl.startsWith("https://")
+    ) {
+      return NextResponse.json(
+        { error: "Invalid redirect URL" },
+        { status: 400 },
+      );
+    }
 
     await dbConnect();
 
@@ -38,9 +49,25 @@ export async function GET(
     return NextResponse.redirect(originalUrl);
   } catch (error) {
     console.error("Error tracking click:", error);
+    // Try to redirect to original URL even if tracking fails
+    try {
+      const { searchParams } = new URL(req.url);
+      const encodedUrl = searchParams.get("url");
+      if (encodedUrl) {
+        const originalUrl = Buffer.from(encodedUrl, "base64").toString("utf-8");
+        if (
+          originalUrl.startsWith("http://") ||
+          originalUrl.startsWith("https://")
+        ) {
+          return NextResponse.redirect(originalUrl);
+        }
+      }
+    } catch {
+      // Final fallback
+    }
     return NextResponse.json(
       { error: "Failed to track click" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

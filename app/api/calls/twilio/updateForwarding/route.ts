@@ -24,6 +24,27 @@ export async function POST(req: NextRequest) {
       leadResponses,
       forwardingNumbers,
       leadBuyers,
+      overflowNumber,
+      // Seller working hours
+      enableWorkingHours,
+      workingHoursStart,
+      workingHoursEnd,
+      // New feature flags
+      recordingConsent,
+      recordingConsentMessage,
+      missedCallTextBack,
+      missedCallTextMessage,
+      dncEnabled,
+      dncList,
+      spamFilterEnabled,
+      spamFilterAction,
+      scheduledCallbackEnabled,
+      scheduledCallbackDigit,
+      multiRingEnabled,
+      geoRoutingEnabled,
+      concurrentCallLimit,
+      transcriptionEnabled,
+      aiSummaryEnabled,
     } = await req.json();
 
     // Find the seller
@@ -55,6 +76,38 @@ export async function POST(req: NextRequest) {
     number.welcomeMessage = welcomeMessage || "";
     number.callWhisper = callWhisper || "";
     number.requireResponse = requireResponse || false;
+    number.overflowNumber = overflowNumber || "";
+
+    // Save working hours
+    number.enableWorkingHours = !!enableWorkingHours;
+    number.workingHoursStart = workingHoursStart || "09:00";
+    number.workingHoursEnd = workingHoursEnd || "17:00";
+
+    // Update new feature flags
+    number.recordingConsent = !!recordingConsent;
+    number.recordingConsentMessage =
+      recordingConsentMessage ||
+      "This call may be recorded for quality assurance purposes.";
+    number.missedCallTextBack = !!missedCallTextBack;
+    number.missedCallTextMessage =
+      missedCallTextMessage ||
+      "We missed your call! We will get back to you shortly.";
+    number.dncEnabled = !!dncEnabled;
+    if (dncList && Array.isArray(dncList)) {
+      number.dncList = dncList
+        .filter((n: string) => n && n.trim())
+        .map((n: string) => n.trim());
+    }
+    number.spamFilterEnabled = !!spamFilterEnabled;
+    number.spamFilterAction = spamFilterAction === "warn" ? "warn" : "block";
+    number.scheduledCallbackEnabled = !!scheduledCallbackEnabled;
+    number.scheduledCallbackDigit = scheduledCallbackDigit || "1";
+    number.multiRingEnabled = !!multiRingEnabled;
+    number.geoRoutingEnabled = !!geoRoutingEnabled;
+    number.concurrentCallLimit =
+      typeof concurrentCallLimit === "number" ? concurrentCallLimit : 0;
+    number.transcriptionEnabled = !!transcriptionEnabled;
+    number.aiSummaryEnabled = !!aiSummaryEnabled;
 
     // Handle response verification settings
     if (requireResponse) {

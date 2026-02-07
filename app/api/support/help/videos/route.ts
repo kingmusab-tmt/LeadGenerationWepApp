@@ -27,9 +27,16 @@ export const GET = withAuth(async (req, session) => {
   );
 
   const videos = await HelpVideo.find({
-    $or: [
-      { title: { $regex: search, $options: "i" } },
-      { description: { $regex: search, $options: "i" } },
+    $and: [
+      {
+        $or: [
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+        ],
+      },
+      {
+        $or: [{ targetAudience: "seller" }, { targetAudience: "both" }],
+      },
     ],
   }).sort({ createdAt: -1 });
 

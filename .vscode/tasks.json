@@ -1,0 +1,61 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "build:debug",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build",
+				"--",
+				"--debug"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "build:log",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-Command",
+				"npm run build 2>&1 | Tee-Object -FilePath build.log"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "typecheck",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"tsc",
+				"-p",
+				"tsconfig.json",
+				"--noEmit",
+				"--pretty",
+				"false"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Build project",
+			"type": "shell",
+			"command": "npm run build",
+			"group": "build"
+		}
+	]
+}

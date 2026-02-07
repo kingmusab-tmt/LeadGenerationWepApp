@@ -100,10 +100,8 @@ interface ILeadBuyerDetail {
   };
   vacationMode?: { enabled: boolean; pauseUntil?: Date; autoReject: boolean };
   locationMatchingStrict?: boolean;
-  restrictedZones?: { city?: string; state?: string; zipCodes?: string[] }[];
   preferredZones?: { city?: string; state?: string; zipCodes?: string[] }[];
   radiusFlexibility?: "strict" | "soft" | "flexible";
-  excludedSources?: string[];
   leadTypes?: ("exclusive" | "shared")[];
   webhookConfig?: { enabled?: boolean; url?: string; authToken?: string };
   serviceLocations?: {
@@ -116,9 +114,6 @@ interface ILeadBuyerDetail {
   maxLeadAge?: number;
   serviceRadius?: number;
   preferredContactMethods?: ("phone" | "email" | "sms")[];
-  blockDuplicateLeads?: boolean;
-  duplicateCheckWindow?: number;
-  enableLeadFeedback?: boolean;
   priorityBySource?: { source: string; priority: number }[];
   priorityByIndustry?: { industry: string; priority: number }[];
   priorityByLocation?: { location: string; priority: number }[];
@@ -141,11 +136,9 @@ interface BuyerPreferences {
   notifyOnWeekends: boolean;
   vacationMode: { enabled: boolean; pauseUntil?: string; autoReject: boolean };
   locationMatchingStrict: boolean;
-  restrictedZones: { city?: string; state?: string; zipCodes?: string[] }[];
   preferredZones: { city?: string; state?: string; zipCodes?: string[] }[];
   radiusFlexibility: "strict" | "soft" | "flexible";
   preferenceMatchingThreshold: "strict" | "moderate" | "flexible";
-  excludedSources: string[];
   leadTypes: ("exclusive" | "shared")[];
   webhookConfig: { enabled: boolean; url: string; authToken: string };
   serviceLocations: {
@@ -163,9 +156,6 @@ interface BuyerPreferences {
   maxLeadAge: number;
   serviceRadius: number;
   preferredContactMethods: ("phone" | "email" | "sms")[];
-  blockDuplicateLeads: boolean;
-  duplicateCheckWindow: number;
-  enableLeadFeedback: boolean;
   priorityBySource: { source: string; priority: number }[];
   priorityByIndustry: { industry: string; priority: number }[];
   priorityByLocation: { location: string; priority: number }[];
@@ -185,9 +175,6 @@ const AccountSettings = () => {
     useState<ILeadBuyerDetail | null>(null);
   const [leadBuyerLoading, setLeadBuyerLoading] = useState(true);
   const [preferences, setPreferences] = useState<BuyerPreferences | null>(null);
-  const [restrictedCitiesInput, setRestrictedCitiesInput] = useState("");
-  const [restrictedStatesInput, setRestrictedStatesInput] = useState("");
-  const [restrictedZipsInput, setRestrictedZipsInput] = useState("");
   const [preferredCitiesInput, setPreferredCitiesInput] = useState("");
   const [preferredStatesInput, setPreferredStatesInput] = useState("");
   const [preferredZipsInput, setPreferredZipsInput] = useState("");
@@ -248,12 +235,10 @@ const AccountSettings = () => {
                 }
               : { enabled: false, autoReject: true, pauseUntil: "" },
             locationMatchingStrict: buyerDetail.locationMatchingStrict ?? false,
-            restrictedZones: buyerDetail.restrictedZones || [],
             preferredZones: buyerDetail.preferredZones || [],
             radiusFlexibility: buyerDetail.radiusFlexibility || "strict",
             preferenceMatchingThreshold:
               buyerDetail.preferenceMatchingThreshold || "moderate",
-            excludedSources: buyerDetail.excludedSources || [],
             leadTypes: buyerDetail.leadTypes || ["shared"],
             webhookConfig:
               buyerDetail.webhookConfig ||
@@ -282,28 +267,10 @@ const AccountSettings = () => {
               "phone",
               "email",
             ],
-            blockDuplicateLeads: buyerDetail.blockDuplicateLeads ?? true,
-            duplicateCheckWindow: buyerDetail.duplicateCheckWindow ?? 30,
-            enableLeadFeedback: buyerDetail.enableLeadFeedback ?? true,
             priorityBySource: buyerDetail.priorityBySource || [],
             priorityByIndustry: buyerDetail.priorityByIndustry || [],
             priorityByLocation: buyerDetail.priorityByLocation || [],
           });
-
-          const cityZones = (buyerDetail.restrictedZones || [])
-            .filter((zone: any) => zone.city)
-            .map((zone: any) => zone.city)
-            .filter(Boolean);
-          const stateZones = (buyerDetail.restrictedZones || [])
-            .filter((zone: any) => zone.state)
-            .map((zone: any) => zone.state)
-            .filter(Boolean);
-          const zipZones = (buyerDetail.restrictedZones || [])
-            .flatMap((zone: any) => zone.zipCodes || [])
-            .filter(Boolean);
-          setRestrictedCitiesInput(cityZones.join(", "));
-          setRestrictedStatesInput(stateZones.join(", "));
-          setRestrictedZipsInput(zipZones.join(", "));
 
           // Parse preferred zones
           const preferredCityZones = (buyerDetail.preferredZones || [])
@@ -413,7 +380,7 @@ const AccountSettings = () => {
   const handlePreferencesMultiSelect = (
     name: keyof Pick<
       BuyerPreferences,
-      "industries" | "excludedSources" | "leadTypes" | "preferredContactMethods"
+      "industries" | "leadTypes" | "preferredContactMethods"
     >,
     rawValue: string[] | string,
   ) => {
@@ -438,7 +405,6 @@ const AccountSettings = () => {
 
     if (
       name === "industries" ||
-      name === "excludedSources" ||
       name === "leadTypes" ||
       name === "preferredContactMethods"
     ) {
@@ -689,32 +655,6 @@ const AccountSettings = () => {
     }
   };
 
-  const buildRestrictedZonesPayload = () => {
-    const zones: { city?: string; state?: string; zipCodes?: string[] }[] = [];
-
-    const cityList = restrictedCitiesInput
-      .split(",")
-      .map((city) => city.trim())
-      .filter(Boolean);
-    cityList.forEach((city) => zones.push({ city }));
-
-    const stateList = restrictedStatesInput
-      .split(",")
-      .map((state) => state.trim())
-      .filter(Boolean);
-    stateList.forEach((state) => zones.push({ state }));
-
-    const zipList = restrictedZipsInput
-      .split(",")
-      .map((zip) => zip.trim())
-      .filter(Boolean);
-    if (zipList.length) {
-      zones.push({ zipCodes: zipList });
-    }
-
-    return zones;
-  };
-
   const buildPreferredZonesPayload = () => {
     const zones: { city?: string; state?: string; zipCodes?: string[] }[] = [];
 
@@ -746,7 +686,6 @@ const AccountSettings = () => {
     try {
       const payload = {
         ...preferences,
-        restrictedZones: buildRestrictedZonesPayload(),
         preferredZones: buildPreferredZonesPayload(),
         leadPreferences: {
           industries: preferences.industries,
@@ -1172,7 +1111,9 @@ const AccountSettings = () => {
                             sx={{
                               p: 2,
                               flex: "0 1 calc(50% - 4px)",
+                              minWidth: 0,
                               border: "1px solid #ddd",
+                              overflow: "hidden",
                             }}
                           >
                             <Box
@@ -1182,14 +1123,21 @@ const AccountSettings = () => {
                                 alignItems: "flex-start",
                               }}
                             >
-                              <Box sx={{ flex: 1 }}>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <Typography
                                   variant="subtitle2"
                                   sx={{ fontWeight: 600 }}
                                 >
                                   {pair.industry}
                                 </Typography>
-                                <Box sx={{ display: "flex", gap: 0.5, mt: 1 }}>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 0.5,
+                                    mt: 1,
+                                  }}
+                                >
                                   {pair.services.map((service) => (
                                     <Chip
                                       key={service}
@@ -1334,6 +1282,15 @@ const AccountSettings = () => {
                         <MenuItem value="exclusive">Exclusive</MenuItem>
                         <MenuItem value="shared">Shared</MenuItem>
                       </Select>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        sx={{ mt: 0.5 }}
+                      >
+                        <strong>Exclusive:</strong> Lead sold only to you
+                        (higher cost). <strong>Shared:</strong> Lead may be sold
+                        to multiple buyers (lower cost).
+                      </Typography>
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
@@ -1348,33 +1305,6 @@ const AccountSettings = () => {
                       )}
                       helperText="0-100 scale (0 = any quality)"
                     />
-                  </Grid>
-                  <Grid size={{ xs: 12 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Excluded Lead Sources</InputLabel>
-                      <Select
-                        multiple
-                        name="excludedSources"
-                        value={preferences.excludedSources}
-                        onChange={handlePreferencesSelect}
-                        label="Excluded Lead Sources"
-                        renderValue={(selected) => (
-                          <Box
-                            sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}
-                          >
-                            {(selected as string[]).map((value) => (
-                              <Chip key={value} label={value} />
-                            ))}
-                          </Box>
-                        )}
-                      >
-                        {LEAD_SOURCES.map((source) => (
-                          <MenuItem key={source.value} value={source.value}>
-                            {source.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
                   </Grid>
                 </Grid>
               </Section>
@@ -1649,6 +1579,15 @@ const AccountSettings = () => {
                         <MenuItem value="weekly">Weekly</MenuItem>
                         <MenuItem value="monthly">Monthly</MenuItem>
                       </Select>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        sx={{ mt: 0.5 }}
+                      >
+                        <strong>Daily:</strong> Budget resets every day.{" "}
+                        <strong>Weekly:</strong> Budget resets every week.{" "}
+                        <strong>Monthly:</strong> Budget resets every month.
+                      </Typography>
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
@@ -1752,116 +1691,6 @@ const AccountSettings = () => {
                           ))}
                       </Select>
                     </FormControl>
-                  </Grid>
-                </Grid>
-
-                <Divider sx={{ my: 2 }} />
-
-                {/* Restricted Locations */}
-                <Typography
-                  variant="subtitle2"
-                  sx={{ mb: 2, fontWeight: 600, color: "#d32f2f" }}
-                >
-                  ❌ Restricted Locations (Exclude These)
-                </Typography>
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid size={{ xs: 12, md: 4 }}>
-                    <Autocomplete
-                      multiple
-                      freeSolo
-                      options={usCities}
-                      value={restrictedCitiesInput
-                        .split(",")
-                        .map((c) => c.trim())
-                        .filter(Boolean)}
-                      onChange={(event, newValue) => {
-                        setRestrictedCitiesInput(newValue.join(", "));
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Restricted Cities"
-                          placeholder="Select or type cities to exclude"
-                          helperText="Cities to exclude from leads"
-                        />
-                      )}
-                      renderTags={(value, getTagProps) =>
-                        value.map((option, index) => {
-                          const { key: _, ...tagProps } = getTagProps({
-                            index,
-                          });
-                          return (
-                            <Chip key={index} label={option} {...tagProps} />
-                          );
-                        })
-                      }
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 4 }}>
-                    <Autocomplete
-                      multiple
-                      options={getStatesFromCities(usCities).map((state) => {
-                        const stateObj = US_STATES.find(
-                          (s) => s.value === state,
-                        );
-                        return {
-                          value: state,
-                          label: stateObj?.label || state,
-                        };
-                      })}
-                      getOptionLabel={(option) =>
-                        typeof option === "string" ? option : option.label
-                      }
-                      value={restrictedStatesInput
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                        .map((state) => ({
-                          value: state,
-                          label:
-                            US_STATES.find((s) => s.value === state)?.label ||
-                            state,
-                        }))}
-                      onChange={(event, newValue) => {
-                        setRestrictedStatesInput(
-                          newValue.map((v) => v.value).join(", "),
-                        );
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Restricted States"
-                          placeholder="Select states to exclude"
-                          helperText="States to exclude from leads"
-                        />
-                      )}
-                      renderTags={(value, getTagProps) =>
-                        value.map((option, index) => {
-                          const { key: _, ...tagProps } = getTagProps({
-                            index,
-                          });
-                          return (
-                            <Chip
-                              key={index}
-                              label={option.label}
-                              {...tagProps}
-                            />
-                          );
-                        })
-                      }
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      label="Restricted Zip Codes"
-                      placeholder="e.g. 90001, 90002"
-                      helperText="Zipcodes to exclude (comma separated)"
-                      value={restrictedZipsInput}
-                      onChange={(event) =>
-                        setRestrictedZipsInput(event.target.value)
-                      }
-                    />
                   </Grid>
                 </Grid>
 

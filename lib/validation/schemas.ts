@@ -62,10 +62,10 @@ export const getLeadsQuerySchema = z.object({
 export const createEmailCampaignSchema = z.object({
   name: z.string().min(1, "Campaign name is required").max(100),
   subject: z.string().min(1, "Subject is required").max(200),
-  body: z.string().min(10, "Body must be at least 10 characters"),
-  recipientList: z
-    .array(z.string().email())
-    .min(1, "At least one recipient is required"),
+  body: z.string().optional(),
+  htmlContent: z.string().optional(),
+  fromEmail: z.string().email().optional(),
+  recipientList: z.array(z.string().email()).optional(),
   schedule: z
     .object({
       scheduledTime: z.string().datetime().optional(),
@@ -90,7 +90,9 @@ export const getEmailCampaignsQuerySchema = z.object({
     .regex(/^\d+$/)
     .optional()
     .transform((v) => (v ? parseInt(v) : 10)),
-  status: z.enum(["draft", "scheduled", "sent", "failed"]).optional(),
+  status: z
+    .enum(["draft", "scheduled", "sending", "paused", "completed", "failed"])
+    .optional(),
   sort: z.string().optional(),
 });
 
@@ -100,10 +102,18 @@ export const getEmailCampaignsQuerySchema = z.object({
 
 export const createSMSCampaignSchema = z.object({
   name: z.string().min(1, "Campaign name is required").max(100),
-  message: z.string().min(1, "Message is required").max(160),
-  recipientList: z
-    .array(z.string().regex(/^\d{10,15}$/, "Invalid phone number"))
-    .min(1),
+  textContent: z.string().min(1, "Message is required").max(1600),
+  recipients: z
+    .array(
+      z.object({
+        phone: z.string().min(1, "Phone number is required"),
+        name: z.string().optional(),
+        variables: z
+          .record(z.string(), z.union([z.string(), z.number()]))
+          .optional(),
+      }),
+    )
+    .optional(),
   schedule: z
     .object({
       scheduledTime: z.string().datetime().optional(),

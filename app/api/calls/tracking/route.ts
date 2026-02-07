@@ -13,9 +13,14 @@ import {
   badRequest,
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
+import { checkCallRateLimit } from "@/lib/security/callSecurity";
 
 export async function GET(req: NextRequest) {
   try {
+    // Rate limit check
+    const rateLimitResponse = await checkCallRateLimit(req);
+    if (rateLimitResponse) return rateLimitResponse;
+
     await dbConnect();
 
     // Get the seller ID from the session

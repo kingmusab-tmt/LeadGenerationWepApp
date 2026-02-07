@@ -12,6 +12,7 @@
 // Re-export models
 export { User } from "./userModel";
 export { Notification } from "./notificationModel";
+export { default as ScheduledCallback } from "./scheduledCallback";
 
 // Re-export types
 export type { IUser } from "./types/user";

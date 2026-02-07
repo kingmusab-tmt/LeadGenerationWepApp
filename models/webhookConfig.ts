@@ -19,6 +19,9 @@ export interface IWebhookEvents {
   leadRejected?: boolean;
   buyerAssigned?: boolean;
   callCompleted?: boolean;
+  callForwarded?: boolean;
+  callVoicemail?: boolean;
+  callRefunded?: boolean;
   dealCreated?: boolean;
   dealUpdated?: boolean;
 }
@@ -147,6 +150,9 @@ const WebhookConfigSchema: Schema = new Schema<IWebhookConfig>(
       leadRejected: { type: Boolean, default: false },
       buyerAssigned: { type: Boolean, default: true },
       callCompleted: { type: Boolean, default: false },
+      callForwarded: { type: Boolean, default: false },
+      callVoicemail: { type: Boolean, default: false },
+      callRefunded: { type: Boolean, default: false },
       dealCreated: { type: Boolean, default: false },
       dealUpdated: { type: Boolean, default: false },
     },

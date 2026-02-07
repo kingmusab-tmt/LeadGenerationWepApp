@@ -82,8 +82,8 @@ const HelpSection = () => {
         setLoading(true);
         const [videosResponse, faqsResponse, userTawkinformation] =
           await Promise.all([
-            axios.get("/api/help/videos"),
-            axios.get("/api/help/faqs"),
+            axios.get("/api/help/videos?targetAudience=buyer"),
+            axios.get("/api/help/faqs?targetAudience=buyer"),
             axios.get("/api/settings/sellerlivechat"),
           ]);
 
@@ -109,13 +109,13 @@ const HelpSection = () => {
   const filteredVideos = videos.filter(
     (video) =>
       video.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      video.description.toLowerCase().includes(searchTerm.toLowerCase())
+      video.description.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const filteredFaqs = faqs.filter(
     (faq) =>
       faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
+      faq.answer.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const extractYoutubeId = (url: string) => {
@@ -228,7 +228,7 @@ const HelpSection = () => {
                             height: "100%",
                           }}
                           src={`https://www.youtube.com/embed/${extractYoutubeId(
-                            selectedVideo.url
+                            selectedVideo.url,
                           )}`}
                           frameBorder="0"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -243,7 +243,7 @@ const HelpSection = () => {
                         Duration: {selectedVideo.duration} | Uploaded:{" "}
                         {selectedVideo.uploadDate
                           ? new Date(
-                              selectedVideo.uploadDate
+                              selectedVideo.uploadDate,
                             ).toLocaleDateString()
                           : "Unknown"}
                       </Typography>

@@ -571,7 +571,11 @@ const BuyerLeads: React.FC = () => {
               <Box
                 sx={{ display: "flex", justifyContent: "space-between", mt: 2 }}
               >
-                <Typography variant="body2" color="text.secondary">
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  component="div"
+                >
                   <strong>Status:</strong>{" "}
                   <Chip
                     label={selectedLead.status}

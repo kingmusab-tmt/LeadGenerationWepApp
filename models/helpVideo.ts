@@ -18,6 +18,11 @@ const HelpVideoSchema = new mongoose.Schema({
   category: {
     type: String,
   },
+  targetAudience: {
+    type: String,
+    enum: ["buyer", "seller", "both"],
+    default: "both",
+  },
   uploadDate: {
     type: Date,
     default: Date.now,

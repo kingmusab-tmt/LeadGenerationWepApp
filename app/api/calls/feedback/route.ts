@@ -6,6 +6,7 @@ import Call from "@/models/call";
 import { Transaction } from "@/models/transactions";
 import { sendNotification } from "@/lib/notificationService";
 import { Buyer } from "@/models/leadbuyers";
+import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
 
 export async function POST(req: NextRequest) {
   await dbConnect();
@@ -88,6 +89,19 @@ async function handleSellerReview(
   }
 
   await call.save();
+
+  // Fire refund webhook (non-blocking)
+  dispatchCallWebhook(call.userId, "callRefunded", {
+    callSid: call.callSid,
+    from: call.from,
+    to: call.to,
+    status: call.paymentStatus,
+    buyerId: call.buyerId,
+    unitsCharged: call.unitsCharged,
+    refundAmount: approved ? call.unitsCharged : 0,
+    refundComment: comment,
+    paymentStatus: call.paymentStatus,
+  });
 
   return NextResponse.json({
     success: true,

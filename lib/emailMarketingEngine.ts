@@ -47,7 +47,11 @@ export class EmailTemplateEngine {
    * @returns HTML with tracking pixel
    */
   static addTrackingPixel(html: string, trackingToken: string): string {
-    const pixel = `<img src="https://yourapp.com/api/email/track/open/${trackingToken}" width="1" height="1" alt="" />`;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
+      "https://localhost:3000";
+    const pixel = `<img src="${baseUrl}/api/marketing/email/track/open/${trackingToken}" width="1" height="1" alt="" />`;
     return html + pixel;
   }
 
@@ -62,7 +66,11 @@ export class EmailTemplateEngine {
     return html.replace(linkRegex, (match, url) => {
       if (url.startsWith("http")) {
         const encodedUrl = Buffer.from(url).toString("base64");
-        return `href="https://yourapp.com/api/email/track/click/${trackingToken}?url=${encodedUrl}"`;
+        const baseUrl =
+          process.env.NEXT_PUBLIC_APP_URL ||
+          process.env.NEXTAUTH_URL ||
+          "https://localhost:3000";
+        return `href="${baseUrl}/api/marketing/email/track/click/${trackingToken}?url=${encodedUrl}"`;
       }
       return match;
     });
@@ -80,7 +88,11 @@ export class EmailTemplateEngine {
     unsubscribeToken: string,
     campaignId: string,
   ): string {
-    const unsubscribeLink = `<a href="https://yourapp.com/api/email/unsubscribe/${unsubscribeToken}?campaign=${campaignId}">Unsubscribe</a>`;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
+      "https://localhost:3000";
+    const unsubscribeLink = `<a href="${baseUrl}/api/marketing/email/unsubscribe/${unsubscribeToken}?campaign=${campaignId}">Unsubscribe</a>`;
     const footer = `<footer style="margin-top: 40px; text-align: center; font-size: 12px; color: #999;">${unsubscribeLink}</footer>`;
     return html.replace("</body>", `${footer}</body>`);
   }
@@ -160,7 +172,27 @@ export class EmailQueueManager {
       throw new Error(`Campaign ${campaignId} not found`);
     }
 
-    const queueItems = recipients.map((email) => ({
+    // Exclude previously unsubscribed recipients (those with "unsubscribed" status in any queue item for this user's campaigns)
+    const userCampaignIds = await EmailCampaign.find({
+      userId: campaign.userId,
+    }).distinct("_id");
+    const unsubscribedEmails = await EmailQueue.find({
+      campaignId: { $in: userCampaignIds },
+      status: "unsubscribed",
+    }).distinct("recipientEmail");
+
+    const unsubscribedSet = new Set(
+      unsubscribedEmails.map((e: string) => e.toLowerCase()),
+    );
+    const filteredRecipients = recipients.filter(
+      (email) => !unsubscribedSet.has(email.toLowerCase()),
+    );
+
+    if (filteredRecipients.length === 0) {
+      return 0;
+    }
+
+    const queueItems = filteredRecipients.map((email) => ({
       campaignId,
       recipientEmail: email,
       status: "pending",
@@ -414,6 +446,11 @@ export class EmailAnalyticsEngine {
 
     if (!queueItem) return;
 
+    // Mark this queue item as unsubscribed
+    await EmailQueue.findByIdAndUpdate(queueItem._id, {
+      status: "unsubscribed",
+    });
+
     // Record event
     await EmailTrackingEvent.create({
       queueId: queueItem._id,
@@ -427,6 +464,24 @@ export class EmailAnalyticsEngine {
       $inc: { "analytics.unsubscribed": 1 },
       "analytics.updatedAt": new Date(),
     });
+
+    // Add this email to a global unsubscribe list by marking all pending queue items for this email
+    // across all campaigns from the same user as unsubscribed
+    const campaign = await EmailCampaign.findById(queueItem.campaignId);
+    if (campaign) {
+      await EmailQueue.updateMany(
+        {
+          recipientEmail: queueItem.recipientEmail,
+          status: "pending",
+          campaignId: {
+            $in: await EmailCampaign.find({ userId: campaign.userId }).distinct(
+              "_id",
+            ),
+          },
+        },
+        { status: "unsubscribed" },
+      );
+    }
   }
 
   /**
@@ -603,14 +658,33 @@ export class EmailMarketingEngine {
         };
       }
 
+      // Validate recipients exist
+      if (!campaign.recipientEmails || campaign.recipientEmails.length === 0) {
+        return {
+          success: false,
+          sent: 0,
+          failed: 0,
+          message: "No recipients configured for this campaign",
+        };
+      }
+
       // Update status
       await EmailCampaign.findByIdAndUpdate(campaignId, {
         status: "sending",
         sentAt: new Date(),
+        totalRecipients: campaign.recipientEmails.length,
       });
+
+      // Add recipients to queue before processing
+      await this.queueManager.addToQueue(campaignId, campaign.recipientEmails);
 
       // Process queue
       const result = await this.queueManager.processQueue(campaignId);
+
+      // Update analytics.sent on the campaign
+      await EmailCampaign.findByIdAndUpdate(campaignId, {
+        $inc: { "analytics.sent": result.sent },
+      });
 
       return {
         success: true,

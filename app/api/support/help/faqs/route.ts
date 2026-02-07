@@ -20,9 +20,16 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search") || "";
 
     const faqs = await FAQ.find({
-      $or: [
-        { question: { $regex: search, $options: "i" } },
-        { answer: { $regex: search, $options: "i" } },
+      $and: [
+        {
+          $or: [
+            { question: { $regex: search, $options: "i" } },
+            { answer: { $regex: search, $options: "i" } },
+          ],
+        },
+        {
+          $or: [{ targetAudience: "seller" }, { targetAudience: "both" }],
+        },
       ],
     }).sort({ createdAt: -1 });
 
@@ -30,7 +37,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch FAQs" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -47,7 +54,7 @@ export async function POST(req: NextRequest) {
   if (session.user.role !== "admin") {
     return NextResponse.json(
       { error: "Forbidden: Only admins can create FAQs" },
-      { status: 403 }
+      { status: 403 },
     );
   }
   try {
@@ -58,7 +65,7 @@ export async function POST(req: NextRequest) {
     if (!question || !answer) {
       return NextResponse.json(
         { error: "Question and answer are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -74,7 +81,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to create FAQ" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -98,7 +105,7 @@ export async function PUT(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to update FAQ" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -113,7 +120,7 @@ export async function DELETE(req: NextRequest) {
     if (!id) {
       return NextResponse.json(
         { error: "FAQ ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -125,12 +132,12 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json(
       { message: "FAQ deleted successfully" },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to delete FAQ" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -56,6 +56,11 @@ interface Call {
   from?: string;
   to?: string;
   feedback?: boolean | null; // true = good, false = bad, null = not rated
+  disposition?: string | null;
+  dispositionNotes?: string;
+  aiSummary?: string;
+  aiSentiment?: string;
+  aiLeadScore?: string;
 }
 
 const PAGE_SIZE = 10;
@@ -295,6 +300,7 @@ const CallHistory: React.FC = () => {
                     "Recording",
                     "Industry",
                     "Payment",
+                    "Disposition",
                     "Quality",
                     "Feedback",
                   ].map((header) => (
@@ -325,6 +331,19 @@ const CallHistory: React.FC = () => {
                         <PaymentChip status={call.paymentStatus} />
                       </TableCell>
                       <TableCell>
+                        <DispositionSelect
+                          callId={call._id}
+                          currentDisposition={call.disposition || ""}
+                          onUpdate={(disposition) => {
+                            setCalls(
+                              calls.map((c) =>
+                                c._id === call._id ? { ...c, disposition } : c,
+                              ),
+                            );
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
                         <QualityChip feedback={call.feedback} />
                       </TableCell>
                       <TableCell>
@@ -341,7 +360,7 @@ const CallHistory: React.FC = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                    <TableCell colSpan={9} sx={{ textAlign: "center", py: 4 }}>
                       {searchTerm
                         ? "No matching calls found"
                         : "No call history available"}
@@ -485,6 +504,92 @@ const RecordingButton = ({
         Play
       </Button>
     </Tooltip>
+  );
+};
+
+const DISPOSITION_OPTIONS = [
+  { value: "", label: "—" },
+  {
+    value: "qualified_lead",
+    label: "Qualified Lead",
+    color: "success" as const,
+  },
+  {
+    value: "not_interested",
+    label: "Not Interested",
+    color: "default" as const,
+  },
+  { value: "wrong_number", label: "Wrong Number", color: "warning" as const },
+  { value: "callback_requested", label: "Callback", color: "info" as const },
+  { value: "sold", label: "Sold", color: "success" as const },
+  { value: "voicemail", label: "Voicemail", color: "default" as const },
+  { value: "spam", label: "Spam", color: "error" as const },
+];
+
+const DispositionSelect = ({
+  callId,
+  currentDisposition,
+  onUpdate,
+}: {
+  callId: string;
+  currentDisposition: string;
+  onUpdate: (disposition: string) => void;
+}) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = async (value: string) => {
+    if (value === currentDisposition) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/calls/disposition", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callId, disposition: value }),
+      });
+      if (res.ok) {
+        onUpdate(value);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (currentDisposition) {
+    const opt = DISPOSITION_OPTIONS.find((o) => o.value === currentDisposition);
+    return (
+      <Tooltip title="Click to change">
+        <Chip
+          label={opt?.label || currentDisposition}
+          color={opt?.color || "default"}
+          size="small"
+          onClick={() => handleChange("")}
+          sx={{ cursor: "pointer" }}
+        />
+      </Tooltip>
+    );
+  }
+
+  return (
+    <FormControl size="small" sx={{ minWidth: 120 }}>
+      <Select
+        value=""
+        displayEmpty
+        disabled={saving}
+        onChange={(e) => handleChange(e.target.value as string)}
+        sx={{ fontSize: "0.8rem" }}
+      >
+        <MenuItem value="" disabled>
+          Set...
+        </MenuItem>
+        {DISPOSITION_OPTIONS.filter((o) => o.value).map((opt) => (
+          <MenuItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
 };
 

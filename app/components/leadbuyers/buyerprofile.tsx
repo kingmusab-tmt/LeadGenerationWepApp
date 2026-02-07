@@ -48,14 +48,62 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
           <strong>Name:</strong> {buyer.name}
         </Typography>
         <Typography>
-          <strong>Company:</strong> {buyer.company}
+          <strong>Company:</strong> {buyer.company || "Not specified"}
         </Typography>
+        {buyer.businessDescription && (
+          <Typography>
+            <strong>Business Description:</strong> {buyer.businessDescription}
+          </Typography>
+        )}
+        {buyer.businessWebsite && (
+          <Typography>
+            <strong>Website:</strong> {buyer.businessWebsite}
+          </Typography>
+        )}
+        {buyer.companyRegNo && (
+          <Typography>
+            <strong>Company Reg No:</strong> {buyer.companyRegNo}
+          </Typography>
+        )}
+        {buyer.vatTaxRegNo && (
+          <Typography>
+            <strong>VAT/Tax Reg No:</strong> {buyer.vatTaxRegNo}
+          </Typography>
+        )}
         <Typography>
           <strong>Email:</strong> {buyer.email}
         </Typography>
         <Typography>
-          <strong>Phone:</strong> {buyer.phone}
+          <strong>Phone:</strong> {buyer.phone || "Not specified"}
         </Typography>
+        {buyer.contactAddress &&
+          (buyer.contactAddress.addressLine1 || buyer.contactAddress.city) && (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Contact Address:
+              </Typography>
+              <Box sx={{ ml: 2 }}>
+                {buyer.contactAddress.addressLine1 && (
+                  <Typography variant="body2">
+                    {buyer.contactAddress.addressLine1}
+                  </Typography>
+                )}
+                {buyer.contactAddress.addressLine2 && (
+                  <Typography variant="body2">
+                    {buyer.contactAddress.addressLine2}
+                  </Typography>
+                )}
+                {(buyer.contactAddress.city ||
+                  buyer.contactAddress.postCode) && (
+                  <Typography variant="body2">
+                    {[buyer.contactAddress.city, buyer.contactAddress.postCode]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          )}
         <Typography>
           <strong>Units Balance:</strong> {buyer.walletUnit}
         </Typography>
@@ -70,7 +118,10 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
           />
         </Box>
         <Typography>
-          <strong>Priority Level:</strong> {buyer.priorityLevel || "Standard"}
+          <strong>Priority:</strong> {buyer.priority ?? 5} / 10
+        </Typography>
+        <Typography>
+          <strong>Active:</strong> {buyer.isActive ? "Yes" : "No"}
         </Typography>
       </Box>
 
@@ -84,28 +135,43 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
             <Typography>
               <strong>Timezone:</strong> {buyer.timezone || "Not specified"}
             </Typography>
+            <Typography>
+              <strong>Lead Location:</strong>{" "}
+              {buyer.leadPreferences?.location || "Not specified"}
+            </Typography>
 
-            {/* Restricted Locations */}
-            {buyer.restrictedZones && buyer.restrictedZones.length > 0 && (
+            {/* Service Locations */}
+            {buyer.serviceLocations && buyer.serviceLocations.length > 0 && (
               <Box sx={{ mt: 2 }}>
-                <Typography variant="subtitle2" color="error" gutterBottom>
-                  ❌ Restricted Locations (Excluded)
+                <Typography variant="subtitle2" color="primary" gutterBottom>
+                  Service Locations
                 </Typography>
-                {buyer.restrictedZones.map((zone: any, index: number) => (
-                  <Box key={index} sx={{ ml: 2, mb: 1 }}>
-                    {zone.city && (
+                {buyer.serviceLocations.map((loc, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      ml: 2,
+                      mb: 1,
+                      p: 1,
+                      bgcolor: "action.hover",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography variant="body2">
+                      <strong>
+                        {[loc.city, loc.state, loc.country]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </strong>
+                    </Typography>
+                    {loc.radius && (
                       <Typography variant="body2">
-                        <strong>Cities:</strong> {zone.city}
+                        Radius: {loc.radius} miles
                       </Typography>
                     )}
-                    {zone.state && (
+                    {loc.zipCodes && loc.zipCodes.length > 0 && (
                       <Typography variant="body2">
-                        <strong>States:</strong> {zone.state}
-                      </Typography>
-                    )}
-                    {zone.zipCodes && zone.zipCodes.length > 0 && (
-                      <Typography variant="body2">
-                        <strong>Zip Codes:</strong> {zone.zipCodes.join(", ")}
+                        Zip Codes: {loc.zipCodes.join(", ")}
                       </Typography>
                     )}
                   </Box>
@@ -113,7 +179,7 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
               </Box>
             )}
 
-            {/* Preferred Locations */}
+            {/* Preferred Zones */}
             {buyer.preferredZones && buyer.preferredZones.length > 0 && (
               <Box sx={{ mt: 2 }}>
                 <Typography
@@ -121,18 +187,18 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
                   color="success.main"
                   gutterBottom
                 >
-                  ✅ Preferred Locations (Only Accept These)
+                  Preferred Zones
                 </Typography>
                 {buyer.preferredZones.map((zone: any, index: number) => (
                   <Box key={index} sx={{ ml: 2, mb: 1 }}>
                     {zone.city && (
                       <Typography variant="body2">
-                        <strong>Cities:</strong> {zone.city}
+                        <strong>City:</strong> {zone.city}
                       </Typography>
                     )}
                     {zone.state && (
                       <Typography variant="body2">
-                        <strong>States:</strong> {zone.state}
+                        <strong>State:</strong> {zone.state}
                       </Typography>
                     )}
                     {zone.zipCodes && zone.zipCodes.length > 0 && (
@@ -146,36 +212,101 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
             )}
 
             <Typography sx={{ mt: 1 }}>
-              <strong>Strict Matching:</strong>{" "}
+              <strong>Strict Location Matching:</strong>{" "}
               {buyer.locationMatchingStrict ? "Yes" : "No"}
             </Typography>
             <Typography>
-              <strong>Flexibility:</strong>{" "}
-              {buyer.radiusFlexibility || "Not specified"}
+              <strong>Radius Flexibility:</strong>{" "}
+              {buyer.radiusFlexibility || "strict"}
+            </Typography>
+            <Typography>
+              <strong>Service Radius:</strong> {buyer.serviceRadius ?? 25} miles
             </Typography>
           </Box>
         </AccordionDetails>
       </Accordion>
 
       {/* LEAD PREFERENCES */}
-      <Accordion>
+      <Accordion defaultExpanded>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography variant="h6">Lead Preferences</Typography>
         </AccordionSummary>
         <AccordionDetails>
           <Box>
-            <Typography>
-              <strong>Location:</strong>{" "}
-              {buyer.leadPreferences?.location || "Not specified"}
-            </Typography>
-            <Typography>
-              <strong>Industry:</strong>{" "}
-              {buyer.leadPreferences?.industry || "Not specified"}
-            </Typography>
+            {/* Industries */}
+            {buyer.leadPreferences?.industries &&
+              buyer.leadPreferences.industries.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography>
+                    <strong>Industries:</strong>
+                  </Typography>
+                  <Box
+                    sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}
+                  >
+                    {buyer.leadPreferences.industries.map(
+                      (industry: string, index: number) => (
+                        <Chip
+                          key={index}
+                          label={industry}
+                          color="secondary"
+                          variant="outlined"
+                          size="small"
+                        />
+                      ),
+                    )}
+                  </Box>
+                </Box>
+              )}
+
+            {/* Industry-Service Pairs */}
+            {buyer.leadPreferences?.industryServicePairs &&
+              buyer.leadPreferences.industryServicePairs.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" color="primary" gutterBottom>
+                    Industry & Service Pairs
+                  </Typography>
+                  {buyer.leadPreferences.industryServicePairs.map(
+                    (pair, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          ml: 2,
+                          mb: 1,
+                          p: 1,
+                          bgcolor: "action.hover",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography variant="body2" fontWeight="bold">
+                          {pair.industry}
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 0.5,
+                            flexWrap: "wrap",
+                            mt: 0.5,
+                          }}
+                        >
+                          {pair.services.map((service, sIdx) => (
+                            <Chip
+                              key={sIdx}
+                              label={service}
+                              size="small"
+                              variant="outlined"
+                              color="secondary"
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    ),
+                  )}
+                </Box>
+              )}
 
             {/* Lead Types */}
             {buyer.leadTypes && buyer.leadTypes.length > 0 && (
-              <Box sx={{ mt: 1 }}>
+              <Box sx={{ mb: 2 }}>
                 <Typography>
                   <strong>Lead Types:</strong>
                 </Typography>
@@ -193,47 +324,24 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
               </Box>
             )}
 
-            {/* Industries */}
-            {buyer.industries && buyer.industries.length > 0 && (
-              <Box sx={{ mt: 1 }}>
-                <Typography>
-                  <strong>Industries:</strong>
-                </Typography>
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
-                  {buyer.industries.map((industry: any, index: number) => (
-                    <Chip
-                      key={index}
-                      label={industry}
-                      color="secondary"
-                      variant="outlined"
-                      size="small"
-                    />
-                  ))}
-                </Box>
-              </Box>
-            )}
-
-            <Typography sx={{ mt: 1 }}>
-              <strong>Min Quality Score:</strong>{" "}
-              {buyer.minQualityScore || "Not specified"}
+            <Typography>
+              <strong>Min Qualification Score:</strong>{" "}
+              {buyer.qualificationScoreMinimum ?? 0}
             </Typography>
             <Typography>
               <strong>Max Credits Per Lead:</strong>{" "}
-              {buyer.maxPricePerLead || "Not specified"} credits
+              {buyer.maxPricePerLead ?? 0} credits
             </Typography>
             <Typography>
-              <strong>Preferred Credits:</strong>{" "}
-              {buyer.preferredPrice || "Not specified"} credits
+              <strong>Accept Call Leads:</strong>{" "}
+              {buyer.acceptCallLeads ? "Yes" : "No"}
             </Typography>
 
             <Typography sx={{ mt: 2 }} variant="subtitle2" color="primary">
               Lead Freshness & Contact
             </Typography>
             <Typography>
-              <strong>Max Lead Age:</strong> {buyer.maxLeadAge || 24} hours
-            </Typography>
-            <Typography>
-              <strong>Service Radius:</strong> {buyer.serviceRadius || 25} miles
+              <strong>Max Lead Age:</strong> {buyer.maxLeadAge ?? 24} hours
             </Typography>
             {buyer.preferredContactMethods &&
               buyer.preferredContactMethods.length > 0 && (
@@ -257,7 +365,11 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
                 </Box>
               )}
 
-            {/* OPERATIONAL AVAILABILITY */}
+            {/* Preference Matching Threshold */}
+            <Typography sx={{ mt: 1 }}>
+              <strong>Matching Threshold:</strong>{" "}
+              {buyer.preferenceMatchingThreshold || "moderate"}
+            </Typography>
           </Box>
         </AccordionDetails>
       </Accordion>
@@ -270,10 +382,18 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
         <AccordionDetails>
           <Box>
             <Typography>
-              <strong>Operating Hours:</strong>{" "}
-              {buyer.operatingHours?.start && buyer.operatingHours?.end
-                ? `${buyer.operatingHours.start} - ${buyer.operatingHours.end}`
+              <strong>Working Hours:</strong>{" "}
+              {buyer.workingHours?.start && buyer.workingHours?.end
+                ? `${buyer.workingHours.start} - ${buyer.workingHours.end}`
                 : "Not specified"}
+            </Typography>
+            <Typography>
+              <strong>Accept Only During Business Hours:</strong>{" "}
+              {buyer.acceptOnlyDuringBusinessHours ? "Yes" : "No"}
+            </Typography>
+            <Typography>
+              <strong>Notify On Weekends:</strong>{" "}
+              {buyer.notifyOnWeekends ? "Yes" : "No"}
             </Typography>
 
             {/* Weekly Schedule */}
@@ -299,7 +419,7 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
                 }}
               >
                 <Typography variant="subtitle2" color="warning.dark">
-                  🏖️ Vacation Mode Active
+                  Vacation Mode Active
                 </Typography>
                 <Typography variant="body2">
                   Paused until:{" "}
@@ -327,28 +447,41 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
         <AccordionDetails>
           <Box>
             <Typography>
-              <strong>Budget Cap Type:</strong>{" "}
-              {buyer.budgetCapType || "Not specified"}
+              <strong>Budget Cap Type:</strong> {buyer.budgetCapType || "daily"}
             </Typography>
             <Typography>
-              <strong>Budget Cap Amount:</strong>{" "}
-              {buyer.budgetCapAmount || "Not specified"} credits
+              <strong>Budget Limit:</strong> {buyer.budgetLimitAmount ?? 0}{" "}
+              credits per {buyer.budgetCapType || "day"}
+            </Typography>
+            <Typography>
+              <strong>Volume Limit:</strong> {buyer.volumeLimitCount ?? 0} leads
+              per {buyer.budgetCapType || "day"}
             </Typography>
             <Typography>
               <strong>Max Concurrent Leads:</strong>{" "}
-              {buyer.maxConcurrentLeads || "Not specified"}
+              {buyer.maxConcurrentLeads ?? 10}
             </Typography>
             <Typography>
-              <strong>Max Leads Per Day:</strong>{" "}
-              {buyer.maxLeadsPerDay || "Not specified"}
+              <strong>Max Leads Per Day:</strong> {buyer.maxLeadsPerDay ?? 10}
+            </Typography>
+
+            <Typography sx={{ mt: 2 }} variant="subtitle2" color="primary">
+              Current Period Usage
             </Typography>
             <Typography>
-              <strong>Max Leads Per Week:</strong>{" "}
-              {buyer.maxLeadsPerWeek || "Not specified"}
+              <strong>Current Period Spent:</strong>{" "}
+              {buyer.currentPeriodSpent ?? 0} credits
             </Typography>
             <Typography>
-              <strong>Max Leads Per Month:</strong>{" "}
-              {buyer.maxLeadsPerMonth || "Not specified"}
+              <strong>Current Period Count:</strong>{" "}
+              {buyer.currentPeriodCount ?? 0} leads
+            </Typography>
+            <Typography>
+              <strong>Current Active Leads:</strong> {buyer.currentLeads ?? 0}
+            </Typography>
+            <Typography>
+              <strong>Today&apos;s Leads:</strong>{" "}
+              {buyer.currentLeadsToday ?? 0}
             </Typography>
           </Box>
         </AccordionDetails>
@@ -363,7 +496,7 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
           <Box>
             <Typography>
               <strong>Preferred Distribution:</strong>{" "}
-              {buyer.preferredDistribution || "Not specified"}
+              {buyer.preferredDistribution || "Manual"}
             </Typography>
             <Typography>
               <strong>Auto-Accept Matching Leads:</strong>{" "}
@@ -393,9 +526,130 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
                 )}
               </Box>
             </Box>
+
+            {/* Active Criteria Set */}
+            {buyer.criteriaSets && buyer.criteriaSets.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" color="primary" gutterBottom>
+                  Criteria Sets ({buyer.criteriaSets.length})
+                </Typography>
+                {buyer.criteriaSets.map((cs, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      ml: 2,
+                      mb: 1,
+                      p: 1,
+                      bgcolor:
+                        buyer.activeCriteriaSetId === cs._id
+                          ? "success.light"
+                          : "action.hover",
+                      borderRadius: 1,
+                      border:
+                        buyer.activeCriteriaSetId === cs._id
+                          ? "1px solid"
+                          : "none",
+                      borderColor: "success.main",
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight="bold">
+                      {cs.name}{" "}
+                      {buyer.activeCriteriaSetId === cs._id && "(Active)"}{" "}
+                      {cs.isDefault && "(Default)"}
+                    </Typography>
+                    <Typography variant="body2">
+                      Lead Types: {cs.leadTypes?.join(", ") || "Any"} | Max
+                      Price: {cs.maxPrice} | Daily Limit: {cs.dailyLimit} |
+                      Auto-Accept: {cs.autoAccept ? "Yes" : "No"}
+                    </Typography>
+                    {cs.industries && cs.industries.length > 0 && (
+                      <Typography variant="body2">
+                        Industries: {cs.industries.join(", ")}
+                      </Typography>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
         </AccordionDetails>
       </Accordion>
+
+      {/* PRIORITY WEIGHTS */}
+      {((buyer.priorityBySource && buyer.priorityBySource.length > 0) ||
+        (buyer.priorityByIndustry && buyer.priorityByIndustry.length > 0) ||
+        (buyer.priorityByLocation && buyer.priorityByLocation.length > 0)) && (
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="h6">Priority Weights</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Box>
+              {buyer.priorityBySource && buyer.priorityBySource.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    By Source:
+                  </Typography>
+                  <Box
+                    sx={{ display: "flex", gap: 1, flexWrap: "wrap", ml: 2 }}
+                  >
+                    {buyer.priorityBySource.map((item, index) => (
+                      <Chip
+                        key={index}
+                        label={`${item.source}: ${item.priority}`}
+                        size="small"
+                        variant="outlined"
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+              {buyer.priorityByIndustry &&
+                buyer.priorityByIndustry.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      By Industry:
+                    </Typography>
+                    <Box
+                      sx={{ display: "flex", gap: 1, flexWrap: "wrap", ml: 2 }}
+                    >
+                      {buyer.priorityByIndustry.map((item, index) => (
+                        <Chip
+                          key={index}
+                          label={`${item.industry}: ${item.priority}`}
+                          size="small"
+                          variant="outlined"
+                          color="secondary"
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              {buyer.priorityByLocation &&
+                buyer.priorityByLocation.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      By Location:
+                    </Typography>
+                    <Box
+                      sx={{ display: "flex", gap: 1, flexWrap: "wrap", ml: 2 }}
+                    >
+                      {buyer.priorityByLocation.map((item, index) => (
+                        <Chip
+                          key={index}
+                          label={`${item.location}: ${item.priority}`}
+                          size="small"
+                          variant="outlined"
+                          color="info"
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+      )}
     </Paper>
   );
 };

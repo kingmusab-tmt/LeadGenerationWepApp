@@ -28,6 +28,7 @@ const EmailSettingsPage = () => {
     fromEmail: "",
     fromName: "",
   });
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -64,6 +65,22 @@ const EmailSettingsPage = () => {
       toast.success("Email settings updated");
     } catch (e) {
       toast.error("Failed to update email settings");
+    }
+  };
+
+  const handleTestConnection = async () => {
+    try {
+      setTesting(true);
+      const { data } = await axios.post("/api/settings/test-smtp");
+      if (data.success) {
+        toast.success(data.message || "SMTP connection successful!");
+      } else {
+        toast.error(data.error || "SMTP connection failed");
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "SMTP connection test failed");
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -127,7 +144,17 @@ const EmailSettingsPage = () => {
             setEmailSettings({ ...emailSettings, fromName: e.target.value })
           }
         />
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+        <Box
+          sx={{ display: "flex", justifyContent: "flex-end", mt: 2, gap: 2 }}
+        >
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={handleTestConnection}
+            disabled={testing || !emailSettings.smtpServer}
+          >
+            {testing ? "Testing..." : "Test Connection"}
+          </Button>
           <Button variant="contained" color="primary" onClick={handleSave}>
             Save Email Settings
           </Button>

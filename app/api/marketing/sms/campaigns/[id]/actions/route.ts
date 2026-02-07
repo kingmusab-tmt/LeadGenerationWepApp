@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   try {
@@ -25,7 +25,7 @@ export async function POST(
     if (!campaign)
       return NextResponse.json(
         { error: "Campaign not found" },
-        { status: 404 }
+        { status: 404 },
       );
     if (campaign.userId !== session.user.id)
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -36,7 +36,7 @@ export async function POST(
         return NextResponse.json({ error: result.message }, { status: 400 });
       return NextResponse.json(
         { message: result.message, sent: result.sent, failed: result.failed },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -46,7 +46,7 @@ export async function POST(
       if (!testPhone)
         return NextResponse.json(
           { error: "Test phone required" },
-          { status: 400 }
+          { status: 400 },
         );
       const result = await smsMarketingEngine.sendTestSms(id, testPhone);
       if (!result.success)
@@ -58,12 +58,31 @@ export async function POST(
       if (campaign.status !== "sending")
         return NextResponse.json(
           { error: "Campaign is not currently sending" },
-          { status: 400 }
+          { status: 400 },
         );
       await SmsCampaign.findByIdAndUpdate(id, { status: "paused" });
       return NextResponse.json(
         { message: "Campaign paused successfully" },
-        { status: 200 }
+        { status: 200 },
+      );
+    }
+
+    if (action === "resume") {
+      if (campaign.status !== "paused")
+        return NextResponse.json(
+          { error: "Campaign is not paused" },
+          { status: 400 },
+        );
+      await SmsCampaign.findByIdAndUpdate(id, { status: "sending" });
+      // Resume sending remaining queue items
+      const result = await smsMarketingEngine.sendCampaignImmediate(id);
+      return NextResponse.json(
+        {
+          message: "Campaign resumed",
+          sent: result.sent || 0,
+          failed: result.failed || 0,
+        },
+        { status: 200 },
       );
     }
 
@@ -72,7 +91,7 @@ export async function POST(
     console.error("Error processing SMS campaign action:", error);
     return NextResponse.json(
       { error: "Failed to process action" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

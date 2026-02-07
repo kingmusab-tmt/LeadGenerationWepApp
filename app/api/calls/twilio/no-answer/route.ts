@@ -5,12 +5,21 @@ import Call from "@/models/call";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import { getNextRoundRobinBuyerAtomic, debugLog } from "@/utils/callHandlers";
+import {
+  callSecurityMiddleware,
+  CALL_DEFAULTS,
+} from "@/lib/security/callSecurity";
 
 export async function POST(req: NextRequest) {
   try {
-    await dbConnect();
+    // Security checks
+    const securityResponse = await callSecurityMiddleware(req, {
+      rateLimit: true,
+      validateWebhook: true,
+    });
+    if (securityResponse) return securityResponse;
 
-    // Parse URL-encoded data from the request body
+    await dbConnect();
     const formData = await req.formData();
     const callSid = formData.get("CallSid") as string; // New CallSid for this forwarded leg
     const callStatus = formData.get("CallStatus") as string; // Call status (e.g., "no-answer")
@@ -66,7 +75,7 @@ export async function POST(req: NextRequest) {
       if (forwardingType === "direct") {
         const buyers = await Buyer.find({
           _id: { $in: seller.buyers },
-          "leadPreferences.industry": industry,
+          "leadPreferences.industries": industry,
         });
 
         if (buyers.length === 0) {

@@ -47,6 +47,53 @@ function matchesBuyerCriteria(
   reasons?: string[],
   resolvedIndustry?: string,
 ): boolean {
+  // Check buyer's preferred distribution mode
+  // If buyer only wants "Manual", skip auto-assignment
+  if (buyer.preferredDistribution === "Manual") {
+    if (reasons) {
+      reasons.push("Buyer prefers manual distribution only");
+    }
+    return false;
+  }
+
+  // Check if buyer accepts call leads (if the lead came from a call source)
+  const isCallLead =
+    lead.leadSource?.toLowerCase().includes("call") ||
+    (lead.calls && lead.calls.length > 0);
+  if (isCallLead && buyer.acceptCallLeads === false) {
+    if (reasons) {
+      reasons.push("Buyer does not accept call-sourced leads");
+    }
+    return false;
+  }
+
+  // Check lead type preference (exclusive vs shared)
+  if (buyer.leadTypes && buyer.leadTypes.length > 0) {
+    const leadType = lead.exclusive ? "exclusive" : "shared";
+    if (!buyer.leadTypes.includes(leadType)) {
+      if (reasons) {
+        reasons.push(
+          `Lead type mismatch (lead: ${leadType}, buyer wants: ${buyer.leadTypes.join(", ")})`,
+        );
+      }
+      return false;
+    }
+  }
+
+  // Check max lead age (freshness)
+  if (buyer.maxLeadAge && buyer.maxLeadAge > 0 && lead.createdAt) {
+    const leadAgeHours =
+      (Date.now() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60);
+    if (leadAgeHours > buyer.maxLeadAge) {
+      if (reasons) {
+        reasons.push(
+          `Lead too old (${Math.round(leadAgeHours)}h > max ${buyer.maxLeadAge}h)`,
+        );
+      }
+      return false;
+    }
+  }
+
   // Check if buyer is in vacation mode
   if (buyer.vacationMode?.enabled) {
     const now = new Date();
@@ -166,6 +213,53 @@ function matchesBuyerCriteria(
     });
   }
 
+  // Check industry-service pairs (more granular than industry-only)
+  // If buyer has industryServicePairs configured, check that the lead's industry
+  // matches AND (optionally) the lead's service/niche matches one of the buyer's services
+  if (
+    buyer.leadPreferences?.industryServicePairs &&
+    buyer.leadPreferences.industryServicePairs.length > 0 &&
+    industryToMatch
+  ) {
+    const pairMatch = buyer.leadPreferences.industryServicePairs.some(
+      (pair) => {
+        if (pair.industry.toLowerCase() !== industryToMatch.toLowerCase()) {
+          return false;
+        }
+        // If the pair has no specific services, industry match is enough
+        if (!pair.services || pair.services.length === 0) {
+          return true;
+        }
+        // If lead has a leadSource or field that indicates a service, match it
+        const leadService =
+          lead.leadSource ||
+          lead.fields?.find(
+            (f) =>
+              f.label.toLowerCase().includes("service") ||
+              f.label.toLowerCase().includes("niche"),
+          )?.value;
+        if (!leadService) {
+          return true; // No service info on lead — industry match is enough
+        }
+        return pair.services.some(
+          (s) => s.toLowerCase() === String(leadService).toLowerCase(),
+        );
+      },
+    );
+
+    if (!pairMatch) {
+      if (reasons) {
+        reasons.push(
+          `Industry-service pair mismatch (lead industry: ${industryToMatch})`,
+        );
+      }
+    }
+    preferenceChecks.push({
+      name: "industryServicePair",
+      matched: pairMatch,
+    });
+  }
+
   // Check location preferences (if strict matching enabled)
   if (
     buyer.locationMatchingStrict &&
@@ -267,44 +361,6 @@ function matchesBuyerCriteria(
     }
   }
 
-  // Check restricted zones (geographic exclusions)
-  if (
-    buyer.restrictedZones &&
-    buyer.restrictedZones.length > 0 &&
-    lead.location
-  ) {
-    const leadCity = lead.location.city?.toLowerCase();
-    const leadState = lead.location.state?.toLowerCase();
-    const leadZip = lead.location.zipCode;
-
-    const isInRestrictedZone = buyer.restrictedZones.some((zone) => {
-      const cityMatch = zone.city && zone.city.toLowerCase() === leadCity;
-      const stateMatch = zone.state && zone.state.toLowerCase() === leadState;
-      const zipMatch =
-        zone.zipCodes && leadZip && zone.zipCodes.includes(leadZip);
-
-      return cityMatch || stateMatch || zipMatch;
-    });
-
-    if (isInRestrictedZone) {
-      if (reasons) {
-        reasons.push("Lead location is in a restricted zone");
-      }
-      return false; // Lead is in a restricted zone
-    }
-  }
-
-  // Check excluded sources
-  if (
-    buyer.excludedSources &&
-    buyer.excludedSources.includes(lead.leadSource)
-  ) {
-    if (reasons) {
-      reasons.push(`Lead source excluded (${lead.leadSource})`);
-    }
-    return false;
-  }
-
   // Check wallet unit balance if there's a cost
   const estimatedCost = lead.unit || buyer.maxPricePerLead || 0;
   if (estimatedCost > 0) {
@@ -342,38 +398,150 @@ function matchesBuyerCriteria(
 
   // Check if buyer accepts leads only during business hours
   if (buyer.acceptOnlyDuringBusinessHours) {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTime = currentHour * 60 + currentMinute; // minutes since midnight
+    // Get current time in buyer's timezone (or fallback to server time)
+    let now: Date;
+    try {
+      const tzString = buyer.timezone || "America/New_York";
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: tzString,
+        hour: "numeric",
+        minute: "numeric",
+        hour12: false,
+        weekday: "long",
+      });
+      const parts = formatter.formatToParts(new Date());
+      const hourPart = parts.find((p) => p.type === "hour");
+      const minutePart = parts.find((p) => p.type === "minute");
+      const weekdayPart = parts.find((p) => p.type === "weekday");
 
-    const [startHour, startMinute] = buyer.workingHours.start
-      .split(":")
-      .map(Number);
-    const [endHour, endMinute] = buyer.workingHours.end.split(":").map(Number);
-    const startTime = startHour * 60 + startMinute;
-    const endTime = endHour * 60 + endMinute;
+      const currentHour = parseInt(hourPart?.value || "0", 10);
+      const currentMinute = parseInt(minutePart?.value || "0", 10);
+      const currentTime = currentHour * 60 + currentMinute;
+      const dayName = weekdayPart?.value || "";
 
-    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+      const isWeekend = dayName === "Saturday" || dayName === "Sunday";
 
-    // Check if buyer accepts on weekends
-    if (isWeekend && !buyer.notifyOnWeekends) {
-      if (reasons) {
-        reasons.push(
-          "Lead submitted on weekend and buyer does not accept weekends",
-        );
+      // Check weekly schedule first (more granular than simple workingHours)
+      if (buyer.weeklySchedule) {
+        const daySchedule =
+          buyer.weeklySchedule instanceof Map
+            ? buyer.weeklySchedule.get(dayName)
+            : (buyer.weeklySchedule as any)[dayName];
+
+        if (daySchedule) {
+          if (!daySchedule.enabled) {
+            if (reasons) {
+              reasons.push(`Buyer's ${dayName} schedule is disabled`);
+            }
+            return false;
+          }
+          const [schStartH, schStartM] = daySchedule.start
+            .split(":")
+            .map(Number);
+          const [schEndH, schEndM] = daySchedule.end.split(":").map(Number);
+          const schStart = schStartH * 60 + schStartM;
+          const schEnd = schEndH * 60 + schEndM;
+
+          if (currentTime < schStart || currentTime > schEnd) {
+            if (reasons) {
+              reasons.push(
+                `Outside ${dayName} schedule (${daySchedule.start}-${daySchedule.end}, buyer TZ: ${buyer.timezone || "America/New_York"})`,
+              );
+            }
+            return false;
+          }
+        } else {
+          // No specific day schedule — fall through to simple workingHours check below
+          if (isWeekend && !buyer.notifyOnWeekends) {
+            if (reasons) {
+              reasons.push(
+                "Lead submitted on weekend and buyer does not accept weekends",
+              );
+            }
+            return false;
+          }
+
+          const [startHour, startMinute] = buyer.workingHours.start
+            .split(":")
+            .map(Number);
+          const [endHour, endMinute] = buyer.workingHours.end
+            .split(":")
+            .map(Number);
+          const startTime = startHour * 60 + startMinute;
+          const endTime = endHour * 60 + endMinute;
+
+          if (currentTime < startTime || currentTime > endTime) {
+            if (reasons) {
+              reasons.push(
+                `Outside business hours (${buyer.workingHours.start}-${buyer.workingHours.end}, buyer TZ: ${buyer.timezone || "America/New_York"})`,
+              );
+            }
+            return false;
+          }
+        }
+      } else {
+        // No weekly schedule — use simple workingHours
+        if (isWeekend && !buyer.notifyOnWeekends) {
+          if (reasons) {
+            reasons.push(
+              "Lead submitted on weekend and buyer does not accept weekends",
+            );
+          }
+          return false;
+        }
+
+        const [startHour, startMinute] = buyer.workingHours.start
+          .split(":")
+          .map(Number);
+        const [endHour, endMinute] = buyer.workingHours.end
+          .split(":")
+          .map(Number);
+        const startTime = startHour * 60 + startMinute;
+        const endTime = endHour * 60 + endMinute;
+
+        if (currentTime < startTime || currentTime > endTime) {
+          if (reasons) {
+            reasons.push(
+              `Outside business hours (${buyer.workingHours.start}-${buyer.workingHours.end})`,
+            );
+          }
+          return false;
+        }
       }
-      return false; // Weekend and buyer doesn't accept weekend leads
-    }
+    } catch {
+      // Fallback to server time if timezone parsing fails
+      now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTime = currentHour * 60 + currentMinute;
+      const isWeekend = now.getDay() === 0 || now.getDay() === 6;
 
-    // Check if current time is within working hours
-    if (currentTime < startTime || currentTime > endTime) {
-      if (reasons) {
-        reasons.push(
-          `Outside business hours (${buyer.workingHours.start}-${buyer.workingHours.end})`,
-        );
+      if (isWeekend && !buyer.notifyOnWeekends) {
+        if (reasons) {
+          reasons.push(
+            "Lead submitted on weekend and buyer does not accept weekends",
+          );
+        }
+        return false;
       }
-      return false; // Outside business hours
+
+      const [startHour, startMinute] = buyer.workingHours.start
+        .split(":")
+        .map(Number);
+      const [endHour, endMinute] = buyer.workingHours.end
+        .split(":")
+        .map(Number);
+      const startTime = startHour * 60 + startMinute;
+      const endTime = endHour * 60 + endMinute;
+
+      if (currentTime < startTime || currentTime > endTime) {
+        if (reasons) {
+          reasons.push(
+            `Outside business hours (${buyer.workingHours.start}-${buyer.workingHours.end})`,
+          );
+        }
+        return false;
+      }
     }
   }
 
@@ -433,13 +601,10 @@ async function getMatchingBuyers(
             leadQualityScore: lead.qualityLevel,
             leadIndustry: resolvedIndustry,
             industries: (buyer as IBuyer).leadPreferences?.industries || [],
-            excludedSources: (buyer as IBuyer).excludedSources || [],
             locationMatchingStrict: (buyer as IBuyer).locationMatchingStrict,
             serviceLocationsCount:
               (buyer as IBuyer).serviceLocations?.length || 0,
             preferredZonesCount: (buyer as IBuyer).preferredZones?.length || 0,
-            restrictedZonesCount:
-              (buyer as IBuyer).restrictedZones?.length || 0,
             preferenceMatchingThreshold: (buyer as IBuyer)
               .preferenceMatchingThreshold,
             maxLeadsPerDay: (buyer as IBuyer).maxLeadsPerDay,

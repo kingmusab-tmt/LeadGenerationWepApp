@@ -211,18 +211,18 @@ const EmailCampaignSchema = new Schema<IEmailCampaign>(
     },
     htmlContent: {
       type: String,
-      required: true,
+      default: "",
     },
     textContent: {
       type: String,
     },
     fromName: {
       type: String,
-      required: true,
+      default: "",
     },
     fromEmail: {
       type: String,
-      required: true,
+      default: "",
     },
     replyTo: String,
     schedule: {
@@ -358,7 +358,7 @@ const EmailCampaignSchema = new Schema<IEmailCampaign>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Email Template Schema
@@ -397,7 +397,7 @@ const EmailTemplateSchema = new Schema<IEmailTemplate>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Email Segment Schema
@@ -428,7 +428,7 @@ const EmailSegmentSchema = new Schema<IEmailSegment>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Email Queue Schema
@@ -471,7 +471,7 @@ const EmailQueueSchema = new Schema<IEmailQueue>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Email Tracking Event Schema
@@ -520,7 +520,7 @@ const EmailTrackingEventSchema = new Schema<IEmailTrackingEvent>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Create Indexes for Performance
@@ -559,5 +559,5 @@ export const EmailTrackingEvent: Model<IEmailTrackingEvent> =
   mongoose.models.EmailTrackingEvent ||
   mongoose.model<IEmailTrackingEvent>(
     "EmailTrackingEvent",
-    EmailTrackingEventSchema
+    EmailTrackingEventSchema,
   );

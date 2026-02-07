@@ -42,6 +42,9 @@ export interface WebhookConfig {
     leadRejected?: boolean;
     buyerAssigned?: boolean;
     callCompleted?: boolean;
+    callForwarded?: boolean;
+    callVoicemail?: boolean;
+    callRefunded?: boolean;
     dealCreated?: boolean;
     dealUpdated?: boolean;
   };

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   try {
@@ -31,7 +31,7 @@ export async function POST(
     if (!campaign) {
       return NextResponse.json(
         { error: "Campaign not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -54,7 +54,7 @@ export async function POST(
           sent: result.sent,
           failed: result.failed,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -66,7 +66,7 @@ export async function POST(
       if (!testEmail) {
         return NextResponse.json(
           { error: "Test email address required" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -84,7 +84,7 @@ export async function POST(
       if (campaign.status !== "sending") {
         return NextResponse.json(
           { error: "Campaign is not currently sending" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -94,7 +94,40 @@ export async function POST(
 
       return NextResponse.json(
         { message: "Campaign paused successfully" },
-        { status: 200 }
+        { status: 200 },
+      );
+    }
+
+    // ==================== RESUME ====================
+    if (action === "resume") {
+      if (campaign.status !== "paused") {
+        return NextResponse.json(
+          { error: "Campaign is not paused" },
+          { status: 400 },
+        );
+      }
+
+      await EmailCampaign.findByIdAndUpdate(id, {
+        status: "sending",
+      });
+
+      // Continue processing remaining queue items
+      const result = await emailMarketingEngine.queueManager.processQueue(id);
+
+      // Update analytics.sent
+      if (result.sent > 0) {
+        await EmailCampaign.findByIdAndUpdate(id, {
+          $inc: { "analytics.sent": result.sent },
+        });
+      }
+
+      return NextResponse.json(
+        {
+          message: `Campaign resumed. Sent ${result.sent} remaining emails.`,
+          sent: result.sent,
+          failed: result.failed,
+        },
+        { status: 200 },
       );
     }
 
@@ -103,7 +136,7 @@ export async function POST(
     console.error("Error processing campaign action:", error);
     return NextResponse.json(
       { error: "Failed to process action" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

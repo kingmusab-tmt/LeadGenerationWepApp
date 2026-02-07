@@ -24,6 +24,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import { Delete, Add, PlayCircle, Edit } from "@mui/icons-material";
 import axios from "axios";
@@ -35,6 +39,7 @@ interface Video {
   url: string;
   duration?: string;
   category?: string;
+  targetAudience?: "buyer" | "seller" | "both";
 }
 
 interface FAQ {
@@ -42,6 +47,7 @@ interface FAQ {
   question: string;
   answer: string;
   category?: string;
+  targetAudience?: "buyer" | "seller" | "both";
 }
 
 const HelpManagement = () => {
@@ -70,12 +76,14 @@ const HelpManagement = () => {
     url: "",
     duration: "",
     category: "",
+    targetAudience: "both" as "buyer" | "seller" | "both",
   });
 
   const [faqForm, setFaqForm] = useState({
     question: "",
     answer: "",
     category: "",
+    targetAudience: "both" as "buyer" | "seller" | "both",
   });
 
   const fetchVideos = async () => {
@@ -160,6 +168,7 @@ const HelpManagement = () => {
         url: item.url,
         duration: item.duration || "",
         category: item.category || "",
+        targetAudience: item.targetAudience || "both",
       });
     } else {
       // It's an FAQ
@@ -167,6 +176,7 @@ const HelpManagement = () => {
         question: item.question,
         answer: item.answer,
         category: item.category || "",
+        targetAudience: item.targetAudience || "both",
       });
     }
     setEditDialogOpen(true);
@@ -179,6 +189,7 @@ const HelpManagement = () => {
       url: "",
       duration: "",
       category: "",
+      targetAudience: "both",
     });
   };
 
@@ -187,6 +198,7 @@ const HelpManagement = () => {
       question: "",
       answer: "",
       category: "",
+      targetAudience: "both",
     });
   };
 
@@ -300,6 +312,26 @@ const HelpManagement = () => {
                       }
                       fullWidth
                     />
+                    <FormControl fullWidth>
+                      <InputLabel>Target Audience</InputLabel>
+                      <Select
+                        value={videoForm.targetAudience}
+                        onChange={(e) =>
+                          setVideoForm({
+                            ...videoForm,
+                            targetAudience: e.target.value as
+                              | "buyer"
+                              | "seller"
+                              | "both",
+                          })
+                        }
+                        label="Target Audience"
+                      >
+                        <MenuItem value="buyer">Buyer</MenuItem>
+                        <MenuItem value="seller">Seller</MenuItem>
+                        <MenuItem value="both">Both</MenuItem>
+                      </Select>
+                    </FormControl>
                     <Box display="flex" gap={2}>
                       <Button
                         type="submit"
@@ -355,6 +387,26 @@ const HelpManagement = () => {
                       }
                       fullWidth
                     />
+                    <FormControl fullWidth>
+                      <InputLabel>Target Audience</InputLabel>
+                      <Select
+                        value={faqForm.targetAudience}
+                        onChange={(e) =>
+                          setFaqForm({
+                            ...faqForm,
+                            targetAudience: e.target.value as
+                              | "buyer"
+                              | "seller"
+                              | "both",
+                          })
+                        }
+                        label="Target Audience"
+                      >
+                        <MenuItem value="buyer">Buyer</MenuItem>
+                        <MenuItem value="seller">Seller</MenuItem>
+                        <MenuItem value="both">Both</MenuItem>
+                      </Select>
+                    </FormControl>
                     <Box display="flex" gap={2}>
                       <Button
                         type="submit"
@@ -435,6 +487,19 @@ const HelpManagement = () => {
                               {video.duration && (
                                 <Chip label={video.duration} size="small" />
                               )}
+                              {video.targetAudience && (
+                                <Chip
+                                  label={`For: ${video.targetAudience.charAt(0).toUpperCase() + video.targetAudience.slice(1)}`}
+                                  size="small"
+                                  color={
+                                    video.targetAudience === "buyer"
+                                      ? "primary"
+                                      : video.targetAudience === "seller"
+                                        ? "secondary"
+                                        : "default"
+                                  }
+                                />
+                              )}
                             </Box>
                           </>
                         }
@@ -475,9 +540,24 @@ const HelpManagement = () => {
                             <Typography variant="body2" gutterBottom>
                               {faq.answer}
                             </Typography>
-                            {faq.category && (
-                              <Chip label={faq.category} size="small" />
-                            )}
+                            <Box display="flex" gap={1} mt={1}>
+                              {faq.category && (
+                                <Chip label={faq.category} size="small" />
+                              )}
+                              {faq.targetAudience && (
+                                <Chip
+                                  label={`For: ${faq.targetAudience.charAt(0).toUpperCase() + faq.targetAudience.slice(1)}`}
+                                  size="small"
+                                  color={
+                                    faq.targetAudience === "buyer"
+                                      ? "primary"
+                                      : faq.targetAudience === "seller"
+                                        ? "secondary"
+                                        : "default"
+                                  }
+                                />
+                              )}
+                            </Box>
                           </>
                         }
                       />

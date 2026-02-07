@@ -19,6 +19,7 @@
     "@google/generative-ai": "^0.24.1",
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
+    "@mui/material-nextjs": "^7.3.7",
     "@mui/x-data-grid": "^8.25.0",
     "@mui/x-date-pickers-pro": "^8.25.0",
     "@paypal/checkout-server-sdk": "^1.0.3",

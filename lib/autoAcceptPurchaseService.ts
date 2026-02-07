@@ -27,12 +27,131 @@ export interface AutoPurchaseResult {
 }
 
 /**
- * Check if lead matches buyer's criteria set
+ * Check if lead matches buyer's criteria set AND buyer's global preferences
  */
 function checkCriteriaMatch(
   lead: ILead,
   criteriaSet: IBuyerCriteriaSet,
+  buyer: IBuyer,
 ): boolean {
+  // ── Global Buyer Checks (not in criteria set) ──
+
+  // Vacation mode
+  if (buyer.vacationMode?.enabled) {
+    const now = new Date();
+    if (!buyer.vacationMode.pauseUntil || buyer.vacationMode.pauseUntil > now) {
+      if (buyer.vacationMode.autoReject) {
+        return false;
+      }
+    }
+  }
+
+  // Qualification score minimum
+  const qualityScoreMap: Record<string, number> = {
+    High: 100,
+    Medium: 60,
+    Low: 30,
+  };
+  const leadQualityScore = qualityScoreMap[lead.qualityLevel || "Medium"] || 60;
+  if (
+    buyer.qualificationScoreMinimum &&
+    leadQualityScore < buyer.qualificationScoreMinimum
+  ) {
+    return false;
+  }
+
+  // Max concurrent leads
+  if (
+    buyer.maxConcurrentLeads &&
+    buyer.currentLeads >= buyer.maxConcurrentLeads
+  ) {
+    return false;
+  }
+
+  // Period-based volume limit
+  if (
+    buyer.volumeLimitCount &&
+    buyer.volumeLimitCount > 0 &&
+    buyer.currentPeriodCount >= buyer.volumeLimitCount
+  ) {
+    return false;
+  }
+
+  // Period-based budget limit
+  if (buyer.budgetLimitAmount && buyer.budgetLimitAmount > 0) {
+    const estimatedCost = lead.unit || buyer.maxPricePerLead || 0;
+    if (buyer.currentPeriodSpent + estimatedCost > buyer.budgetLimitAmount) {
+      return false;
+    }
+  }
+
+  // Lead age / freshness
+  if (buyer.maxLeadAge && buyer.maxLeadAge > 0 && lead.createdAt) {
+    const leadAgeHours =
+      (Date.now() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60);
+    if (leadAgeHours > buyer.maxLeadAge) {
+      return false;
+    }
+  }
+
+  // Business hours / weekly schedule check
+  if (buyer.acceptOnlyDuringBusinessHours) {
+    try {
+      const tzString = buyer.timezone || "America/New_York";
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: tzString,
+        hour: "numeric",
+        minute: "numeric",
+        hour12: false,
+        weekday: "long",
+      });
+      const parts = formatter.formatToParts(new Date());
+      const hourPart = parts.find((p) => p.type === "hour");
+      const minutePart = parts.find((p) => p.type === "minute");
+      const weekdayPart = parts.find((p) => p.type === "weekday");
+
+      const currentTime =
+        parseInt(hourPart?.value || "0", 10) * 60 +
+        parseInt(minutePart?.value || "0", 10);
+      const dayName = weekdayPart?.value || "";
+      const isWeekend = dayName === "Saturday" || dayName === "Sunday";
+
+      if (buyer.weeklySchedule) {
+        const daySchedule =
+          buyer.weeklySchedule instanceof Map
+            ? buyer.weeklySchedule.get(dayName)
+            : (buyer.weeklySchedule as any)[dayName];
+
+        if (daySchedule) {
+          if (!daySchedule.enabled) return false;
+          const [sH, sM] = daySchedule.start.split(":").map(Number);
+          const [eH, eM] = daySchedule.end.split(":").map(Number);
+          if (currentTime < sH * 60 + sM || currentTime > eH * 60 + eM) {
+            return false;
+          }
+        } else {
+          if (isWeekend && !buyer.notifyOnWeekends) return false;
+          const [sH, sM] = buyer.workingHours.start.split(":").map(Number);
+          const [eH, eM] = buyer.workingHours.end.split(":").map(Number);
+          if (currentTime < sH * 60 + sM || currentTime > eH * 60 + eM) {
+            return false;
+          }
+        }
+      } else {
+        if (isWeekend && !buyer.notifyOnWeekends) return false;
+        const [sH, sM] = buyer.workingHours.start.split(":").map(Number);
+        const [eH, eM] = buyer.workingHours.end.split(":").map(Number);
+        if (currentTime < sH * 60 + sM || currentTime > eH * 60 + eM) {
+          return false;
+        }
+      }
+    } catch {
+      // Fallback: skip business-hours check on parse error
+    }
+  }
+
+  // ── Criteria Set Checks ──
+
   // Check lead types (exclusive vs shared)
   if (
     criteriaSet.leadTypes &&
@@ -95,15 +214,6 @@ function checkCriteriaMatch(
     if ((lead.soldCount || 0) >= criteriaSet.dailyLimit) {
       return false;
     }
-  }
-
-  // Check excluded sources
-  if (
-    criteriaSet.excludedSources &&
-    criteriaSet.excludedSources.length > 0 &&
-    criteriaSet.excludedSources.includes(lead.leadSource)
-  ) {
-    return false;
   }
 
   return true;
@@ -295,7 +405,13 @@ export async function processAutoAcceptPurchases(
         }
 
         // Check if lead matches criteria
-        if (!checkCriteriaMatch(lead, criteriaSet as IBuyerCriteriaSet)) {
+        if (
+          !checkCriteriaMatch(
+            lead,
+            criteriaSet as IBuyerCriteriaSet,
+            buyer as IBuyer,
+          )
+        ) {
           console.log(
             `✗ Lead ${lead._id} does not match criteria for buyer ${buyer._id}`,
           );

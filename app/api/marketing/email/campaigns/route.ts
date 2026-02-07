@@ -124,13 +124,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Create campaign
+    const recipientEmails = validatedData.recipientList || [];
     const campaign = new EmailCampaign({
       userId: session.user.id,
       name: validatedData.name,
       subject: validatedData.subject,
-      body: validatedData.body,
-      recipientEmails: validatedData.recipientList,
-      totalRecipients: validatedData.recipientList.length,
+      htmlContent: validatedData.htmlContent || validatedData.body || "",
+      fromEmail: validatedData.fromEmail || "",
+      recipientEmails,
+      totalRecipients: recipientEmails.length,
       status: "draft",
       schedule: validatedData.schedule || { type: "immediate" },
       tags: validatedData.tags || [],

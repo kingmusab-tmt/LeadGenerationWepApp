@@ -140,8 +140,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
     locationMatchingStrict: false,
     radiusFlexibility: "strict",
     preferenceMatchingThreshold: "moderate",
-    excludedSources: [],
-    restrictedZones: [],
     preferredZones: [],
     serviceLocations: [],
     weeklySchedule: {
@@ -156,9 +154,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
     maxLeadAge: 24,
     serviceRadius: 25,
     preferredContactMethods: ["phone", "email"],
-    blockDuplicateLeads: true,
-    duplicateCheckWindow: 30,
-    enableLeadFeedback: true,
     priorityBySource: [],
     priorityByIndustry: [],
     priorityByLocation: [],
@@ -216,8 +211,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
         radiusFlexibility: initialValues.radiusFlexibility || "strict",
         preferenceMatchingThreshold:
           initialValues.preferenceMatchingThreshold || "moderate",
-        excludedSources: initialValues.excludedSources || [],
-        restrictedZones: initialValues.restrictedZones || [],
         preferredZones: initialValues.preferredZones || [],
         serviceLocations: initialValues.serviceLocations || [],
         weeklySchedule: initialValues.weeklySchedule || {
@@ -235,15 +228,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
           "phone",
           "email",
         ],
-        blockDuplicateLeads:
-          initialValues.blockDuplicateLeads !== undefined
-            ? initialValues.blockDuplicateLeads
-            : true,
-        duplicateCheckWindow: initialValues.duplicateCheckWindow || 30,
-        enableLeadFeedback:
-          initialValues.enableLeadFeedback !== undefined
-            ? initialValues.enableLeadFeedback
-            : true,
         priorityBySource: initialValues.priorityBySource || [],
         priorityByIndustry: initialValues.priorityByIndustry || [],
         priorityByLocation: initialValues.priorityByLocation || [],
@@ -392,40 +376,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
     setFormData((prev) => ({
       ...prev,
       [name]: checked,
-    }));
-  };
-
-  const handleRestrictedZoneChange = (
-    field: "city" | "state" | "zipCodes",
-    value: string | string[],
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      restrictedZones: [
-        {
-          city:
-            field === "city"
-              ? Array.isArray(value)
-                ? value.join(", ")
-                : value
-              : prev.restrictedZones?.[0]?.city || "",
-          state:
-            field === "state"
-              ? Array.isArray(value)
-                ? value.join(", ")
-                : value
-              : prev.restrictedZones?.[0]?.state || "",
-          zipCodes:
-            field === "zipCodes"
-              ? typeof value === "string"
-                ? value
-                    .split(",")
-                    .map((z) => z.trim())
-                    .filter(Boolean)
-                : value
-              : prev.restrictedZones?.[0]?.zipCodes || [],
-        },
-      ],
     }));
   };
 
@@ -618,99 +568,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                         </Typography>
                       )}
                     </FormControl>
-                  </Grid>
-
-                  {/* RESTRICTED LOCATIONS (EXCLUDE) */}
-                  <Grid size={{ xs: 12 }}>
-                    <Typography
-                      variant="subtitle1"
-                      color="error"
-                      gutterBottom
-                      sx={{ mt: 2 }}
-                    >
-                      ❌ Restricted Locations (Exclude These)
-                    </Typography>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Restricted Cities</InputLabel>
-                      <Select
-                        name="restrictedCities"
-                        value={
-                          formData.restrictedZones?.[0]?.city
-                            ?.split(", ")
-                            .filter(Boolean) || []
-                        }
-                        onChange={(e) =>
-                          handleRestrictedZoneChange("city", e.target.value)
-                        }
-                        label="Restricted Cities"
-                        multiple
-                      >
-                        {usCities.map((city) => (
-                          <MenuItem key={city} value={city}>
-                            {city}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        sx={{ mt: 0.5 }}
-                      >
-                        Cities to exclude from leads
-                      </Typography>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Restricted States</InputLabel>
-                      <Select
-                        name="restrictedStates"
-                        value={
-                          formData.restrictedZones?.[0]?.state
-                            ?.split(", ")
-                            .filter(Boolean) || []
-                        }
-                        onChange={(e) =>
-                          handleRestrictedZoneChange("state", e.target.value)
-                        }
-                        label="Restricted States"
-                        multiple
-                      >
-                        {US_STATES.map((state) => (
-                          <MenuItem key={state} value={state}>
-                            {state}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        sx={{ mt: 0.5 }}
-                      >
-                        States to exclude from leads
-                      </Typography>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid size={{ xs: 12 }}>
-                    <TextField
-                      label="Restricted Zip Codes"
-                      name="restrictedZipCodes"
-                      value={
-                        formData.restrictedZones?.[0]?.zipCodes?.join(", ") ||
-                        ""
-                      }
-                      onChange={(e) =>
-                        handleRestrictedZoneChange("zipCodes", e.target.value)
-                      }
-                      fullWidth
-                      placeholder="e.g. 90001, 90002"
-                      helperText="Zipcodes to exclude (comma separated)"
-                    />
                   </Grid>
 
                   {/* PREFERRED LOCATIONS (INCLUDE ONLY) */}

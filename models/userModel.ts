@@ -175,6 +175,7 @@ const UserSchema: Schema = new Schema<IUser>(
     creditSetup: CreditSetupSchema,
     unitPricingOptions: UnitPricingSchema,
     callChargeOptions: CallChargeSchema,
+    holdMusicUrl: { type: String, default: "" },
     stripeCustomerId: { type: String },
     paypalCustomerId: { type: String },
     subscription: SubscriptionSchema,

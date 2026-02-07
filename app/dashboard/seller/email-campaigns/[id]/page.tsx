@@ -15,9 +15,14 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { Send as SendIcon, Save as SaveIcon } from "@mui/icons-material";
 import { toast } from "react-toastify";
+import RecipientPicker from "@/app/components/RecipientPicker";
 
 interface CampaignDetail {
   _id: string;
@@ -27,6 +32,7 @@ interface CampaignDetail {
   textContent: string;
   fromName: string;
   fromEmail: string;
+  recipientEmails: string[];
   status: string;
   totalRecipients: number;
   analytics: {
@@ -49,12 +55,22 @@ interface AnalyticsData {
   };
 }
 
+interface TemplateItem {
+  _id: string;
+  name: string;
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+  category: string;
+}
+
 export default function CampaignEditor() {
   const params = useParams();
   const campaignId = params.id as string;
 
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tabValue, setTabValue] = useState(0);
@@ -63,18 +79,26 @@ export default function CampaignEditor() {
     subject: "",
     htmlContent: "",
     textContent: "",
+    fromEmail: "",
+    fromName: "",
+    recipientList: "",
   });
 
   const fetchCampaign = useCallback(async () => {
     try {
-      const response = await fetch(`/api/email-campaigns/${campaignId}`);
+      const response = await fetch(
+        `/api/marketing/email/campaigns/${campaignId}`,
+      );
       const data = await response.json();
       setCampaign(data);
       setFormData({
         name: data.name,
         subject: data.subject,
-        htmlContent: data.htmlContent,
-        textContent: data.textContent,
+        htmlContent: data.htmlContent || "",
+        textContent: data.textContent || "",
+        fromEmail: data.fromEmail || "",
+        fromName: data.fromName || "",
+        recipientList: (data.recipientEmails || []).join(", "),
       });
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
@@ -87,7 +111,7 @@ export default function CampaignEditor() {
   const fetchAnalytics = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/email-campaigns/${campaignId}/analytics`,
+        `/api/marketing/email/campaigns/${campaignId}/analytics`,
       );
       const data = await response.json();
       setAnalytics(data);
@@ -97,19 +121,48 @@ export default function CampaignEditor() {
     }
   }, [campaignId]);
 
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const response = await fetch("/api/marketing/email/templates");
+      const data = await response.json();
+      setTemplates(data || []);
+    } catch {
+      // Templates are optional — don't block
+    }
+  }, []);
+
   useEffect(() => {
     void fetchCampaign();
     void fetchAnalytics();
-  }, [fetchCampaign, fetchAnalytics]);
+    void fetchTemplates();
+  }, [fetchCampaign, fetchAnalytics, fetchTemplates]);
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await fetch(`/api/email-campaigns/${campaignId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      // Parse recipients from comma-separated string
+      const recipientArray = formData.recipientList
+        .split(",")
+        .map((e) => e.trim())
+        .filter((e) => e.length > 0);
+
+      const response = await fetch(
+        `/api/marketing/email/campaigns/${campaignId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            subject: formData.subject,
+            htmlContent: formData.htmlContent,
+            textContent: formData.textContent,
+            fromEmail: formData.fromEmail || undefined,
+            fromName: formData.fromName || undefined,
+            recipientList:
+              recipientArray.length > 0 ? recipientArray : undefined,
+          }),
+        },
+      );
 
       if (!response.ok) throw new Error("Failed to save campaign");
 
@@ -135,7 +188,7 @@ export default function CampaignEditor() {
     try {
       setSaving(true);
       const response = await fetch(
-        `/api/email-campaigns/${campaignId}/actions?action=send`,
+        `/api/marketing/email/campaigns/${campaignId}/actions?action=send`,
         {
           method: "POST",
         },
@@ -209,7 +262,7 @@ export default function CampaignEditor() {
       {tabValue === 0 && (
         <Box>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 label="Campaign Name"
                 value={formData.name}
@@ -220,7 +273,7 @@ export default function CampaignEditor() {
                 disabled={campaign.status !== "draft"}
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 label="Subject Line"
                 value={formData.subject}
@@ -231,6 +284,76 @@ export default function CampaignEditor() {
                 disabled={campaign.status !== "draft"}
               />
             </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                label="From Email"
+                value={formData.fromEmail}
+                onChange={(e) =>
+                  setFormData({ ...formData, fromEmail: e.target.value })
+                }
+                fullWidth
+                disabled={campaign.status !== "draft"}
+                helperText="Sender email address (uses SMTP settings default if empty)"
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                label="From Name"
+                value={formData.fromName}
+                onChange={(e) =>
+                  setFormData({ ...formData, fromName: e.target.value })
+                }
+                fullWidth
+                disabled={campaign.status !== "draft"}
+                helperText="Display name for the sender"
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <RecipientPicker
+                value={formData.recipientList}
+                onChange={(val) =>
+                  setFormData({ ...formData, recipientList: val })
+                }
+                disabled={campaign.status !== "draft"}
+              />
+            </Grid>
+            {/* Template Picker */}
+            {campaign.status === "draft" && templates.length > 0 && (
+              <Grid size={{ xs: 12 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Load Template</InputLabel>
+                  <Select
+                    value=""
+                    onChange={async (e) => {
+                      const templateId = e.target.value;
+                      if (!templateId) return;
+                      try {
+                        const response = await fetch(
+                          `/api/marketing/email/templates/${templateId}`,
+                        );
+                        const tmpl = await response.json();
+                        setFormData((prev) => ({
+                          ...prev,
+                          subject: tmpl.subject || prev.subject,
+                          htmlContent: tmpl.htmlContent || prev.htmlContent,
+                          textContent: tmpl.textContent || prev.textContent,
+                        }));
+                        toast.success("Template loaded into campaign");
+                      } catch {
+                        toast.error("Failed to load template");
+                      }
+                    }}
+                    label="Load Template"
+                  >
+                    {templates.map((t) => (
+                      <MenuItem key={t._id} value={t._id}>
+                        {t.name} ({t.category})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
             <Grid size={{ xs: 12 }}>
               <TextField
                 label="HTML Content"

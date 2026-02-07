@@ -5,22 +5,53 @@ import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
+import { Buyer } from "@/models/leadbuyers";
 import Call from "@/models/call";
 import {
   debugLog,
   getDialParams,
+  getWhisperUrl,
+  dialWithWhisper,
   getNextRoundRobinBuyerAtomic,
   createCallRecord,
   updateAnsweredCall,
   sendNotifications,
   checkBuyerUnitBalance,
+  isBuyerInBusinessHours,
+  isBuyerOnVacation,
+  addVoicemailToTwiml,
+  addOverflowToTwiml,
 } from "@/utils/callHandlers";
+import {
+  callSecurityMiddleware,
+  CALL_DEFAULTS,
+} from "@/lib/security/callSecurity";
+import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
+import {
+  checkSpamStatus,
+  isOnDncList,
+  sendMissedCallTextBack,
+  createScheduledCallback,
+  extractGeoData,
+  doesBuyerServiceArea,
+  isBuyerAtConcurrentLimit,
+  markCallActive,
+  markCallInactive,
+} from "@/utils/callFeatureServices";
+import { processCallAIAnalysis } from "@/lib/callAIAnalysis";
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   debugLog("Incoming call request received");
 
   try {
+    // Security checks: rate limiting + webhook signature validation
+    const securityResponse = await callSecurityMiddleware(req, {
+      rateLimit: true,
+      validateWebhook: true,
+    });
+    if (securityResponse) return securityResponse;
+
     await dbConnect();
     debugLog("Database connection established");
 
@@ -160,9 +191,137 @@ async function handleNewCall(
     forwardingNumbers,
     leadBuyers,
     recordCall,
+    reconnectCaller,
     welcomeMessage,
     passCallerId,
+    callWhisper,
+    requireResponse,
+    buyerResponses,
+    overflowNumber,
+    // Seller working hours
+    enableWorkingHours,
+    workingHoursStart,
+    workingHoursEnd,
+    // New feature flags
+    recordingConsent,
+    recordingConsentMessage,
+    missedCallTextBack,
+    missedCallTextMessage,
+    dncEnabled,
+    dncList,
+    spamFilterEnabled,
+    spamFilterAction,
+    scheduledCallbackEnabled,
+    scheduledCallbackDigit,
+    multiRingEnabled,
+    geoRoutingEnabled,
+    concurrentCallLimit,
+    transcriptionEnabled,
+    aiSummaryEnabled,
   } = trackingNumber;
+
+  // ─── DNC List Check ───
+  if (dncEnabled && isOnDncList(from, dncList)) {
+    debugLog("Caller is on DNC list — rejecting", { from });
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("This number is not able to receive your call. Goodbye.");
+    twiml.hangup();
+    return new NextResponse(twiml.toString(), {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  // ─── Spam Detection ───
+  const stirVerstat = formData.get("StirVerstat") as string;
+  const geoData = extractGeoData(from);
+  const spamCheck = spamFilterEnabled
+    ? checkSpamStatus(stirVerstat, from)
+    : { isSpam: false, stirVerstat: stirVerstat || "", spamScore: 0 };
+
+  if (spamFilterEnabled && spamCheck.isSpam && spamFilterAction === "block") {
+    debugLog("Spam call blocked", {
+      from,
+      spamScore: spamCheck.spamScore,
+      reason: spamCheck.reason,
+    });
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("We are unable to take your call at this time. Goodbye.");
+    twiml.hangup();
+    // Create a record for tracking
+    await createCallRecord({
+      callSid,
+      userId: String(seller._id),
+      from,
+      to,
+      status: "spam_blocked",
+      callRecorded: false,
+      forwardingType,
+      forwardingNumbers,
+      leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
+      industry,
+      insufficientBalance: false,
+    });
+    return new NextResponse(twiml.toString(), {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  // ─── Seller Working Hours Check ───
+  if (enableWorkingHours && workingHoursStart && workingHoursEnd) {
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    if (currentTime < workingHoursStart || currentTime >= workingHoursEnd) {
+      debugLog("Call outside seller working hours", {
+        currentTime,
+        workingHoursStart,
+        workingHoursEnd,
+      });
+      const afterHoursTwiml = new twilio.twiml.VoiceResponse();
+      // Try overflow number first, then voicemail
+      if (overflowNumber) {
+        addOverflowToTwiml(afterHoursTwiml, {
+          overflowNumber,
+          sellerId,
+          callSid,
+          from,
+          passCallerId,
+          recordCall,
+        });
+      } else {
+        afterHoursTwiml.say(
+          "We are currently outside of business hours. Please leave a message after the beep.",
+        );
+        addVoicemailToTwiml(afterHoursTwiml, { sellerId, callSid });
+      }
+      // Send missed-call text-back if configured
+      if (missedCallTextBack) {
+        const msg =
+          missedCallTextMessage ||
+          "Sorry we missed your call! We are currently outside business hours and will get back to you shortly.";
+        sendMissedCallTextBack(from, msg, callSid);
+      }
+      // Record the call
+      await createCallRecord({
+        callSid,
+        userId: String(seller._id),
+        from,
+        to,
+        status: "after_hours",
+        callRecorded: false,
+        forwardingType,
+        forwardingNumbers,
+        leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
+        industry,
+        insufficientBalance: false,
+      });
+      return new NextResponse(afterHoursTwiml.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+  }
 
   debugLog("Tracking number configuration", {
     industry,
@@ -172,7 +331,35 @@ async function handleNewCall(
     recordCall,
     welcomeMessage: !!welcomeMessage,
     passCallerId,
+    callWhisper: !!callWhisper,
+    requireResponse,
+    spamScore: spamCheck.spamScore,
+    geoData,
   });
+
+  // Build whisper/screening URL if configured
+  const whisperUrl = getWhisperUrl({
+    callWhisper,
+    requireResponse,
+    buyerResponses,
+    sellerId,
+    callSid,
+  });
+
+  // Add spam warning to whisper if configured
+  const effectiveWhisperUrl =
+    spamFilterEnabled &&
+    spamCheck.spamScore >= 60 &&
+    spamFilterAction === "warn"
+      ? getWhisperUrl({
+          callWhisper:
+            `⚠ Possible spam call (score: ${spamCheck.spamScore}). ${callWhisper || ""}`.trim(),
+          requireResponse,
+          buyerResponses,
+          sellerId,
+          callSid,
+        })
+      : whisperUrl;
 
   // Initialize TwiML response
   const twiml = new twilio.twiml.VoiceResponse();
@@ -180,10 +367,108 @@ async function handleNewCall(
   let newBuyerId = "";
   let insufficientBalance = false;
 
+  // Play recording consent announcement if enabled
+  if (recordingConsent && recordCall) {
+    const consent =
+      recordingConsentMessage ||
+      "This call may be recorded for quality and training purposes.";
+    twiml.say(consent);
+    debugLog("Recording consent played", { consent });
+  }
+
   // Play welcome message if set
   if (welcomeMessage) {
     twiml.say(welcomeMessage);
     debugLog("Welcome message added to TwiML", { welcomeMessage });
+  }
+
+  // ─── Helper: check eligibility for a buyer (vacation, hours, balance, geo, concurrent) ───
+  async function isBuyerEligible(
+    buyerDoc: any,
+    buyerId: string,
+  ): Promise<boolean> {
+    if (buyerDoc && isBuyerOnVacation(buyerDoc)) {
+      debugLog("Skipping buyer on vacation", { buyerId });
+      return false;
+    }
+    if (buyerDoc && !isBuyerInBusinessHours(buyerDoc)) {
+      debugLog("Skipping buyer outside business hours", { buyerId });
+      return false;
+    }
+    // Geo-routing check
+    if (
+      geoRoutingEnabled &&
+      buyerDoc &&
+      !doesBuyerServiceArea(buyerDoc, geoData)
+    ) {
+      debugLog("Skipping buyer — geo mismatch", {
+        buyerId,
+        callerArea: geoData,
+      });
+      return false;
+    }
+    // Concurrent call limit check
+    if (
+      concurrentCallLimit &&
+      concurrentCallLimit > 0 &&
+      (await isBuyerAtConcurrentLimit(buyerId, concurrentCallLimit))
+    ) {
+      debugLog("Skipping buyer — at concurrent limit", {
+        buyerId,
+        limit: concurrentCallLimit,
+      });
+      return false;
+    }
+    try {
+      const { hasSufficientBalance } = await checkBuyerUnitBalance(
+        buyerId,
+        callRate.units,
+      );
+      return hasSufficientBalance;
+    } catch (error) {
+      debugLog("Error checking buyer balance", { buyerId, error }, "warn");
+      return false;
+    }
+  }
+
+  // ─── Helper: handle no-buyer fallback (overflow → callback IVR → voicemail + text-back) ───
+  function handleNoBuyersFallback() {
+    insufficientBalance = true;
+    if (overflowNumber) {
+      addOverflowToTwiml(twiml, {
+        overflowNumber,
+        sellerId,
+        callSid,
+        from,
+        passCallerId,
+        recordCall,
+      });
+      debugLog("No buyers — overflow to external", { overflowNumber }, "warn");
+    } else if (scheduledCallbackEnabled) {
+      // Offer callback option before voicemail
+      const cbDigit = scheduledCallbackDigit || "1";
+      const gather = twiml.gather({
+        numDigits: 1,
+        action: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/callback-request?sellerId=${sellerId}&callSid=${callSid}&from=${encodeURIComponent(from)}&trackingNumber=${encodeURIComponent(to)}&industry=${encodeURIComponent(industry)}`,
+        method: "POST",
+        timeout: 5,
+      });
+      gather.say(
+        `No one is available right now. Press ${cbDigit} to request a callback, or stay on the line to leave a message.`,
+      );
+      // If no input, fall through to voicemail
+      addVoicemailToTwiml(twiml, { sellerId, callSid });
+    } else {
+      addVoicemailToTwiml(twiml, { sellerId, callSid });
+    }
+
+    // Send missed-call text-back (non-blocking)
+    if (missedCallTextBack) {
+      const msg =
+        missedCallTextMessage ||
+        "Sorry we missed your call! A representative will call you back shortly.";
+      sendMissedCallTextBack(from, msg, callSid);
+    }
   }
 
   // Handle different forwarding types
@@ -195,8 +480,23 @@ async function handleNewCall(
         industry,
         callRate,
       );
+
+      // Additional eligibility checks (geo, concurrent)
+      const buyerDoc = await Buyer.findById(buyer._id);
+      if (
+        (geoRoutingEnabled ||
+          (concurrentCallLimit && concurrentCallLimit > 0)) &&
+        buyerDoc &&
+        !(await isBuyerEligible(buyerDoc, buyer._id.toString()))
+      ) {
+        throw new Error("Buyer not eligible after extended checks");
+      }
+
       forwardedTo = buyer.phone;
       newBuyerId = buyer._id.toString();
+
+      // Mark call as active for concurrent tracking
+      markCallActive(newBuyerId, callSid);
 
       const dialParams = getDialParams({
         from,
@@ -206,14 +506,11 @@ async function handleNewCall(
         passCallerId,
         recordCall,
       });
-      twiml.dial(dialParams, forwardedTo);
+      dialWithWhisper(twiml, forwardedTo, dialParams, effectiveWhisperUrl);
     } catch (error) {
-      insufficientBalance = true;
-      twiml.say(
-        "No available buyers with sufficient balance. Please try again later.",
-      );
+      handleNoBuyersFallback();
       debugLog(
-        "No buyers with sufficient balance",
+        "No buyers available for direct forwarding",
         { error: error instanceof Error ? error.message : "Unknown error" },
         "warn",
       );
@@ -230,40 +527,58 @@ async function handleNewCall(
         passCallerId,
         recordCall,
       });
-      twiml.dial(dialParams, num);
+      dialWithWhisper(twiml, num, dialParams, effectiveWhisperUrl);
       if (index < forwardingNumbers.length - 1) {
         twiml.pause({ length: 1 });
       }
     });
     forwardedTo = forwardingNumbers.join(", ");
   } else if (forwardingType === "specific_lead" && leadBuyers?.length) {
-    // Filter lead buyers with sufficient balance
+    // Look up full buyer documents to check availability
+    const buyerIds = leadBuyers.map((b: { id: string }) => b.id);
+    const buyerDocs = await Buyer.find({ _id: { $in: buyerIds } });
+    const buyerDocMap = new Map(buyerDocs.map((b) => [b._id.toString(), b]));
+
+    // Filter lead buyers with all eligibility checks
     const eligibleBuyers = [];
     for (const buyer of leadBuyers) {
-      try {
-        const { hasSufficientBalance } = await checkBuyerUnitBalance(
-          buyer.id.toString(),
-          callRate.units,
-        );
-        if (hasSufficientBalance) {
-          eligibleBuyers.push(buyer);
-        }
-      } catch (error) {
-        debugLog(
-          "Error checking buyer balance",
-          { buyerId: buyer.id, error },
-          "warn",
-        );
+      const buyerDoc = buyerDocMap.get(buyer.id.toString());
+      if (await isBuyerEligible(buyerDoc, buyer.id.toString())) {
+        eligibleBuyers.push(buyer);
       }
     }
 
     if (eligibleBuyers.length === 0) {
-      insufficientBalance = true;
-      twiml.say(
-        "No available buyers with sufficient balance. Please try again later.",
-      );
-      debugLog("No eligible buyers with sufficient balance", null, "warn");
+      handleNoBuyersFallback();
+      debugLog("No eligible buyers — filtered by all criteria", null, "warn");
+    } else if (multiRingEnabled && eligibleBuyers.length > 1) {
+      // ─── Multi-Ring: ring all eligible buyers simultaneously ───
+      const dialParams = getDialParams({
+        from,
+        sellerId,
+        callSid,
+        buyerId: eligibleBuyers[0].id.toString(),
+        passCallerId,
+        recordCall,
+      });
+      const dial = twiml.dial(dialParams);
+      eligibleBuyers.forEach((buyer) => {
+        const numAttrs: Record<string, string> = {};
+        if (effectiveWhisperUrl) {
+          numAttrs.url = effectiveWhisperUrl;
+          numAttrs.method = "POST";
+        }
+        dial.number(numAttrs, buyer.phone);
+        markCallActive(buyer.id.toString(), callSid);
+      });
+      forwardedTo = eligibleBuyers.map((b) => b.phone).join(", ");
+      newBuyerId = eligibleBuyers[0]?.id;
+      debugLog("Multi-ring initiated", {
+        buyerCount: eligibleBuyers.length,
+        numbers: forwardedTo,
+      });
     } else {
+      // Sequential dial
       eligibleBuyers.forEach((buyer, index) => {
         const dialParams = getDialParams({
           from,
@@ -273,7 +588,8 @@ async function handleNewCall(
           passCallerId,
           recordCall,
         });
-        twiml.dial(dialParams, buyer.phone);
+        dialWithWhisper(twiml, buyer.phone, dialParams, effectiveWhisperUrl);
+        markCallActive(buyer.id.toString(), callSid);
         if (index < eligibleBuyers.length - 1) {
           twiml.pause({ length: 1 });
         }
@@ -286,7 +602,7 @@ async function handleNewCall(
     debugLog("No forwarding rules configured. Call ended.", null, "warn");
   }
 
-  // Create call record
+  // Create call record with all new fields
   const newCall = await createCallRecord({
     callSid,
     userId: String(seller._id),
@@ -302,7 +618,33 @@ async function handleNewCall(
     insufficientBalance,
   });
 
+  // Update call with geo/spam data (non-blocking)
+  Call.updateOne(
+    { callSid },
+    {
+      $set: {
+        callerAreaCode: geoData.areaCode,
+        callerCity: geoData.city || "",
+        callerState: geoData.state || "",
+        stirVerstat: spamCheck.stirVerstat,
+        spamScore: spamCheck.spamScore,
+        flaggedAsSpam: spamCheck.isSpam,
+      },
+    },
+  ).catch(() => {});
+
   debugLog("New call record created", { callId: newCall._id });
+
+  // Fire call webhook (non-blocking)
+  dispatchCallWebhook(String(seller._id), "callForwarded", {
+    callSid,
+    from,
+    to: forwardedTo || to,
+    status: insufficientBalance ? "insufficient_balance" : "forwarded",
+    industry,
+    buyerId: newBuyerId,
+    forwardingType,
+  });
 
   // Send notifications
   await sendNotifications(
@@ -330,6 +672,11 @@ async function handleNoAnswer(
   callRate?: { units: number; seconds: number },
 ) {
   debugLog("Handling no-answer scenario", { callSid, buyerId });
+
+  // Mark buyer call inactive for concurrent tracking
+  if (buyerId) {
+    markCallInactive(buyerId, callSid);
+  }
 
   // Find the original call record
   const originalCall = await Call.findOne({ callSid });
@@ -359,8 +706,73 @@ async function handleNoAnswer(
 
   const twiml = new twilio.twiml.VoiceResponse();
 
+  // Look up tracking number config for overflow + feature flags
+  const trackingConfig = seller.trackingNumbers?.find(
+    (num: { phoneNumber: string }) => num.phoneNumber === to,
+  );
+  const overflowNumber = trackingConfig?.overflowNumber || "";
+  const reconnectEnabled = trackingConfig?.reconnectCaller || false;
+  const missedCallTextBack = trackingConfig?.missedCallTextBack || false;
+  const missedCallTextMessage = trackingConfig?.missedCallTextMessage || "";
+  const scheduledCallbackEnabled =
+    trackingConfig?.scheduledCallbackEnabled || false;
+  const scheduledCallbackDigit = trackingConfig?.scheduledCallbackDigit || "1";
+  const geoRoutingEnabled = trackingConfig?.geoRoutingEnabled || false;
+  const concurrentCallLimit = trackingConfig?.concurrentCallLimit || 0;
+  const multiRingEnabled = trackingConfig?.multiRingEnabled || false;
+
+  // Extract geo data for geo-routing in retry
+  const geoData = geoRoutingEnabled ? extractGeoData(from) : null;
+
+  // Helper: no-answer fallback (overflow → callback IVR → voicemail + text-back)
+  const handleNoAnswerFallback = () => {
+    if (overflowNumber) {
+      addOverflowToTwiml(twiml, {
+        overflowNumber,
+        sellerId: seller._id as string,
+        callSid,
+        from,
+        passCallerId,
+        recordCall: callRecorded,
+      });
+      debugLog("No-answer fallback: overflow", { overflowNumber });
+    } else if (scheduledCallbackEnabled) {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "";
+      twiml.say("All of our representatives are currently unavailable.");
+      const gather = twiml.gather({
+        numDigits: 1,
+        timeout: 5,
+        action: `${baseUrl}/api/calls/twilio/callback-request?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&sellerId=${seller._id}&industry=${industry || ""}`,
+        method: "POST",
+      });
+      gather.say(`Press ${scheduledCallbackDigit} to request a callback.`);
+      addVoicemailToTwiml(twiml, {
+        sellerId: seller._id as string,
+        callSid,
+      });
+      debugLog("No-answer fallback: callback IVR offered");
+    } else {
+      addVoicemailToTwiml(twiml, {
+        sellerId: seller._id as string,
+        callSid,
+      });
+      debugLog("No-answer fallback: voicemail");
+    }
+    // Send missed call text-back (non-blocking)
+    if (missedCallTextBack && missedCallTextMessage) {
+      sendMissedCallTextBack(from, missedCallTextMessage, callSid);
+    }
+  };
+
   // Handle different forwarding types for retry
-  if (forwardingType === "direct") {
+  // Only attempt reconnection if Auto-Reconnect is enabled
+  if (!reconnectEnabled) {
+    debugLog("Auto-Reconnect disabled — going straight to fallback", {
+      callSid,
+    });
+    handleNoAnswerFallback();
+  } else if (forwardingType === "direct") {
     try {
       // Use atomic round-robin for retry as well (Issue #1 fix)
       const { buyer } = await getNextRoundRobinBuyerAtomic(
@@ -395,14 +807,7 @@ async function handleNoAnswer(
         industry,
       });
     } catch (error) {
-      twiml.say(
-        "No available buyers with sufficient balance. Please try again later.",
-      );
-      debugLog(
-        "No buyers with sufficient balance for retry",
-        { error: error instanceof Error ? error.message : "Unknown error" },
-        "warn",
-      );
+      handleNoAnswerFallback();
     }
   } else if (
     forwardingType === "single_multiple" &&
@@ -422,9 +827,52 @@ async function handleNoAnswer(
       }
     });
   } else if (forwardingType === "specific_lead" && leadBuyers?.length) {
-    // Filter lead buyers with sufficient balance
+    // Look up full buyer documents for availability checks
+    const retryBuyerIds = leadBuyers.map((b: { id: string }) => b.id);
+    const retryBuyerDocs = await Buyer.find({ _id: { $in: retryBuyerIds } });
+    const retryBuyerDocMap = new Map(
+      retryBuyerDocs.map((b) => [b._id.toString(), b]),
+    );
+
+    // Filter lead buyers by availability, business hours, geo, concurrent, and balance
     const eligibleBuyers = [];
     for (const buyer of leadBuyers) {
+      const buyerDoc = retryBuyerDocMap.get(buyer.id.toString());
+
+      if (buyerDoc && isBuyerOnVacation(buyerDoc)) {
+        debugLog("Skipping retry buyer on vacation", { buyerId: buyer.id });
+        continue;
+      }
+      if (buyerDoc && !isBuyerInBusinessHours(buyerDoc)) {
+        debugLog("Skipping retry buyer outside business hours", {
+          buyerId: buyer.id,
+        });
+        continue;
+      }
+      // Geo-routing check
+      if (
+        geoRoutingEnabled &&
+        geoData &&
+        buyerDoc &&
+        !doesBuyerServiceArea(buyerDoc, geoData)
+      ) {
+        debugLog("Skipping retry buyer (geo mismatch)", { buyerId: buyer.id });
+        continue;
+      }
+      // Concurrent call limit check
+      if (
+        concurrentCallLimit > 0 &&
+        (await isBuyerAtConcurrentLimit(
+          buyer.id.toString(),
+          concurrentCallLimit,
+        ))
+      ) {
+        debugLog("Skipping retry buyer (concurrent limit)", {
+          buyerId: buyer.id,
+        });
+        continue;
+      }
+
       try {
         const { hasSufficientBalance } = await checkBuyerUnitBalance(
           buyer.id.toString(),
@@ -443,14 +891,7 @@ async function handleNoAnswer(
     }
 
     if (eligibleBuyers.length === 0) {
-      twiml.say(
-        "No available buyers with sufficient balance. Please try again later.",
-      );
-      debugLog(
-        "No eligible buyers with sufficient balance for retry",
-        null,
-        "warn",
-      );
+      handleNoAnswerFallback();
     } else {
       eligibleBuyers.forEach(
         (buyer: { id: string; phone: string | undefined }, index: number) => {
@@ -501,6 +942,42 @@ async function handleCallAnswered(
     },
     callRate,
   );
+
+  // Fire call completed webhook (non-blocking)
+  if (updatedCall) {
+    // Mark call inactive for concurrent tracking
+    if (updatedCall.buyerId) {
+      markCallInactive(updatedCall.buyerId, callSid);
+    }
+
+    dispatchCallWebhook(updatedCall.userId, "callCompleted", {
+      callSid,
+      from: updatedCall.from,
+      to: updatedCall.to,
+      status: "completed",
+      industry: updatedCall.industry,
+      buyerId: updatedCall.buyerId,
+      callDuration: updatedCall.callDuration,
+      unitsCharged: updatedCall.unitsCharged,
+      recordingUrl: updatedCall.recordingUrl,
+      paymentStatus: updatedCall.paymentStatus,
+    });
+
+    // Trigger AI analysis if configured (non-blocking, fire-and-forget)
+    const seller = await User.findById(updatedCall.userId);
+    if (seller) {
+      const tn = seller.trackingNumbers?.find(
+        (n: any) => n.industry === updatedCall.industry,
+      );
+      if (tn?.transcriptionEnabled || tn?.aiSummaryEnabled) {
+        processCallAIAnalysis(callSid, {
+          transcriptionEnabled: !!tn.transcriptionEnabled,
+          aiSummaryEnabled: !!tn.aiSummaryEnabled,
+          industry: updatedCall.industry,
+        }).catch(() => {});
+      }
+    }
+  }
 
   return new NextResponse(
     JSON.stringify({

@@ -13,19 +13,6 @@ const sanitizeStringArray = (value: unknown): string[] => {
     .filter(Boolean);
 };
 
-const sanitizeRestrictedZones = (
-  zones: unknown,
-): { city?: string; state?: string; zipCodes?: string[] }[] => {
-  if (!Array.isArray(zones)) return [];
-  return zones
-    .map((zone: any) => ({
-      city: zone?.city?.trim?.() || undefined,
-      state: zone?.state?.trim?.() || undefined,
-      zipCodes: sanitizeStringArray(zone?.zipCodes),
-    }))
-    .filter((zone) => zone.city || zone.state || (zone.zipCodes || []).length);
-};
-
 const sanitizePreferredZones = (
   zones: unknown,
 ): { city?: string; state?: string; zipCodes?: string[] }[] => {
@@ -103,11 +90,9 @@ export async function GET() {
       notifyOnWeekends: buyer.notifyOnWeekends,
       vacationMode: buyer.vacationMode,
       locationMatchingStrict: buyer.locationMatchingStrict,
-      restrictedZones: buyer.restrictedZones,
       preferredZones: buyer.preferredZones,
       radiusFlexibility: buyer.radiusFlexibility,
       preferenceMatchingThreshold: buyer.preferenceMatchingThreshold,
-      excludedSources: buyer.excludedSources,
       leadTypes: buyer.leadTypes,
       webhookConfig: buyer.webhookConfig,
       serviceLocations: buyer.serviceLocations,
@@ -115,9 +100,6 @@ export async function GET() {
       maxLeadAge: buyer.maxLeadAge,
       serviceRadius: buyer.serviceRadius,
       preferredContactMethods: buyer.preferredContactMethods,
-      blockDuplicateLeads: buyer.blockDuplicateLeads,
-      duplicateCheckWindow: buyer.duplicateCheckWindow,
-      enableLeadFeedback: buyer.enableLeadFeedback,
       priorityBySource: buyer.priorityBySource,
       priorityByIndustry: buyer.priorityByIndustry,
       priorityByLocation: buyer.priorityByLocation,
@@ -216,10 +198,6 @@ export async function PUT(req: NextRequest) {
       update.locationMatchingStrict = body.locationMatchingStrict;
     }
 
-    if (body.restrictedZones) {
-      update.restrictedZones = sanitizeRestrictedZones(body.restrictedZones);
-    }
-
     if (body.preferredZones) {
       update.preferredZones = sanitizePreferredZones(body.preferredZones);
     }
@@ -238,10 +216,6 @@ export async function PUT(req: NextRequest) {
       )
     ) {
       update.preferenceMatchingThreshold = body.preferenceMatchingThreshold;
-    }
-
-    if (body.excludedSources) {
-      update.excludedSources = sanitizeStringArray(body.excludedSources);
     }
 
     if (body.leadTypes) {
@@ -296,21 +270,6 @@ export async function PUT(req: NextRequest) {
       if (methods.length) update.preferredContactMethods = methods;
     }
 
-    if (typeof body.blockDuplicateLeads === "boolean") {
-      update.blockDuplicateLeads = body.blockDuplicateLeads;
-    }
-
-    if (
-      typeof body.duplicateCheckWindow === "number" &&
-      body.duplicateCheckWindow > 0
-    ) {
-      update.duplicateCheckWindow = body.duplicateCheckWindow;
-    }
-
-    if (typeof body.enableLeadFeedback === "boolean") {
-      update.enableLeadFeedback = body.enableLeadFeedback;
-    }
-
     if (Array.isArray(body.priorityBySource)) {
       update.priorityBySource = body.priorityBySource;
     }
@@ -348,11 +307,9 @@ export async function PUT(req: NextRequest) {
         notifyOnWeekends: updatedBuyer?.notifyOnWeekends,
         vacationMode: updatedBuyer?.vacationMode,
         locationMatchingStrict: updatedBuyer?.locationMatchingStrict,
-        restrictedZones: updatedBuyer?.restrictedZones,
         preferredZones: updatedBuyer?.preferredZones,
         radiusFlexibility: updatedBuyer?.radiusFlexibility,
         preferenceMatchingThreshold: updatedBuyer?.preferenceMatchingThreshold,
-        excludedSources: updatedBuyer?.excludedSources,
         leadTypes: updatedBuyer?.leadTypes,
         webhookConfig: updatedBuyer?.webhookConfig,
         serviceLocations: updatedBuyer?.serviceLocations,
@@ -363,9 +320,6 @@ export async function PUT(req: NextRequest) {
         maxLeadAge: updatedBuyer?.maxLeadAge,
         serviceRadius: updatedBuyer?.serviceRadius,
         preferredContactMethods: updatedBuyer?.preferredContactMethods,
-        blockDuplicateLeads: updatedBuyer?.blockDuplicateLeads,
-        duplicateCheckWindow: updatedBuyer?.duplicateCheckWindow,
-        enableLeadFeedback: updatedBuyer?.enableLeadFeedback,
         priorityBySource: updatedBuyer?.priorityBySource,
         priorityByIndustry: updatedBuyer?.priorityByIndustry,
         priorityByLocation: updatedBuyer?.priorityByLocation,

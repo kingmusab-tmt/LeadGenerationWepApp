@@ -31,24 +31,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <MuiThemeProvider>
-        <ThemeProvider>
-          <AuthProvider>
-            <NavigationProvider>
-              <Providers>
-                <CSRFProvider>
-                  <body
-                    className={`${geistSans.variable} ${geistMono.variable}`}
-                  >
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <MuiThemeProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <NavigationProvider>
+                <Providers>
+                  <CSRFProvider>
                     {children}
                     <NotificationManager />
-                  </body>
-                </CSRFProvider>
-              </Providers>
-            </NavigationProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </MuiThemeProvider>
+                  </CSRFProvider>
+                </Providers>
+              </NavigationProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </MuiThemeProvider>
+      </body>
     </html>
   );
 }

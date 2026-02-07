@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -31,7 +31,7 @@ export async function GET(
     if (!campaign) {
       return NextResponse.json(
         { error: "Campaign not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -45,7 +45,7 @@ export async function GET(
     console.error("Error fetching campaign:", error);
     return NextResponse.json(
       { error: "Failed to fetch campaign" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -56,7 +56,7 @@ export async function GET(
  */
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -72,7 +72,7 @@ export async function PUT(
     if (!campaign) {
       return NextResponse.json(
         { error: "Campaign not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -85,7 +85,7 @@ export async function PUT(
     if (["sending", "completed"].includes(campaign.status)) {
       return NextResponse.json(
         { error: `Cannot update campaign with status: ${campaign.status}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -95,24 +95,37 @@ export async function PUT(
       subject,
       htmlContent,
       textContent,
+      fromEmail,
+      fromName,
+      replyTo,
+      recipientList,
       schedule,
       abTesting,
       trackingPixel,
       trackLinks,
       unsubscribeLink,
+      tags,
     } = body;
 
     // Update fields
     if (name) campaign.name = name;
     if (subject) campaign.subject = subject;
-    if (htmlContent) campaign.htmlContent = htmlContent;
-    if (textContent) campaign.textContent = textContent;
+    if (htmlContent !== undefined) campaign.htmlContent = htmlContent;
+    if (textContent !== undefined) campaign.textContent = textContent;
+    if (fromEmail !== undefined) campaign.fromEmail = fromEmail;
+    if (fromName !== undefined) campaign.fromName = fromName;
+    if (replyTo !== undefined) campaign.replyTo = replyTo;
+    if (recipientList && Array.isArray(recipientList)) {
+      campaign.recipientEmails = recipientList;
+      campaign.totalRecipients = recipientList.length;
+    }
     if (schedule) campaign.schedule = schedule;
     if (abTesting) campaign.abTesting = abTesting;
     if (trackingPixel !== undefined) campaign.trackingPixel = trackingPixel;
     if (trackLinks !== undefined) campaign.trackLinks = trackLinks;
     if (unsubscribeLink !== undefined)
       campaign.unsubscribeLink = unsubscribeLink;
+    if (tags && Array.isArray(tags)) campaign.tags = tags;
 
     const updatedCampaign = await campaign.save();
 
@@ -121,13 +134,13 @@ export async function PUT(
         message: "Campaign updated successfully",
         campaign: updatedCampaign,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error updating campaign:", error);
     return NextResponse.json(
       { error: "Failed to update campaign" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -138,7 +151,7 @@ export async function PUT(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -154,7 +167,7 @@ export async function DELETE(
     if (!campaign) {
       return NextResponse.json(
         { error: "Campaign not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -167,7 +180,7 @@ export async function DELETE(
     if (campaign.status === "sending") {
       return NextResponse.json(
         { error: "Cannot delete campaign while sending" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -177,13 +190,13 @@ export async function DELETE(
 
     return NextResponse.json(
       { message: "Campaign deleted successfully" },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error deleting campaign:", error);
     return NextResponse.json(
       { error: "Failed to delete campaign" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

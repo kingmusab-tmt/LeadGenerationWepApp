@@ -101,7 +101,7 @@ class SmsQueueManager {
           body: text,
           from: fromNumber,
           to: item.recipient.phone,
-          statusCallback: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/sms/track/status`,
+          statusCallback: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/marketing/sms/track/status`,
         });
         await SmsQueue.findByIdAndUpdate(item._id, {
           status: "sent",
@@ -261,12 +261,14 @@ class SmsMarketingEngine {
     campaignId?: string,
   ) {
     await dbConnect();
+    const resolvedCampaignId = campaignId
+      ? new mongoose.Types.ObjectId(campaignId)
+      : new mongoose.Types.ObjectId();
+
     if (status === "delivered") {
       await SmsEvent.create({
         userId,
-        campaignId: campaignId
-          ? new mongoose.Types.ObjectId(campaignId)
-          : new mongoose.Types.ObjectId(),
+        campaignId: resolvedCampaignId,
         type: "delivered",
         phone: to,
         meta: { messageSid },
@@ -274,6 +276,23 @@ class SmsMarketingEngine {
       await SmsCampaign.findByIdAndUpdate(campaignId, {
         $inc: { "stats.delivered": 1 },
       });
+      // Update queue item status
+      await SmsQueue.findOneAndUpdate({ messageSid }, { status: "delivered" });
+    } else if (status === "undelivered" || status === "failed") {
+      await SmsEvent.create({
+        userId,
+        campaignId: resolvedCampaignId,
+        type: "failed",
+        phone: to,
+        meta: { messageSid, twilioStatus: status },
+      });
+      await SmsCampaign.findByIdAndUpdate(campaignId, {
+        $inc: { "stats.failed": 1 },
+      });
+      await SmsQueue.findOneAndUpdate(
+        { messageSid },
+        { status: "failed", error: `Twilio status: ${status}` },
+      );
     }
   }
 }

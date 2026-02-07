@@ -12,6 +12,11 @@ const FAQSchema = new mongoose.Schema({
   category: {
     type: String,
   },
+  targetAudience: {
+    type: String,
+    enum: ["buyer", "seller", "both"],
+    default: "both",
+  },
   createdAt: {
     type: Date,
     default: Date.now,

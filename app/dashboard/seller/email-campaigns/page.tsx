@@ -32,14 +32,17 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Send as SendIcon,
+  Pause as PauseIcon,
+  PlayArrow as ResumeIcon,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
+import RecipientPicker from "@/app/components/RecipientPicker";
 
 interface Campaign {
   _id: string;
   name: string;
   subject: string;
-  status: "draft" | "scheduled" | "sending" | "completed" | "failed";
+  status: "draft" | "scheduled" | "sending" | "paused" | "completed" | "failed";
   analytics: {
     sent: number;
     opened: number;
@@ -66,6 +69,7 @@ export default function EmailCampaigns() {
     subject: "",
     htmlContent: "",
     fromEmail: "",
+    recipientList: "",
   });
 
   // Fetch campaigns
@@ -78,9 +82,9 @@ export default function EmailCampaigns() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/email-campaigns");
+      const response = await fetch("/api/marketing/email/campaigns");
       const data = await response.json();
-      setCampaigns(data.campaigns || []);
+      setCampaigns(data?.data?.campaigns || data?.campaigns || []);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_error) {
       toast.error("Failed to fetch campaigns");
@@ -89,16 +93,33 @@ export default function EmailCampaigns() {
     }
   };
 
-  const handleOpenDialog = (campaign?: Campaign) => {
+  const handleOpenDialog = async (campaign?: Campaign) => {
     if (campaign) {
       setEditMode(true);
       setSelectedCampaign(campaign);
-      setFormData({
-        name: campaign.name,
-        subject: campaign.subject,
-        htmlContent: "",
-        fromEmail: "",
-      });
+      // Fetch full campaign data including htmlContent, fromEmail, recipients
+      try {
+        const response = await fetch(
+          `/api/marketing/email/campaigns/${campaign._id}`,
+        );
+        const fullCampaign = await response.json();
+        setFormData({
+          name: fullCampaign.name || campaign.name,
+          subject: fullCampaign.subject || campaign.subject,
+          htmlContent: fullCampaign.htmlContent || "",
+          fromEmail: fullCampaign.fromEmail || "",
+          recipientList: (fullCampaign.recipientEmails || []).join(", "),
+        });
+      } catch {
+        // Fallback to partial data from list
+        setFormData({
+          name: campaign.name,
+          subject: campaign.subject,
+          htmlContent: "",
+          fromEmail: "",
+          recipientList: "",
+        });
+      }
     } else {
       setEditMode(false);
       setFormData({
@@ -106,6 +127,7 @@ export default function EmailCampaigns() {
         subject: "",
         htmlContent: "",
         fromEmail: "",
+        recipientList: "",
       });
     }
     setOpenDialog(true);
@@ -126,13 +148,25 @@ export default function EmailCampaigns() {
 
       const method = editMode ? "PUT" : "POST";
       const url = editMode
-        ? `/api/email-campaigns/${selectedCampaign?._id}`
-        : "/api/email-campaigns";
+        ? `/api/marketing/email/campaigns/${selectedCampaign?._id}`
+        : "/api/marketing/email/campaigns";
+
+      // Parse comma-separated recipients into an array
+      const recipientArray = formData.recipientList
+        .split(",")
+        .map((e) => e.trim())
+        .filter((e) => e.length > 0);
 
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          subject: formData.subject,
+          htmlContent: formData.htmlContent || undefined,
+          fromEmail: formData.fromEmail || undefined,
+          recipientList: recipientArray.length > 0 ? recipientArray : undefined,
+        }),
       });
 
       if (!response.ok) throw new Error("Failed to save campaign");
@@ -154,7 +188,7 @@ export default function EmailCampaigns() {
     }
 
     try {
-      const response = await fetch(`/api/email-campaigns/${id}`, {
+      const response = await fetch(`/api/marketing/email/campaigns/${id}`, {
         method: "DELETE",
       });
 
@@ -179,20 +213,52 @@ export default function EmailCampaigns() {
 
     try {
       const response = await fetch(
-        `/api/email-campaigns/${id}/actions?action=send`,
+        `/api/marketing/email/campaigns/${id}/actions?action=send`,
         {
           method: "POST",
         },
       );
 
-      if (!response.ok) throw new Error("Failed to send campaign");
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to send campaign");
+      }
 
       const data = await response.json();
       toast.success(`Campaign sent to ${data.sent} recipients`);
       fetchCampaigns();
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_error) {
-      toast.error("Error sending campaign");
+    } catch (_error: any) {
+      toast.error(_error?.message || "Error sending campaign");
+    }
+  };
+
+  const handlePauseCampaign = async (id: string) => {
+    try {
+      const response = await fetch(
+        `/api/marketing/email/campaigns/${id}/actions?action=pause`,
+        { method: "POST" },
+      );
+      if (!response.ok) throw new Error("Failed to pause campaign");
+      toast.success("Campaign paused");
+      fetchCampaigns();
+    } catch {
+      toast.error("Error pausing campaign");
+    }
+  };
+
+  const handleResumeCampaign = async (id: string) => {
+    try {
+      const response = await fetch(
+        `/api/marketing/email/campaigns/${id}/actions?action=resume`,
+        { method: "POST" },
+      );
+      if (!response.ok) throw new Error("Failed to resume campaign");
+      const data = await response.json();
+      toast.success(data.message || "Campaign resumed");
+      fetchCampaigns();
+    } catch {
+      toast.error("Error resuming campaign");
     }
   };
 
@@ -203,6 +269,7 @@ export default function EmailCampaigns() {
       draft: "default",
       scheduled: "info",
       sending: "warning",
+      paused: "info",
       completed: "success",
       failed: "error",
     };
@@ -367,22 +434,50 @@ export default function EmailCampaigns() {
                         Send
                       </Button>
                     )}
-                    <Button
-                      size="small"
-                      startIcon={<EditIcon />}
-                      onClick={() => handleOpenDialog(campaign)}
-                      sx={{ mr: 1 }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={() => handleDeleteCampaign(campaign._id)}
-                    >
-                      Delete
-                    </Button>
+                    {campaign.status === "sending" && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<PauseIcon />}
+                        onClick={() => handlePauseCampaign(campaign._id)}
+                        sx={{ mr: 1 }}
+                      >
+                        Pause
+                      </Button>
+                    )}
+                    {campaign.status === "paused" && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="success"
+                        startIcon={<ResumeIcon />}
+                        onClick={() => handleResumeCampaign(campaign._id)}
+                        sx={{ mr: 1 }}
+                      >
+                        Resume
+                      </Button>
+                    )}
+                    {["draft", "paused"].includes(campaign.status) && (
+                      <Button
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleOpenDialog(campaign)}
+                        sx={{ mr: 1 }}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    {!["sending"].includes(campaign.status) && (
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => handleDeleteCampaign(campaign._id)}
+                      >
+                        Delete
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -395,7 +490,7 @@ export default function EmailCampaigns() {
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle>
@@ -428,6 +523,10 @@ export default function EmailCampaigns() {
               setFormData({ ...formData, fromEmail: e.target.value })
             }
             fullWidth
+          />
+          <RecipientPicker
+            value={formData.recipientList}
+            onChange={(val) => setFormData({ ...formData, recipientList: val })}
           />
         </DialogContent>
         <DialogActions>

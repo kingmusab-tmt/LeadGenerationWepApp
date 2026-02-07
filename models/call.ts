@@ -21,6 +21,32 @@ interface ICall extends Document {
   leadBuyers: string[];
   industry: string;
   callRecorded: boolean;
+  // Disposition
+  disposition?: string;
+  dispositionNotes?: string;
+  // Transcription & AI
+  transcription?: string;
+  aiSummary?: string;
+  aiSentiment?: "positive" | "neutral" | "negative";
+  aiLeadScore?: string; // A/B/C/D grade
+  // Geo data
+  callerAreaCode?: string;
+  callerCity?: string;
+  callerState?: string;
+  // Spam detection
+  stirVerstat?: string; // STIR/SHAKEN attestation
+  spamScore?: number; // 0-100
+  flaggedAsSpam?: boolean;
+  // Missed call text-back
+  textBackSent?: boolean;
+  // Voicemail fields
+  voicemail?: {
+    recordingUrl: string;
+    duration: number;
+    transcription?: string;
+    listened: boolean;
+    listenedAt?: Date;
+  };
   feedback?: {
     buyerRating: boolean | null; // true = good, false = bad
     sellerApproved: boolean | null; // null = not reviewed
@@ -55,6 +81,55 @@ const CallSchema = new Schema<ICall>(
     leadBuyers: { type: [String], default: [] },
     industry: { type: String, required: true },
     reassigned: { type: Boolean, default: false },
+    // Disposition
+    disposition: {
+      type: String,
+      enum: [
+        "qualified_lead",
+        "not_interested",
+        "wrong_number",
+        "callback_requested",
+        "sold",
+        "voicemail",
+        "spam",
+        null,
+      ],
+      default: null,
+    },
+    dispositionNotes: { type: String, default: "" },
+    // Transcription & AI
+    transcription: { type: String },
+    aiSummary: { type: String },
+    aiSentiment: {
+      type: String,
+      enum: ["positive", "neutral", "negative", null],
+      default: null,
+    },
+    aiLeadScore: {
+      type: String,
+      enum: ["A", "B", "C", "D", null],
+      default: null,
+    },
+    // Geo data
+    callerAreaCode: { type: String },
+    callerCity: { type: String },
+    callerState: { type: String },
+    // Spam detection
+    stirVerstat: { type: String },
+    spamScore: { type: Number },
+    flaggedAsSpam: { type: Boolean, default: false },
+    // Missed call text-back
+    textBackSent: { type: Boolean, default: false },
+    voicemail: {
+      type: {
+        recordingUrl: { type: String },
+        duration: { type: Number },
+        transcription: { type: String },
+        listened: { type: Boolean, default: false },
+        listenedAt: { type: Date },
+      },
+      default: undefined,
+    },
     feedback: {
       type: {
         buyerRating: { type: Boolean, default: null },
@@ -71,6 +146,11 @@ const CallSchema = new Schema<ICall>(
 
 CallSchema.index({ leadId: 1 }); // PHASE 3: Index for lead queries
 CallSchema.index({ userId: 1, leadId: 1 }); // PHASE 3: Index for user's lead calls
+CallSchema.index({ buyerId: 1 }); // Buyer performance queries
+CallSchema.index({ userId: 1, createdAt: -1 }); // Seller call history
+CallSchema.index({ buyerId: 1, createdAt: -1 }); // Buyer call history
+CallSchema.index({ disposition: 1 }); // Disposition filtering
+CallSchema.index({ userId: 1, buyerId: 1 }); // Buyer performance per seller
 
 export default mongoose.models.Call ||
   mongoose.model<ICall>("Call", CallSchema);

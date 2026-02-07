@@ -86,6 +86,8 @@ export interface IUser extends Document {
     seconds: number;
   }[];
 
+  holdMusicUrl?: string;
+
   subscription?: ISubscription;
 
   stripeAccountId?: string;

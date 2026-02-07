@@ -32,7 +32,17 @@ function matchesMarketplaceCriteria(lead: ILead, buyer: IBuyer): boolean {
     return false;
   }
 
-  // 2. Check qualification score (using qualityLevel map)
+  // 2. Check vacation mode — don't notify if on vacation + autoReject
+  if (buyer.vacationMode?.enabled) {
+    const now = new Date();
+    if (!buyer.vacationMode.pauseUntil || buyer.vacationMode.pauseUntil > now) {
+      if (buyer.vacationMode.autoReject) {
+        return false;
+      }
+    }
+  }
+
+  // 3. Check qualification score (using qualityLevel map)
   const qualityScoreMap: Record<string, number> = {
     High: 100,
     Medium: 60,
@@ -47,25 +57,28 @@ function matchesMarketplaceCriteria(lead: ILead, buyer: IBuyer): boolean {
     return false;
   }
 
-  // 3. Check excluded sources
-  if (
-    buyer.excludedSources &&
-    buyer.excludedSources.length > 0 &&
-    buyer.excludedSources.includes(lead.leadSource)
-  ) {
-    return false;
+  // 4. Check lead type preference (exclusive vs shared)
+  if (buyer.leadTypes && buyer.leadTypes.length > 0) {
+    const leadType = lead.exclusive ? "exclusive" : "shared";
+    if (!buyer.leadTypes.includes(leadType)) {
+      return false;
+    }
   }
 
-  // 6. Check wallet balance (soft check - warn if low)
-  if (buyer.walletBalance && buyer.walletBalance < (lead.unit || 0)) {
-    // Don't exclude based on wallet - buyer might purchase units later
-    // But we can make a note
+  // 6. Check lead age / freshness
+  if (buyer.maxLeadAge && buyer.maxLeadAge > 0 && lead.createdAt) {
+    const leadAgeHours =
+      (Date.now() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60);
+    if (leadAgeHours > buyer.maxLeadAge) {
+      return false;
+    }
   }
 
-  // 7. Check daily limits (soft check)
-  if (buyer.maxLeadsPerDay && buyer.currentLeadsToday >= buyer.maxLeadsPerDay) {
-    // Don't exclude - buyer might have capacity later
-  }
+  // 7. Check wallet balance (soft check - warn if low but don't exclude)
+  // Buyer might purchase units later
+
+  // 8. Check daily limits (soft check - don't exclude)
+  // Buyer might have capacity later
 
   return true;
 }

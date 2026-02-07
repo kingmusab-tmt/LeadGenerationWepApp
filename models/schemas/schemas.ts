@@ -36,6 +36,55 @@ export const TrackingNumberSchema = {
   welcomeMessage: { type: String, default: "" }, // Welcome message
   callWhisper: { type: String, default: "" }, // Call whisper message
   requireResponse: { type: Boolean, default: false }, // Require response toggle
+  overflowNumber: { type: String, default: "" }, // Overflow number (ring before voicemail)
+
+  // Seller working hours
+  enableWorkingHours: { type: Boolean, default: false },
+  workingHoursStart: { type: String, default: "09:00" },
+  workingHoursEnd: { type: String, default: "17:00" },
+
+  // Recording consent
+  recordingConsent: { type: Boolean, default: false },
+  recordingConsentMessage: {
+    type: String,
+    default: "This call may be recorded for quality and training purposes.",
+  },
+
+  // Missed call text-back
+  missedCallTextBack: { type: Boolean, default: false },
+  missedCallTextMessage: {
+    type: String,
+    default:
+      "Sorry we missed your call! A representative will call you back shortly.",
+  },
+
+  // DNC & Spam
+  dncEnabled: { type: Boolean, default: false },
+  dncList: [{ type: String }],
+  spamFilterEnabled: { type: Boolean, default: false },
+  spamFilterAction: {
+    type: String,
+    enum: ["block", "warn"],
+    default: "block",
+  },
+
+  // Scheduled callbacks
+  scheduledCallbackEnabled: { type: Boolean, default: false },
+  scheduledCallbackDigit: { type: String, default: "1" },
+
+  // Multi-ring
+  multiRingEnabled: { type: Boolean, default: false },
+
+  // Geo-routing
+  geoRoutingEnabled: { type: Boolean, default: false },
+
+  // Concurrent call handling
+  concurrentCallLimit: { type: Number, default: 0 }, // 0 = unlimited
+
+  // AI features
+  transcriptionEnabled: { type: Boolean, default: false },
+  aiSummaryEnabled: { type: Boolean, default: false },
+
   forwardingNumbers: [{ type: String }], // Forwarding numbers (for "single_multiple")
   buyerResponses: [
     {
@@ -112,6 +161,14 @@ export const EmailSettingsSchema = {
       message: "Port must be between 1 and 65535",
     },
   },
+  fromEmail: {
+    type: String,
+    validate: {
+      validator: (v: string) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+      message: "Invalid from email format",
+    },
+  },
+  fromName: { type: String },
   emailSubject: {
     type: String,
     maxlength: [255, "Email subject cannot exceed 255 characters"],

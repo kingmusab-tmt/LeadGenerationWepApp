@@ -63,34 +63,49 @@ export async function POST(req: NextRequest) {
       return badRequest("Invalid request body");
     }
 
+    // Build update object — use dot notation for emailSettings to avoid wiping unaffected fields
+    const updateObj: Record<string, any> = {};
+    if (typeof validatedData.autoAssignLeads === "boolean") {
+      updateObj.autoAssignLeads = validatedData.autoAssignLeads;
+    }
+    if (typeof validatedData.maxAutoAssignPerDay === "number") {
+      updateObj.maxAutoAssignPerDay = validatedData.maxAutoAssignPerDay;
+    }
+    if (validatedData.distributionMode) {
+      updateObj.distributionMode = validatedData.distributionMode;
+    }
+    if (typeof validatedData.aiQualityThreshold === "number") {
+      updateObj.aiQualityThreshold = validatedData.aiQualityThreshold;
+    }
+    if (typeof validatedData.marketplaceFallback === "boolean") {
+      updateObj.marketplaceFallback = validatedData.marketplaceFallback;
+    }
+    // Use dot notation for emailSettings to preserve other fields
+    if (validatedData.emailSettings) {
+      for (const [key, value] of Object.entries(validatedData.emailSettings)) {
+        if (value !== undefined) {
+          updateObj[`emailSettings.${key}`] = value;
+        }
+      }
+    }
+    if (validatedData.apiSettings) {
+      for (const [key, value] of Object.entries(validatedData.apiSettings)) {
+        if (value !== undefined) {
+          updateObj[`apiSettings.${key}`] = value;
+        }
+      }
+    }
+    if (validatedData.creditSetup) {
+      for (const [key, value] of Object.entries(validatedData.creditSetup)) {
+        if (value !== undefined) {
+          updateObj[`creditSetup.${key}`] = value;
+        }
+      }
+    }
+
     const user = await User.findByIdAndUpdate(
       session.user.id,
-      {
-        ...(typeof validatedData.autoAssignLeads === "boolean" && {
-          autoAssignLeads: validatedData.autoAssignLeads,
-        }),
-        ...(typeof validatedData.maxAutoAssignPerDay === "number" && {
-          maxAutoAssignPerDay: validatedData.maxAutoAssignPerDay,
-        }),
-        ...(validatedData.distributionMode && {
-          distributionMode: validatedData.distributionMode,
-        }),
-        ...(typeof validatedData.aiQualityThreshold === "number" && {
-          aiQualityThreshold: validatedData.aiQualityThreshold,
-        }),
-        ...(typeof validatedData.marketplaceFallback === "boolean" && {
-          marketplaceFallback: validatedData.marketplaceFallback,
-        }),
-        ...(validatedData.emailSettings && {
-          emailSettings: validatedData.emailSettings,
-        }),
-        ...(validatedData.apiSettings && {
-          apiSettings: validatedData.apiSettings,
-        }),
-        ...(validatedData.creditSetup && {
-          creditSetup: validatedData.creditSetup,
-        }),
-      },
+      { $set: updateObj },
       { new: true },
     );
 

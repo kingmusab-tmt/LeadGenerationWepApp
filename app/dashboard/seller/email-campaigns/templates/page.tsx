@@ -113,6 +113,7 @@ export default function EmailTemplateBuilder() {
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [editTemplateId, setEditTemplateId] = useState<string | null>(null);
   const [presetSelected, setPresetSelected] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
@@ -130,7 +131,7 @@ export default function EmailTemplateBuilder() {
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/email/templates");
+      const response = await fetch("/api/marketing/email/templates");
       const data = await response.json();
       setTemplates(data || []);
     } catch {
@@ -140,19 +141,37 @@ export default function EmailTemplateBuilder() {
     }
   };
 
-  const handleOpenDialog = (template?: Template) => {
+  const handleOpenDialog = async (template?: Template) => {
     if (template) {
       setEditMode(true);
-      setFormData({
-        name: template.name,
-        subject: "",
-        htmlContent: "",
-        textContent: "",
-        category: template.category,
-        previewText: "",
-      });
+      setEditTemplateId(template._id);
+      // Fetch full template data including htmlContent
+      try {
+        const response = await fetch(
+          `/api/marketing/email/templates/${template._id}`,
+        );
+        const fullTemplate = await response.json();
+        setFormData({
+          name: fullTemplate.name || template.name,
+          subject: fullTemplate.subject || "",
+          htmlContent: fullTemplate.htmlContent || "",
+          textContent: fullTemplate.textContent || "",
+          category: fullTemplate.category || template.category,
+          previewText: fullTemplate.previewText || "",
+        });
+      } catch {
+        setFormData({
+          name: template.name,
+          subject: "",
+          htmlContent: "",
+          textContent: "",
+          category: template.category,
+          previewText: "",
+        });
+      }
     } else {
       setEditMode(false);
+      setEditTemplateId(null);
       setFormData({
         name: "",
         subject: "",
@@ -169,6 +188,7 @@ export default function EmailTemplateBuilder() {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditMode(false);
+    setEditTemplateId(null);
     setFormData({
       name: "",
       subject: "",
@@ -182,12 +202,19 @@ export default function EmailTemplateBuilder() {
   const handleLoadPreset = (presetKey: string) => {
     const preset = PRESET_TEMPLATES[presetKey as keyof typeof PRESET_TEMPLATES];
     if (preset) {
+      // Map preset keys to valid Mongoose category enum values
+      const categoryMap: Record<string, string> = {
+        lead_notification: "lead_notification",
+        weekly_newsletter: "newsletter",
+        promotional: "promotional",
+        welcome: "welcome",
+      };
       setFormData({
         name: preset.name,
         subject: preset.subject,
         htmlContent: preset.htmlContent,
         textContent: "",
-        category: presetKey,
+        category: categoryMap[presetKey] || "custom",
         previewText: preset.name,
       });
       setPresetSelected(presetKey);
@@ -201,8 +228,14 @@ export default function EmailTemplateBuilder() {
         return;
       }
 
-      const response = await fetch("/api/email/templates", {
-        method: "POST",
+      const method = editMode && editTemplateId ? "PUT" : "POST";
+      const url =
+        editMode && editTemplateId
+          ? `/api/marketing/email/templates/${editTemplateId}`
+          : "/api/marketing/email/templates";
+
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
@@ -212,7 +245,11 @@ export default function EmailTemplateBuilder() {
         throw new Error(error.error || "Failed to save template");
       }
 
-      toast.success("Template created successfully");
+      toast.success(
+        editMode
+          ? "Template updated successfully"
+          : "Template created successfully",
+      );
       handleCloseDialog();
       fetchTemplates();
     } catch (error) {
@@ -228,7 +265,7 @@ export default function EmailTemplateBuilder() {
     }
 
     try {
-      const response = await fetch(`/api/email/templates/${id}`, {
+      const response = await fetch(`/api/marketing/email/templates/${id}`, {
         method: "DELETE",
       });
 

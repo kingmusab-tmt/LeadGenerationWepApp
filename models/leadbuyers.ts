@@ -68,11 +68,6 @@ export interface IBuyer extends Document {
   maxConcurrentLeads: number; // Max active leads at once
 
   // Advanced Location Preferences
-  restrictedZones: {
-    city?: string;
-    state?: string;
-    zipCodes?: string[];
-  }[];
   preferredZones: {
     city?: string;
     state?: string;
@@ -107,19 +102,6 @@ export interface IBuyer extends Document {
   // Contact Attempt Preferences
   preferredContactMethods: ("phone" | "email" | "sms")[]; // Preferred contact methods
 
-  // Lead Duplication Prevention
-  blockDuplicateLeads: boolean; // Block duplicate leads based on phone/email
-  duplicateCheckWindow: number; // Days to check for duplicates (e.g., 30, 60, 90)
-
-  // Feedback Settings
-  enableLeadFeedback: boolean; // Enable quality feedback mechanism
-  leadRatings: {
-    leadId: string;
-    rating: number; // 1-5 stars
-    comment?: string;
-    ratedAt: Date;
-  }[];
-
   // Lead Priority Settings
   priorityBySource: { source: string; priority: number }[]; // Priority weights by source
   priorityByIndustry: { industry: string; priority: number }[]; // Priority weights by industry
@@ -145,7 +127,6 @@ export interface IBuyer extends Document {
   maxPricePerLead: number;
   autoAcceptMatchingLeads: boolean;
   acceptCallLeads: boolean;
-  excludedSources: string[];
   criteriaSets: IBuyerCriteriaSet[];
   activeCriteriaSetId?: Types.ObjectId | null;
   assignedLeads: Types.ObjectId[]; // PHASE 1: Array of Lead IDs assigned to this buyer (for efficient queries)
@@ -166,7 +147,6 @@ export interface IBuyerCriteriaSet {
   industries: string[];
   maxPrice: number;
   dailyLimit: number;
-  excludedSources: string[];
   autoAccept: boolean;
   isDefault: boolean;
   createdAt: Date;
@@ -227,13 +207,6 @@ const BuyerSchema: Schema = new Schema({
   maxConcurrentLeads: { type: Number, default: 10 },
 
   // Advanced Location Preferences
-  restrictedZones: [
-    {
-      city: { type: String },
-      state: { type: String },
-      zipCodes: [{ type: String }],
-    },
-  ],
   preferredZones: [
     {
       city: { type: String },
@@ -296,21 +269,6 @@ const BuyerSchema: Schema = new Schema({
     },
   ],
 
-  // Lead Duplication Prevention
-  blockDuplicateLeads: { type: Boolean, default: true },
-  duplicateCheckWindow: { type: Number, default: 30 }, // Default 30 days
-
-  // Feedback Settings
-  enableLeadFeedback: { type: Boolean, default: true },
-  leadRatings: [
-    {
-      leadId: { type: String },
-      rating: { type: Number, min: 1, max: 5 },
-      comment: { type: String },
-      ratedAt: { type: Date, default: Date.now },
-    },
-  ],
-
   // Lead Priority Settings
   priorityBySource: [
     {
@@ -346,7 +304,6 @@ const BuyerSchema: Schema = new Schema({
   maxPricePerLead: { type: Number, default: 0 },
   autoAcceptMatchingLeads: { type: Boolean, default: false },
   acceptCallLeads: { type: Boolean, default: true },
-  excludedSources: [{ type: String }],
   notificationPreferences: [
     {
       type: String,
@@ -422,7 +379,6 @@ const BuyerSchema: Schema = new Schema({
       industries: [{ type: String }],
       maxPrice: { type: Number, default: 0 },
       dailyLimit: { type: Number, default: 5 },
-      excludedSources: [{ type: String }],
       autoAccept: { type: Boolean, default: false },
       isDefault: { type: Boolean, default: false },
       createdAt: { type: Date, default: Date.now },

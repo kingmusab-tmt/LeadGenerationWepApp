@@ -7,6 +7,22 @@ import Call from "@/models/call";
 import { Transaction } from "@/models/transactions";
 import { sendEmail, sendSMS } from "@/utils/notifications";
 import { invalidateCallCache, invalidateLeadCache } from "@/lib/cachedSession"; // PHASE 3: Cache invalidation
+import { CALL_DEFAULTS } from "@/lib/security/callSecurity";
+
+type VoiceResponse = import("twilio").twiml.VoiceResponse;
+
+type DialParams = {
+  callerId: string;
+  timeout: number;
+  action: string;
+  record?:
+    | "record-from-answer"
+    | "do-not-record"
+    | "record-from-ringing"
+    | "record-from-answer-dual"
+    | "record-from-ringing-dual";
+  recordingStatusCallback?: string;
+};
 
 export const debugLog = (
   message: string,
@@ -18,6 +34,171 @@ export const debugLog = (
   console[level](logMessage, data ? JSON.stringify(data, null, 2) : "");
 };
 
+/**
+ * Check if a buyer is currently within their business hours.
+ * Uses the buyer's configured timezone (defaults to UTC).
+ * Returns true if business hours checking is disabled OR if currently within hours.
+ */
+export const isBuyerInBusinessHours = (buyer: {
+  acceptOnlyDuringBusinessHours?: boolean;
+  workingHours?: { start: string; end: string };
+  timezone?: string;
+}): boolean => {
+  // If buyer doesn't enforce business hours, always available
+  if (!buyer.acceptOnlyDuringBusinessHours) return true;
+
+  const { workingHours, timezone } = buyer;
+  if (!workingHours?.start || !workingHours?.end) return true; // No hours configured = always available
+
+  try {
+    // Get current time in buyer's timezone
+    const tz = timezone || "UTC";
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(now);
+    const currentHour = parseInt(
+      parts.find((p) => p.type === "hour")?.value || "0",
+    );
+    const currentMinute = parseInt(
+      parts.find((p) => p.type === "minute")?.value || "0",
+    );
+    const currentMinutes = currentHour * 60 + currentMinute;
+
+    const [startH, startM] = workingHours.start.split(":").map(Number);
+    const [endH, endM] = workingHours.end.split(":").map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    // Handle overnight hours (e.g., 22:00 - 06:00)
+    if (startMinutes > endMinutes) {
+      return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    }
+
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  } catch (error) {
+    debugLog(
+      "Error checking business hours",
+      { error, timezone: buyer.timezone },
+      "warn",
+    );
+    return true; // Fail open — don't block calls on timezone errors
+  }
+};
+
+/**
+ * Check if a buyer is on vacation mode.
+ * Returns true if buyer IS on vacation (should be skipped).
+ */
+export const isBuyerOnVacation = (buyer: {
+  vacationMode?: {
+    enabled: boolean;
+    pauseUntil?: Date;
+    autoReject: boolean;
+  };
+}): boolean => {
+  if (!buyer.vacationMode?.enabled) return false;
+
+  // If pauseUntil is set and has passed, vacation is over
+  if (buyer.vacationMode.pauseUntil) {
+    return new Date() < new Date(buyer.vacationMode.pauseUntil);
+  }
+
+  // Vacation mode enabled with no end date
+  return true;
+};
+
+/**
+ * Attempt overflow to an external number before falling back to voicemail.
+ * Dials the overflow number with a timeout; if no answer, the action URL
+ * triggers voicemail via the existing no-answer handler.
+ */
+export const addOverflowToTwiml = (
+  twiml: VoiceResponse,
+  options: {
+    overflowNumber: string;
+    sellerId: string;
+    callSid: string;
+    from: string;
+    passCallerId: boolean;
+    recordCall: boolean;
+  },
+) => {
+  twiml.say(
+    "All agents are currently unavailable. We are connecting you to an alternative line.",
+  );
+
+  const dialParams: Record<string, unknown> = {
+    callerId: options.passCallerId ? options.from : options.overflowNumber,
+    timeout: CALL_DEFAULTS.dialTimeout,
+    action: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/voicemail?callSid=${options.callSid}`,
+    method: "POST" as const,
+  };
+  if (options.recordCall) {
+    dialParams.record = "record-from-answer";
+  }
+
+  twiml.dial(dialParams, options.overflowNumber);
+};
+
+/**
+ * Add voicemail recording to a TwiML response.
+ * Plays a message then records. The recording callback updates the call record.
+ */
+export const addVoicemailToTwiml = (
+  twiml: VoiceResponse,
+  options: {
+    sellerId: string;
+    callSid: string;
+    message?: string;
+  },
+) => {
+  const voicemailMessage =
+    options.message ||
+    "No one is available to take your call right now. Please leave a message after the beep, and we will get back to you as soon as possible.";
+
+  twiml.say(voicemailMessage);
+  twiml.record({
+    maxLength: CALL_DEFAULTS.voicemailMaxLength,
+    timeout: 5, // 5 seconds of silence before stopping
+    playBeep: true,
+    action: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/voicemail?callSid=${options.callSid}`,
+    recordingStatusCallback: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/voicemail`,
+    transcribe: false, // Set to true if Twilio transcription is enabled
+  });
+  twiml.say("Thank you for your message. Goodbye.");
+};
+
+/**
+ * Add a caller to a hold queue with music.
+ * Used when buyers exist but are temporarily busy.
+ */
+export const enqueueCallerWithHoldMusic = (
+  twiml: VoiceResponse,
+  options: {
+    sellerId: string;
+    industry: string;
+  },
+) => {
+  const queueName = `seller_${options.sellerId}_${options.industry}`;
+  const waitUrl = `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/queue?sellerId=${options.sellerId}`;
+
+  twiml.say(
+    "All agents are currently busy. Please hold and we will connect you shortly.",
+  );
+  twiml.enqueue(
+    {
+      waitUrl,
+      waitUrlMethod: "POST",
+    },
+    queueName,
+  );
+};
+
 export const getDialParams = (options: {
   from: string;
   sellerId: string;
@@ -27,23 +208,9 @@ export const getDialParams = (options: {
   recordCall: boolean;
   timeout?: number;
 }) => {
-  type DialParams = {
-    callerId: string;
-    timeout: number;
-    action: string;
-    // Twilio Dial 'record' valid values
-    record?:
-      | "record-from-answer"
-      | "do-not-record"
-      | "record-from-ringing"
-      | "record-from-answer-dual"
-      | "record-from-ringing-dual";
-    recordingStatusCallback?: string;
-  };
-
   const dialParams: DialParams = {
     callerId: options.passCallerId ? options.from : " ",
-    timeout: options.timeout || 30,
+    timeout: options.timeout || CALL_DEFAULTS.dialTimeout,
     action: `https://${
       process.env.NEXT_PUBLIC_DOMAIN
     }/api/calls/twilio/calls?sellerId=${options.sellerId}&callSid=${
@@ -57,6 +224,57 @@ export const getDialParams = (options: {
   }
 
   return dialParams;
+};
+
+/**
+ * Build the whisper/screening URL for a buyer's <Number> element.
+ * Returns undefined if no whisper or screening is configured.
+ */
+export const getWhisperUrl = (options: {
+  callWhisper?: string;
+  requireResponse?: boolean;
+  buyerResponses?: { message: string; digit: string }[];
+  sellerId: string;
+  callSid: string;
+}): string | undefined => {
+  const { callWhisper, requireResponse, buyerResponses, sellerId, callSid } =
+    options;
+
+  // Only build URL if whisper or screening is configured
+  if (!callWhisper && !requireResponse) return undefined;
+
+  const params = new URLSearchParams();
+  if (callWhisper) params.set("whisper", callWhisper);
+  if (requireResponse) params.set("requireResponse", "true");
+  if (buyerResponses?.length) {
+    params.set(
+      "buyerResponses",
+      encodeURIComponent(JSON.stringify(buyerResponses)),
+    );
+  }
+  params.set("sellerId", sellerId);
+  params.set("callSid", callSid);
+
+  return `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/whisper?${params.toString()}`;
+};
+
+/**
+ * Add a <Dial><Number> to TwiML with optional whisper/screening.
+ * Uses the `url` attribute on <Number> so the whisper plays to the callee (buyer)
+ * before the two parties are bridged.
+ */
+export const dialWithWhisper = (
+  twiml: VoiceResponse,
+  phoneNumber: string,
+  dialParams: DialParams,
+  whisperUrl?: string,
+) => {
+  const dial = twiml.dial(dialParams);
+  if (whisperUrl) {
+    dial.number({ url: whisperUrl, method: "POST" }, phoneNumber);
+  } else {
+    dial.number(phoneNumber);
+  }
 };
 
 export const checkBuyerUnitBalance = async (
@@ -82,8 +300,11 @@ export const chargeBuyerForCall = async (
   callRate: { units: number; seconds: number },
 ) => {
   // Skip charging for short calls (likely spam/wrong number)
-  if (callDuration <= 15) {
-    debugLog("Skipping charge for short call", { callDuration });
+  if (callDuration <= CALL_DEFAULTS.minBillableDuration) {
+    debugLog("Skipping charge for short call", {
+      callDuration,
+      minBillable: CALL_DEFAULTS.minBillableDuration,
+    });
     return { charged: false, unitsCharged: 0 };
   }
 
@@ -129,13 +350,32 @@ export const getNextRoundRobinBuyer = async (
   industry: string,
   callRate: { units: number; seconds: number },
 ) => {
-  const buyers = await Buyer.find({
+  const allBuyers = await Buyer.find({
     _id: { $in: seller.buyers },
-    "leadPreferences.industry": industry,
+    "leadPreferences.industries": industry,
   }).sort({ walletUnit: -1 }); // Sort by highest balance first
 
+  // Filter out buyers on vacation or outside business hours
+  const buyers = allBuyers.filter((buyer) => {
+    if (isBuyerOnVacation(buyer)) {
+      debugLog("Skipping buyer on vacation", { buyerId: buyer._id });
+      return false;
+    }
+    if (!isBuyerInBusinessHours(buyer)) {
+      debugLog("Skipping buyer outside business hours", {
+        buyerId: buyer._id,
+        workingHours: buyer.workingHours,
+        timezone: buyer.timezone,
+      });
+      return false;
+    }
+    return true;
+  });
+
   if (buyers.length === 0) {
-    throw new Error(`No buyers available for industry: ${industry}`);
+    throw new Error(
+      `No buyers available for industry: ${industry} (all buyers are outside business hours, on vacation, or no match)`,
+    );
   }
 
   const lastAssignedIndex = seller.lastAssignedIndex || 0;
@@ -195,13 +435,34 @@ export const getNextRoundRobinBuyerAtomic = async (
   industry: string,
   callRate: { units: number; seconds: number },
 ) => {
-  const buyers = await Buyer.find({
+  const allBuyers = await Buyer.find({
     _id: { $in: seller.buyers },
-    "leadPreferences.industry": industry,
+    "leadPreferences.industries": industry,
   }).sort({ _id: 1 }); // STABLE SORT by ID to prevent index drift (Issue #3 fix)
 
+  // Filter out buyers on vacation or outside business hours
+  const buyers = allBuyers.filter((buyer) => {
+    if (isBuyerOnVacation(buyer)) {
+      debugLog("Skipping buyer on vacation (atomic RR)", {
+        buyerId: buyer._id,
+      });
+      return false;
+    }
+    if (!isBuyerInBusinessHours(buyer)) {
+      debugLog("Skipping buyer outside business hours (atomic RR)", {
+        buyerId: buyer._id,
+        workingHours: buyer.workingHours,
+        timezone: buyer.timezone,
+      });
+      return false;
+    }
+    return true;
+  });
+
   if (buyers.length === 0) {
-    throw new Error(`No buyers available for industry: ${industry}`);
+    throw new Error(
+      `No buyers available for industry: ${industry} (all buyers are outside business hours, on vacation, or no match)`,
+    );
   }
 
   // ATOMIC INCREMENT using MongoDB $inc operator
