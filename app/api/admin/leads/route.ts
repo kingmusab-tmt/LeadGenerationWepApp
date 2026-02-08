@@ -4,8 +4,12 @@ import mongoose from "mongoose";
 import { Lead } from "@/models/leads";
 import { User } from "@/models";
 import dbConnect from "@/lib/connectdb";
+import { requireAdmin } from "@/lib/api/adminAuth";
 
 export async function GET(req: NextRequest) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
     await dbConnect();
 

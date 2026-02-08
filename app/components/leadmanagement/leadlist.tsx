@@ -48,6 +48,7 @@ interface Lead {
   createdAt: string;
   status: "new" | "available" | "sold" | "assigned";
   distributionMethod: "manual" | "round_robin" | "marketplace";
+  quality?: "High" | "Medium" | "Low";
   exclusive: boolean;
   shared: boolean;
   shareNumber: number;
@@ -299,6 +300,7 @@ const LeadList: React.FC<LeadListProps> = ({
                 <TableCell>Number</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Quality</TableCell>
                 <TableCell>Exclusive</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -315,6 +317,11 @@ const LeadList: React.FC<LeadListProps> = ({
                       color={statusColors[lead.status]}
                       size="small"
                     />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="caption" color="text.secondary">
+                      {lead.quality || "—"}
+                    </Typography>
                   </TableCell>
                   <TableCell>
                     <IconButton onClick={() => onToggleFavorite(lead._id)}>

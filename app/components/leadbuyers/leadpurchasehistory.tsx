@@ -9,7 +9,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Container,
   FormControl,
   InputLabel,
   Select,
@@ -178,14 +177,7 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
   }
 
   return (
-    <Container sx={{ mt: 6 }}>
-      <Typography
-        variant="h6"
-        align="center"
-        sx={{ mt: 5, mb: 1, fontWeight: "bold", color: "primary.main" }}
-      >
-        Transaction History
-      </Typography>
+    <Box>
       <FormControl fullWidth sx={{ mb: 2 }}>
         <InputLabel>Filter by Type</InputLabel>
         <Select
@@ -235,7 +227,21 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
       </TableContainer>
 
       <Modal open={modalOpen} onClose={handleCloseModal}>
-        <Box sx={{ p: 4, bgcolor: "background.paper", borderRadius: 2 }}>
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: { xs: "90%", sm: 450 },
+            maxHeight: "80vh",
+            overflow: "auto",
+            p: 4,
+            bgcolor: "background.paper",
+            borderRadius: 2,
+            boxShadow: 24,
+          }}
+        >
           <Typography variant="h6" gutterBottom>
             Transaction Details
           </Typography>
@@ -294,7 +300,7 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
           {snackbarMessage}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 };
 

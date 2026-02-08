@@ -192,18 +192,6 @@ export const LEAD_SOURCES: LeadSource[] = [
     category: "other",
     description: "BRIXCOT lead generation platform",
   },
-  {
-    value: "hubspot",
-    label: "HubSpot",
-    category: "other",
-    description: "HubSpot CRM integration",
-  },
-  {
-    value: "salesforce",
-    label: "Salesforce",
-    category: "other",
-    description: "Salesforce CRM integration",
-  },
 
   // Other Sources
   {

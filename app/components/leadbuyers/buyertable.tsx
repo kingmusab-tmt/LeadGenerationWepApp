@@ -152,8 +152,7 @@ const BuyerTable: React.FC<BuyerTableProps> = ({
       <Box
         sx={{
           flexGrow: 1,
-          width: isMobile ? "95vw" : "100%",
-          mx: "auto", // Centering on larger screens
+          width: "100%",
         }}
       >
         <DataGrid
@@ -162,9 +161,14 @@ const BuyerTable: React.FC<BuyerTableProps> = ({
           pageSizeOptions={[5, 10, 20]}
           checkboxSelection
           sx={{
-            width: "90%",
-            "& .MuiDataGrid-root": {
-              border: "none",
+            width: "100%",
+            border: "none",
+            "& .MuiDataGrid-columnHeaders": {
+              bgcolor: "action.hover",
+              fontWeight: "bold",
+            },
+            "& .MuiDataGrid-row:hover": {
+              bgcolor: "action.hover",
             },
           }}
           getRowId={(row) => row._id}

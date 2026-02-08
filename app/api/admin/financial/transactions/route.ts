@@ -3,16 +3,15 @@ import { NextRequest } from "next/server";
 import mongoose from "mongoose";
 import { Transaction } from "@/models/transactions";
 import { User } from "@/models";
-
-const connectDB = async () => {
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(process.env.MONGODB_URI!);
-  }
-};
+import dbConnect from "@/lib/connectdb";
+import { requireAdmin } from "@/lib/api/adminAuth";
 
 export async function GET(req: NextRequest) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
-    await connectDB();
+    await dbConnect();
 
     // Get transactions with optional population
     const transactions = await Transaction.find()

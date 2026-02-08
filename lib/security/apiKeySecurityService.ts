@@ -3,7 +3,7 @@
  * Handles secure storage, encryption, rotation, and audit logging for API keys
  *
  * Security Features:
- * - AES-256-CBC encryption for API keys that need to be retrieved (HubSpot, Salesforce)
+ * - AES-256-CBC encryption for API keys that need to be retrieved
  * - SHA-256 hashing for API keys used for authentication (Zapier Actions)
  * - Key rotation support
  * - Audit logging for all key operations
@@ -22,8 +22,6 @@ import mongoose from "mongoose";
  * API Key Types
  */
 export enum ApiKeyType {
-  HUBSPOT = "hubspot",
-  SALESFORCE = "salesforce",
   ZAPIER_ACTION = "zapier_action",
   ZAPIER_TRIGGER = "zapier_trigger",
   GENERIC = "generic",
@@ -63,7 +61,7 @@ interface ApiKeyMetadata {
  */
 interface EncryptedApiKey {
   keyId: string;
-  encryptedValue: string; // For keys that need retrieval (HubSpot, Salesforce)
+  encryptedValue: string; // For keys that need retrieval (e.g., third-party integrations)
   hashedValue?: string; // For authentication keys (Zapier)
   metadata: ApiKeyMetadata;
 }
@@ -134,7 +132,7 @@ export class ApiKeySecurityService {
 
   /**
    * Encrypt an API key using AES-256-CBC
-   * Used for keys that need to be retrieved (HubSpot, Salesforce)
+   * Used for keys that need to be retrieved (e.g., third-party integrations)
    *
    * @param apiKey Plain API key
    * @returns Encrypted API key with IV
@@ -167,7 +165,7 @@ export class ApiKeySecurityService {
 
   /**
    * Store an encrypted API key
-   * For keys that need to be retrieved and used (HubSpot, Salesforce)
+   * For keys that need to be retrieved and used (e.g., third-party integrations)
    *
    * @param apiKey Plain API key
    * @param metadata Key metadata

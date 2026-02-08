@@ -3,11 +3,15 @@ import { NextRequest } from "next/server";
 import { Lead } from "@/models/leads";
 import Call from "@/models/call";
 import dbConnects from "@/lib/connectdb";
+import { requireAdmin } from "@/lib/api/adminAuth";
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; type: string }> }
+  { params }: { params: Promise<{ id: string; type: string }> },
 ) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
     await dbConnects();
 
@@ -18,7 +22,7 @@ export async function PUT(
       const updatedLead = await Lead.findByIdAndUpdate(
         id,
         { status: flagged ? "flagged" : "available" },
-        { new: true }
+        { new: true },
       ).lean();
 
       if (!updatedLead) {
@@ -36,7 +40,7 @@ export async function PUT(
       const updatedCall = await Call.findByIdAndUpdate(
         id,
         { status: flagged ? "flagged" : "completed" },
-        { new: true }
+        { new: true },
       ).lean();
 
       if (!updatedCall) {
@@ -55,14 +59,14 @@ export async function PUT(
     } else {
       return NextResponse.json(
         { error: "Invalid content type" },
-        { status: 400 }
+        { status: 400 },
       );
     }
   } catch (error) {
     console.error("Failed to flag content:", error);
     return NextResponse.json(
       { error: "Failed to flag content" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

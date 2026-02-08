@@ -42,6 +42,12 @@ export interface IUser extends Document {
   aiQualityThreshold?: number;
   /** Post leads to marketplace if not auto-assigned */
   marketplaceFallback?: boolean;
+  /** Unit pricing per quality level */
+  leadPricing?: {
+    high: number;
+    medium: number;
+    low: number;
+  };
   autoAssignLeads?: boolean;
   maxAutoAssignPerDay?: number;
   currentAutoAssignedToday?: number;

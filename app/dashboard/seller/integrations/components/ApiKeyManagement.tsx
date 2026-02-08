@@ -26,6 +26,7 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Chip,
 } from "@mui/material";
 import {
   ContentCopy as CopyIcon,
@@ -44,6 +45,7 @@ interface Props {
 export default function ApiKeyManagement({ onNotify }: Props) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [apiKeyExists, setApiKeyExists] = useState(false);
+  const [truncatedKey, setTruncatedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
@@ -60,6 +62,7 @@ export default function ApiKeyManagement({ onNotify }: Props) {
         const data = await res.json();
         setApiKeyExists(data.exists);
         setCreatedAt(data.createdAt);
+        setTruncatedKey(data.truncatedKey || null);
       }
     } catch (error) {
       console.error("Failed to check API key:", error);
@@ -69,6 +72,15 @@ export default function ApiKeyManagement({ onNotify }: Props) {
   };
 
   const generateApiKey = async () => {
+    if (
+      apiKeyExists &&
+      !confirm(
+        "Generating a new key will invalidate your current API key. Any existing integrations using the old key will stop working. Continue?",
+      )
+    ) {
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/integrations/zapier/api-key", {
@@ -78,6 +90,10 @@ export default function ApiKeyManagement({ onNotify }: Props) {
       if (res.ok) {
         const data = await res.json();
         setApiKey(data.apiKey);
+        setTruncatedKey(
+          `${data.apiKey.slice(0, 8)}...${data.apiKey.slice(-4)}`,
+        );
+        setCreatedAt(new Date().toISOString());
         setApiKeyExists(true);
         setShowKey(true);
         onNotify(
@@ -113,6 +129,7 @@ export default function ApiKeyManagement({ onNotify }: Props) {
       if (res.ok) {
         setApiKey(null);
         setApiKeyExists(false);
+        setTruncatedKey(null);
         setCreatedAt(null);
         onNotify("API key revoked successfully", "success");
       } else {
@@ -165,10 +182,11 @@ export default function ApiKeyManagement({ onNotify }: Props) {
           {apiKeyExists ? (
             <Box>
               {apiKey ? (
-                <>
+                /* Just generated — show the full key */
+                <Box sx={{ mb: 2 }}>
                   <Alert severity="warning" sx={{ mb: 2 }}>
-                    <strong>Important:</strong> Save this key securely - it
-                    won't be shown again after you leave this page!
+                    <strong>Important:</strong> Save this key securely — it
+                    won&apos;t be shown again after you leave this page!
                   </Alert>
 
                   <TextField
@@ -196,30 +214,89 @@ export default function ApiKeyManagement({ onNotify }: Props) {
                         </Box>
                       ),
                     }}
-                    sx={{ mb: 2 }}
                   />
-                </>
+                </Box>
               ) : (
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  API key is active and configured
-                  {createdAt && (
-                    <>
-                      <br />
-                      Created: {new Date(createdAt).toLocaleString()}
-                    </>
-                  )}
-                </Alert>
+                /* Previously generated — show truncated preview */
+                <Box
+                  sx={{
+                    mb: 2,
+                    p: 2,
+                    borderRadius: 1,
+                    bgcolor: "action.hover",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 1,
+                  }}
+                >
+                  <Box>
+                    <Typography
+                      variant="body2"
+                      component="div"
+                      fontWeight="bold"
+                      sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                    >
+                      <Chip
+                        label="Active"
+                        color="success"
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Typography
+                        component="code"
+                        sx={{
+                          fontFamily: "monospace",
+                          fontSize: "0.9rem",
+                          bgcolor: "background.paper",
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 0.5,
+                          border: 1,
+                          borderColor: "divider",
+                        }}
+                      >
+                        {truncatedKey || "••••••••...••••"}
+                      </Typography>
+                    </Typography>
+                    {createdAt && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mt: 0.5, display: "block" }}
+                      >
+                        Generated on{" "}
+                        {new Date(createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
               )}
 
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={revokeApiKey}
-                disabled={loading}
-                fullWidth
-              >
-                Revoke API Key
-              </Button>
+              <Box sx={{ display: "flex", gap: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={generateApiKey}
+                  disabled={loading}
+                  sx={{ flex: 1 }}
+                >
+                  Generate New API Key
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={revokeApiKey}
+                  disabled={loading}
+                  sx={{ flex: 1 }}
+                >
+                  Revoke API Key
+                </Button>
+              </Box>
             </Box>
           ) : (
             <Box>

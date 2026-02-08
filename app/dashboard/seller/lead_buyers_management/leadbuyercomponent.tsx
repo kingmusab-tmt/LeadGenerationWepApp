@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
-  Container,
   Typography,
   Box,
   Snackbar,
@@ -17,14 +16,85 @@ import {
   InputAdornment,
   Card,
   CardContent,
-  Divider,
+  Grid,
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Collapse,
+  Paper,
 } from "@mui/material";
-import { ContentCopy } from "@mui/icons-material";
+import {
+  ContentCopy,
+  Search as SearchIcon,
+  Add as AddIcon,
+  PersonAdd as PersonAddIcon,
+  People as PeopleIcon,
+  CheckCircle as ActiveIcon,
+  PauseCircle as InactiveIcon,
+  FiberNew as NewIcon,
+  Refresh as RefreshIcon,
+  Code as CodeIcon,
+  Link as LinkIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  WarningAmber as WarningIcon,
+} from "@mui/icons-material";
 import BuyerTable from "@/app/components/leadbuyers/buyertable";
 import BuyerFormEnhanced from "@/app/components/leadbuyers/BuyerFormEnhanced";
 import { IBuyer } from "@/models/leadbuyers";
 import { useInitializeUser } from "@/lib/hooks";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+
+// ---------- Stats Card ----------
+
+function StatsCard({
+  title,
+  value,
+  color,
+  icon,
+  subtitle,
+}: {
+  title: string;
+  value: number | string;
+  color: string;
+  icon: React.ReactNode;
+  subtitle?: string;
+}) {
+  return (
+    <Card variant="outlined" sx={{ height: "100%" }}>
+      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+          <Box sx={{ color, display: "flex" }}>{icon}</Box>
+          <Typography variant="caption" color="text.secondary">
+            {title}
+          </Typography>
+        </Box>
+        <Typography variant="h5" fontWeight="bold" sx={{ color }}>
+          {value}
+        </Typography>
+        {subtitle && (
+          <Typography variant="caption" color="text.secondary">
+            {subtitle}
+          </Typography>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------- Status Colors ----------
+
+const statusChipColor: Record<
+  string,
+  "success" | "warning" | "error" | "info" | "primary"
+> = {
+  active: "success",
+  new: "primary",
+  inactive: "error",
+  suspended: "warning",
+};
 
 const BuyersPage: React.FC = () => {
   const { currentUser } = useInitializeUser();
@@ -47,22 +117,60 @@ const BuyersPage: React.FC = () => {
     maxAllowed: 0,
   });
 
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showEmbedSection, setShowEmbedSection] = useState(false);
+
   const sellerId = currentUser?.id || "";
   const [registrationLink, setRegistrationLink] = useState("");
   const [iframeCode, setIframeCode] = useState("");
 
-  // Fetch buyers and subscription limits
+  // ---------- Computed Stats ----------
+
+  const stats = useMemo(() => {
+    const total = buyers.length;
+    const active = buyers.filter((b) => b.status === "active").length;
+    const inactive = buyers.filter((b) => b.status === "inactive").length;
+    const newBuyers = buyers.filter((b) => b.status === "new").length;
+    return { total, active, inactive, newBuyers };
+  }, [buyers]);
+
+  // ---------- Filtered Buyers ----------
+
+  const filteredBuyers = useMemo(() => {
+    let result = [...buyers];
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (b) =>
+          b.name?.toLowerCase().includes(q) ||
+          b.email?.toLowerCase().includes(q) ||
+          b.company?.toLowerCase().includes(q),
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== "all") {
+      result = result.filter((b) => b.status === statusFilter);
+    }
+
+    return result;
+  }, [buyers, searchQuery, statusFilter]);
+
+  // ---------- Data Fetching ----------
+
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Fetch buyers
       const buyersResponse = await fetch("/api/buyers");
       if (!buyersResponse.ok) throw new Error("Failed to fetch buyers");
       const buyersData: IBuyer[] = await buyersResponse.json();
       setBuyers(buyersData);
 
-      // Fetch subscription limits
       const limitsResponse = await fetch(
         `/api/subscriptions/limits?sellerId=${sellerId}`,
       );
@@ -73,14 +181,6 @@ const BuyersPage: React.FC = () => {
         currentCount: buyersData.length,
         maxAllowed: limitsData.data?.subscriptionLimits?.buyers || 0,
       });
-
-      if (buyersData.length === 0) {
-        setSnackbar({
-          open: true,
-          message: "No buyers registered yet.",
-          severity: "info",
-        });
-      }
     } catch (err) {
       setError((err as Error).message);
       setSnackbar({
@@ -102,6 +202,8 @@ const BuyersPage: React.FC = () => {
       setIframeCode(code);
     }
   }, [sellerId]);
+
+  // ---------- Handlers ----------
 
   const handleAddNewBuyer = () => {
     if (subscriptionLimits.currentCount >= subscriptionLimits.maxAllowed) {
@@ -176,13 +278,13 @@ const BuyersPage: React.FC = () => {
     }
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard
       .writeText(text)
       .then(() => {
         setSnackbar({
           open: true,
-          message: "Copied to clipboard!",
+          message: `${label} copied to clipboard!`,
           severity: "success",
         });
       })
@@ -198,74 +300,297 @@ const BuyersPage: React.FC = () => {
   const isLimitReached =
     subscriptionLimits.currentCount >= subscriptionLimits.maxAllowed;
 
+  const limitPercentage =
+    subscriptionLimits.maxAllowed > 0
+      ? Math.round(
+          (subscriptionLimits.currentCount / subscriptionLimits.maxAllowed) *
+            100,
+        )
+      : 0;
+
   return (
-    <Box sx={{ width: "100%" }}>
-      <Typography variant="h5" gutterBottom sx={{ textAlign: "center", mb: 4 }}>
-        Lead Buyer Management
-      </Typography>
-
-      {/* Subscription Limit Info */}
-      {subscriptionLimits.currentCount === subscriptionLimits.maxAllowed && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6">
-              Buyer Limit: {subscriptionLimits.currentCount}/
-              {subscriptionLimits.maxAllowed}
-            </Typography>
-            <Typography color="error" sx={{ mt: 1 }}>
-              You've reached your buyer limit. Upgrade to add more buyers.
-              Kindly go to Settings to upgrade your subscription.
-            </Typography>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Action Buttons */}
+    <Box sx={{ width: "100%", p: { xs: 2, sm: 3 } }}>
+      {/* Header */}
       <Box
-        display="flex"
-        justifyContent="space-between"
-        mb={3}
-        flexWrap="wrap"
-        gap={2}
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          justifyContent: "space-between",
+          alignItems: { xs: "flex-start", sm: "center" },
+          gap: 2,
+          mb: 3,
+        }}
       >
-        <Button
-          variant="contained"
-          onClick={handleAddNewBuyer}
-          disabled={isLimitReached}
-        >
-          Add New Buyer
-        </Button>
-
-        <Box display="flex" gap={2} flexWrap="wrap">
+        <Box>
+          <Typography variant="h5" fontWeight="bold">
+            Lead Buyer Management
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Manage your lead buyers, registration, and distribution settings
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <Tooltip title="Refresh data">
+            <IconButton onClick={fetchData} size="small">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
           <Button
-            variant="outlined"
-            onClick={() => copyToClipboard(registrationLink)}
+            variant="contained"
+            startIcon={<PersonAddIcon />}
+            onClick={handleAddNewBuyer}
             disabled={isLimitReached}
-            startIcon={<ContentCopy />}
+            size={isMobile ? "small" : "medium"}
           >
-            Copy Registration Link
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => copyToClipboard(iframeCode)}
-            disabled={isLimitReached}
-            startIcon={<ContentCopy />}
-          >
-            Copy Iframe Code
+            Add Buyer
           </Button>
         </Box>
+      </Box>
+
+      {/* Limit Warning */}
+      {isLimitReached && (
+        <Alert
+          severity="warning"
+          icon={<WarningIcon />}
+          sx={{ mb: 3 }}
+          action={
+            <Button color="warning" size="small" variant="outlined">
+              Upgrade
+            </Button>
+          }
+        >
+          You&apos;ve reached your buyer limit (
+          {subscriptionLimits.currentCount}/{subscriptionLimits.maxAllowed}).
+          Upgrade your subscription to add more buyers.
+        </Alert>
+      )}
+
+      {/* Stats Cards */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatsCard
+            title="Total Buyers"
+            value={stats.total}
+            color={theme.palette.primary.main}
+            icon={<PeopleIcon fontSize="small" />}
+            subtitle={`${limitPercentage}% of limit`}
+          />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatsCard
+            title="Active"
+            value={stats.active}
+            color={theme.palette.success.main}
+            icon={<ActiveIcon fontSize="small" />}
+          />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatsCard
+            title="New"
+            value={stats.newBuyers}
+            color={theme.palette.info.main}
+            icon={<NewIcon fontSize="small" />}
+          />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatsCard
+            title="Inactive"
+            value={stats.inactive}
+            color={theme.palette.error.main}
+            icon={<InactiveIcon fontSize="small" />}
+          />
+        </Grid>
+      </Grid>
+
+      {/* Registration / Embed Section (Collapsible) */}
+      <Paper variant="outlined" sx={{ mb: 3, overflow: "hidden" }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: 2,
+            py: 1.5,
+            cursor: "pointer",
+            "&:hover": { bgcolor: "action.hover" },
+          }}
+          onClick={() => setShowEmbedSection(!showEmbedSection)}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <LinkIcon fontSize="small" color="primary" />
+            <Typography variant="subtitle2" fontWeight="bold">
+              Buyer Registration & Embed Code
+            </Typography>
+          </Box>
+          {showEmbedSection ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        </Box>
+        <Collapse in={showEmbedSection}>
+          <Box sx={{ px: 2, pb: 2 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  gutterBottom
+                  sx={{ display: "block" }}
+                >
+                  Registration Link
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={registrationLink}
+                  slotProps={{
+                    input: {
+                      readOnly: true,
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Tooltip title="Copy registration link">
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                copyToClipboard(
+                                  registrationLink,
+                                  "Registration link",
+                                )
+                              }
+                              disabled={isLimitReached}
+                            >
+                              <ContentCopy fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  gutterBottom
+                  sx={{ display: "block" }}
+                >
+                  Iframe Embed Code
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={iframeCode}
+                  slotProps={{
+                    input: {
+                      readOnly: true,
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Tooltip title="Copy iframe code">
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                copyToClipboard(iframeCode, "Iframe code")
+                              }
+                              disabled={isLimitReached}
+                            >
+                              <CodeIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </Box>
+        </Collapse>
+      </Paper>
+
+      {/* Search & Filter Toolbar */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          gap: 2,
+          mb: 3,
+          alignItems: { sm: "center" },
+        }}
+      >
+        <TextField
+          placeholder="Search by name, email, or company..."
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ flexGrow: 1, maxWidth: { sm: 400 } }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" color="action" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={statusFilter}
+            label="Status"
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <MenuItem value="all">All Statuses</MenuItem>
+            <MenuItem value="active">Active</MenuItem>
+            <MenuItem value="new">New</MenuItem>
+            <MenuItem value="inactive">Inactive</MenuItem>
+            <MenuItem value="suspended">Suspended</MenuItem>
+          </Select>
+        </FormControl>
+        <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
+          {filteredBuyers.length} of {buyers.length} buyer
+          {buyers.length !== 1 ? "s" : ""}
+        </Typography>
       </Box>
 
       {/* Buyer Table */}
       {loading ? (
         <LoadingComponent />
       ) : error ? (
-        <Alert severity="error">{error}</Alert>
-      ) : buyers.length === 0 ? (
-        <Alert severity="info">No buyers registered yet.</Alert>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      ) : filteredBuyers.length === 0 ? (
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 4,
+            textAlign: "center",
+          }}
+        >
+          <PeopleIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {buyers.length === 0
+              ? "No buyers registered yet"
+              : "No buyers match your search"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {buyers.length === 0
+              ? "Add your first buyer or share your registration link to get started."
+              : "Try adjusting your search or filter criteria."}
+          </Typography>
+          {buyers.length === 0 && (
+            <Button
+              variant="contained"
+              startIcon={<PersonAddIcon />}
+              onClick={handleAddNewBuyer}
+              disabled={isLimitReached}
+            >
+              Add First Buyer
+            </Button>
+          )}
+        </Paper>
       ) : (
         <BuyerTable
-          buyers={buyers}
+          buyers={filteredBuyers}
           onDelete={handleDelete}
           onEdit={handleEditBuyer}
         />
@@ -292,8 +617,15 @@ const BuyersPage: React.FC = () => {
         open={snackbar.open}
         autoHideDuration={4000}
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+        <Alert
+          variant="filled"
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        >
+          {snackbar.message}
+        </Alert>
       </Snackbar>
     </Box>
   );

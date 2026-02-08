@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
-import mongoose from "mongoose";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
-
-const connectDB = async () => {
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(process.env.MONGODB_URI!);
-  }
-};
+import dbConnect from "@/lib/connectdb";
+import { requireAdmin } from "@/lib/api/adminAuth";
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
-    await connectDB();
+    await dbConnect();
     const { id } = await params;
     const { status, role } = await req.json();
 
@@ -95,8 +93,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
-    await connectDB();
+    await dbConnect();
     const { id } = await params;
 
     // First find the user to check their role and get email if buyer

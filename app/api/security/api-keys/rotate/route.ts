@@ -9,11 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/userModel";
-import {
-  rotateHubSpotApiKey,
-  storeSalesforceCredentials,
-  storeZapierActionApiKey,
-} from "@/lib/security/apiKeyStorage";
+import { storeZapierActionApiKey } from "@/lib/security/apiKeyStorage";
 import { ApiKeySecurityService } from "@/lib/security/apiKeySecurityService";
 
 export const dynamic = "force-dynamic";
@@ -50,20 +46,6 @@ export async function POST(req: NextRequest) {
     }
 
     switch (keyType) {
-      case "hubspot":
-        if (!newKey) {
-          return NextResponse.json(
-            { error: "New HubSpot API key is required" },
-            { status: 400 },
-          );
-        }
-        await rotateHubSpotApiKey(userId, newKey);
-        return NextResponse.json({
-          success: true,
-          message: "HubSpot API key rotated successfully",
-          keyType: "hubspot",
-        });
-
       case "zapier":
         // Generate new Zapier key
         const newZapierKey = ApiKeySecurityService.generateApiKey();
@@ -74,20 +56,6 @@ export async function POST(req: NextRequest) {
           apiKey: newZapierKey,
           keyType: "zapier",
           warning: "Save this key - it won't be shown again!",
-        });
-
-      case "salesforce":
-        if (!body.credentials) {
-          return NextResponse.json(
-            { error: "Salesforce credentials are required" },
-            { status: 400 },
-          );
-        }
-        await storeSalesforceCredentials(userId, body.credentials);
-        return NextResponse.json({
-          success: true,
-          message: "Salesforce credentials rotated successfully",
-          keyType: "salesforce",
         });
 
       default:

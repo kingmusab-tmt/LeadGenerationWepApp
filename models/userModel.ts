@@ -163,6 +163,11 @@ const UserSchema: Schema = new Schema<IUser>(
       type: Boolean,
       default: true,
     },
+    leadPricing: {
+      high: { type: Number, default: 10, min: 0 },
+      medium: { type: Number, default: 5, min: 0 },
+      low: { type: Number, default: 2, min: 0 },
+    },
     emailSettings: EmailSettingsSchema,
     apiSettings: ApiSettingsSchema,
     stripeAccountId: { type: String },

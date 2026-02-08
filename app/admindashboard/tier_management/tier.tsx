@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Button,
@@ -26,7 +26,8 @@ import {
   RadioGroup,
   FormControl,
   FormLabel,
-  Divider,
+  Tooltip,
+  Badge,
 } from "@mui/material";
 import {
   DndContext,
@@ -49,6 +50,10 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import PreviewIcon from "@mui/icons-material/Preview";
+import PeopleIcon from "@mui/icons-material/People";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useNotification } from "@/lib/useNotification";
 
 interface TierLimits {
   leads: number;
@@ -96,7 +101,12 @@ const defaultTierLimits: TierLimits = {
 };
 
 const TierManagement = () => {
+  const csrfFetch = useCSRFFetch();
+  const notify = useNotification();
   const [tiers, setTiers] = useState<Tier[]>([]);
+  const [subscriberCounts, setSubscriberCounts] = useState<
+    Record<string, number>
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
@@ -109,6 +119,8 @@ const TierManagement = () => {
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showLimits, setShowLimits] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [previewTier, setPreviewTier] = useState<Tier | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -121,23 +133,27 @@ const TierManagement = () => {
     }),
   );
 
-  useEffect(() => {
-    fetchTiers();
-  }, []);
-
-  const fetchTiers = async () => {
+  const fetchTiers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/tier");
-      if (!response.ok) throw new Error("Failed to fetch tiers");
-      const data = await response.json();
-      // Ensure tierType is properly set based on price and add default limits if missing
+      const [tiersRes, countsRes] = await Promise.all([
+        fetch("/api/admin/tier"),
+        fetch("/api/admin/tier/subscribers"),
+      ]);
+
+      if (!tiersRes.ok) throw new Error("Failed to fetch tiers");
+      const data = await tiersRes.json();
       const processedTiers = data.map((tier: Tier) => ({
         ...tier,
         tierType: tier.price === "0" ? "free" : "paid",
         tierLimits: tier.tierLimits || { ...defaultTierLimits },
       }));
       setTiers(processedTiers);
+
+      if (countsRes.ok) {
+        const countsData = await countsRes.json();
+        setSubscriberCounts(countsData.counts || {});
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unknown error occurred",
@@ -150,7 +166,11 @@ const TierManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchTiers();
+  }, [fetchTiers]);
 
   const handleOpenDialog = (tier: Partial<Tier> | null) => {
     const baseTier = tier || {
@@ -285,7 +305,7 @@ const TierManagement = () => {
         ? `/api/admin/tier?id=${currentTier._id}`
         : "/api/admin/tier";
 
-      const response = await fetch(url, {
+      const response = await csrfFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tierToSave),
@@ -311,7 +331,7 @@ const TierManagement = () => {
 
   const handleDeleteTier = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/tier/?id=${id}`, {
+      const response = await csrfFetch(`/api/admin/tier/?id=${id}`, {
         method: "DELETE",
       });
 
@@ -322,6 +342,7 @@ const TierManagement = () => {
         message: "Tier deleted successfully",
         severity: "success",
       });
+      setDeleteConfirmId(null);
       fetchTiers();
     } catch (err) {
       setSnackbar({
@@ -329,6 +350,7 @@ const TierManagement = () => {
         message: err instanceof Error ? err.message : "Failed to delete tier",
         severity: "error",
       });
+      setDeleteConfirmId(null);
     }
   };
 
@@ -349,7 +371,7 @@ const TierManagement = () => {
     setTiers(updatedTiers);
 
     try {
-      await fetch("/api/admin/tier/reorder", {
+      await csrfFetch("/api/admin/tier/reorder", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tiers: updatedTiers }),
@@ -490,7 +512,22 @@ const TierManagement = () => {
                             </>
                           }
                         />
-                        <Box>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          {subscriberCounts[tier._id] !== undefined && (
+                            <Tooltip
+                              title={`${subscriberCounts[tier._id]} subscriber(s)`}
+                            >
+                              <Badge
+                                badgeContent={subscriberCounts[tier._id]}
+                                color="info"
+                                showZero
+                                max={9999}
+                                sx={{ mr: 1 }}
+                              >
+                                <PeopleIcon fontSize="small" color="action" />
+                              </Badge>
+                            </Tooltip>
+                          )}
                           <IconButton
                             onClick={(e) => {
                               e.stopPropagation();
@@ -500,10 +537,21 @@ const TierManagement = () => {
                           >
                             <EditIcon />
                           </IconButton>
+                          <Tooltip title="Preview">
+                            <IconButton
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewTier(tier);
+                              }}
+                              color="default"
+                            >
+                              <PreviewIcon />
+                            </IconButton>
+                          </Tooltip>
                           <IconButton
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteTier(tier._id);
+                              setDeleteConfirmId(tier._id);
                             }}
                             color="error"
                           >
@@ -937,6 +985,128 @@ const TierManagement = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)}>
+        <DialogTitle>Delete Tier</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this tier?
+            {deleteConfirmId && subscriberCounts[deleteConfirmId] > 0 && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                This tier currently has {subscriberCounts[deleteConfirmId]}{" "}
+                active subscriber(s). They will need to be migrated to another
+                tier.
+              </Alert>
+            )}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+          <Button
+            onClick={() => deleteConfirmId && handleDeleteTier(deleteConfirmId)}
+            color="error"
+            variant="contained"
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Tier Preview Dialog */}
+      <Dialog
+        open={!!previewTier}
+        onClose={() => setPreviewTier(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Public Pricing Preview</DialogTitle>
+        <DialogContent>
+          {previewTier && (
+            <Paper
+              elevation={previewTier.highlight ? 8 : 2}
+              sx={{
+                p: 3,
+                textAlign: "center",
+                border: previewTier.highlight ? "2px solid" : "1px solid",
+                borderColor: previewTier.highlight ? "primary.main" : "divider",
+                borderRadius: 2,
+                position: "relative",
+                overflow: "visible",
+              }}
+            >
+              {previewTier.highlight && (
+                <Chip
+                  label="Most Popular"
+                  color="primary"
+                  size="small"
+                  sx={{
+                    position: "absolute",
+                    top: -12,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                  }}
+                />
+              )}
+              <Typography variant="h5" fontWeight="bold" gutterBottom>
+                {previewTier.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {previewTier.description}
+              </Typography>
+              <Typography variant="h3" fontWeight="bold" color="primary">
+                $
+                {previewTier.discountedPrice &&
+                parseFloat(previewTier.discountedPrice) > 0
+                  ? previewTier.discountedPrice
+                  : previewTier.price}
+                <Typography
+                  component="span"
+                  variant="body1"
+                  color="text.secondary"
+                >
+                  /mo
+                </Typography>
+              </Typography>
+              {previewTier.discountPercentage &&
+                previewTier.discountPercentage > 0 && (
+                  <Typography
+                    variant="body2"
+                    color="success.main"
+                    sx={{ mt: 0.5 }}
+                  >
+                    Save {previewTier.discountPercentage}% on first year
+                  </Typography>
+                )}
+              <Box sx={{ textAlign: "left", mt: 3 }}>
+                {previewTier.features.map((feature, i) => (
+                  <Box
+                    key={i}
+                    sx={{ display: "flex", alignItems: "center", mb: 1 }}
+                  >
+                    <CheckCircleIcon
+                      color="primary"
+                      sx={{ mr: 1, fontSize: 20 }}
+                    />
+                    <Typography variant="body2">{feature}</Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Button
+                variant={previewTier.highlight ? "contained" : "outlined"}
+                color="primary"
+                fullWidth
+                sx={{ mt: 3 }}
+              >
+                {previewTier.ctaText || "Get Started"}
+              </Button>
+            </Paper>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewTier(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

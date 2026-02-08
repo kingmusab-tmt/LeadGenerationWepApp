@@ -1,7 +1,7 @@
 /**
  * Webhook Handler
  * Manages webhook creation, verification, dispatch, and processing
- * Supports multiple sources: Zapier, HubSpot, Salesforce,  custom
+ * Supports multiple sources: Zapier, custom
  *
  * Date: January 21, 2026
  */
@@ -16,7 +16,7 @@ export interface WebhookPayload {
   type: "lead" | "deal" | "contact" | "event" | "call" | "assignment";
   action: "created" | "updated" | "deleted" | "accepted" | "rejected";
   data: Record<string, unknown>;
-  source: "zapier" | "hubspot" | "salesforce" | "internal";
+  source: "zapier" | "internal";
   timestamp: Date;
   signature?: string; // HMAC signature for verification
   retryCount?: number; // For retry tracking
@@ -29,7 +29,7 @@ export interface WebhookConfig {
   id: string;
   userId: string; // Seller/User ID
   url: string;
-  source: "zapier" | "hubspot" | "salesforce" | "custom";
+  source: "zapier" | "custom";
   secret: string; // For HMAC signing
   isActive: boolean;
 

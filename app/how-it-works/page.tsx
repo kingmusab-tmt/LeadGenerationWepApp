@@ -137,26 +137,24 @@ const HowItWorksPage = () => {
           </Typography>
 
           <Grid container spacing={4} mt={6} justifyContent="center">
-            {["Salesforce", "HubSpot", "Zapier", "Facebook", "Google Ads"].map(
-              (integration) => (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={integration}>
-                  <Paper
-                    elevation={2}
-                    sx={{ p: 3, textAlign: "center", width: 150 }}
-                  >
-                    <Box
-                      component="img"
-                      src={`/integrations/${integration
-                        .toLowerCase()
-                        .replace(" ", "-")}.png`}
-                      alt={integration}
-                      sx={{ height: 40, mb: 1 }}
-                    />
-                    <Typography>{integration}</Typography>
-                  </Paper>
-                </Grid>
-              ),
-            )}
+            {["Zapier", "Facebook", "Google Ads"].map((integration) => (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={integration}>
+                <Paper
+                  elevation={2}
+                  sx={{ p: 3, textAlign: "center", width: 150 }}
+                >
+                  <Box
+                    component="img"
+                    src={`/integrations/${integration
+                      .toLowerCase()
+                      .replace(" ", "-")}.png`}
+                    alt={integration}
+                    sx={{ height: 40, mb: 1 }}
+                  />
+                  <Typography>{integration}</Typography>
+                </Paper>
+              </Grid>
+            ))}
           </Grid>
         </Container>
       </Box>

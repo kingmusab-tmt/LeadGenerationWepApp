@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { Lead } from "@/models/leads";
 import Form from "@/models/form";
+import { User } from "@/models/userModel";
 import { processLeadDistribution } from "@/lib/leadAssignmentService";
 import { sendNotification } from "@/lib/notificationService";
 import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
-import { processAutoAcceptPurchases } from "@/lib/autoAcceptPurchaseService";
 
 interface Field {
   id: string;
@@ -346,6 +346,28 @@ export async function POST(request: Request) {
         isValid: normalizedIsValid,
         reason: normalizedReason,
       });
+
+      // Apply seller's quality-based lead pricing
+      try {
+        const seller = await User.findById(formOwnerId)
+          .select("leadPricing")
+          .lean();
+        const pricing = (seller as any)?.leadPricing || {
+          high: 10,
+          medium: 5,
+          low: 2,
+        };
+        const unitPrice =
+          qualityLevel === "High"
+            ? pricing.high
+            : qualityLevel === "Low"
+              ? pricing.low
+              : pricing.medium;
+        await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
+        console.log("✅ Lead unit price set:", { qualityLevel, unitPrice });
+      } catch (pricingError) {
+        console.error("⚠️ Error setting lead pricing:", pricingError);
+      }
     } catch (aiError) {
       console.error("❌ Error in AI quality assessment:", aiError);
       // Don't fail the entire request - assign default medium quality
@@ -381,7 +403,13 @@ export async function POST(request: Request) {
     // 3. AUTOMATIC LEAD DISTRIBUTION & ASSIGNMENT
     // ========================================
     try {
-      const distributionResult = await processLeadDistribution(lead);
+      // Re-fetch the lead to get the updated AI quality scores
+      const scoredLead = await Lead.findById(lead._id);
+      if (!scoredLead) {
+        throw new Error(`Lead ${lead._id} not found after AI scoring`);
+      }
+
+      const distributionResult = await processLeadDistribution(scoredLead);
 
       console.log("✅ Lead distribution processed:", {
         leadId: lead._id,
@@ -419,26 +447,6 @@ export async function POST(request: Request) {
           console.log(
             `✅ Marketplace notifications sent to ${marketplaceResult.notificationResult?.notifiedBuyers.length || 0} buyers`,
           );
-
-          // Trigger auto-accept purchases
-          try {
-            const autoPurchaseResult =
-              await processAutoAcceptPurchases(updatedLead);
-            const successCount = autoPurchaseResult.purchasedByBuyers.filter(
-              (b) => b.success,
-            ).length;
-            const failureCount = autoPurchaseResult.purchasedByBuyers.filter(
-              (b) => !b.success,
-            ).length;
-            console.log(
-              `💰 Auto-purchase: ${successCount} purchased, ${failureCount} failed`,
-            );
-          } catch (autoPurchaseError) {
-            console.error(
-              "⚠️ Error processing auto-accept purchases:",
-              autoPurchaseError,
-            );
-          }
         } catch (marketplaceError) {
           console.error(
             "⚠️ Error making lead available in marketplace:",

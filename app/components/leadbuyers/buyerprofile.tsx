@@ -2,13 +2,11 @@ import React from "react";
 import {
   Box,
   Typography,
-  Paper,
   Chip,
   Divider,
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Grid,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Buyer } from "@/types/buyer";
@@ -33,49 +31,120 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
   };
 
   return (
-    <Paper elevation={3} sx={{ padding: 3, marginBottom: 4 }}>
-      <Typography variant="h5" gutterBottom fontWeight="bold">
-        Buyer Profile
-      </Typography>
-
+    <Box
+      sx={{
+        overflow: "hidden",
+        "& .MuiTypography-root": { wordBreak: "break-word" },
+      }}
+    >
       {/* BASIC INFORMATION */}
-      <Box sx={{ marginTop: 2, marginBottom: 2 }}>
+      <Box sx={{ mb: 3 }}>
         <Typography variant="h6" color="primary" gutterBottom>
           Basic Information
         </Typography>
         <Divider sx={{ mb: 2 }} />
-        <Typography>
-          <strong>Name:</strong> {buyer.name}
-        </Typography>
-        <Typography>
-          <strong>Company:</strong> {buyer.company || "Not specified"}
-        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "1fr 1fr",
+              md: "1fr 1fr 1fr",
+            },
+            gap: 2,
+            mb: 2,
+          }}
+        >
+          <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Name
+            </Typography>
+            <Typography variant="body2" fontWeight={500}>
+              {buyer.name}
+            </Typography>
+          </Box>
+          <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Company
+            </Typography>
+            <Typography variant="body2" fontWeight={500}>
+              {buyer.company || "Not specified"}
+            </Typography>
+          </Box>
+          <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Email
+            </Typography>
+            <Typography variant="body2" fontWeight={500}>
+              {buyer.email}
+            </Typography>
+          </Box>
+          <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Phone
+            </Typography>
+            <Typography variant="body2" fontWeight={500}>
+              {buyer.phone || "Not specified"}
+            </Typography>
+          </Box>
+          {buyer.businessWebsite && (
+            <Box
+              sx={{
+                p: 1.5,
+                bgcolor: "action.hover",
+                borderRadius: 1,
+                gridColumn: { sm: "span 2" },
+                overflow: "hidden",
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Website
+              </Typography>
+              <Typography
+                variant="body2"
+                fontWeight={500}
+                sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+              >
+                {buyer.businessWebsite}
+              </Typography>
+            </Box>
+          )}
+          {buyer.companyRegNo && (
+            <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Company Reg No
+              </Typography>
+              <Typography variant="body2" fontWeight={500}>
+                {buyer.companyRegNo}
+              </Typography>
+            </Box>
+          )}
+          {buyer.vatTaxRegNo && (
+            <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                VAT/Tax Reg No
+              </Typography>
+              <Typography variant="body2" fontWeight={500}>
+                {buyer.vatTaxRegNo}
+              </Typography>
+            </Box>
+          )}
+        </Box>
         {buyer.businessDescription && (
-          <Typography>
-            <strong>Business Description:</strong> {buyer.businessDescription}
-          </Typography>
+          <Box
+            sx={{
+              p: 1.5,
+              bgcolor: "action.hover",
+              borderRadius: 1,
+              mb: 2,
+            }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              Business Description
+            </Typography>
+            <Typography variant="body2">{buyer.businessDescription}</Typography>
+          </Box>
         )}
-        {buyer.businessWebsite && (
-          <Typography>
-            <strong>Website:</strong> {buyer.businessWebsite}
-          </Typography>
-        )}
-        {buyer.companyRegNo && (
-          <Typography>
-            <strong>Company Reg No:</strong> {buyer.companyRegNo}
-          </Typography>
-        )}
-        {buyer.vatTaxRegNo && (
-          <Typography>
-            <strong>VAT/Tax Reg No:</strong> {buyer.vatTaxRegNo}
-          </Typography>
-        )}
-        <Typography>
-          <strong>Email:</strong> {buyer.email}
-        </Typography>
-        <Typography>
-          <strong>Phone:</strong> {buyer.phone || "Not specified"}
-        </Typography>
         {buyer.contactAddress &&
           (buyer.contactAddress.addressLine1 || buyer.contactAddress.city) && (
             <Box sx={{ mt: 1 }}>
@@ -104,25 +173,52 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
               </Box>
             </Box>
           )}
-        <Typography>
-          <strong>Units Balance:</strong> {buyer.walletUnit}
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography>
-            <strong>Status:</strong>
-          </Typography>
-          <Chip
-            label={buyer.status}
-            color={buyer.status === "active" ? "success" : "default"}
-            size="small"
-          />
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr 1fr",
+              sm: "1fr 1fr 1fr 1fr",
+            },
+            gap: 2,
+          }}
+        >
+          <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Units Balance
+            </Typography>
+            <Typography variant="body2" fontWeight={600}>
+              {buyer.walletUnit}
+            </Typography>
+          </Box>
+          <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Status
+            </Typography>
+            <Chip
+              label={buyer.status}
+              color={buyer.status === "active" ? "success" : "default"}
+              size="small"
+              sx={{ mt: 0.5 }}
+            />
+          </Box>
+          <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Priority
+            </Typography>
+            <Typography variant="body2" fontWeight={600}>
+              {buyer.priority ?? 5} / 10
+            </Typography>
+          </Box>
+          <Box sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Active
+            </Typography>
+            <Typography variant="body2" fontWeight={600}>
+              {buyer.isActive ? "Yes" : "No"}
+            </Typography>
+          </Box>
         </Box>
-        <Typography>
-          <strong>Priority:</strong> {buyer.priority ?? 5} / 10
-        </Typography>
-        <Typography>
-          <strong>Active:</strong> {buyer.isActive ? "Yes" : "No"}
-        </Typography>
       </Box>
 
       {/* LOCATION PREFERENCES */}
@@ -650,7 +746,7 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
           </AccordionDetails>
         </Accordion>
       )}
-    </Paper>
+    </Box>
   );
 };
 

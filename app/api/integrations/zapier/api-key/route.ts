@@ -48,7 +48,10 @@ export async function POST(req: NextRequest) {
       };
     }
 
+    // Store hash + truncated preview (first 8 + last 4 chars)
+    const truncatedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
     (user.apiSettings as any).zapierApiKeyHash = apiKeyHash;
+    (user.apiSettings as any).zapierApiKeyTruncated = truncatedKey;
     (user.apiSettings as any).zapierApiKeyCreatedAt = new Date();
 
     await user.save();
@@ -94,6 +97,7 @@ export async function DELETE(req: NextRequest) {
     // Remove API key hash
     if (user.apiSettings) {
       delete (user.apiSettings as any).zapierApiKeyHash;
+      delete (user.apiSettings as any).zapierApiKeyTruncated;
       delete (user.apiSettings as any).zapierApiKeyCreatedAt;
       await user.save();
     }
@@ -133,10 +137,13 @@ export async function GET(req: NextRequest) {
 
     const hasApiKey = !!(user.apiSettings as any)?.zapierApiKeyHash;
     const createdAt = (user.apiSettings as any)?.zapierApiKeyCreatedAt;
+    const truncatedKey =
+      (user.apiSettings as any)?.zapierApiKeyTruncated || null;
 
     return NextResponse.json({
       exists: hasApiKey,
       createdAt: createdAt || null,
+      truncatedKey: hasApiKey ? truncatedKey : null,
       message: hasApiKey
         ? "API key is active"
         : "No API key configured. Generate one to use Zapier actions.",

@@ -8,17 +8,15 @@ import { Lead } from "@/models/leads";
 import Call from "@/models/call";
 import { Verifications } from "@/models/vertification";
 import { Buyer } from "@/models/leadbuyers";
-
-// Connect to MongoDB if not already connected
-const connectDB = async () => {
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(process.env.MONGODB_URI!);
-  }
-};
+import dbConnect from "@/lib/connectdb";
+import { requireAdmin } from "@/lib/api/adminAuth";
 
 export async function GET(req: NextRequest) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
-    await connectDB();
+    await dbConnect();
 
     // Get date ranges for analytics
     const now = new Date();

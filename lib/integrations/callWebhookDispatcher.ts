@@ -1,7 +1,7 @@
 /**
  * Call Webhook Dispatcher
  * Fires webhooks for call events to configured external endpoints
- * (Zapier, HubSpot, Salesforce, custom webhooks).
+ * (Zapier, custom webhooks).
  *
  * Uses the existing WebhookManager infrastructure for dispatch,
  * retry, and signature signing.
@@ -84,11 +84,7 @@ export async function dispatchCallWebhook(
           id: config._id?.toString() || "",
           userId: config.userId?.toString() || "",
           url: config.url,
-          source: config.source as
-            | "zapier"
-            | "hubspot"
-            | "salesforce"
-            | "custom",
+          source: config.source as "zapier" | "custom",
           secret: config.secret,
           isActive: config.isActive,
           events: config.events,

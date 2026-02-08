@@ -125,9 +125,7 @@ export async function PUT(req: NextRequest) {
     if (
       typeof body.preferredDistribution === "string" &&
       body.preferredDistribution.trim() &&
-      ["Automatic", "Manual", "Both", "Direct"].includes(
-        body.preferredDistribution,
-      )
+      ["Automatic", "Manual", "Both"].includes(body.preferredDistribution)
     ) {
       update.preferredDistribution = body.preferredDistribution.trim();
     }

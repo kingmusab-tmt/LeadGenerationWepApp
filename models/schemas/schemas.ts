@@ -201,6 +201,9 @@ export const ApiSettingsSchema = {
       message: "Invalid phone number format",
     },
   },
+  zapierApiKeyHash: { type: String, default: "" },
+  zapierApiKeyTruncated: { type: String, default: "" },
+  zapierApiKeyCreatedAt: { type: Date, default: null },
 };
 
 /**

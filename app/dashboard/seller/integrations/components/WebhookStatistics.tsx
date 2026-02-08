@@ -136,7 +136,14 @@ export default function WebhookStatistics({ onNotify }: Props) {
 
   return (
     <Box>
-      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between" }}>
+      <Box
+        sx={{
+          mb: 3,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <div>
           <Typography variant="h6" gutterBottom>
             Webhook Activity & Statistics
@@ -151,8 +158,8 @@ export default function WebhookStatistics({ onNotify }: Props) {
       </Box>
 
       {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, md: 2 }}>
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid size={{ xs: 6, md: 2 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" variant="body2" gutterBottom>
@@ -162,7 +169,7 @@ export default function WebhookStatistics({ onNotify }: Props) {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
+        <Grid size={{ xs: 6, md: 2 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" variant="body2" gutterBottom>
@@ -174,7 +181,7 @@ export default function WebhookStatistics({ onNotify }: Props) {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
+        <Grid size={{ xs: 6, md: 2 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" variant="body2" gutterBottom>
@@ -184,7 +191,7 @@ export default function WebhookStatistics({ onNotify }: Props) {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
+        <Grid size={{ xs: 6, md: 2 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" variant="body2" gutterBottom>
@@ -196,7 +203,7 @@ export default function WebhookStatistics({ onNotify }: Props) {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
+        <Grid size={{ xs: 6, md: 2 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" variant="body2" gutterBottom>
@@ -208,7 +215,7 @@ export default function WebhookStatistics({ onNotify }: Props) {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
+        <Grid size={{ xs: 6, md: 2 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" variant="body2" gutterBottom>

@@ -44,6 +44,7 @@ import {
   Email,
   Sms,
   ViewList,
+  Extension,
 } from "@mui/icons-material";
 import { useRouter, usePathname } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
@@ -144,6 +145,11 @@ const navItems: NavItem[] = [
     title: "Call Tracking",
     path: "calltrackingsetting",
     icon: <Call />,
+  },
+  {
+    title: "Integrations",
+    path: "integrations",
+    icon: <Extension />,
   },
 ];
 
@@ -277,7 +283,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
             L
           </Box>
           <Typography variant="h6" fontWeight={700}>
-            LeadGen
+            Brixcot
           </Typography>
         </Box>
         {isMobile && (
@@ -539,7 +545,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               L
             </Box>
             <Typography variant="h6" fontWeight={700} color="text.primary">
-              LeadGen
+              Brixcot
             </Typography>
           </Box>
 

@@ -52,7 +52,7 @@ const SectionHeader = styled(Typography)({
   letterSpacing: "0.5px",
 });
 
-const preferredDistributionOptions = ["Manual", "Automatic", "Direct"];
+const preferredDistributionOptions = ["Manual", "Automatic", "Both"];
 
 const notificationPreferencesOptions = ["Email", "SMS", "In-App Notification"];
 

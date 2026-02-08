@@ -1,7 +1,7 @@
 /**
  * Webhook Configuration Model
  * Stores webhook endpoints and their configurations for all sources
- * (Zapier, HubSpot, Salesforce, custom webhooks)
+ * (Zapier, custom webhooks)
  *
  * Date: January 21, 2026
  */
@@ -47,7 +47,7 @@ export interface IWebhookConfig extends Document {
   name: string; // Human-readable name
   description?: string;
   url: string; // Endpoint URL to send webhooks to
-  source: "zapier" | "hubspot" | "salesforce" | "custom";
+  source: "zapier" | "custom";
 
   // Events configuration
   events: IWebhookEvents;
@@ -134,8 +134,8 @@ const WebhookConfigSchema: Schema = new Schema<IWebhookConfig>(
     source: {
       type: String,
       enum: {
-        values: ["zapier", "hubspot", "salesforce", "custom"],
-        message: "Source must be zapier, hubspot, salesforce, or custom",
+        values: ["zapier", "custom"],
+        message: "Source must be zapier or custom",
       },
       default: "custom",
       index: true,

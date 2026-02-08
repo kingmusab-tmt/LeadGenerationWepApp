@@ -32,7 +32,48 @@ export const createLeadSchema = z.object({
   customFields: z.record(z.string(), z.any()).optional(),
 });
 
-export const updateLeadSchema = createLeadSchema.partial();
+export const updateLeadSchema = z
+  .object({
+    name: z.string().max(100).optional(),
+    email: z.string().email("Invalid email").optional(),
+    phone: z.string().max(20).optional(),
+    source: z.string().max(50).optional(),
+    status: z
+      .enum([
+        "new",
+        "contacted",
+        "qualified",
+        "converted",
+        "lost",
+        "available",
+        "sold",
+        "assigned",
+        "unqualified",
+        "transferred",
+      ])
+      .optional(),
+    notes: z.string().max(500).optional(),
+    customFields: z.record(z.string(), z.any()).optional(),
+    company: z.string().max(200).optional(),
+    industry: z.string().max(100).optional(),
+    distributionMethod: z
+      .enum(["manual", "auto", "marketplace", "round_robin"])
+      .optional(),
+    unit: z.number().min(0).optional(),
+    fields: z
+      .array(
+        z
+          .object({
+            label: z.string(),
+            value: z.any(),
+            type: z.string().optional(),
+            id: z.string().optional(),
+          })
+          .strip(),
+      )
+      .optional(),
+  })
+  .strip();
 
 export const bulkImportLeadsSchema = z.object({
   leads: z.array(createLeadSchema).min(1, "At least one lead is required"),
@@ -385,6 +426,13 @@ export const updateSettingsSchema = z.object({
   distributionMode: z.enum(["automatic", "marketplace", "both"]).optional(),
   aiQualityThreshold: z.number().int().min(0).max(100).optional(),
   marketplaceFallback: z.boolean().optional(),
+  leadPricing: z
+    .object({
+      high: z.number().min(0).optional(),
+      medium: z.number().min(0).optional(),
+      low: z.number().min(0).optional(),
+    })
+    .optional(),
   emailSettings: z
     .object({
       smtpServer: z.string().optional(),

@@ -62,9 +62,10 @@ export default function TrackingNumbersTable({
 
   // Filter numbers
   const filteredNumbers = useMemo(() => {
-    if (!search) return numbers;
+    const list = Array.isArray(numbers) ? numbers : [];
+    if (!search) return list;
     const q = search.toLowerCase();
-    return numbers.filter(
+    return list.filter(
       (n) =>
         n.phoneNumber.toLowerCase().includes(q) ||
         n.industry?.toLowerCase().includes(q) ||

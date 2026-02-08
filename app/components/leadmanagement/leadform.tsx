@@ -31,7 +31,14 @@ interface Lead {
   userId: string;
   fields: Array<{ id: string; label: string; value: string; _id?: string }>;
   createdAt: string;
-  status: "new" | "available" | "assigned" | "sold";
+  status:
+    | "new"
+    | "available"
+    | "assigned"
+    | "sold"
+    | "qualified"
+    | "unqualified"
+    | "transferred";
   distributionMethod: "manual" | "round_robin" | "marketplace";
   exclusive: boolean;
   unit: number;

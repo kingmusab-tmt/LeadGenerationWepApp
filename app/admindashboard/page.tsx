@@ -1,9 +1,7 @@
-import AdminDashboard from "./layout";
+import { redirect } from "next/navigation";
 
-// import AdminDashboard from "./layout";
-
-const AdminPage: React.FC = () => {
-  return <AdminDashboard children={undefined} />;
+const AdminPage = () => {
+  redirect("/admindashboard/overview");
 };
 
 export default AdminPage;

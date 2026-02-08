@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       query.status = queryParams.status;
     }
     if (queryParams.source) {
-      query.source = queryParams.source;
+      query.leadSource = queryParams.source;
     }
 
     const skip = (queryParams.page - 1) * queryParams.limit;
@@ -159,6 +159,10 @@ export async function PUT(req: NextRequest) {
       validatedData = await updateLeadSchema.parseAsync(body);
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error(
+          "[PUT /api/leads] Zod validation error:",
+          JSON.stringify(error.issues, null, 2),
+        );
         return handleValidationError(error);
       }
       return badRequest("Invalid request body");
@@ -172,7 +176,10 @@ export async function PUT(req: NextRequest) {
     }
 
     // Verify ownership (unless admin)
-    if (session.user.role !== "admin" && lead.userId !== session.user.id) {
+    if (
+      session.user.role !== "admin" &&
+      lead.userId.toString() !== session.user.id
+    ) {
       return unauthorized("You cannot modify this lead");
     }
 
@@ -226,7 +233,10 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Verify ownership (unless admin)
-    if (session.user.role !== "admin" && lead.userId !== session.user.id) {
+    if (
+      session.user.role !== "admin" &&
+      lead.userId.toString() !== session.user.id
+    ) {
       return unauthorized("You cannot delete this lead");
     }
 

@@ -11,10 +11,7 @@ import { Buyer, IBuyer } from "@/models/leadbuyers";
 import Form from "@/models/form";
 import { User } from "@/models";
 import { sendNotification } from "@/lib/notificationService";
-import {
-  processAutoAcceptPurchases,
-  AutoPurchaseResult,
-} from "@/lib/autoAcceptPurchaseService";
+
 import {
   makeLeadAvailableInMarketplace,
   MarketplaceNotificationResult,
@@ -869,29 +866,6 @@ export async function processLeadDistribution(
         });
       }
 
-      // Trigger auto-accept purchases for buyers with auto-accept enabled
-      try {
-        const autoPurchaseResult = await processAutoAcceptPurchases(lead);
-        console.log(
-          `💰 Auto-purchase processing: ${autoPurchaseResult.purchasedByBuyers.filter((r: any) => r.success).length} purchased, ${autoPurchaseResult.purchasedByBuyers.filter((r: any) => !r.success).length} failed`,
-        );
-        result.assignedBuyers.push(
-          ...autoPurchaseResult.purchasedByBuyers
-            .filter((r: any) => r.success)
-            .map((r: any) => ({
-              buyerId: r.buyerId,
-              buyerEmail: r.buyerEmail || "",
-              reason: "Auto-purchased from marketplace",
-            })),
-        );
-      } catch (error) {
-        console.error("Error processing auto-accept purchases:", error);
-        result.errors.push({
-          step: "auto_accept_purchases",
-          error: String(error),
-        });
-      }
-
       // Notify seller
       try {
         await sendNotification({
@@ -1103,20 +1077,6 @@ export async function processLeadDistribution(
               console.log(
                 `📢 Shared lead ${lead._id} made available in marketplace (${totalAssignments}/${sharedCount} slots filled)`,
               );
-
-              const autoPurchaseResult = await processAutoAcceptPurchases(lead);
-              console.log(
-                `💰 Auto-purchase processing: ${autoPurchaseResult.purchasedByBuyers.filter((r: any) => r.success).length} additional purchases`,
-              );
-              result.assignedBuyers.push(
-                ...autoPurchaseResult.purchasedByBuyers
-                  .filter((r: any) => r.success)
-                  .map((r: any) => ({
-                    buyerId: r.buyerId,
-                    buyerEmail: r.buyerEmail || "",
-                    reason: "Auto-purchased (shared lead - marketplace)",
-                  })),
-              );
             } catch (error) {
               console.error(
                 "Error with shared lead marketplace availability:",
@@ -1136,15 +1096,8 @@ export async function processLeadDistribution(
         if (lead.shared) {
           try {
             await makeLeadAvailableInMarketplace(lead, "unmatched");
-            const autoPurchaseResult = await processAutoAcceptPurchases(lead);
-            result.assignedBuyers.push(
-              ...autoPurchaseResult.purchasedByBuyers
-                .filter((r: any) => r.success)
-                .map((r: any) => ({
-                  buyerId: r.buyerId,
-                  buyerEmail: r.buyerEmail || "",
-                  reason: "Auto-purchased (shared lead - assignment fallback)",
-                })),
+            console.log(
+              `📢 Shared lead ${lead._id} made available in marketplace (assignment fallback)`,
             );
           } catch (error) {
             console.error("Error with marketplace fallback:", error);

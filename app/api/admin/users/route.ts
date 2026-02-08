@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
-import mongoose from "mongoose";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
-
-const connectDB = async () => {
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(process.env.MONGODB_URI!);
-  }
-};
+import dbConnect from "@/lib/connectdb";
+import { requireAdmin, escapeRegex } from "@/lib/api/adminAuth";
 
 export async function GET(req: NextRequest) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+
   try {
-    await connectDB();
+    await dbConnect();
 
     const searchParams = req.nextUrl.searchParams;
     const search = searchParams.get("search") || "";
@@ -24,8 +22,8 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       conditions.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
+        { name: { $regex: escapeRegex(search), $options: "i" } },
+        { email: { $regex: escapeRegex(search), $options: "i" } },
       ];
     }
 
@@ -49,8 +47,8 @@ export async function GET(req: NextRequest) {
       const buyerConditions: any = {};
       if (search) {
         buyerConditions.$or = [
-          { name: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } },
+          { name: { $regex: escapeRegex(search), $options: "i" } },
+          { email: { $regex: escapeRegex(search), $options: "i" } },
         ];
       }
       if (status !== "all") {

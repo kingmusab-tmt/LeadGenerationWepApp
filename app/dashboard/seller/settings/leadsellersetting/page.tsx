@@ -14,6 +14,7 @@ import {
   Switch,
   Paper,
   Divider,
+  CircularProgress,
 } from "@mui/material";
 import axios from "axios";
 import { styled } from "@mui/system";
@@ -54,6 +55,12 @@ const LeadSettings = () => {
   const [maxAutoAssignPerDay, setMaxAutoAssignPerDay] = useState<number>(50);
   const [aiQualityThreshold, setAiQualityThreshold] = useState<number>(50);
   const [marketplaceFallback, setMarketplaceFallback] = useState<boolean>(true);
+  const [leadPricing, setLeadPricing] = useState<{
+    high: number;
+    medium: number;
+    low: number;
+  }>({ high: 10, medium: 5, low: 2 });
+  const [saving, setSaving] = useState(false);
 
   // Load current settings
   useEffect(() => {
@@ -67,6 +74,13 @@ const LeadSettings = () => {
           setMaxAutoAssignPerDay(s.maxAutoAssignPerDay ?? 50);
           setAiQualityThreshold(s.aiQualityThreshold ?? 50);
           setMarketplaceFallback(s.marketplaceFallback ?? true);
+          if (s.leadPricing) {
+            setLeadPricing({
+              high: s.leadPricing.high ?? 10,
+              medium: s.leadPricing.medium ?? 5,
+              low: s.leadPricing.low ?? 2,
+            });
+          }
         }
       } catch (e) {
         // ignore load error for now
@@ -87,6 +101,7 @@ const LeadSettings = () => {
   }, [distributionMode]);
 
   const handleSaveSettings = async () => {
+    setSaving(true);
     try {
       await axios.post(
         "/api/settings",
@@ -96,6 +111,7 @@ const LeadSettings = () => {
           maxAutoAssignPerDay,
           aiQualityThreshold,
           marketplaceFallback,
+          leadPricing,
         },
         {
           headers: {
@@ -104,8 +120,10 @@ const LeadSettings = () => {
         },
       );
       toast.success("Settings updated successfully");
+      window.location.reload();
     } catch (error) {
       toast.error("Failed to update settings");
+      setSaving(false);
     }
   };
 
@@ -153,34 +171,71 @@ const LeadSettings = () => {
         </Box>
       </Section>
 
-      {/* AI QUALITY CONTROLS */}
+      {/* LEAD PRICING BY QUALITY LEVEL */}
       <Section>
-        <SectionHeader>🤖 AI Quality Controls</SectionHeader>
+        <SectionHeader>💰 Lead Pricing by Quality Level</SectionHeader>
         <Typography
           variant="caption"
           sx={{ display: "block", mb: 2, color: "#666" }}
         >
-          Control lead quality using AI spam/quality scoring (lower is stricter)
+          Set the unit price for leads based on their AI quality level. This
+          replaces the default flat price — each lead will be priced according
+          to its quality score.
         </Typography>
 
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" },
             gap: 2,
           }}
         >
           <Box>
             <TextField
-              label="AI Quality Threshold"
+              label="🟢 High Quality (units)"
               type="number"
-              value={aiQualityThreshold}
+              value={leadPricing.high}
               onChange={(e) =>
-                setAiQualityThreshold(parseInt(e.target.value || "50", 10))
+                setLeadPricing((prev) => ({
+                  ...prev,
+                  high: Math.max(0, parseInt(e.target.value || "0", 10)),
+                }))
               }
-              inputProps={{ min: 0, max: 100 }}
+              inputProps={{ min: 0 }}
               fullWidth
-              helperText="Auto-assign only leads with AI score ≤ this threshold (0-100, lower is stricter)"
+              helperText="AI spam score 0–30"
+            />
+          </Box>
+          <Box>
+            <TextField
+              label="🟡 Medium Quality (units)"
+              type="number"
+              value={leadPricing.medium}
+              onChange={(e) =>
+                setLeadPricing((prev) => ({
+                  ...prev,
+                  medium: Math.max(0, parseInt(e.target.value || "0", 10)),
+                }))
+              }
+              inputProps={{ min: 0 }}
+              fullWidth
+              helperText="AI spam score 31–69"
+            />
+          </Box>
+          <Box>
+            <TextField
+              label="🔴 Low Quality (units)"
+              type="number"
+              value={leadPricing.low}
+              onChange={(e) =>
+                setLeadPricing((prev) => ({
+                  ...prev,
+                  low: Math.max(0, parseInt(e.target.value || "0", 10)),
+                }))
+              }
+              inputProps={{ min: 0 }}
+              fullWidth
+              helperText="AI spam score 70–100"
             />
           </Box>
         </Box>
@@ -250,8 +305,12 @@ const LeadSettings = () => {
           variant="contained"
           color="primary"
           onClick={handleSaveSettings}
+          disabled={saving}
+          startIcon={
+            saving ? <CircularProgress size={18} color="inherit" /> : undefined
+          }
         >
-          Save All Settings
+          {saving ? "Saving..." : "Save All Settings"}
         </Button>
       </Box>
     </SettingsContainer>

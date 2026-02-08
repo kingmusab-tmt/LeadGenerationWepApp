@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       distributionMode: user.distributionMode,
       aiQualityThreshold: user.aiQualityThreshold,
       marketplaceFallback: user.marketplaceFallback,
+      leadPricing: user.leadPricing || { high: 10, medium: 5, low: 2 },
       emailSettings: user.emailSettings || {},
       apiSettings: user.apiSettings || {},
       creditSetup: user.creditSetup || {},
@@ -80,6 +81,17 @@ export async function POST(req: NextRequest) {
     if (typeof validatedData.marketplaceFallback === "boolean") {
       updateObj.marketplaceFallback = validatedData.marketplaceFallback;
     }
+    if (validatedData.leadPricing) {
+      if (typeof validatedData.leadPricing.high === "number") {
+        updateObj["leadPricing.high"] = validatedData.leadPricing.high;
+      }
+      if (typeof validatedData.leadPricing.medium === "number") {
+        updateObj["leadPricing.medium"] = validatedData.leadPricing.medium;
+      }
+      if (typeof validatedData.leadPricing.low === "number") {
+        updateObj["leadPricing.low"] = validatedData.leadPricing.low;
+      }
+    }
     // Use dot notation for emailSettings to preserve other fields
     if (validatedData.emailSettings) {
       for (const [key, value] of Object.entries(validatedData.emailSettings)) {
@@ -119,6 +131,7 @@ export async function POST(req: NextRequest) {
       distributionMode: user.distributionMode,
       aiQualityThreshold: user.aiQualityThreshold,
       marketplaceFallback: user.marketplaceFallback,
+      leadPricing: user.leadPricing || { high: 10, medium: 5, low: 2 },
       emailSettings: user.emailSettings,
       apiSettings: user.apiSettings,
       creditSetup: user.creditSetup,

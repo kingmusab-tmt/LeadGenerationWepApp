@@ -8,6 +8,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
+    console.log(
+      "[filter-lead] Received lead data for AI scoring:",
+      JSON.stringify(body, null, 2),
+    );
+
     // 1. Select the Flash model (Fastest for real-time)
     // We enforce JSON output for easy parsing
     const model = genAI.getGenerativeModel({
@@ -42,28 +47,26 @@ export async function POST(req: Request) {
       }
     `;
 
+    console.log("[filter-lead] Prompt fields sent to Gemini:\n", fieldsText);
+
     // 3. Get the Verdict
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     const validation = JSON.parse(responseText);
 
-    // 4. Act on the Verdict
-    // If spam score is high, reject the request
-    if (!validation.is_valid || validation.spam_score > 80) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Our system flagged this submission as spam.",
-          debug_reason: validation.reason, // Remove this line in production
-        },
-        { status: 400 },
-      );
-    }
+    console.log("[filter-lead] Gemini AI verdict:", JSON.stringify(validation));
 
-    // --- IF WE GET HERE, THE LEAD IS GOOD ---
-    // TODO: Add your code here to save to Database (MongoDB, Postgres, etc.)
-
-    return NextResponse.json({ success: true, message: "Lead received!" });
+    // 4. Return the AI scoring result — always 200
+    // This endpoint is for internal scoring only, NEVER blocks form submissions
+    return NextResponse.json({
+      success: true,
+      message: validation.is_valid
+        ? "Lead received!"
+        : "Lead flagged as low quality.",
+      spam_score: validation.spam_score,
+      reason: validation.reason,
+      is_valid: validation.is_valid,
+    });
   } catch (error) {
     console.error("AI Filter Error:", error);
     // Fallback: If AI fails, allow the lead through so you don't lose data

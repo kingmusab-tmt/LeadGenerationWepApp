@@ -9,7 +9,7 @@ import {
   Box,
   Drawer,
   List,
-  ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Avatar,
@@ -19,56 +19,69 @@ import {
   CssBaseline,
   CircularProgress,
   Backdrop,
+  Breadcrumbs,
+  Link as MuiLink,
 } from "@mui/material";
 import {
   Dashboard,
   HelpOutline,
   Menu as MenuIcon,
   ReceiptLong,
-  LocalAtm,
   People,
-  TireRepair,
+  Layers,
+  Article,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useInitializeUser } from "@/lib/hooks";
 
-interface UserDashboardProps {
+const navItems = [
+  { label: "Overview", path: "overview", icon: <Dashboard /> },
+  { label: "User Management", path: "user_management", icon: <People /> },
+  { label: "Tier Management", path: "tier_management", icon: <Layers /> },
+  { label: "Help Management", path: "help_management", icon: <HelpOutline /> },
+  {
+    label: "Financial Management",
+    path: "financial_management",
+    icon: <ReceiptLong />,
+  },
+  {
+    label: "Content Management",
+    path: "content_management",
+    icon: <Article />,
+  },
+];
+
+interface AdminDashboardProps {
   children: React.ReactNode;
 }
 
-const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
   const { currentUser, loading: userLoading } = useInitializeUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [subMenuAnchorEl, setSubMenuAnchorEl] = useState<null | HTMLElement>(
-    null,
-  );
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
-  const [subMenuVisible, setSubMenuVisible] = useState(false);
-  let subMenuTimeout: NodeJS.Timeout;
-
-  // useEffect(() => {
-  //   if (!children) {
-  //     <LoadingComponent />;
-  //     redirect("/admindashboard/overview");
-  //   }
-  // }, []);
 
   useEffect(() => {
-    if (!userLoading && !currentUser) {
+    if (!userLoading && (!currentUser || currentUser.role !== "admin")) {
       router.push("/auth/sign-in");
     }
   }, [userLoading, currentUser, router]);
 
   const avatarSrc = currentUser?.image || "";
   const displayName = currentUser?.name || "User";
+
+  // Derive the active nav item from the current pathname
+  const activeNav = navItems.find((item) =>
+    pathname?.includes(`/admindashboard/${item.path}`),
+  );
 
   const handleNavigation = (path: string) => {
     setLoading(true);
@@ -102,21 +115,6 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     setAnchorEl(null);
   };
 
-  const handleSubMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    clearTimeout(subMenuTimeout);
-    setSubMenuAnchorEl(event.currentTarget);
-    setSubMenuVisible(true);
-  };
-
-  const handleSubMenuClose = () => {
-    subMenuTimeout = setTimeout(() => {
-      setSubMenuVisible(false);
-      setSubMenuAnchorEl(null);
-    }, 300); // Adjust the delay as needed
-  };
-
-  // const subMenuOpen = Boolean(subMenuAnchorEl);
-
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>
       <CssBaseline />
@@ -146,15 +144,13 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
             >
-              <MenuItem onClick={() => handleNavigation("settings")}>
-                Settings
-              </MenuItem>
-              <MenuItem onClick={() => onSignOut()}>
-                {loading ? (
-                  <CircularProgress size={24} style={{ color: "white" }} />
-                ) : (
-                  loading || "Sign Out"
-                )}
+              <MenuItem
+                onClick={() => {
+                  handleMenuClose();
+                  onSignOut();
+                }}
+              >
+                {loading ? <CircularProgress size={24} /> : "Sign Out"}
               </MenuItem>
             </Menu>
           </Box>
@@ -172,200 +168,79 @@ const AdminDashboard: React.FC<UserDashboardProps> = ({ children }) => {
             boxSizing: "border-box",
             transition: "width 0.3s",
             mt: 8,
-            backgroundColor: "white",
+            backgroundColor: theme.palette.background.paper,
           },
         }}
       >
         <List>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("overview")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Overview" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Dashboard />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Overview" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("user_management")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="User Management" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <People />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="User Management" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("tier_management")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Tier Management" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <TireRepair />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Tier Management" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("help_management")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Help Management" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <HelpOutline />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Help Management" />
-          </ListItem>
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("financial_management")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Financial Management" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <ReceiptLong />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Financial Management" />
-          </ListItem>
-
-          <ListItem
-            component="button"
-            onClick={() => handleNavigation("content_management")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Content Management" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <LocalAtm />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Content Management" />
-          </ListItem>
-          {/* <ListItem
-            component="button"
-            onClick={() => handleNavigation("help")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Help" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <HelpOutline />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Help" />
-          </ListItem> */}
-          {/* <ListItem
-            component="button"
-            onClick={() => handleNavigation("settings")}
-            sx={{
-              color: "blue",
-              backgroundColor: "white",
-              border: "none",
-              "&:hover": {
-                backgroundColor: "blue",
-                color: "white",
-                "& .MuiListItemIcon-root": {
-                  color: "white",
-                },
-              },
-            }}
-          >
-            <Tooltip title="Settings" placement="right">
-              <ListItemIcon sx={{ color: "blue" }}>
-                <Settings />
-              </ListItemIcon>
-            </Tooltip>
-            <ListItemText primary="Settings" />
-          </ListItem> */}
+          {navItems.map((item) => {
+            const isActive = pathname?.includes(`/admindashboard/${item.path}`);
+            return (
+              <ListItemButton
+                key={item.path}
+                selected={isActive}
+                onClick={() => handleNavigation(item.path)}
+                sx={{
+                  color: isActive
+                    ? theme.palette.primary.contrastText
+                    : theme.palette.primary.main,
+                  backgroundColor: isActive
+                    ? theme.palette.primary.main
+                    : "transparent",
+                  border: "none",
+                  "&:hover": {
+                    backgroundColor: theme.palette.primary.main,
+                    color: theme.palette.primary.contrastText,
+                    "& .MuiListItemIcon-root": {
+                      color: theme.palette.primary.contrastText,
+                    },
+                  },
+                  "&.Mui-selected": {
+                    backgroundColor: theme.palette.primary.main,
+                    color: theme.palette.primary.contrastText,
+                    "& .MuiListItemIcon-root": {
+                      color: theme.palette.primary.contrastText,
+                    },
+                    "&:hover": {
+                      backgroundColor: theme.palette.primary.dark,
+                    },
+                  },
+                }}
+              >
+                <Tooltip title={item.label} placement="right">
+                  <ListItemIcon
+                    sx={{
+                      color: isActive
+                        ? theme.palette.primary.contrastText
+                        : theme.palette.primary.main,
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                </Tooltip>
+                <ListItemText primary={item.label} />
+              </ListItemButton>
+            );
+          })}
         </List>
       </Drawer>
 
       <Box component="main" sx={{ flexGrow: 1, mt: 3 }}>
+        {activeNav && (
+          <Box sx={{ px: 3, pt: 5 }}>
+            <Breadcrumbs aria-label="breadcrumb">
+              <MuiLink
+                underline="hover"
+                color="inherit"
+                sx={{ cursor: "pointer" }}
+                onClick={() => handleNavigation("overview")}
+              >
+                Admin
+              </MuiLink>
+              <Typography color="text.primary">{activeNav.label}</Typography>
+            </Breadcrumbs>
+          </Box>
+        )}
         {children}
       </Box>
       <Backdrop

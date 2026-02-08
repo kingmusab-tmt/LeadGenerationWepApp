@@ -10,44 +10,21 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
-  Container,
   Typography,
   Grid,
   Card,
   CardContent,
-  CardActions,
-  Button,
   Tabs,
   Tab,
   Alert,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControlLabel,
-  Switch,
   CircularProgress,
   Snackbar,
-  Tooltip,
 } from "@mui/material";
 import {
   Settings as SettingsIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
   Info as InfoIcon,
-  ContentCopy as CopyIcon,
-  Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon,
 } from "@mui/icons-material";
 import { useSession } from "next-auth/react";
-import HubSpotIntegration from "./components/HubSpotIntegration";
-import SalesforceIntegration from "./components/SalesforceIntegration";
 import ZapierIntegration from "./components/ZapierIntegration";
 import WebhookStatistics from "./components/WebhookStatistics";
 import ApiKeyManagement from "./components/ApiKeyManagement";
@@ -69,7 +46,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`integration-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: { xs: 2, sm: 3 } }}>{children}</Box>}
     </div>
   );
 }
@@ -116,14 +93,14 @@ export default function IntegrationsPage() {
 
   if (status === "unauthenticated") {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ p: { xs: 2, sm: 3 } }}>
         <Alert severity="warning">Please sign in to manage integrations.</Alert>
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
@@ -135,8 +112,8 @@ export default function IntegrationsPage() {
       </Box>
 
       {/* Overview Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, md: 3 }}>
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>
@@ -148,7 +125,7 @@ export default function IntegrationsPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>
@@ -160,7 +137,7 @@ export default function IntegrationsPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>
@@ -172,7 +149,7 @@ export default function IntegrationsPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>
@@ -187,8 +164,10 @@ export default function IntegrationsPage() {
       </Grid>
 
       {/* Integration Tabs */}
-      <Card>
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+      <Card sx={{ overflow: "hidden" }}>
+        <Box
+          sx={{ borderBottom: 1, borderColor: "divider", px: { xs: 1, sm: 2 } }}
+        >
           <Tabs
             value={activeTab}
             onChange={handleTabChange}
@@ -196,12 +175,6 @@ export default function IntegrationsPage() {
             variant="scrollable"
             scrollButtons="auto"
           >
-            <Tab label="HubSpot" icon={<SettingsIcon />} iconPosition="start" />
-            <Tab
-              label="Salesforce"
-              icon={<SettingsIcon />}
-              iconPosition="start"
-            />
             <Tab label="Zapier" icon={<SettingsIcon />} iconPosition="start" />
             <Tab label="Webhooks" icon={<InfoIcon />} iconPosition="start" />
             <Tab
@@ -213,27 +186,20 @@ export default function IntegrationsPage() {
         </Box>
 
         <TabPanel value={activeTab} index={0}>
-          <HubSpotIntegration onNotify={showSnackbar} />
-        </TabPanel>
-
-        <TabPanel value={activeTab} index={1}>
-          <SalesforceIntegration onNotify={showSnackbar} />
-        </TabPanel>
-
-        <TabPanel value={activeTab} index={2}>
           <ZapierIntegration onNotify={showSnackbar} />
         </TabPanel>
 
-        <TabPanel value={activeTab} index={3}>
+        <TabPanel value={activeTab} index={1}>
           <WebhookStatistics onNotify={showSnackbar} />
         </TabPanel>
 
-        <TabPanel value={activeTab} index={4}>
+        <TabPanel value={activeTab} index={2}>
           <ApiKeyManagement onNotify={showSnackbar} />
         </TabPanel>
       </Card>
 
       {/* Snackbar for notifications */}
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -248,7 +214,7 @@ export default function IntegrationsPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 }
 
