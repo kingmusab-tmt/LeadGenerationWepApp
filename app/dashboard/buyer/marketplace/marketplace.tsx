@@ -426,21 +426,36 @@ const BuyerLeads: React.FC = () => {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
+                          gap: 1,
                         }}
                       >
                         <Typography variant="caption" color="text.secondary">
                           Posted:{" "}
                           {new Date(lead.createdAt).toLocaleDateString()}
                         </Typography>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          startIcon={<ShoppingCart />}
-                          onClick={() => handlePurchase(lead._id, lead.unit)}
-                          disabled={purchaseLoading}
-                        >
-                          {purchaseLoading ? <LoadingComponent /> : "Purchase"}
-                        </Button>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<Visibility />}
+                            onClick={() => handleViewDetails(lead)}
+                          >
+                            Details
+                          </Button>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<ShoppingCart />}
+                            onClick={() => handlePurchase(lead._id, lead.unit)}
+                            disabled={purchaseLoading}
+                          >
+                            {purchaseLoading ? (
+                              <LoadingComponent />
+                            ) : (
+                              "Purchase"
+                            )}
+                          </Button>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -559,12 +574,47 @@ const BuyerLeads: React.FC = () => {
           {selectedLead && (
             <>
               <Grid container spacing={2} sx={{ mb: 2 }}>
-                {selectedLead.fields.map((field) => (
-                  <Grid size={{ xs: 12, sm: 6 }} key={field.id}>
-                    {renderFieldValue(field)}
-                  </Grid>
-                ))}
+                {selectedLead.fields
+                  .filter(
+                    (field) =>
+                      // For available leads: hide email, phone, address fields until purchased
+                      selectedLead.status === "sold" ||
+                      ![
+                        "email",
+                        "phone",
+                        "address",
+                        "postcode",
+                        "city",
+                        "state",
+                      ].some((forbidden) =>
+                        field.label.toLowerCase().includes(forbidden),
+                      ),
+                  )
+                  .map((field) => (
+                    <Grid size={{ xs: 12, sm: 6 }} key={field.id}>
+                      {renderFieldValue(field)}
+                    </Grid>
+                  ))}
               </Grid>
+
+              {/* Show locked message for contact info on available leads */}
+              {selectedLead.status === "available" && (
+                <Box
+                  sx={{
+                    backgroundColor: "#fff3cd",
+                    border: "1px solid #ffc107",
+                    borderRadius: 1,
+                    p: 2,
+                    mb: 2,
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    🔒 <strong>Contact information is hidden</strong> until you
+                    purchase this lead. Purchase to see full details including
+                    email, phone, and address.
+                  </Typography>
+                </Box>
+              )}
 
               <Divider sx={{ my: 2 }} />
 

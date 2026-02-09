@@ -58,6 +58,7 @@ export interface ILead extends Document {
   }[];
   isManual: boolean;
   leadSource: string;
+  distributionMethod?: "manual" | "round_robin" | "marketplace";
   createdAt: Date;
   updatedAt: Date;
   industry?: string; // Optional field for industry
@@ -176,6 +177,11 @@ const LeadSchema = new Schema<ILead>(
         ref: "Call",
       },
     ],
+    distributionMethod: {
+      type: String,
+      enum: ["manual", "round_robin", "marketplace"],
+      default: "marketplace",
+    },
   },
   {
     timestamps: true,

@@ -166,6 +166,9 @@ const BuyersPage: React.FC = () => {
     try {
       setLoading(true);
 
+      // Update buyer statuses from "new" to "active" if they have purchased leads
+      await fetch("/api/sellers/update-buyer-status", { method: "POST" });
+
       const buyersResponse = await fetch("/api/buyers");
       if (!buyersResponse.ok) throw new Error("Failed to fetch buyers");
       const buyersData: IBuyer[] = await buyersResponse.json();

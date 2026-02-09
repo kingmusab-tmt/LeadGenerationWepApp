@@ -16,6 +16,8 @@ import { ILead, Lead } from "@/models/leads";
 import { User } from "@/models/userModel";
 import { IUser } from "@/models/types/user";
 import mongoose from "mongoose";
+import { processLeadDistribution } from "@/lib/leadAssignmentService";
+import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
 
 /**
  * Zapier action result structure
@@ -120,6 +122,7 @@ export class ZapierActionsService {
         aiQualityScore: 0,
         followUps: [],
         fields: [],
+        distributionMethod: "marketplace",
       };
 
       // Add location if provided
@@ -358,6 +361,57 @@ export class ZapierActionsService {
         );
       }
 
+      // ========================================
+      // 2. AUTOMATIC LEAD DISTRIBUTION & ASSIGNMENT (same as form)
+      // ========================================
+      try {
+        const scoredLead = await Lead.findById(lead._id);
+        if (!scoredLead) {
+          throw new Error(`Lead ${lead._id} not found after AI scoring`);
+        }
+
+        const distributionResult = await processLeadDistribution(scoredLead);
+
+        console.log("✅ Zapier lead distribution processed:", {
+          leadId: lead._id,
+          assignedBuyers: distributionResult.assignedBuyers.length,
+          notified: distributionResult.notified.length,
+          errors: distributionResult.errors.length,
+        });
+
+        if (distributionResult.errors.length > 0) {
+          console.warn(
+            "⚠️ Zapier distribution errors:",
+            distributionResult.errors,
+          );
+        }
+
+        // Marketplace fallback for low-quality unmatched leads
+        const updatedLead = await Lead.findById(lead._id);
+        if (
+          updatedLead &&
+          distributionResult.assignedBuyers.length === 0 &&
+          updatedLead.qualityLevel === "Low"
+        ) {
+          try {
+            console.log(
+              `📢 Low quality Zapier lead ${lead._id} - making available in marketplace`,
+            );
+            await makeLeadAvailableInMarketplace(updatedLead, "low_quality");
+          } catch (marketplaceError) {
+            console.error(
+              "⚠️ Error making Zapier lead available in marketplace:",
+              marketplaceError,
+            );
+          }
+        }
+      } catch (distributionError) {
+        console.error(
+          "❌ Error processing Zapier lead distribution:",
+          distributionError,
+        );
+      }
+
       return {
         success: true,
         data: {
@@ -449,6 +503,21 @@ export class ZapierActionsService {
       // Apply updates
       Object.assign(lead, updates);
       await lead.save();
+
+      // If Zapier sets status to available, run the same distribution flow
+      if (input.status === "available") {
+        try {
+          const refreshedLead = await Lead.findById(lead._id);
+          if (refreshedLead) {
+            await processLeadDistribution(refreshedLead);
+          }
+        } catch (distributionError) {
+          console.error(
+            "❌ Error processing Zapier lead distribution after update:",
+            distributionError,
+          );
+        }
+      }
 
       return {
         success: true,

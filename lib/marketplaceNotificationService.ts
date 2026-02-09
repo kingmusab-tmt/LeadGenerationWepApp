@@ -252,6 +252,7 @@ export async function makeLeadAvailableInMarketplace(
     // Mark lead as available in marketplace
     await Lead.findByIdAndUpdate(lead._id, {
       status: "available",
+      distributionMethod: "marketplace",
       availableInMarketplace: true,
       marketplaceAvailableAt: new Date(),
       marketplaceReason: reason,

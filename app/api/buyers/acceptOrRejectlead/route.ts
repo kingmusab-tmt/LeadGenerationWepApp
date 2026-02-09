@@ -5,6 +5,7 @@ import { Buyer } from "@/models/leadbuyers"; // Import Buyer model
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Transaction } from "@/models/transactions";
+import { Types } from "mongoose";
 
 // Define the type for objects in the assignedTo array
 interface AssignedBuyer {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!leadId || !action) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -54,13 +55,13 @@ export async function POST(req: NextRequest) {
     // Check if the lead is assigned to the buyer
     const isAssigned = lead.assignedTo.some(
       (assigned: AssignedBuyer) =>
-        assigned.buyerId && assigned.buyerId.toString() === buyerId.toString()
+        assigned.buyerId && assigned.buyerId.toString() === buyerId.toString(),
     );
 
     if (!isAssigned) {
       return NextResponse.json(
         { error: "Lead not assigned to this buyer" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -70,12 +71,51 @@ export async function POST(req: NextRequest) {
         //("Insufficient credit balance");
         return NextResponse.json(
           { error: "Insufficient credit balance" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       // Deduct the unit price from the buyer's wallet balance
       buyer.walletUnit -= lead.unit;
+
+      // Add to buyer's purchaseHistory
+      buyer.purchaseHistory.push({
+        leadId: lead._id.toString(),
+        date: new Date(),
+        amount: lead.unit,
+        unit: lead.unit,
+      });
+
+      // Add leadId to buyer's purchasedLeads array
+      const leadIdString = lead._id.toString();
+      if (!buyer.purchasedLeads.some((id) => id.toString() === leadIdString)) {
+        buyer.purchasedLeads.push(new Types.ObjectId(lead._id));
+      }
+
+      // Copy complete lead data to buyer's purchasedLeadsData
+      buyer.purchasedLeadsData = buyer.purchasedLeadsData || [];
+      buyer.purchasedLeadsData.push({
+        leadId: lead._id.toString(),
+        name: lead.name || "",
+        email: lead.email || "",
+        phone: lead.phone || "",
+        company: lead.company || "",
+        industry: lead.industry || "",
+        location: {
+          city: lead.location?.city || "",
+          state: lead.location?.state || "",
+          country: lead.location?.country || "USA",
+          zipCode: lead.location?.zipCode || "",
+          address: lead.location?.address || "",
+        },
+        fields: lead.fields || [],
+        aiQualityScore: lead.aiQualityScore,
+        qualityLevel: lead.qualityLevel,
+        purchasedAt: new Date(),
+        unitPaid: lead.unit,
+        purchaseType: "assigned",
+      });
+
       await buyer.save();
 
       // Create a transaction record
@@ -103,7 +143,8 @@ export async function POST(req: NextRequest) {
       // Set accepted to true for the assigned buyer
       const assignedBuyer = lead.assignedTo.find(
         (assigned: AssignedBuyer) =>
-          assigned.buyerId && assigned.buyerId.toString() === buyerId.toString()
+          assigned.buyerId &&
+          assigned.buyerId.toString() === buyerId.toString(),
       );
       if (assignedBuyer) {
         assignedBuyer.accepted = true;
@@ -114,7 +155,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         { message: "Lead accepted and purchased successfully" },
-        { status: 200 }
+        { status: 200 },
       );
     } else if (action === "reject") {
       // Update lead status to 'available' and remove buyer from assignedTo
@@ -122,7 +163,8 @@ export async function POST(req: NextRequest) {
       // Set rejected to true for the assigned buyer before removing or updating
       const assignedBuyer = lead.assignedTo.find(
         (assigned: AssignedBuyer) =>
-          assigned.buyerId && assigned.buyerId.toString() === buyerId.toString()
+          assigned.buyerId &&
+          assigned.buyerId.toString() === buyerId.toString(),
       );
       if (assignedBuyer) {
         assignedBuyer.rejected = true;
@@ -130,7 +172,8 @@ export async function POST(req: NextRequest) {
       }
       lead.assignedTo = lead.assignedTo.filter(
         (assigned: AssignedBuyer) =>
-          assigned.buyerId && assigned.buyerId.toString() !== buyerId.toString()
+          assigned.buyerId &&
+          assigned.buyerId.toString() !== buyerId.toString(),
       );
       await lead.save();
 
@@ -142,7 +185,7 @@ export async function POST(req: NextRequest) {
     console.error(error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -131,6 +131,32 @@ export interface IBuyer extends Document {
   activeCriteriaSetId?: Types.ObjectId | null;
   assignedLeads: Types.ObjectId[]; // PHASE 1: Array of Lead IDs assigned to this buyer (for efficient queries)
   purchasedLeads: Types.ObjectId[]; // PHASE 1: Array of Lead IDs purchased by this buyer (for efficient queries)
+  // Complete lead data stored locally (buyer keeps data even if admin deletes original lead)
+  purchasedLeadsData: {
+    leadId: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    company?: string;
+    industry?: string;
+    location?: {
+      city?: string;
+      state?: string;
+      country?: string;
+      zipCode?: string;
+      address?: string;
+    };
+    fields: Array<{
+      id: string;
+      label: string;
+      value: any;
+    }>;
+    aiQualityScore?: number;
+    qualityLevel?: "High" | "Medium" | "Low";
+    purchasedAt: Date;
+    unitPaid: number;
+    purchaseType: "assigned" | "marketplace";
+  }[];
 }
 
 export interface IBuyerCriteriaSet {
@@ -407,6 +433,44 @@ const BuyerSchema: Schema = new Schema({
     {
       type: Schema.Types.ObjectId,
       ref: "Lead", // Reference to Lead model
+    },
+  ],
+  // Complete lead data stored locally (buyer keeps data even if admin deletes original lead)
+  purchasedLeadsData: [
+    {
+      leadId: { type: String, required: true },
+      name: { type: String, default: "" },
+      email: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      company: { type: String, default: "" },
+      industry: { type: String, default: "" },
+      location: {
+        city: { type: String, default: "" },
+        state: { type: String, default: "" },
+        country: { type: String, default: "USA" },
+        zipCode: { type: String, default: "" },
+        address: { type: String, default: "" },
+      },
+      fields: [
+        {
+          id: { type: String },
+          label: { type: String },
+          value: { type: Schema.Types.Mixed },
+        },
+      ],
+      aiQualityScore: { type: Number, default: 50 },
+      qualityLevel: {
+        type: String,
+        enum: ["High", "Medium", "Low"],
+        default: "Medium",
+      },
+      purchasedAt: { type: Date, default: Date.now },
+      unitPaid: { type: Number, required: true },
+      purchaseType: {
+        type: String,
+        enum: ["assigned", "marketplace"],
+        required: true,
+      },
     },
   ],
   createdAt: { type: Date, default: Date.now },

@@ -5,6 +5,7 @@ import { Buyer } from "@/models/leadbuyers";
 import { Transaction } from "@/models/transactions";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { Types } from "mongoose";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (typeof unitCost !== "number" || unitCost <= 0) {
       return NextResponse.json(
         { success: false, message: "Invalid unit cost" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (!session || session.user.role !== "buyer") {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!buyer) {
       return NextResponse.json(
         { success: false, message: "Buyer not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     if (buyer.walletUnit < unitCost) {
       return NextResponse.json(
         { success: false, message: "Insufficient wallet balance" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     if (!lead) {
       return NextResponse.json(
         { success: false, message: "Lead not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     if (lead.status !== "available") {
       return NextResponse.json(
         { success: false, message: "Lead is not available for purchase" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (lead.soldCount >= lead.shareNumber) {
       return NextResponse.json(
         { success: false, message: "Lead is no longer available" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -89,6 +90,45 @@ export async function POST(req: NextRequest) {
 
     // Deduct the unitCost from the buyer's wallet balance
     buyer.walletUnit -= unitCost;
+
+    // Add to buyer's purchaseHistory
+    buyer.purchaseHistory.push({
+      leadId: lead._id.toString(),
+      date: new Date(),
+      amount: unitCost,
+      unit: unitCost,
+    });
+
+    // Add leadId to buyer's purchasedLeads array
+    const leadIdString = lead._id.toString();
+    if (!buyer.purchasedLeads.some((id) => id.toString() === leadIdString)) {
+      buyer.purchasedLeads.push(new Types.ObjectId(lead._id));
+    }
+
+    // Copy complete lead data to buyer's purchasedLeadsData
+    buyer.purchasedLeadsData = buyer.purchasedLeadsData || [];
+    buyer.purchasedLeadsData.push({
+      leadId: lead._id.toString(),
+      name: lead.name || "",
+      email: lead.email || "",
+      phone: lead.phone || "",
+      company: lead.company || "",
+      industry: lead.industry || "",
+      location: {
+        city: lead.location?.city || "",
+        state: lead.location?.state || "",
+        country: lead.location?.country || "USA",
+        zipCode: lead.location?.zipCode || "",
+        address: lead.location?.address || "",
+      },
+      fields: lead.fields || [],
+      aiQualityScore: lead.aiQualityScore,
+      qualityLevel: lead.qualityLevel,
+      purchasedAt: new Date(),
+      unitPaid: unitCost,
+      purchaseType: "marketplace",
+    });
+
     await buyer.save();
 
     // Create a transaction record
@@ -115,7 +155,7 @@ export async function POST(req: NextRequest) {
     console.error("Error purchasing lead:", error);
     return NextResponse.json(
       { success: false, message: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

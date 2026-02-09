@@ -26,7 +26,6 @@ import {
 import {
   Dashboard,
   Group,
-  Campaign,
   Settings,
   HelpOutline,
   Menu as MenuIcon,
@@ -109,11 +108,6 @@ const navItems: NavItem[] = [
         icon: <People />,
       },
     ],
-  },
-  {
-    title: "Campaigns",
-    path: "campaigns",
-    icon: <Campaign />,
   },
   {
     title: "Email Campaigns",

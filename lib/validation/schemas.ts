@@ -35,7 +35,9 @@ export const createLeadSchema = z.object({
 export const updateLeadSchema = z
   .object({
     name: z.string().max(100).optional(),
-    email: z.string().email("Invalid email").optional(),
+    email: z
+      .union([z.literal(""), z.string().email("Invalid email")])
+      .optional(),
     phone: z.string().max(20).optional(),
     source: z.string().max(50).optional(),
     status: z
