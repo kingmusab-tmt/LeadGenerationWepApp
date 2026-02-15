@@ -4,6 +4,7 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { SmsCampaign } from "@/models/smsCampaign";
 import { smsMarketingEngine } from "@/lib/smsMarketingEngine";
+import { getSubscriptionLimits } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,22 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     if (action === "send") {
+      // Check recipient limit
+      const recipientCount = campaign.recipients?.length || 0;
+      const limits = await getSubscriptionLimits(session.user.id);
+      const maxRecipients = limits?.smsRecipientsPerCampaign || 0;
+
+      if (maxRecipients > 0 && recipientCount > maxRecipients) {
+        return NextResponse.json(
+          {
+            error: `Recipient limit exceeded. Your plan allows ${maxRecipients} recipients per SMS campaign, but this campaign has ${recipientCount}.`,
+            limit: maxRecipients,
+            current: recipientCount,
+          },
+          { status: 403 },
+        );
+      }
+
       const result = await smsMarketingEngine.sendCampaignImmediate(id);
       if (!result.success)
         return NextResponse.json({ error: result.message }, { status: 400 });

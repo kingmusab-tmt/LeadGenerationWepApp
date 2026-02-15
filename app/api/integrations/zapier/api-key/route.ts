@@ -10,6 +10,7 @@ import { getServerSession } from "next-auth";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/userModel";
 import crypto from "crypto";
+import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,21 @@ export async function POST(req: NextRequest) {
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Check Zapier integration feature access
+    const featureCheck = await checkFeatureAccess(
+      (user._id as any).toString(),
+      "zapierIntegration",
+    );
+    if (!featureCheck.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "Zapier integration is not available on your current plan. Please upgrade to access this feature.",
+        },
+        { status: 403 },
+      );
     }
 
     // Generate new API key (32 random bytes = 64 hex characters)

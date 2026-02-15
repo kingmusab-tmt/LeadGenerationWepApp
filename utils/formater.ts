@@ -16,7 +16,7 @@ export function formatDate(
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }
+  },
 ): string {
   if (!date) return "N/A";
 
@@ -40,7 +40,7 @@ export function formatDate(
 export function formatCurrency(
   amount: number | string,
   currency: string = "USD",
-  locale: string = "en-US"
+  locale: string = "en-US",
 ): string {
   if (amount === null || amount === undefined) return "$0.00";
 
@@ -67,7 +67,7 @@ export function formatCurrency(
  */
 export function formatNumber(
   num: number | string,
-  decimalPlaces: number = 2
+  decimalPlaces: number = 2,
 ): string {
   if (num === null || num === undefined) return "0";
 
@@ -135,7 +135,7 @@ export function formatPhoneNumber(phoneNumber: string): string {
   const cleaned = phoneNumber.replace(/\D/g, "");
 
   // Check if the number looks like a US phone number
-  const match = cleaned.match(/^(\d{3})(\d{3})(\d{4})$/);
+  const match = cleaned?.match(/^(\d{3})(\d{3})(\d{4})$/);
 
   if (match) {
     return `(${match[1]}) ${match[2]}-${match[3]}`;
@@ -158,11 +158,13 @@ export function formatDuration(ms: number): string {
     seconds: Math.floor(((ms % 3600000) % 60000) / 1000),
   };
 
-  return (Object.entries(time)
-    .filter(([_, val]) => val !== 0)
-    .map(([key, val]) => `${val}`.padStart(2, "0"))
-    .join(":")
-    .replace(/^0+/, "") || "0");
+  return (
+    Object.entries(time)
+      .filter(([_, val]) => val !== 0)
+      .map(([key, val]) => `${val}`.padStart(2, "0"))
+      .join(":")
+      .replace(/^0+/, "") || "0"
+  );
 }
 
 /**

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,26 +20,39 @@ export async function POST(req: NextRequest) {
         JSON.stringify({
           error: "CallSid and CallStatus are required",
         }),
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Find the call record by CallSid and update it
+    // Find the call record first to get the userId
+    const existingCall = await Call.findOne({ callSid });
+    if (!existingCall) {
+      return new NextResponse(
+        JSON.stringify({ error: "Call record not found" }),
+        { status: 404 },
+      );
+    }
+
+    const durationSeconds = callDuration ? parseInt(callDuration, 10) : 0;
+
+    // Update the call record
     const updatedCall = await Call.findOneAndUpdate(
       { callSid },
       {
         callStatus,
         answeredBy: answeredBy || "N/A",
         recordingUrl: recordingUrl || "No Record",
-        callDuration: callDuration ? parseInt(callDuration, 10) : null,
+        callDuration: durationSeconds || null,
       },
-      { new: true } // Return the updated document
+      { new: true }, // Return the updated document
     );
 
-    if (!updatedCall) {
-      return new NextResponse(
-        JSON.stringify({ error: "Call record not found" }),
-        { status: 404 }
+    // Track call seconds usage against subscription limit
+    if (existingCall.userId && durationSeconds > 0) {
+      await checkAndIncrementUsage(
+        existingCall.userId.toString(),
+        "callSeconds",
+        durationSeconds,
       );
     }
 
@@ -49,7 +63,7 @@ export async function POST(req: NextRequest) {
     console.error("Error updating call record:", error);
     return new NextResponse(
       JSON.stringify({ error: "Failed to update call record" }),
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

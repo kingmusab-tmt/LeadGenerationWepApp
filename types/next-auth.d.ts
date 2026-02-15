@@ -26,6 +26,7 @@ declare module "next-auth" {
     image: string | null;
     isSubActive: boolean | null;
     provider: string | null;
+    tierUserType?: "seller" | "business";
   }
 }
 declare module "next-auth/jwt" {

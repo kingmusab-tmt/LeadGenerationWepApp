@@ -213,13 +213,11 @@ export const CreditSetupSchema = {
   stripeSecretKey: { type: String, default: "" },
   stripePublishableKey: { type: String, default: "" },
   stripeWebhookSecret: { type: String, default: "" },
-  paypalClientId: { type: String, default: "" },
-  paypalSecret: { type: String, default: "" },
-  paypalAccessToken: { type: String, default: "" },
 };
 
 /**
  * Subscription Schema
+ * Comprehensive subscription limits and usage tracking
  */
 export const SubscriptionSchema = {
   usedTrial: { type: Boolean, default: false },
@@ -239,8 +237,8 @@ export const SubscriptionSchema = {
     },
   },
   subscriptionTierId: {
-    type: mongoose.Schema.Types.ObjectId, // PHASE 1: Changed from String to ObjectId ref
-    ref: "Tier", // Reference to Tier model
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Tier",
     required: [true, "Subscription tier ID is required"],
   },
   subscriptionTierType: {
@@ -282,89 +280,122 @@ export const SubscriptionSchema = {
   subscriptionPaymentMethod: {
     type: String,
     enum: {
-      values: ["stripe", "paypal", "free"],
-      message: "Payment method must be stripe, paypal, or free",
+      values: ["stripe", "free"],
+      message: "Payment method must be stripe or free",
     },
   },
-  subscriptionPaymentId: String,
+  subscriptionPaymentId: String, // Legacy: Stripe checkout session ID
+
+  // Recurring Billing Fields
+  stripeSubscriptionId: String, // Stripe Subscription ID for recurring billing
+  billingInterval: {
+    type: String,
+    enum: {
+      values: ["month", "year"],
+      message: "Billing interval must be month or year",
+    },
+    default: "month",
+  },
+  cancelAtPeriodEnd: { type: Boolean, default: false },
+  canceledAt: Date,
+  paymentFailed: { type: Boolean, default: false },
+  lastPaymentFailedAt: Date,
+
+  // Comprehensive Subscription Limits
   subscriptionLimits: {
-    leads: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Leads limit cannot be negative",
-      },
-    },
-    twilioNumbers: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Twilio numbers limit cannot be negative",
-      },
-    },
-    numbers: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Numbers limit cannot be negative",
-      },
-    },
-    callSeconds: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Call seconds limit cannot be negative",
-      },
-    },
-    forms: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Forms limit cannot be negative",
-      },
-    },
-    buyers: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Buyers limit cannot be negative",
-      },
-    },
+    // Core Limits
+    forms: { type: Number, default: 1, min: 0 },
+    leads: { type: Number, default: 100, min: 0 },
+    buyers: { type: Number, default: 5, min: 0 },
+    industries: { type: Number, default: 1, min: 0 },
+
+    // Call Tracking & Telephony
+    numbers: { type: Number, default: 1, min: 0 },
+    twilioNumbers: { type: Number, default: 0, min: 0 },
+    callSeconds: { type: Number, default: 1000, min: 0 },
+    callRecording: { type: Boolean, default: false },
+    callTranscription: { type: Boolean, default: false },
+    callAIAnalysis: { type: Boolean, default: false },
+    multiRingForwarding: { type: Boolean, default: false },
+    geoRouting: { type: Boolean, default: false },
+    scheduledCallbacks: { type: Boolean, default: false },
+    concurrentCallLimit: { type: Number, default: 1, min: 0 },
+
+    // Marketing & Campaigns
+    emailCampaignsPerMonth: { type: Number, default: 0, min: 0 },
+    smsCampaignsPerMonth: { type: Number, default: 0, min: 0 },
+    emailRecipientsPerCampaign: { type: Number, default: 100, min: 0 },
+    smsRecipientsPerCampaign: { type: Number, default: 50, min: 0 },
+
+    // Automation & Workflows
+    automationWorkflows: { type: Number, default: 0, min: 0 },
+    automationActionsPerWorkflow: { type: Number, default: 3, min: 0 },
+
+    // AI & Advanced Features
+    chatbotEnabled: { type: Boolean, default: false },
+    leadScoringEnabled: { type: Boolean, default: false },
+    sentimentAnalysisEnabled: { type: Boolean, default: false },
+    aiSummariesEnabled: { type: Boolean, default: false },
+
+    // Invoicing & Payments
+    invoicesPerMonth: { type: Number, default: 10, min: 0 },
+    customInvoiceBranding: { type: Boolean, default: false },
+
+    // Integrations
+    zapierIntegration: { type: Boolean, default: false },
+    webhookIntegration: { type: Boolean, default: false },
+    apiAccess: { type: Boolean, default: false },
+    maxWebhooks: { type: Number, default: 0, min: 0 },
+
+    // Marketplace & Distribution
+    marketplaceAccess: { type: Boolean, default: false },
+    exclusiveLeads: { type: Boolean, default: false },
+    leadDistributionRules: { type: Boolean, default: false },
+
+    // Data & Reporting
     exports: { type: Boolean, default: false },
     imports: { type: Boolean, default: false },
+    advancedReports: { type: Boolean, default: false },
+    dataRetentionDays: { type: Number, default: 90, min: 0 },
+
+    // Team & Access
+    teamMembers: { type: Number, default: 1, min: 1 },
+    maxConcurrentSessions: { type: Number, default: 1, min: 1 },
+
+    // Support
     liveSupport: { type: Boolean, default: false },
-    industries: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Industries limit cannot be negative",
-      },
-    },
+    prioritySupport: { type: Boolean, default: false },
+
+    // Customization
+    customBranding: { type: Boolean, default: false },
+    customDomain: { type: Boolean, default: false },
   },
+
+  // Subscription Usage Tracking
   subscriptionUsage: {
-    leads: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Leads usage cannot be negative",
-      },
-    },
-    callSeconds: {
-      type: Number,
-      default: 0,
-      validate: {
-        validator: (v: number) => v >= 0,
-        message: "Call seconds usage cannot be negative",
-      },
-    },
+    // Core Usage
+    leads: { type: Number, default: 0, min: 0 },
+    callSeconds: { type: Number, default: 0, min: 0 },
+    forms: { type: Number, default: 0, min: 0 },
+    buyers: { type: Number, default: 0, min: 0 },
+
+    // Campaign Usage
+    emailCampaigns: { type: Number, default: 0, min: 0 },
+    smsCampaigns: { type: Number, default: 0, min: 0 },
+
+    // Automation Usage
+    workflowExecutions: { type: Number, default: 0, min: 0 },
+
+    // Invoice Usage
+    invoices: { type: Number, default: 0, min: 0 },
+
+    // Team Usage
+    activeSessions: { type: Number, default: 0, min: 0 },
+    teamMembersCount: { type: Number, default: 0, min: 0 },
+
+    // Reset tracking
+    usagePeriodStart: { type: Date, default: Date.now },
+    usagePeriodEnd: { type: Date },
   },
 };
 

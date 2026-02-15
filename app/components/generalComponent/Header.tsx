@@ -120,7 +120,7 @@ const Header = () => {
     },
     {
       name: "Pricing",
-      href: "/#pricing",
+      href: "/pricing",
       icon: <PriceCheckRounded fontSize="small" />,
     },
     {

@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate webhook ID format
-    if (!webhookId.match(/^[0-9a-fA-F]{24}$/)) {
+    if (!webhookId || !webhookId.match(/^[0-9a-fA-F]{24}$/)) {
       return NextResponse.json(
         { error: "Invalid webhook ID format" },
         { status: 400 },

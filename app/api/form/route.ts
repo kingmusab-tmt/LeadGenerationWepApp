@@ -15,7 +15,9 @@ import {
   conflict,
   internalError,
   handleValidationError,
+  forbidden,
 } from "@/lib/api/error-handler";
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 /**
  * GET /api/form?formId=<id>
@@ -79,6 +81,19 @@ export async function POST(request: Request) {
     }
 
     await dbConnect();
+
+    // Check subscription limit for forms
+    const usageCheck = await checkAndIncrementUsage(
+      session.user.id,
+      "forms",
+      1,
+    );
+    if (!usageCheck.allowed) {
+      return forbidden(
+        usageCheck.message ||
+          `Form limit reached (${usageCheck.currentUsage}/${usageCheck.limit}). Please upgrade your plan.`,
+      );
+    }
 
     // Check for existing form with the same name
     const existingForm = await Form.findOne({

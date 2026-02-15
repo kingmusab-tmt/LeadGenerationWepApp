@@ -1,6 +1,7 @@
 import { ChatbotEngine } from "@/lib/chatbot-engine";
 import { QualificationFlow } from "@/types/chatbot";
 import dbConnect from "@/lib/connectdb";
+import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 // Use Web standard Request/Response types for Next.js route handlers
 import { Lead as LeadModel } from "@/models/leads";
 
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
         {
           status: 400,
           headers: { "content-type": "application/json" },
-        }
+        },
       );
     }
 
@@ -128,14 +129,14 @@ export async function POST(request: Request) {
 
       chatbotEngine = new ChatbotEngine(
         process.env.GOOGLE_AI_STUDIO_KEY,
-        qualificationFlow
+        qualificationFlow,
       );
     }
 
     const result = await chatbotEngine.processMessage(
       conversationId,
       message,
-      leadData || {}
+      leadData || {},
     );
 
     // Update lead data with proper schema validation
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
         upsert: true,
         new: true,
         strict: false, // Allow flexible schema if needed
-      }
+      },
     );
 
     return new Response(
@@ -164,7 +165,7 @@ export async function POST(request: Request) {
         nextQuestion: result.nextQuestion,
         qualificationScore: result.leadUpdate?.qualificationScore,
       }),
-      { status: 200, headers: { "content-type": "application/json" } }
+      { status: 200, headers: { "content-type": "application/json" } },
     );
   } catch (error) {
     console.error("Chatbot error:", error);

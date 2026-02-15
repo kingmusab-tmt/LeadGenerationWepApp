@@ -168,13 +168,15 @@ const Overview: React.FC = () => {
   const [subscriptionAlert, setSubscriptionAlert] = useState<{
     open: boolean;
     message: string;
-    severity: "warning" | "error";
+    severity: "warning" | "error" | "info";
     daysRemaining: number;
+    isTrial?: boolean;
   }>({
     open: false,
     message: "",
     severity: "warning",
     daysRemaining: 0,
+    isTrial: false,
   });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -192,11 +194,14 @@ const Overview: React.FC = () => {
 
         const subscriptionCheck = await fetch("/api/subscriptions/check");
         if (subscriptionCheck.ok) {
-          const { isActive, expiryDate } = await subscriptionCheck.json();
+          const { isActive, expiryDate, isTrial, daysRemaining, planName } =
+            await subscriptionCheck.json();
 
           console.log("[Dashboard] API subscription check result:", {
             isActive,
             expiryDate,
+            isTrial,
+            daysRemaining,
           });
 
           // If subscription is active, don't do any redirects
@@ -205,22 +210,35 @@ const Overview: React.FC = () => {
               "[Dashboard] Subscription is ACTIVE - staying on dashboard",
             );
 
-            // Only show warning if expiring soon
-            if (expiryDate) {
-              const expiry = new Date(expiryDate);
-              const today = new Date();
-              const timeDiff = expiry.getTime() - today.getTime();
-              const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-              if (daysRemaining <= 10 && daysRemaining > 0) {
-                setSubscriptionAlert({
-                  open: true,
-                  message: `Your subscription expires in ${daysRemaining} day${
-                    daysRemaining !== 1 ? "s" : ""
-                  }. Please renew to avoid service interruption.`,
-                  severity: "warning",
-                  daysRemaining,
-                });
+            // Show trial or subscription expiry notifications
+            if (expiryDate && daysRemaining !== undefined) {
+              if (isTrial) {
+                // Trial notification - always show for trials
+                if (daysRemaining <= 14 && daysRemaining > 0) {
+                  setSubscriptionAlert({
+                    open: true,
+                    message:
+                      daysRemaining <= 3
+                        ? `Your free trial ends in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}! Subscribe now to keep access.`
+                        : `You're on a free trial - ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} remaining. Explore all features!`,
+                    severity: daysRemaining <= 3 ? "warning" : "info",
+                    daysRemaining,
+                    isTrial: true,
+                  });
+                }
+              } else {
+                // Paid subscription - only show warning if expiring soon
+                if (daysRemaining <= 10 && daysRemaining > 0) {
+                  setSubscriptionAlert({
+                    open: true,
+                    message: `Your subscription expires in ${daysRemaining} day${
+                      daysRemaining !== 1 ? "s" : ""
+                    }. Please renew to avoid service interruption.`,
+                    severity: "warning",
+                    daysRemaining,
+                    isTrial: false,
+                  });
+                }
               }
             }
             return; // Exit early - subscription is active
@@ -517,7 +535,7 @@ const Overview: React.FC = () => {
       {/* Subscription Alert Snackbar */}
       <Snackbar
         open={subscriptionAlert.open}
-        autoHideDuration={10000}
+        autoHideDuration={subscriptionAlert.isTrial ? null : 10000}
         onClose={handleSubscriptionAlertClose}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
@@ -532,12 +550,18 @@ const Overview: React.FC = () => {
               size="small"
               onClick={handleRenewSubscription}
             >
-              RENEW
+              {subscriptionAlert.isTrial ? "SUBSCRIBE" : "RENEW"}
             </Button>
           }
         >
           <Box display="flex" alignItems="center">
-            <Warning sx={{ mr: 1 }} />
+            {subscriptionAlert.isTrial ? (
+              <Box component="span" sx={{ mr: 1 }}>
+                🎉
+              </Box>
+            ) : (
+              <Warning sx={{ mr: 1 }} />
+            )}
             {subscriptionAlert.message}
           </Box>
         </Alert>

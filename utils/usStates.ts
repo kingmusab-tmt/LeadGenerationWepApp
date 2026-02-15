@@ -64,6 +64,7 @@ export const US_STATES = [
  * Extract state abbreviation from city string (e.g., "New York, NY" -> "NY")
  */
 export const extractStateFromCity = (cityString: string): string | null => {
+  if (!cityString) return null;
   const match = cityString.match(/,\s*([A-Z]{2})$/);
   return match ? match[1] : null;
 };
@@ -72,6 +73,7 @@ export const extractStateFromCity = (cityString: string): string | null => {
  * Extract city name from city string (e.g., "New York, NY" -> "New York")
  */
 export const extractCityName = (cityString: string): string => {
+  if (!cityString) return "";
   return cityString.split(",")[0].trim();
 };
 

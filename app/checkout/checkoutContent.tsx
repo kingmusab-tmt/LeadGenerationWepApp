@@ -34,7 +34,7 @@ import { useInitializeUser } from "@/lib/hooks";
 import { useSession } from "next-auth/react";
 import Head from "next/head";
 import axios from "axios";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY!);
 
@@ -50,46 +50,61 @@ interface Tier {
   tierType: string;
   discountPercentage: number;
   discountedPrice: string;
+  annualPrice?: string;
+  billingInterval?: "month" | "year";
+  discountDuration?: "once" | "forever" | "repeating";
 }
 
 const StripeCheckoutButton = ({
   tier,
-  duration,
+  billingInterval,
   onSuccess,
   onError,
   onCancel,
 }: {
   tier: Tier;
-  duration: number;
+  billingInterval: "month" | "year";
   onSuccess: () => void;
   onError: (message: string) => void;
   onCancel: () => void;
 }) => {
   const [loading, setLoading] = useState(false);
+  const csrfFetch = useCSRFFetch();
 
   const handleCheckout = async () => {
     setLoading(true);
     onError("");
 
     try {
-      const response = await axios.post(
+      const response = await csrfFetch(
         "/api/payments/stripe/stripecheckoutapi",
         {
-          tierId: tier._id,
-          durationMonths: duration,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tierId: tier._id,
+            billingInterval: billingInterval,
+          }),
         },
       );
+      const data = await response.json();
 
-      if (response.data.success) {
-        window.location.href = response.data.sessionUrl;
+      if (data.success) {
+        window.location.href = data.sessionUrl;
       } else {
-        onError(response.data.message || "Failed to initiate Stripe payment");
+        onError(data.message || "Failed to initiate Stripe payment");
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : "Payment failed");
       setLoading(false);
     }
   };
+
+  // Calculate display price based on billing interval
+  const displayPrice =
+    billingInterval === "year"
+      ? parseFloat(tier.annualPrice || tier.price)
+      : parseFloat(tier.discountedPrice || tier.price);
 
   return (
     <Button
@@ -104,76 +119,21 @@ const StripeCheckoutButton = ({
       {loading ? (
         <CircularProgress size={24} />
       ) : (
-        `Pay $${(
-          parseFloat(tier.discountedPrice || tier.price) * duration
-        ).toFixed(2)}`
+        `Pay $${displayPrice.toFixed(2)}${billingInterval === "year" ? "/year" : "/month"}`
       )}
     </Button>
   );
 };
 
-const PayPalPayment = ({
-  tier,
-  duration,
-  onSuccess,
-  onError,
-  onCancel,
-}: {
-  tier: Tier;
-  duration: number;
-  onSuccess: () => void;
-  onError: (message: string) => void;
-  onCancel: () => void;
-}) => {
-  return (
-    <PayPalButtons
-      style={{ layout: "vertical" }}
-      createOrder={async (data, actions) => {
-        try {
-          const response = await axios.post("/api/payments/paypal/create", {
-            tierId: tier._id,
-            durationMonths: duration,
-          });
-          return response.data.orderID;
-        } catch (err) {
-          onError("Failed to create PayPal order");
-          throw err;
-        }
-      }}
-      onApprove={async (data, actions) => {
-        try {
-          const response = await axios.post("/api/payments/paypal/capture", {
-            orderID: data.orderID,
-            tierId: tier._id,
-            durationMonths: duration,
-          });
-          if (response.data.success) onSuccess();
-          else onError(response.data.message || "Payment failed");
-        } catch (err) {
-          onError("Failed to process PayPal payment");
-        }
-      }}
-      onCancel={() => {
-        onCancel();
-      }}
-      onError={(err) => {
-        onError(`PayPal error: ${err.toString()}`);
-      }}
-    />
-  );
-};
-
 const PaymentSection = ({
   tier,
-  paymentMethod,
-  duration,
+  billingInterval,
   onSuccess,
   onError,
   onCancel,
 }: {
   tier: Tier;
-  paymentMethod: "stripe" | "paypal";
-  duration: number;
+  billingInterval: "month" | "year";
   onSuccess: () => void;
   onError: (message: string) => void;
   onCancel: () => void;
@@ -182,57 +142,39 @@ const PaymentSection = ({
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (paymentMethod === "stripe") {
-      const paymentStatus = searchParams.get("payment");
-      //("Payment Status:", paymentStatus);
+    const paymentStatus = searchParams.get("payment");
+    const sessionId = searchParams.get("session_id");
 
-      const sessionId = searchParams.get("session_id");
-      //("Session ID:", sessionId);
-
-      if (paymentStatus === "success" && sessionId) {
-        const verifyPayment = async () => {
-          try {
-            const response = await axios.get(
-              `/api/payments/status?session_id=${sessionId}`,
-            );
-            if (response.data.success) {
-              onSuccess();
-              router.replace(window.location.pathname);
-            } else {
-              onError("Payment verification failed");
-            }
-          } catch (err) {
-            onError("Error verifying payment");
+    if (paymentStatus === "success" && sessionId) {
+      const verifyPayment = async () => {
+        try {
+          const response = await axios.get(
+            `/api/payments/status?sessionId=${sessionId}`,
+          );
+          if (response.data.success) {
+            onSuccess();
+            router.replace(window.location.pathname);
+          } else {
+            onError("Payment verification failed");
           }
-        };
-        verifyPayment();
-      } else if (paymentStatus === "canceled") {
-        onCancel();
-      }
+        } catch (err) {
+          onError("Error verifying payment");
+        }
+      };
+      verifyPayment();
+    } else if (paymentStatus === "canceled") {
+      onCancel();
     }
-  }, [paymentMethod, onSuccess, onError, onCancel, router, searchParams]);
+  }, [onSuccess, onError, onCancel, router, searchParams]);
 
   return (
-    <Box>
-      {paymentMethod === "stripe" && (
-        <StripeCheckoutButton
-          tier={tier}
-          duration={duration}
-          onSuccess={onSuccess}
-          onError={onError}
-          onCancel={onCancel}
-        />
-      )}
-      {paymentMethod === "paypal" && (
-        <PayPalPayment
-          tier={tier}
-          duration={duration}
-          onSuccess={onSuccess}
-          onError={onError}
-          onCancel={onCancel}
-        />
-      )}
-    </Box>
+    <StripeCheckoutButton
+      tier={tier}
+      billingInterval={billingInterval}
+      onSuccess={onSuccess}
+      onError={onError}
+      onCancel={onCancel}
+    />
   );
 };
 
@@ -243,15 +185,13 @@ const CheckoutContent = () => {
   const { data: session, status, update: updateSession } = useSession();
 
   const [activeStep, setActiveStep] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<
-    "stripe" | "paypal" | null
-  >(null);
-  const [duration, setDuration] = useState<number>(1);
+  const [billingInterval, setBillingInterval] = useState<"month" | "year">(
+    "month",
+  );
   const [completed, setCompleted] = useState(false);
   const [tier, setTier] = useState<Tier | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [paypalClientId, setPaypalClientId] = useState<string | null>(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isCanceled, setIsCanceled] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -283,18 +223,6 @@ const CheckoutContent = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    const fetchPaypalClientId = async () => {
-      try {
-        const response = await axios.get(
-          "/api/payments/paypal/getpaypalapiclientid",
-        );
-        setPaypalClientId(response.data.clientId);
-      } catch (error) {
-        console.error("Failed to fetch PayPal client ID:", error);
-        setError("Failed to initialize PayPal");
-      }
-    };
-
     const fetchTier = async () => {
       const planId = searchParams.get("plan");
       if (!planId) {
@@ -306,10 +234,12 @@ const CheckoutContent = () => {
         const response = await axios.get(
           `/api/subscriptions/tiers?tierId=${planId}`,
         );
-        if (!response.data.isActive) {
+        // Extract the actual tier data from the response
+        const tierData = response.data.data || response.data;
+        if (!tierData.isActive) {
           throw new Error("This tier is not currently available");
         }
-        setTier(response.data);
+        setTier(tierData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load tier");
         router.push("/plan");
@@ -319,7 +249,6 @@ const CheckoutContent = () => {
     };
 
     if (status === "authenticated") {
-      fetchPaypalClientId();
       fetchTier();
     }
   }, [status, router, searchParams]);
@@ -339,12 +268,6 @@ const CheckoutContent = () => {
     setShowFailureModal(true);
     setIsCanceled(true);
     setActiveStep(1);
-  };
-
-  const handlePaymentMethodSelect = (method: "stripe" | "paypal") => {
-    setPaymentMethod(method);
-    setError(null);
-    setIsCanceled(false);
   };
 
   const handleCancelOrder = () => {
@@ -370,7 +293,7 @@ const CheckoutContent = () => {
     setError(null);
     try {
       const response = await axios.get(
-        `/api/payments/status?session_id=${sessionId}`,
+        `/api/payments/status?sessionId=${sessionId}`,
       );
       if (response.data.success) {
         handlePaymentSuccess();
@@ -425,7 +348,11 @@ const CheckoutContent = () => {
     );
   }
 
-  const totalAmount = parseFloat(tier.discountedPrice) * duration;
+  // Calculate total based on billing interval
+  const totalAmount =
+    billingInterval === "year"
+      ? parseFloat(tier.annualPrice || (parseFloat(tier.price) * 12).toString())
+      : parseFloat(tier.discountedPrice || tier.price);
 
   return (
     <>
@@ -478,22 +405,36 @@ const CheckoutContent = () => {
                     </Box>
 
                     <FormControl fullWidth sx={{ mb: 3 }}>
-                      <InputLabel id="duration-label">
-                        Subscription Duration
+                      <InputLabel id="billing-interval-label">
+                        Billing Cycle
                       </InputLabel>
                       <Select
-                        labelId="duration-label"
-                        value={duration}
-                        label="Subscription Duration"
-                        onChange={(e) => setDuration(Number(e.target.value))}
+                        labelId="billing-interval-label"
+                        value={billingInterval}
+                        label="Billing Cycle"
+                        onChange={(e) =>
+                          setBillingInterval(e.target.value as "month" | "year")
+                        }
                       >
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24].map(
-                          (months) => (
-                            <MenuItem key={months} value={months}>
-                              {months} month{months !== 1 ? "s" : ""}
-                            </MenuItem>
-                          ),
-                        )}
+                        <MenuItem value="month">
+                          Monthly - ${tier.discountedPrice || tier.price}/month
+                        </MenuItem>
+                        <MenuItem value="year">
+                          Annual - $
+                          {tier.annualPrice ||
+                            (parseFloat(tier.price) * 12).toFixed(2)}
+                          /year
+                          {tier.annualPrice &&
+                            parseFloat(tier.annualPrice) <
+                              parseFloat(tier.price) * 12 && (
+                              <Chip
+                                label={`Save ${Math.round((1 - parseFloat(tier.annualPrice) / (parseFloat(tier.price) * 12)) * 100)}%`}
+                                color="success"
+                                size="small"
+                                sx={{ ml: 1 }}
+                              />
+                            )}
+                        </MenuItem>
                       </Select>
                     </FormControl>
 
@@ -526,7 +467,7 @@ const CheckoutContent = () => {
                 ) : (
                   <>
                     <Typography variant="h6" gutterBottom>
-                      Payment Method
+                      Complete Payment
                     </Typography>
 
                     {isCanceled ? (
@@ -538,27 +479,18 @@ const CheckoutContent = () => {
                           variant="contained"
                           onClick={handleBackToPayment}
                         >
-                          Back to Payment
+                          Try Again
                         </Button>
                       </Box>
-                    ) : !paymentMethod ? (
+                    ) : (
                       <Box display="flex" flexDirection="column" gap={2}>
-                        <Button
-                          variant="outlined"
-                          size="large"
-                          onClick={() => handlePaymentMethodSelect("stripe")}
-                          sx={{ py: 2 }}
-                        >
-                          Stripe
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          size="large"
-                          onClick={() => handlePaymentMethodSelect("paypal")}
-                          sx={{ py: 2 }}
-                        >
-                          PayPal
-                        </Button>
+                        <PaymentSection
+                          tier={tier}
+                          billingInterval={billingInterval}
+                          onSuccess={handlePaymentSuccess}
+                          onError={handlePaymentError}
+                          onCancel={handlePaymentCancel}
+                        />
                         <Button
                           variant="text"
                           onClick={() => setActiveStep(0)}
@@ -567,31 +499,6 @@ const CheckoutContent = () => {
                           Back to Plan Selection
                         </Button>
                       </Box>
-                    ) : (
-                      <PayPalScriptProvider
-                        options={{
-                          clientId: paypalClientId || "",
-                          currency: "USD",
-                          intent: "capture",
-                          components: "buttons",
-                        }}
-                      >
-                        <PaymentSection
-                          tier={tier}
-                          paymentMethod={paymentMethod}
-                          duration={duration}
-                          onSuccess={handlePaymentSuccess}
-                          onError={handlePaymentError}
-                          onCancel={handlePaymentCancel}
-                        />
-                        <Button
-                          variant="text"
-                          onClick={() => setPaymentMethod(null)}
-                          sx={{ mt: 2 }}
-                        >
-                          Choose different payment method
-                        </Button>
-                      </PayPalScriptProvider>
                     )}
                   </>
                 )}
@@ -610,33 +517,46 @@ const CheckoutContent = () => {
                 </Box>
 
                 <Box display="flex" justifyContent="space-between" mb={2}>
-                  <Typography>Duration:</Typography>
+                  <Typography>Billing Cycle:</Typography>
                   <Typography fontWeight="bold">
-                    {duration} month{duration !== 1 ? "s" : ""}
+                    {billingInterval === "year" ? "Annual" : "Monthly"}
                   </Typography>
                 </Box>
 
                 {tier.discountPercentage > 0 && (
                   <>
                     <Box display="flex" justifyContent="space-between" mb={1}>
-                      <Typography>Original Price:</Typography>
+                      <Typography>Base Price:</Typography>
                       <Typography sx={{ textDecoration: "line-through" }}>
-                        ${(parseFloat(tier.price) * duration).toFixed(2)}
+                        $
+                        {billingInterval === "year"
+                          ? (parseFloat(tier.price) * 12).toFixed(2)
+                          : tier.price}
+                        /{billingInterval === "year" ? "year" : "month"}
                       </Typography>
                     </Box>
                     <Box display="flex" justifyContent="space-between" mb={2}>
                       <Typography>Discount:</Typography>
                       <Typography color="success.main">
                         {tier.discountPercentage}% OFF
+                        {tier.discountDuration === "once" &&
+                          " (first payment only)"}
                       </Typography>
                     </Box>
                   </>
                 )}
 
                 <Box display="flex" justifyContent="space-between" mb={2}>
-                  <Typography>Monthly Price:</Typography>
+                  <Typography>
+                    {billingInterval === "year" ? "Annual" : "Monthly"} Price:
+                  </Typography>
                   <Typography fontWeight="bold">
-                    ${tier.discountedPrice}/month
+                    $
+                    {billingInterval === "year"
+                      ? tier.annualPrice ||
+                        (parseFloat(tier.price) * 12).toFixed(2)
+                      : tier.discountedPrice || tier.price}
+                    /{billingInterval === "year" ? "year" : "month"}
                   </Typography>
                 </Box>
 

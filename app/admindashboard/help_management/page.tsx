@@ -63,6 +63,7 @@ interface FAQ {
 
 const getYouTubeEmbedUrl = (url: string): string | null => {
   try {
+    if (!url) return null;
     const match = url.match(
       /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/,
     );

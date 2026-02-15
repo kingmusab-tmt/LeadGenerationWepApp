@@ -28,7 +28,7 @@ Before evaluating the integrations, it's important to understand what a BRIXCOT 
 | **Lead Scoring**        | AI quality scoring (0–100) + human-readable scoring (0–10)                      |
 | **Lead Distribution**   | Automatic assignment to matching buyers, marketplace fallback, round-robin      |
 | **Buyer Management**    | Register buyers, set preferences/criteria, priority ranking, auto-accept        |
-| **Wallet & Billing**    | Buyer wallet system (units), Stripe/PayPal payments, invoicing engine           |
+| **Wallet & Billing**    | Buyer wallet system (units), Stripe payments, invoicing engine                  |
 | **Email Marketing**     | Full Nodemailer-based email campaigns with templates, open/click tracking       |
 | **SMS Marketing**       | Twilio-based SMS campaigns with delivery tracking                               |
 | **Analytics Dashboard** | Lead counts, revenue, conversion rates, trend charts                            |
@@ -169,19 +169,19 @@ The question is: **where do external CRMs and automation tools fit into this wor
 
 This matrix shows where integrations duplicate capabilities BRIXCOT already provides:
 
-| Capability          | BRIXCOT Built-In           | Zapier                     |
-| ------------------- | -------------------------- | -------------------------- |
-| Lead capture        | Forms, Chatbot, Calls      | Adds external sources      |
-| Lead scoring        | AI scoring (0–100)         | No                         |
-| Lead distribution   | Auto-assign, marketplace   | No                         |
-| Contact management  | Buyer management page      | No                         |
-| Deal tracking       | Transactions + invoices    | No                         |
-| Email marketing     | Full engine                | Connects to Mailchimp etc. |
-| SMS marketing       | Full engine                | No                         |
-| Notifications       | Push, email, SMS, in-app   | Adds Slack/Teams           |
-| Analytics/reporting | Dashboard with charts      | Sheets sync                |
-| Payment processing  | Stripe + PayPal + invoices | No                         |
-| Audit trail         | MongoDB logs               | No                         |
+| Capability          | BRIXCOT Built-In         | Zapier                     |
+| ------------------- | ------------------------ | -------------------------- |
+| Lead capture        | Forms, Chatbot, Calls    | Adds external sources      |
+| Lead scoring        | AI scoring (0–100)       | No                         |
+| Lead distribution   | Auto-assign, marketplace | No                         |
+| Contact management  | Buyer management page    | No                         |
+| Deal tracking       | Transactions + invoices  | No                         |
+| Email marketing     | Full engine              | Connects to Mailchimp etc. |
+| SMS marketing       | Full engine              | No                         |
+| Notifications       | Push, email, SMS, in-app | Adds Slack/Teams           |
+| Analytics/reporting | Dashboard with charts    | Sheets sync                |
+| Payment processing  | Stripe + invoices        | No                         |
+| Audit trail         | MongoDB logs             | No                         |
 
 > **Note:** HubSpot and Salesforce previously appeared in this matrix providing "redundant" contact management, deal tracking, and reporting capabilities — which was one of the reasons they were removed.
 

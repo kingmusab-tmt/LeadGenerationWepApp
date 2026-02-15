@@ -7,10 +7,12 @@ import { paginationSchema } from "@/lib/validation/schemas";
 import {
   successResponse,
   unauthorized,
+  forbidden,
   internalError,
   badRequest,
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +80,19 @@ export async function POST(req: NextRequest) {
     }
 
     await dbConnect();
+
+    // Check subscription limit for SMS campaigns
+    const usageCheck = await checkAndIncrementUsage(
+      session.user.id,
+      "smsCampaignsPerMonth",
+      1,
+    );
+    if (!usageCheck.allowed) {
+      return forbidden(
+        usageCheck.message ||
+          "SMS campaign limit reached for your subscription",
+      );
+    }
 
     const campaign = await SmsCampaign.create({
       userId: session.user.id,

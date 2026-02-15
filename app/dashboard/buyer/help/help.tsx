@@ -119,6 +119,7 @@ const HelpSection = () => {
   );
 
   const extractYoutubeId = (url: string) => {
+    if (!url) return null;
     const regExp =
       /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);

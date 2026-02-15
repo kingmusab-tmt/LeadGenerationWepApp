@@ -7,6 +7,7 @@ import dbConnect from "@/lib/connectdb";
 import { Invoice } from "@/models/invoice";
 import { invoiceEngine } from "@/lib/invoiceEngine";
 import { invalidateAllUserSessions } from "@/lib/cachedSession"; // PHASE 3: Cache invalidation
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,22 @@ export async function POST(req: NextRequest) {
 
     if (!dueDate) {
       return NextResponse.json({ error: "Due date required" }, { status: 400 });
+    }
+
+    // Check subscription limit for invoices
+    const usageCheck = await checkAndIncrementUsage(
+      session.user.id,
+      "invoicesPerMonth",
+      1,
+    );
+    if (!usageCheck.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            usageCheck.message || "Invoice limit reached for your subscription",
+        },
+        { status: 403 },
+      );
     }
 
     const invoice = await invoiceEngine.createInvoice(session.user.id, {

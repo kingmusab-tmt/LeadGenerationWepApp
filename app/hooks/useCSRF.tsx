@@ -165,7 +165,17 @@ export function useCSRFFetch() {
   const { csrfToken, ensureToken } = useCSRF();
 
   return async (url: string, options: RequestInit = {}) => {
-    let token = csrfToken;
+    // Read token from cookie to ensure consistency with middleware validation
+    // This prevents stale closure issues where context token differs from cookie
+    const getCookieToken = () => {
+      if (typeof document === "undefined") return null;
+      if (!document.cookie) return null;
+      const match = document.cookie.match(/(?:^|; )csrfToken=([^;]*)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    };
+
+    let token = getCookieToken() || csrfToken;
+
     // Lazily fetch token if missing for non-GET requests
     if (
       (!token || token === "") &&
@@ -173,6 +183,8 @@ export function useCSRFFetch() {
       options.method !== "GET"
     ) {
       token = await ensureToken();
+      // Re-read from cookie after ensureToken sets it
+      token = getCookieToken() || token;
     }
 
     const headers = new Headers(options.headers);

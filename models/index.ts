@@ -13,12 +13,18 @@
 export { User } from "./userModel";
 export { Notification } from "./notificationModel";
 export { default as ScheduledCallback } from "./scheduledCallback";
+export { CancellationFeedback } from "./cancellationFeedback";
 
 // Re-export types
 export type { IUser } from "./types/user";
 export type { ISubscription } from "./types/subscription";
 export type { ITrackingNumber } from "./types/tracking";
 export type { INotification } from "./types/notification";
+export type {
+  ICancellationFeedback,
+  CancellationReason,
+} from "./cancellationFeedback";
+export { CANCELLATION_REASONS } from "./cancellationFeedback";
 
 // Re-export schemas
 export {

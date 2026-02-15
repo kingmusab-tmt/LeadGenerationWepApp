@@ -14,6 +14,10 @@ import { WebhookConfig, IWebhookConfig } from "@/models/webhookConfig";
 import { encryptData } from "@/lib/encryption";
 import crypto from "crypto";
 import { z } from "zod";
+import {
+  checkAndIncrementUsage,
+  checkFeatureAccess,
+} from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -184,6 +188,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "At least one event must be enabled" },
         { status: 400 },
+      );
+    }
+
+    // Check subscription limit for webhooks
+    const userId =
+      (authResult.user as any)._id?.toString() || (authResult.user as any).id;
+
+    // Check webhookIntegration feature access
+    const featureCheck = await checkFeatureAccess(userId, "webhookIntegration");
+    if (!featureCheck.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "Webhook integration is not available on your current plan. Please upgrade to access this feature.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const usageCheck = await checkAndIncrementUsage(userId, "maxWebhooks", 1);
+    if (!usageCheck.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            usageCheck.message || "Webhook limit reached for your subscription",
+        },
+        { status: 403 },
       );
     }
 

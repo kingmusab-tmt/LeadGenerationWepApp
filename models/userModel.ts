@@ -182,7 +182,6 @@ const UserSchema: Schema = new Schema<IUser>(
     callChargeOptions: CallChargeSchema,
     holdMusicUrl: { type: String, default: "" },
     stripeCustomerId: { type: String },
-    paypalCustomerId: { type: String },
     subscription: SubscriptionSchema,
   },
   {
@@ -224,7 +223,6 @@ UserSchema.index({ "subscription.subscriptionPaymentMethod": 1 }); // Find users
 
 // Stripe/Payment queries
 UserSchema.index({ stripeCustomerId: 1 }); // Find user by Stripe customer ID
-UserSchema.index({ paypalCustomerId: 1 }); // Find user by PayPal customer ID
 UserSchema.index({ stripeAccountId: 1 }); // Find user by Stripe account ID
 
 // Timestamp indexes for sorting

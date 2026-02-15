@@ -13,8 +13,6 @@ const PaymentSetupForm: React.FC = () => {
   const [stripeSecretKey, setStripeSecretKey] = useState("");
   const [stripePublishableKey, setStripePublishableKey] = useState("");
   const [stripeWebhookSecret, setStripeWebhookSecret] = useState("");
-  const [paypalClientId, setPaypalClientId] = useState("");
-  const [paypalSecret, setPaypalSecret] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -24,8 +22,6 @@ const PaymentSetupForm: React.FC = () => {
         stripeSecretKey,
         stripeWebhookSecret,
         stripePublishableKey,
-        paypalClientId,
-        paypalSecret,
       });
 
       if (response.data.success) {
@@ -64,20 +60,6 @@ const PaymentSetupForm: React.FC = () => {
         label="Stripe Webhook Secret"
         value={stripeWebhookSecret}
         onChange={(e) => setStripeWebhookSecret(e.target.value)}
-        fullWidth
-        margin="normal"
-      />
-      <TextField
-        label="PayPal Client ID"
-        value={paypalClientId}
-        onChange={(e) => setPaypalClientId(e.target.value)}
-        fullWidth
-        margin="normal"
-      />
-      <TextField
-        label="PayPal Secret"
-        value={paypalSecret}
-        onChange={(e) => setPaypalSecret(e.target.value)}
         fullWidth
         margin="normal"
       />

@@ -431,7 +431,6 @@ export default function InvoiceDetailPage() {
             sx={{ mt: 2 }}
           >
             <MenuItem value="stripe">Stripe</MenuItem>
-            <MenuItem value="paypal">PayPal</MenuItem>
             <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
             <MenuItem value="check">Check</MenuItem>
           </TextField>

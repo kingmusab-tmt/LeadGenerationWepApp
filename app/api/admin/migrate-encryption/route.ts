@@ -66,28 +66,6 @@ export async function POST(req: NextRequest) {
           needsUpdate = true;
         }
 
-        // Migrate paypalSecret if it exists and doesn't have new format
-        if (
-          user.creditSetup?.paypalSecret &&
-          !user.creditSetup.paypalSecret.includes(":")
-        ) {
-          updates["creditSetup.paypalSecret"] = migrateEncryptedData(
-            user.creditSetup.paypalSecret,
-          );
-          needsUpdate = true;
-        }
-
-        // Migrate paypalAccessToken if it exists and doesn't have new format
-        if (
-          user.creditSetup?.paypalAccessToken &&
-          !user.creditSetup.paypalAccessToken.includes(":")
-        ) {
-          updates["creditSetup.paypalAccessToken"] = migrateEncryptedData(
-            user.creditSetup.paypalAccessToken,
-          );
-          needsUpdate = true;
-        }
-
         // Update user if any fields were migrated
         if (needsUpdate) {
           await User.findByIdAndUpdate(user._id, { $set: updates });

@@ -24,16 +24,16 @@ import { useCSRF } from "@/app/hooks";
 const SettingsContainer = styled(Container)({
   marginTop: "20px",
   padding: "20px",
-  backgroundColor: "#fff",
+  backgroundColor: "#ffffff",
   borderRadius: "8px",
 });
 
 const Section = styled(Paper)({
   marginBottom: "24px",
   padding: "20px",
-  border: "1px solid #e0e0e0",
+  border: "1px solid #ffffff",
   borderRadius: "8px",
-  backgroundColor: "#fafafa",
+  backgroundColor: "#ffffff",
 });
 
 const SectionHeader = styled(Typography)({

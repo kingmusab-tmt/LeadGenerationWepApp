@@ -113,6 +113,7 @@ export class ChatbotEngine {
 
       // Safely extract JSON from response
       try {
+        if (!text) return {};
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
       } catch (e) {

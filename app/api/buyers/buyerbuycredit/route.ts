@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse the request body
-    const { units, cost, paymentMethod, paypalOrderId } = await req.json();
+    const { units, cost, paymentMethod } = await req.json();
 
     // Get buyer details
     const buyer = await Buyer.findById(session.user.id);
@@ -91,56 +91,6 @@ export async function POST(req: NextRequest) {
       if (paymentIntent.status !== "succeeded") {
         return NextResponse.json(
           { success: false, message: "Stripe payment failed" },
-          { status: 400 },
-        );
-      }
-    }
-
-    // Handle PayPal payment
-    else if (paymentMethod === "paypal") {
-      const encryptedPaypalAccessToken =
-        leadSeller.creditSetup?.paypalAccessToken;
-      if (!encryptedPaypalAccessToken) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "PayPal payment is not available for this seller",
-          },
-          { status: 400 },
-        );
-      }
-
-      // Decrypt the PayPal access token
-      let paypalAccessToken: string;
-      try {
-        paypalAccessToken = decryptData(encryptedPaypalAccessToken);
-      } catch (error) {
-        console.error("Failed to decrypt PayPal access token:", error);
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Payment configuration error. Please contact the seller.",
-          },
-          { status: 500 },
-        );
-      }
-
-      // Verify the PayPal order
-      const verifyResponse = await fetch(
-        `https://api-m.paypal.com/v2/checkout/orders/${paypalOrderId}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${paypalAccessToken}`,
-          },
-        },
-      );
-
-      const verifyData = await verifyResponse.json();
-      if (verifyData.status !== "COMPLETED") {
-        return NextResponse.json(
-          { success: false, message: "PayPal payment not completed" },
           { status: 400 },
         );
       }

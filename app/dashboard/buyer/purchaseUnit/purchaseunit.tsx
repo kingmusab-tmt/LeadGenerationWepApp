@@ -1,6 +1,7 @@
 "use client";
-import React, { useState, useEffect, memo } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import {
   Typography,
   Select,
@@ -20,16 +21,14 @@ import LoadingComponent from "@/app/components/generalComponent/loadingcomponent
 const UnitPurchase: React.FC = () => {
   const [units, setUnits] = useState<number>(0);
   const [cost, setCost] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<string>("stripe");
   const [loading, setLoading] = useState(false);
+  const csrfFetch = useCSRFFetch();
   const [unitPricingOptions, setUnitPricingOptions] = useState<
     { units: number; cost: number }[]
   >([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
-  const [paypalClientId, setPaypalClientId] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showFailureModal, setShowFailureModal] = useState(false);
-  const [isPayPalSdkLoaded, setIsPayPalSdkLoaded] = useState(false);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -91,108 +90,32 @@ const UnitPurchase: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (paymentMethod === "paypal") {
-      const fetchPaypalClientId = async () => {
-        try {
-          const response = await axios.get(
-            "/api/payments/paypal/getpaypalapiclientid",
-          );
-          if (response.data.success) {
-            setPaypalClientId(response.data.clientId);
-          } else {
-            showSnackbar(
-              response.data.message || "Failed to fetch PayPal Client ID",
-              "error",
-            );
-          }
-        } catch (error) {
-          console.error("Error fetching PayPal Client ID:", error);
-          showSnackbar(
-            "An error occurred while fetching PayPal Client ID",
-            "error",
-          );
-        }
-      };
-
-      fetchPaypalClientId();
-    }
-  }, [paymentMethod]);
-
-  useEffect(() => {
-    if (paypalClientId && paymentMethod === "paypal") {
-      const script = document.createElement("script");
-      script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}`;
-      script.async = true;
-
-      script.onload = () => {
-        setIsPayPalSdkLoaded(true);
-      };
-
-      script.onerror = () => {
-        showSnackbar("Failed to load PayPal. Please try again.", "error");
-      };
-
-      document.body.appendChild(script);
-
-      return () => {
-        document.body.removeChild(script);
-        setIsPayPalSdkLoaded(false);
-      };
-    }
-  }, [paypalClientId, paymentMethod]);
-
   const handleStripePurchase = async () => {
     setLoading(true);
     try {
-      const response = await axios.post(
+      const response = await csrfFetch(
         "/api/payments/stripe/stripecheckoutapi",
         {
-          units,
-          cost,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            units,
+            cost,
+          }),
         },
       );
+      const data = await response.json();
 
-      if (response.data.success) {
-        window.location.href = response.data.sessionUrl;
+      if (data.success) {
+        window.location.href = data.sessionUrl;
       } else {
         showSnackbar(
-          response.data.message || "Failed to initiate Stripe payment",
+          data.message || "Failed to initiate Stripe payment",
           "error",
         );
       }
     } catch (error) {
       console.error("Error initiating Stripe payment:", error);
-      showSnackbar("An error occurred. Please try again.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePayPalApprove = async (orderId: string) => {
-    setLoading(true);
-    try {
-      const response = await axios.post("/api/payments/paypal/capture-order", {
-        orderId,
-        units,
-        cost,
-      });
-
-      if (response.data.success) {
-        showSnackbar(
-          "Payment successful! Your wallet has been updated.",
-          "success",
-        );
-        // Redirect to the dashboard after successful payment
-        router.push("/dashboard/buyer/overview");
-      } else {
-        showSnackbar(
-          response.data.message || "Payment failed. Please try again.",
-          "error",
-        );
-      }
-    } catch (error) {
-      console.error("Error capturing PayPal payment:", error);
       showSnackbar("An error occurred. Please try again.", "error");
     } finally {
       setLoading(false);
@@ -231,57 +154,15 @@ const UnitPurchase: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth>
-                <InputLabel>Payment Method</InputLabel>
-                <Select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as string)}
-                >
-                  <MenuItem value="stripe">Stripe</MenuItem>
-                  <MenuItem value="paypal">PayPal</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
             <Grid size={{ xs: 12 }}>
-              {paymentMethod === "stripe" ? (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleStripePurchase}
-                  disabled={loading || units === 0}
-                >
-                  {loading ? "Processing..." : "Purchase with Stripe"}
-                </Button>
-              ) : (
-                <div id="paypal-button-container">
-                  {isPayPalSdkLoaded && (
-                    <PayPalButtons
-                      createOrder={(data: any, actions: any) => {
-                        if (cost <= 0) {
-                          showSnackbar(
-                            "Invalid cost. Please select a valid number of units.",
-                            "error",
-                          );
-                          return Promise.reject("Invalid cost");
-                        }
-                        return actions.order.create({
-                          purchase_units: [
-                            {
-                              amount: {
-                                value: cost.toFixed(2),
-                              },
-                            },
-                          ],
-                        });
-                      }}
-                      onApprove={async (data: any, actions: any) => {
-                        await handlePayPalApprove(data.orderID);
-                      }}
-                    />
-                  )}
-                </div>
-              )}
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleStripePurchase}
+                disabled={loading || units === 0}
+              >
+                {loading ? "Processing..." : "Purchase with Stripe"}
+              </Button>
             </Grid>
           </Grid>
         )}
@@ -388,36 +269,5 @@ const UnitPurchase: React.FC = () => {
     </Container>
   );
 };
-
-const PayPalButtons = memo(
-  ({
-    createOrder,
-    onApprove,
-  }: {
-    createOrder: (data: any, actions: any) => Promise<string>;
-    onApprove: (data: any, actions: any) => Promise<void>;
-  }) => {
-    useEffect(() => {
-      if (window.paypal && typeof window.paypal.Buttons === "function") {
-        // Clear the container before rendering the button
-        const container = document.getElementById("paypal-button-container");
-        if (container) {
-          container.innerHTML = ""; // Clear any existing buttons
-        }
-
-        window.paypal
-          .Buttons({
-            createOrder,
-            onApprove,
-          })
-          .render("#paypal-button-container");
-      } else {
-        console.error("PayPal SDK not loaded or Buttons method is unavailable");
-      }
-    }, [createOrder, onApprove]);
-
-    return <div id="paypal-button-container"></div>;
-  },
-);
 
 export default UnitPurchase;

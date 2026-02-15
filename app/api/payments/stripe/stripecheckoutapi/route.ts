@@ -7,6 +7,7 @@ import dbConnect from "@/lib/connectdb";
 import { Tier } from "@/models/tier";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
+import { createSubscriptionCheckout } from "@/lib/stripeSubscriptionService";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
@@ -15,7 +16,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(req: NextRequest) {
   await dbConnect();
 
-  const { units, cost, tierId, durationMonths } = await req.json();
+  const { units, cost, tierId, billingInterval = "month" } = await req.json();
   const userSession = await getServerSession(authOptions);
 
   if (!userSession) {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     let sessionParams: Stripe.Checkout.SessionCreateParams;
 
     if (tierId) {
-      // Handle subscription checkout - processed by platform's Stripe account
+      // Handle subscription checkout using the subscription service
       const tier = await Tier.findById(tierId);
       if (!tier) {
         return NextResponse.json(
@@ -38,37 +39,40 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const pricePerMonth = parseFloat(tier.discountedPrice || tier.price);
-      const totalAmount = pricePerMonth * (durationMonths || 1);
-
-      sessionParams = {
-        payment_method_types: ["card"],
-        line_items: [
+      // For free tiers, don't create Stripe checkout
+      if (tier.tierType === "free") {
+        return NextResponse.json(
           {
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: `${tier.name} Subscription (${durationMonths || 1} month${
-                  durationMonths !== 1 ? "s" : ""
-                })`,
-              },
-              unit_amount: Math.round(totalAmount * 100),
-            },
-            quantity: 1,
+            success: false,
+            message: "Free tier does not require payment checkout",
           },
-        ],
-        mode: "payment",
-        success_url: `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=canceled`,
-        customer_email: userSession.user.email,
-        metadata: {
-          tierId,
-          userId: userSession.user.id,
-          durationMonths: (durationMonths || 1).toString(),
-          purchaseType: "subscription",
-        },
-      };
+          { status: 400 },
+        );
+      }
+
+      // Use the subscription service for recurring billing
+      const result = await createSubscriptionCheckout(
+        userSession.user.id,
+        tierId,
+        billingInterval as "month" | "year",
+        `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=canceled`,
+      );
+
+      if (!result.success) {
+        return NextResponse.json(
+          { success: false, message: result.message },
+          { status: 400 },
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        sessionId: result.sessionId,
+        sessionUrl: result.sessionUrl,
+      });
     } else {
+      // Handle credit purchases (one-time payment to seller)
       const buyer = await Buyer.findOne({
         email: userSession.user.email,
       });
@@ -140,15 +144,15 @@ export async function POST(req: NextRequest) {
           purchaseType: "credits",
         },
       };
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
+
+      return NextResponse.json({
+        success: true,
+        sessionId: session.id,
+        sessionUrl: session.url,
+      });
     }
-
-    const session = await stripe.checkout.sessions.create(sessionParams);
-
-    return NextResponse.json({
-      success: true,
-      sessionId: session.id,
-      sessionUrl: session.url,
-    });
   } catch (error: any) {
     console.error("Checkout session creation error:", error);
     return NextResponse.json(

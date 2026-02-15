@@ -21,19 +21,25 @@ import {
   Chip,
   Alert,
   Snackbar,
+  Paper,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningIcon from "@mui/icons-material/Warning";
+import BusinessIcon from "@mui/icons-material/Business";
+import StorefrontIcon from "@mui/icons-material/Storefront";
 import { useInitializeUser } from "@/lib/hooks";
 
 interface Tier {
   discountPercentage: number;
   discountedPrice: string;
   renewalPrice: any;
+  annualPrice?: string;
   _id: string;
   id: string;
   name: string;
-  price: number;
+  price: number | string;
   description: string;
   features: string[];
   highlight: boolean;
@@ -64,6 +70,12 @@ export default function PricingSection() {
     useState<SubscriptionCheckResponse | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
+
+  // User type selection - default to their current role or seller
+  const [userType, setUserType] = useState<"seller" | "business">(
+    (currentUser?.tierUserType || "seller") as "seller" | "business",
+  );
+
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -239,10 +251,24 @@ export default function PricingSection() {
     setApiError(null);
   };
 
+  const handleUserTypeChange = (
+    _: React.MouseEvent<HTMLElement>,
+    newType: "seller" | "business" | null,
+  ) => {
+    if (newType !== null) {
+      setUserType(newType);
+    }
+  };
+
   // Filter out free tier if user has already used trial
-  const filteredTiers = subscriptionInfo?.usedTrial
+  let filteredTiers = subscriptionInfo?.usedTrial
     ? tiers.filter((tier) => tier.tierType !== "free")
     : tiers;
+
+  // Filter by user type (role)
+  filteredTiers = filteredTiers.filter(
+    (tier) => tier.tierUserType === userType,
+  );
 
   // Determine if user is renewing (has active subscription that's expiring soon)
   const isRenewing =
@@ -366,6 +392,51 @@ export default function PricingSection() {
               }. Choose a plan to continue uninterrupted service.`
             : "Choose the plan that fits your business needs. Start with our free tier and upgrade anytime."}
         </Typography>
+
+        {/* User Type Toggle */}
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 0.5,
+              borderRadius: 3,
+              bgcolor: "action.hover",
+            }}
+          >
+            <ToggleButtonGroup
+              value={userType}
+              exclusive
+              onChange={handleUserTypeChange}
+              aria-label="user type"
+              sx={{
+                "& .MuiToggleButton-root": {
+                  px: 4,
+                  py: 1.5,
+                  border: "none",
+                  borderRadius: "12px !important",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  "&.Mui-selected": {
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                    "&:hover": {
+                      bgcolor: "primary.dark",
+                    },
+                  },
+                },
+              }}
+            >
+              <ToggleButton value="seller">
+                <StorefrontIcon sx={{ mr: 1 }} />
+                Lead Seller
+              </ToggleButton>
+              <ToggleButton value="business">
+                <BusinessIcon sx={{ mr: 1 }} />
+                Business
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Paper>
+        </Box>
 
         {/* Alert for expiring subscription */}
         {isRenewing && (

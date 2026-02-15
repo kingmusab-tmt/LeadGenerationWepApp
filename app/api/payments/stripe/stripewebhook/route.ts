@@ -6,9 +6,15 @@ import { User } from "@/models";
 import { Transaction } from "@/models/transactions";
 import { Tier } from "@/models/tier";
 import {
-  invalidateSessionCache,
-  invalidateAllUserSessions,
+  forceRefreshUserSession,
+  invalidateSessionWithConfirmation,
 } from "@/lib/cachedSession";
+import {
+  activateSubscription,
+  deactivateSubscription,
+  handleInvoicePaid,
+  handlePaymentFailed,
+} from "@/lib/stripeSubscriptionService";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
@@ -23,12 +29,16 @@ interface Metadata {
   tierId?: string;
   durationMonths?: string;
   sellerId?: string;
+  billingInterval?: string;
 }
+
+type LegacyInvoiceSubscription = {
+  subscription?: string | Stripe.Subscription | null;
+};
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature")!;
-  //("reached");
 
   let event: Stripe.Event;
 
@@ -38,7 +48,6 @@ export async function POST(req: NextRequest) {
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!,
     );
-    //(signature);
   } catch (error: any) {
     console.error("Webhook signature verification failed:", error);
 
@@ -55,10 +64,11 @@ export async function POST(req: NextRequest) {
   try {
     await dbConnect();
 
+    console.log("[StripeWebhook] Processing event:", event.type);
+
     switch (event.type as string) {
       case "account.updated":
         const account = event.data.object;
-        // Ensure the object is a Stripe.Account before calling the handler
         if (
           account &&
           typeof account === "object" &&
@@ -76,9 +86,27 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         return await handleCheckoutSessionCompleted(session);
 
+      // Subscription lifecycle events
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+        const updatedSubscription = event.data.object as Stripe.Subscription;
+        return await handleSubscriptionUpdated(updatedSubscription);
+
+      case "customer.subscription.deleted":
+        const deletedSubscription = event.data.object as Stripe.Subscription;
+        return await handleSubscriptionDeleted(deletedSubscription);
+
+      // Invoice events for renewal
+      case "invoice.paid":
+        const paidInvoice = event.data.object as Stripe.Invoice;
+        return await handleInvoicePaidEvent(paidInvoice);
+
+      case "invoice.payment_failed":
+        const failedInvoice = event.data.object as Stripe.Invoice;
+        return await handleInvoicePaymentFailed(failedInvoice);
+
       case "payment_intent.succeeded":
         const paymentIntent = event.data.object;
-        // Ensure the object is a PaymentIntent before calling the handler
         if (
           paymentIntent &&
           typeof paymentIntent === "object" &&
@@ -92,7 +120,6 @@ export async function POST(req: NextRequest) {
       case "transfer.created":
       case "transfer.paid":
         const transfer = event.data.object;
-        // Type guard to ensure transfer is a Stripe.Transfer
         if (
           transfer &&
           typeof transfer === "object" &&
@@ -108,6 +135,7 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
+        console.log("[StripeWebhook] Unhandled event type:", event.type);
         return NextResponse.json({ received: true });
     }
 
@@ -346,7 +374,7 @@ async function handleSubscriptionPurchase(
   session: Stripe.Checkout.Session,
   metadata: Metadata,
 ) {
-  const { tierId, userId, durationMonths } = metadata;
+  const { tierId, userId, durationMonths, billingInterval } = metadata;
   const amount = session.amount_total ? session.amount_total / 100 : 0;
 
   if (!tierId || !userId) {
@@ -375,10 +403,20 @@ async function handleSubscriptionPurchase(
     );
   }
 
+  // Calculate subscription duration: use durationMonths if available, otherwise calculate from billingInterval
+  let subscriptionDurationMonths = 1;
+  if (durationMonths) {
+    subscriptionDurationMonths = parseInt(durationMonths, 10);
+  } else if (billingInterval === "year") {
+    subscriptionDurationMonths = 12;
+  } else if (billingInterval === "month") {
+    subscriptionDurationMonths = 1;
+  }
+
   // Calculate subscription dates
   const startDate = new Date();
   const expiryDate = new Date(startDate);
-  expiryDate.setMonth(expiryDate.getMonth() + parseInt(durationMonths || "1"));
+  expiryDate.setMonth(expiryDate.getMonth() + subscriptionDurationMonths);
 
   // Update user's subscription
   await User.findByIdAndUpdate(
@@ -394,12 +432,10 @@ async function handleSubscriptionPurchase(
         "subscription.subscriptionTierId": tierId,
         "subscription.subscriptionTierType": tier.tierType,
         "subscription.subscriptionPrice":
-          parseFloat(tier.discountedPrice || "0") *
-          parseInt(durationMonths || "1"),
+          parseFloat(tier.discountedPrice || "0") * subscriptionDurationMonths,
         "subscription.subscriptionPaymentId": session.id,
         "subscription.subscriptionRenewalPrice":
-          parseFloat(tier.renewalPrice || "0") *
-          parseInt(durationMonths || "1"),
+          parseFloat(tier.renewalPrice || "0") * subscriptionDurationMonths,
         "subscription.subscriptionLimits": {
           leads: tier.tierLimits?.leads || 0,
           twilioNumbers: tier.tierLimits?.twilioNumbers || 0,
@@ -417,14 +453,22 @@ async function handleSubscriptionPurchase(
     { new: true },
   );
 
-  // Invalidate session caches so new subscription reflects immediately
-  try {
+  // Force refresh session cache to prevent race conditions
+  // This ensures user immediately sees their new subscription status
+  const refreshResult = await forceRefreshUserSession(userId, {
+    maxRetries: 3,
+  });
+  if (!refreshResult.success) {
+    console.error(
+      "[StripeWebhook] Session refresh failed (will be consistent eventually):",
+      refreshResult.error,
+    );
+    // Fallback: confirm invalidation at minimum
     if (user?.email) {
-      await invalidateSessionCache(user.email);
+      await invalidateSessionWithConfirmation(user.email, userId);
     }
-    await invalidateAllUserSessions(userId);
-  } catch (e) {
-    console.error("[StripeWebhook] Failed to invalidate session caches", e);
+  } else {
+    console.log("[StripeWebhook] Session refreshed successfully for:", userId);
   }
 
   // Create transaction record
@@ -450,4 +494,348 @@ async function handleSubscriptionPurchase(
     success: true,
     message: "Subscription created successfully",
   });
+}
+
+/**
+ * Handle subscription updates from Stripe subscription lifecycle events
+ */
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  console.log(
+    "[StripeWebhook] Subscription updated:",
+    subscription.id,
+    subscription.status,
+  );
+
+  const tierId = subscription.metadata?.tierId;
+  const userId = subscription.metadata?.userId;
+
+  // First, try to find user by subscription ID (works for plan changes)
+  let user = await User.findOne({
+    "subscription.stripeSubscriptionId": subscription.id,
+  });
+
+  // Fallback to userId from metadata (for new subscriptions)
+  if (!user && userId) {
+    user = await User.findById(userId);
+  }
+
+  if (!user) {
+    console.log(
+      "[StripeWebhook] User not found for subscription:",
+      subscription.id,
+    );
+    return NextResponse.json({ received: true });
+  }
+
+  // Check if this is a plan change (tierId in metadata differs from current)
+  const isPlanChange =
+    tierId &&
+    user.subscription?.subscriptionTierId &&
+    tierId !== user.subscription.subscriptionTierId.toString();
+
+  console.log("[StripeWebhook] Subscription update detected:", {
+    userId: user._id,
+    isPlanChange,
+    currentTierId: user.subscription?.subscriptionTierId,
+    newTierId: tierId,
+    subscriptionStatus: subscription.status,
+  });
+
+  // Handle plan changes - finalize immediately if subscription is active
+  if (
+    isPlanChange &&
+    (subscription.status === "active" || subscription.status === "trialing")
+  ) {
+    console.log(
+      "[StripeWebhook] PLAN CHANGE DETECTED - Finalizing upgrade/downgrade",
+    );
+
+    try {
+      const tier = await Tier.findById(tierId);
+      if (!tier) {
+        console.error("[StripeWebhook] New tier not found:", tierId);
+        return NextResponse.json({ received: true });
+      }
+
+      const billingInterval = subscription.metadata?.billingInterval || "month";
+      const durationMonths = billingInterval === "year" ? 12 : 1;
+      const renewalPrice =
+        parseFloat(tier.renewalPrice || "0") * durationMonths;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sub = subscription as any;
+      const newExpiryDate = sub.current_period_end
+        ? new Date(sub.current_period_end * 1000)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      // Get actual price from Stripe subscription
+      const stripePrice = subscription.items.data[0]?.price;
+      const actualPriceInCents = stripePrice?.unit_amount || 0;
+      const actualPrice = actualPriceInCents / 100;
+
+      // Check for applied discount
+      const discounts = subscription.discounts;
+      type ExpandedDiscount = {
+        coupon?: { id?: string; percent_off?: number };
+      };
+      const firstDiscount: ExpandedDiscount | null =
+        Array.isArray(discounts) && discounts.length > 0
+          ? (discounts[0] as unknown as ExpandedDiscount)
+          : null;
+      const appliedCoupon = firstDiscount?.coupon?.id || null;
+      const discountPercent = firstDiscount?.coupon?.percent_off || 0;
+      const effectivePrice =
+        discountPercent > 0
+          ? actualPrice * (1 - discountPercent / 100)
+          : actualPrice;
+
+      // Update user with new plan details and ALL limits/features
+      await User.findByIdAndUpdate(user._id, {
+        $set: {
+          "subscription.subscriptionTierId": tierId,
+          "subscription.subscriptionPlan": tier.name,
+          "subscription.subscriptionTierType": tier.tierType,
+          "subscription.billingInterval": billingInterval,
+          "subscription.subscriptionRenewalPrice": renewalPrice,
+          "subscription.subscriptionExpiryDate": newExpiryDate,
+          "subscription.isSubscriptionActive": true,
+          "subscription.subscriptionPrice": effectivePrice,
+          "subscription.subscriptionBasePrice": actualPrice,
+          "subscription.appliedCoupon": appliedCoupon,
+          "subscription.discountPercent": discountPercent,
+          // Update ALL subscription limits with new tier limits
+          "subscription.subscriptionLimits": {
+            // Core Limits
+            forms: tier.tierLimits?.forms || 1,
+            leads: tier.tierLimits?.leads || 100,
+            buyers: tier.tierLimits?.buyers || 5,
+            industries: tier.tierLimits?.industries || 1,
+
+            // Call Tracking & Telephony
+            numbers: tier.tierLimits?.numbers || 1,
+            twilioNumbers: tier.tierLimits?.twilioNumbers || 0,
+            callSeconds: tier.tierLimits?.callSeconds || 1000,
+            callRecording: tier.tierLimits?.callRecording || false,
+            callTranscription: tier.tierLimits?.callTranscription || false,
+            callAIAnalysis: tier.tierLimits?.callAIAnalysis || false,
+            multiRingForwarding: tier.tierLimits?.multiRingForwarding || false,
+            geoRouting: tier.tierLimits?.geoRouting || false,
+            scheduledCallbacks: tier.tierLimits?.scheduledCallbacks || false,
+            concurrentCallLimit: tier.tierLimits?.concurrentCallLimit || 1,
+
+            // Marketing & Campaigns
+            emailCampaignsPerMonth:
+              tier.tierLimits?.emailCampaignsPerMonth || 0,
+            smsCampaignsPerMonth: tier.tierLimits?.smsCampaignsPerMonth || 0,
+            emailRecipientsPerCampaign:
+              tier.tierLimits?.emailRecipientsPerCampaign || 100,
+            smsRecipientsPerCampaign:
+              tier.tierLimits?.smsRecipientsPerCampaign || 50,
+
+            // Automation & Workflows
+            automationWorkflows: tier.tierLimits?.automationWorkflows || 0,
+            automationActionsPerWorkflow:
+              tier.tierLimits?.automationActionsPerWorkflow || 3,
+
+            // AI & Advanced Features
+            chatbotEnabled: tier.tierLimits?.chatbotEnabled || false,
+            leadScoringEnabled: tier.tierLimits?.leadScoringEnabled || false,
+            sentimentAnalysisEnabled:
+              tier.tierLimits?.sentimentAnalysisEnabled || false,
+            aiSummariesEnabled: tier.tierLimits?.aiSummariesEnabled || false,
+
+            // Invoicing & Payments
+            invoicesPerMonth: tier.tierLimits?.invoicesPerMonth || 10,
+            customInvoiceBranding:
+              tier.tierLimits?.customInvoiceBranding || false,
+
+            // Integrations
+            zapierIntegration: tier.tierLimits?.zapierIntegration || false,
+            webhookIntegration: tier.tierLimits?.webhookIntegration || false,
+            apiAccess: tier.tierLimits?.apiAccess || false,
+            maxWebhooks: tier.tierLimits?.maxWebhooks || 0,
+
+            // Marketplace & Distribution
+            marketplaceAccess: tier.tierLimits?.marketplaceAccess || false,
+            exclusiveLeads: tier.tierLimits?.exclusiveLeads || false,
+            leadDistributionRules:
+              tier.tierLimits?.leadDistributionRules || false,
+
+            // Data & Reporting
+            exports: tier.tierLimits?.exports || false,
+            imports: tier.tierLimits?.imports || false,
+            advancedReports: tier.tierLimits?.advancedReports || false,
+            dataRetentionDays: tier.tierLimits?.dataRetentionDays || 90,
+
+            // Team & Access
+            teamMembers: tier.tierLimits?.teamMembers || 1,
+            maxConcurrentSessions: tier.tierLimits?.maxConcurrentSessions || 1,
+
+            // Support
+            liveSupport: tier.tierLimits?.liveSupport || false,
+            prioritySupport: tier.tierLimits?.prioritySupport || false,
+
+            // Customization
+            customBranding: tier.tierLimits?.customBranding || false,
+            customDomain: tier.tierLimits?.customDomain || false,
+          },
+        },
+      });
+
+      console.log(
+        `[StripeWebhook] Plan change finalized: ${user.email} → ${tier.name} (limits updated)`,
+      );
+
+      // Force refresh user session
+      await forceRefreshUserSession(String(user._id), { maxRetries: 3 });
+
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error("[StripeWebhook] Failed to finalize plan change:", error);
+      return NextResponse.json(
+        { success: false, message: "Failed to finalize plan change" },
+        { status: 500 },
+      );
+    }
+  }
+
+  // Handle new subscriptions or reactivations
+  if (!tierId || !userId) {
+    console.log(
+      "[StripeWebhook] Missing tierId or userId in subscription metadata",
+    );
+    return NextResponse.json({ received: true });
+  }
+
+  // Only activate for active/trialing subscriptions
+  if (subscription.status === "active" || subscription.status === "trialing") {
+    const result = await activateSubscription(subscription, tierId, userId);
+
+    if (!result.success) {
+      console.error(
+        "[StripeWebhook] Failed to activate subscription:",
+        result.message,
+      );
+      return NextResponse.json(
+        { success: false, message: result.message },
+        { status: 500 },
+      );
+    }
+
+    // Create transaction record for new/renewed subscription
+    const amount = subscription.items.data[0]?.price?.unit_amount
+      ? subscription.items.data[0].price.unit_amount / 100
+      : 0;
+
+    const transaction = new Transaction({
+      type: "subscription_payment",
+      userId,
+      amount,
+      currency: subscription.currency || "usd",
+      paymentGateway: "stripe",
+      gatewayTransactionId: subscription.id,
+      status: "completed",
+      metadata: {
+        tierId,
+        stripeSubscriptionId: subscription.id,
+        billingInterval: subscription.items.data[0]?.price?.recurring?.interval,
+        isPlatformPayment: true,
+        isRecurring: true,
+      },
+    });
+    await transaction.save();
+  } else if (subscription.status === "past_due") {
+    // Mark subscription as having payment issues
+    await User.findByIdAndUpdate(userId, {
+      "subscription.paymentFailed": true,
+      "subscription.lastPaymentFailedAt": new Date(),
+    });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+/**
+ * Handle subscription deletion (cancellation)
+ */
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  console.log("[StripeWebhook] Subscription deleted:", subscription.id);
+
+  const result = await deactivateSubscription(subscription.id);
+
+  if (!result.success) {
+    console.error(
+      "[StripeWebhook] Failed to deactivate subscription:",
+      result.message,
+    );
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+/**
+ * Handle invoice.paid event - subscription renewal
+ */
+async function handleInvoicePaidEvent(invoice: Stripe.Invoice) {
+  console.log("[StripeWebhook] Invoice paid:", invoice.id);
+
+  // Only handle subscription invoices
+  const legacyInvoice = invoice as unknown as LegacyInvoiceSubscription;
+  const subscriptionRef =
+    invoice.parent?.subscription_details?.subscription ??
+    legacyInvoice.subscription ??
+    null;
+  if (!subscriptionRef) {
+    return NextResponse.json({ received: true });
+  }
+
+  const result = await handleInvoicePaid(invoice);
+
+  if (result.success) {
+    // Create transaction record for renewal
+    let stripeSubscriptionId: string;
+    if (typeof subscriptionRef === "string") {
+      stripeSubscriptionId = subscriptionRef;
+    } else {
+      stripeSubscriptionId = subscriptionRef.id;
+    }
+
+    const user = await User.findOne({
+      "subscription.stripeSubscriptionId": stripeSubscriptionId,
+    });
+
+    if (user) {
+      const transaction = new Transaction({
+        type: "subscription_renewal",
+        userId: user._id,
+        amount: invoice.amount_paid ? invoice.amount_paid / 100 : 0,
+        currency: invoice.currency || "usd",
+        paymentGateway: "stripe",
+        gatewayTransactionId: invoice.id,
+        status: "completed",
+        metadata: {
+          stripeSubscriptionId,
+          invoiceNumber: invoice.number,
+          isPlatformPayment: true,
+          isRenewal: true,
+        },
+      });
+      await transaction.save();
+    }
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+/**
+ * Handle invoice.payment_failed event
+ */
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+  console.log("[StripeWebhook] Invoice payment failed:", invoice.id);
+
+  const result = await handlePaymentFailed(invoice);
+
+  // TODO: Send notification email to user about failed payment
+
+  return NextResponse.json({ success: true });
 }

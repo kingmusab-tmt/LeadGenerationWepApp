@@ -68,7 +68,7 @@ interface Transaction {
   userName: string;
   status: "pending" | "completed" | "failed" | "refunded";
   createdAt: string;
-  gateway: "stripe" | "paypal" | "manual";
+  gateway: "stripe" | "manual";
   metadata?: {
     leadId?: string;
     units?: number;
@@ -82,7 +82,7 @@ interface Payout {
   sellerName: string;
   amount: number;
   status: "pending" | "processed" | "failed";
-  method: "stripe" | "paypal" | "bank_transfer";
+  method: "stripe" | "bank_transfer";
   createdAt: string;
   processedAt?: string;
 }

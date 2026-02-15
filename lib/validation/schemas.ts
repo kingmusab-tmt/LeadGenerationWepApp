@@ -222,13 +222,13 @@ export const createPaymentSchema = z.object({
   amount: z.number().positive("Amount must be positive"),
   currency: z.string().length(3, "Invalid currency code"),
   description: z.string().min(1, "Description is required"),
-  paymentMethod: z.enum(["stripe", "paypal", "square"]),
+  paymentMethod: z.enum(["stripe", "square"]),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
 export const createSubscriptionSchema = z.object({
   tierId: z.string().min(1, "Tier ID is required"),
-  paymentMethod: z.enum(["stripe", "paypal"]),
+  paymentMethod: z.enum(["stripe"]),
   billingCycle: z.enum(["monthly", "annual"]),
 });
 

@@ -43,7 +43,7 @@ export interface ITransaction extends Document {
     transferVerified: boolean;
     transferAmount: number;
   };
-  paymentGateway: "stripe" | "paypal" | "square" | "manual";
+  paymentGateway: "stripe" | "square" | "manual";
   gatewayTransactionId?: string; // Transaction ID from the payment gateway
   status: "pending" | "completed" | "failed" | "refunded";
   createdAt: Date;
@@ -154,7 +154,7 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
     },
     paymentGateway: {
       type: String,
-      enum: ["stripe", "paypal", "square", "manual"],
+      enum: ["stripe", "square", "manual"],
     },
     gatewayTransactionId: {
       type: String,

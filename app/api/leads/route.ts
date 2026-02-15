@@ -21,8 +21,10 @@ import {
   internalError,
   handleValidationError,
   badRequest,
+  forbidden,
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 // GET /api/leads - Fetch all leads with pagination
 export async function GET(req: NextRequest) {
@@ -105,6 +107,19 @@ export async function POST(req: NextRequest) {
     }
 
     await dbConnect();
+
+    // Check subscription limit for leads
+    const usageCheck = await checkAndIncrementUsage(
+      session.user.id,
+      "leads",
+      1,
+    );
+    if (!usageCheck.allowed) {
+      return forbidden(
+        usageCheck.message ||
+          `Lead limit reached (${usageCheck.currentUsage}/${usageCheck.limit}). Please upgrade your plan.`,
+      );
+    }
 
     const newLead = new Lead({
       ...validatedData,

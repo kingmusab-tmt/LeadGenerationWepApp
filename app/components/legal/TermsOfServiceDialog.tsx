@@ -42,8 +42,8 @@ export default function TermsOfServiceDialog({
         <Typography variant="body1" paragraph>
           Our Service provides lead management solutions including but not
           limited to lead capture, organization, tracking, and analytics. We
-          integrate with third-party payment processors (Stripe and PayPal) for
-          payment transactions.
+          integrate with third-party payment processors (Stripe) for payment
+          transactions.
         </Typography>
 
         <Typography variant="h6" gutterBottom>
@@ -69,7 +69,7 @@ export default function TermsOfServiceDialog({
         </Typography>
         <Typography variant="body1" paragraph>
           All payments are processed through PCI DSS compliant third-party
-          processors (Stripe and PayPal). We do not store or process credit card
+          processors (Stripe). We do not store or process credit card
           information on our servers. You agree to comply with the terms of
           service of our payment processors.
         </Typography>

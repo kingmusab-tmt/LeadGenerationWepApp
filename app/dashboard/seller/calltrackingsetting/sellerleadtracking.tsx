@@ -190,6 +190,7 @@ export default function LeadTracking() {
   const uniqueStatuses = Array.from(new Set(allCalls.map((c) => c.status)));
 
   const handlePlayRecording = (recordingUrl: string, callSid?: string) => {
+    if (!recordingUrl) return;
     const matches = recordingUrl.match(/Recordings\/([^/]+)/);
     const recordingSid = matches ? matches[1] : null;
 

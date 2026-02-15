@@ -39,7 +39,6 @@ import Header from "../components/generalComponent/Header";
 import Footer from "../components/generalComponent/Footer";
 import logo from "../../public/BRIXCOT.png";
 import Image from "next/image";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import {
   Description,
   Speed,
@@ -78,50 +77,13 @@ import {
 } from "@mui/icons-material";
 import Head from "next/head";
 
-interface Tier {
-  _id: string;
-  discountPercentage: number;
-  discountedPrice: string;
-  tierType: string;
-  renewalPrice: string;
-  id: string;
-  name: string;
-  price: string;
-  description: string;
-  features: string[];
-  ctaText: string;
-  highlight: boolean;
-  isActive: boolean;
-}
-
 const LandingPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const [tiers, setTiers] = useState<Tier[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    const fetchTiers = async () => {
-      try {
-        const response = await fetch("/api/tiers");
-        if (!response.ok) {
-          throw new Error("Failed to fetch pricing tiers");
-        }
-        const data = await response.json();
-        setTiers(data.filter((tier: Tier) => tier.isActive));
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred",
-        );
-      } finally {
-        setLoading(false);
-        setChecked(true);
-      }
-    };
-
-    fetchTiers();
+    setChecked(true);
   }, []);
 
   const features = [
@@ -430,19 +392,6 @@ const LandingPage = () => {
     return count;
   };
 
-  if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <LoadingComponent />
-      </Box>
-    );
-  }
-
   return (
     <>
       <Head>
@@ -642,8 +591,13 @@ const LandingPage = () => {
                     variant="contained"
                     color="secondary"
                     size="large"
-                    href="/auth/sign-in"
+                    href="/auth/sign-in?trial=true"
                     startIcon={<Rocket />}
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        sessionStorage.setItem("trialIntent", "true");
+                      }
+                    }}
                     sx={{
                       px: 4,
                       py: 1.8,
@@ -1381,202 +1335,70 @@ const LandingPage = () => {
         </Container>
       </Box>
 
-      {/* Pricing Section with Fade animation */}
+      {/* Pricing CTA Section */}
       <Fade in={checked}>
-        <Box py={10} bgcolor="background.paper" id="pricing">
-          <Container maxWidth="lg">
-            <Typography variant="h3" align="center" gutterBottom>
-              Simple, Transparent Pricing
-            </Typography>
-            <Typography
-              variant="subtitle1"
-              align="center"
-              color="text.secondary"
-              paragraph
-            >
-              Choose the plan that fits your business needs
-            </Typography>
-
-            {tiers.length > 0 ? (
-              <Grid container spacing={4} mt={6} alignItems="stretch">
-                {tiers.map((tier, index) => (
-                  <Grid size={{ xs: 12, md: 4 }} key={tier._id}>
-                    <Grow
-                      in={checked}
-                      style={{ transformOrigin: "0 0 0" }}
-                      {...(checked ? { timeout: 500 + index * 200 } : {})}
-                    >
-                      <Card
-                        sx={{
-                          height: "100%",
-                          border: tier.highlight
-                            ? `2px solid ${theme.palette.primary.main}`
-                            : undefined,
-                          transform:
-                            tier.highlight && !isMobile
-                              ? "scale(1.05)"
-                              : undefined,
-                          transition: "all 0.3s ease-in-out",
-                          display: "flex",
-                          flexDirection: "column",
-                          position: "relative",
-                          "&:hover": {
-                            boxShadow: theme.shadows[8],
-                            transform:
-                              tier.highlight && !isMobile
-                                ? "scale(1.07)"
-                                : "scale(1.02)",
-                          },
-                        }}
-                      >
-                        {tier.highlight && (
-                          <Box
-                            bgcolor="primary.main"
-                            color="primary.contrastText"
-                            textAlign="center"
-                            py={1}
-                          >
-                            <Typography variant="subtitle2" fontWeight="bold">
-                              MOST POPULAR
-                            </Typography>
-                          </Box>
-                        )}
-
-                        {tier.discountPercentage > 0 && (
-                          <Box
-                            sx={{
-                              position: "absolute",
-                              top: 16,
-                              right: 16,
-                              bgcolor: "success.main",
-                              color: "success.contrastText",
-                              px: 1.5,
-                              py: 0.5,
-                              borderRadius: 1,
-                              zIndex: 1,
-                            }}
-                          >
-                            <Typography variant="caption" fontWeight="bold">
-                              SAVE {tier.discountPercentage}%
-                            </Typography>
-                          </Box>
-                        )}
-
-                        <CardContent sx={{ flexGrow: 1 }}>
-                          <Typography variant="h5" component="h2" gutterBottom>
-                            {tier.name}
-                          </Typography>
-
-                          <Box sx={{ mb: 2 }}>
-                            <Typography variant="h3" component="div">
-                              $
-                              {tier.discountPercentage > 0
-                                ? tier.discountedPrice
-                                : tier.price}
-                              <Typography
-                                component="span"
-                                variant="h6"
-                                color="text.secondary"
-                                sx={{ ml: 1 }}
-                              >
-                                /month
-                              </Typography>
-                            </Typography>
-
-                            {tier.discountPercentage > 0 && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ textDecoration: "line-through" }}
-                              >
-                                ${tier.price}/month
-                              </Typography>
-                            )}
-                          </Box>
-
-                          {tier.tierType === "paid" && (
-                            <Box sx={{ mb: 2 }}>
-                              <Typography variant="body2" color="text.primary">
-                                <Box component="span" fontWeight="bold">
-                                  You pay $
-                                  {(
-                                    parseFloat(
-                                      tier.discountedPrice || tier.price,
-                                    ) * 12
-                                  ).toFixed(2)}
-                                </Box>
-                                {tier.renewalPrice && (
-                                  <Box component="span">
-                                    {" "}
-                                    - renews at ${tier.renewalPrice}/year
-                                  </Box>
-                                )}
-                              </Typography>
-                              {tier.discountPercentage > 0 && (
-                                <Typography
-                                  variant="caption"
-                                  color="success.main"
-                                >
-                                  Save {tier.discountPercentage}% on first year
-                                </Typography>
-                              )}
-                            </Box>
-                          )}
-
-                          <Typography
-                            variant="subtitle1"
-                            color="text.secondary"
-                            paragraph
-                          >
-                            {tier.description}
-                          </Typography>
-
-                          <Divider sx={{ my: 2 }} />
-
-                          <List dense>
-                            {tier.features.map((feature, index) => (
-                              <ListItem key={index} disableGutters>
-                                <ListItemIcon sx={{ minWidth: 32 }}>
-                                  <CheckCircleIcon
-                                    color="primary"
-                                    fontSize="small"
-                                  />
-                                </ListItemIcon>
-                                <ListItemText primary={feature} />
-                              </ListItem>
-                            ))}
-                          </List>
-                        </CardContent>
-
-                        <CardActions sx={{ p: 2 }}>
-                          <Button
-                            fullWidth
-                            variant={tier.highlight ? "contained" : "outlined"}
-                            color={tier.highlight ? "primary" : "inherit"}
-                            size="large"
-                            href={`/auth/sign-in?`}
-                            sx={{
-                              transition: "all 0.3s ease",
-                              "&:hover": {
-                                transform: "translateY(-2px)",
-                                boxShadow: 3,
-                              },
-                            }}
-                          >
-                            {tier.ctaText}
-                          </Button>
-                        </CardActions>
-                      </Card>
-                    </Grow>
-                  </Grid>
-                ))}
-              </Grid>
-            ) : (
-              <Typography align="center" color="text.secondary" mt={4}>
-                No pricing tiers available at the moment. Please check back
-                later.
+        <Box
+          py={10}
+          id="pricing"
+          sx={{
+            background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+          }}
+        >
+          <Container maxWidth="md">
+            <Box textAlign="center" color="white">
+              <Typography variant="h3" fontWeight="bold" gutterBottom>
+                Simple, Transparent Pricing
               </Typography>
-            )}
+              <Typography variant="h6" sx={{ opacity: 0.9, mb: 4 }}>
+                Choose from flexible plans designed for lead sellers and
+                businesses. Start free and scale as you grow.
+              </Typography>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                justifyContent="center"
+              >
+                <Button
+                  variant="contained"
+                  size="large"
+                  href="/pricing"
+                  sx={{
+                    bgcolor: "white",
+                    color: "primary.main",
+                    px: 4,
+                    py: 1.5,
+                    fontWeight: 600,
+                    "&:hover": {
+                      bgcolor: "grey.100",
+                      transform: "translateY(-2px)",
+                    },
+                  }}
+                >
+                  View All Plans
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  href="/auth/sign-up"
+                  sx={{
+                    borderColor: "white",
+                    color: "white",
+                    px: 4,
+                    py: 1.5,
+                    fontWeight: 600,
+                    "&:hover": {
+                      borderColor: "white",
+                      bgcolor: "rgba(255,255,255,0.1)",
+                    },
+                  }}
+                >
+                  Start Free Trial
+                </Button>
+              </Stack>
+              <Typography variant="body2" sx={{ mt: 3, opacity: 0.8 }}>
+                No credit card required for free plan
+              </Typography>
+            </Box>
           </Container>
         </Box>
       </Fade>
@@ -1691,7 +1513,12 @@ const LandingPage = () => {
                     boxShadow: theme.shadows[8],
                   },
                 }}
-                href="/auth/sign-in"
+                href="/auth/sign-in?trial=true"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    sessionStorage.setItem("trialIntent", "true");
+                  }
+                }}
               >
                 Start Your Free 14-Day Trial
               </Button>

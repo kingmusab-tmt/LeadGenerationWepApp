@@ -10,11 +10,13 @@ import {
 import {
   successResponse,
   unauthorized,
+  forbidden,
   internalError,
   handleValidationError,
   badRequest,
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +94,19 @@ export async function POST(req: NextRequest) {
         return handleValidationError(error);
       }
       return badRequest("Invalid request body");
+    }
+
+    // Check subscription limit for automation workflows
+    const usageCheck = await checkAndIncrementUsage(
+      userId,
+      "automationWorkflows",
+      1,
+    );
+    if (!usageCheck.allowed) {
+      return forbidden(
+        usageCheck.message ||
+          "Automation workflow limit reached for your subscription",
+      );
     }
 
     const workflow = new AutomationWorkflow({

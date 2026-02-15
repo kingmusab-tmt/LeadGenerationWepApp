@@ -1,7 +1,7 @@
 // app/subscription-expired/page.tsx
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Container,
@@ -11,6 +11,7 @@ import {
   Stack,
   useTheme,
   useMediaQuery,
+  Skeleton,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import {
@@ -19,6 +20,7 @@ import {
   Security,
   Speed,
   Support,
+  Celebration,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 
@@ -44,10 +46,44 @@ const FeatureCard = styled(Paper)(({ theme }) => ({
   },
 }));
 
+interface SubscriptionInfo {
+  isTrialExpired: boolean;
+  usedTrial: boolean;
+  isTrial: boolean;
+}
+
 export default function SubscriptionExpiredPage() {
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const [subscriptionInfo, setSubscriptionInfo] =
+    useState<SubscriptionInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkSubscription = async () => {
+      try {
+        const response = await fetch("/api/subscriptions/check");
+        if (response.ok) {
+          const data = await response.json();
+          setSubscriptionInfo({
+            isTrialExpired: data.isTrialExpired || false,
+            usedTrial: data.usedTrial || false,
+            isTrial: data.isTrial || false,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to check subscription:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkSubscription();
+  }, []);
+
+  const isTrialExpired =
+    subscriptionInfo?.isTrialExpired ||
+    (subscriptionInfo?.isTrial && subscriptionInfo?.usedTrial);
 
   const features = [
     {
@@ -71,13 +107,32 @@ export default function SubscriptionExpiredPage() {
   ];
 
   const handleRenewSubscription = () => {
-    router.push("/pricing");
+    router.push("/plan");
   };
 
   const handleContactSupport = () => {
     // You can implement support contact logic here
     window.open("mailto:support@yourapp.com", "_blank");
   };
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Stack spacing={3} alignItems="center">
+          <Skeleton variant="circular" width={80} height={80} />
+          <Skeleton variant="text" width={300} height={60} />
+          <Skeleton variant="text" width={400} height={30} />
+        </Stack>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -93,13 +148,23 @@ export default function SubscriptionExpiredPage() {
         <Stack spacing={6}>
           {/* Main Message */}
           <StyledPaper>
-            <Warning
-              sx={{
-                fontSize: 80,
-                color: "warning.main",
-                mb: 3,
-              }}
-            />
+            {isTrialExpired ? (
+              <Celebration
+                sx={{
+                  fontSize: 80,
+                  color: "primary.main",
+                  mb: 3,
+                }}
+              />
+            ) : (
+              <Warning
+                sx={{
+                  fontSize: 80,
+                  color: "warning.main",
+                  mb: 3,
+                }}
+              />
+            )}
             <Typography
               variant="h3"
               gutterBottom
@@ -109,7 +174,9 @@ export default function SubscriptionExpiredPage() {
                 mb: 2,
               }}
             >
-              Subscription Expired
+              {isTrialExpired
+                ? "Your Free Trial Has Ended"
+                : "Subscription Expired"}
             </Typography>
             <Typography
               variant="h6"
@@ -120,8 +187,9 @@ export default function SubscriptionExpiredPage() {
                 mb: 4,
               }}
             >
-              Your subscription has expired. To continue using all features and
-              maintain uninterrupted service, please renew your subscription.
+              {isTrialExpired
+                ? "We hope you enjoyed exploring our platform! Choose a subscription plan to continue using all the features you've been testing."
+                : "Your subscription has expired. To continue using all features and maintain uninterrupted service, please renew your subscription."}
             </Typography>
 
             <Stack
@@ -142,7 +210,7 @@ export default function SubscriptionExpiredPage() {
                   fontWeight: "bold",
                 }}
               >
-                Renew Subscription
+                {isTrialExpired ? "Choose a Plan" : "Renew Subscription"}
               </Button>
               <Button
                 variant="outlined"

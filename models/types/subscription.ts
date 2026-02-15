@@ -16,23 +16,118 @@ export interface ISubscription {
   isTrial: boolean; // true if Free Tier trial is active
   usedTrial: boolean; // true if user has used their Free Tier trial
   subscriptionRenewalDate?: Date;
-  subscriptionPaymentMethod: "stripe" | "paypal" | "free";
-  subscriptionPaymentId?: string; // Stripe/PayPal subscription ID
+  subscriptionPaymentMethod: "stripe" | "free";
+  subscriptionPaymentId?: string; // Legacy: Stripe checkout session ID
+  stripeSubscriptionId?: string; // Stripe Subscription ID for recurring billing
+  billingInterval?: "month" | "year"; // Current billing interval
+  cancelAtPeriodEnd?: boolean; // Will subscription cancel at period end
+  canceledAt?: Date; // When subscription was canceled
+  paymentFailed?: boolean; // Whether last payment failed
+  lastPaymentFailedAt?: Date; // When last payment failed
   subscriptionRenewalPrice?: number; // Renewal price for the subscription
-  subscriptionLimits: {
-    forms: number;
-    leads: number;
-    buyers: number;
-    numbers: number;
-    twilioNumbers: number;
-    callSeconds: number;
-    exports: boolean;
-    imports: boolean;
-    liveSupport: boolean;
-    industries: number;
-  };
-  subscriptionUsage: {
-    leads: number;
-    callSeconds: number;
-  };
+  subscriptionLimits: ISubscriptionLimits;
+  subscriptionUsage: ISubscriptionUsage;
+}
+
+/**
+ * Granular Subscription Limits Interface
+ * Defines all feature limitations per subscription tier
+ */
+export interface ISubscriptionLimits {
+  // Core Limits
+  forms: number; // Max number of lead capture forms
+  leads: number; // Max leads per month (0 = unlimited)
+  buyers: number; // Max registered buyers
+  industries: number; // Max industries/niches
+
+  // Call Tracking & Telephony
+  numbers: number; // Max tracking numbers (manual)
+  twilioNumbers: number; // Max Twilio numbers
+  callSeconds: number; // Max call seconds per month (0 = unlimited)
+  callRecording: boolean; // Enable call recording
+  callTranscription: boolean; // Enable AI call transcription
+  callAIAnalysis: boolean; // Enable AI call analysis (sentiment, scoring)
+  multiRingForwarding: boolean; // Enable multi-ring call forwarding
+  geoRouting: boolean; // Enable geo-based call routing
+  scheduledCallbacks: boolean; // Enable scheduled callback feature
+  concurrentCallLimit: number; // Max concurrent calls (0 = unlimited)
+
+  // Marketing & Campaigns
+  emailCampaignsPerMonth: number; // Max email campaigns per month (0 = unlimited)
+  smsCampaignsPerMonth: number; // Max SMS campaigns per month (0 = unlimited)
+  emailRecipientsPerCampaign: number; // Max recipients per email campaign
+  smsRecipientsPerCampaign: number; // Max recipients per SMS campaign
+
+  // Automation & Workflows
+  automationWorkflows: number; // Max active automation workflows
+  automationActionsPerWorkflow: number; // Max actions per workflow
+
+  // AI & Advanced Features
+  chatbotEnabled: boolean; // Enable chatbot qualification
+  leadScoringEnabled: boolean; // Enable AI lead scoring
+  sentimentAnalysisEnabled: boolean; // Enable sentiment analysis
+  aiSummariesEnabled: boolean; // Enable AI summaries
+
+  // Invoicing & Payments
+  invoicesPerMonth: number; // Max invoices per month (0 = unlimited)
+  customInvoiceBranding: boolean; // Enable custom invoice branding
+
+  // Integrations
+  zapierIntegration: boolean; // Enable Zapier integration
+  webhookIntegration: boolean; // Enable webhook integrations
+  apiAccess: boolean; // Enable API access
+  maxWebhooks: number; // Max webhook endpoints
+
+  // Marketplace & Distribution
+  marketplaceAccess: boolean; // Access to lead marketplace
+  exclusiveLeads: boolean; // Can purchase/sell exclusive leads
+  leadDistributionRules: boolean; // Enable advanced lead distribution rules
+
+  // Data & Reporting
+  exports: boolean; // Enable data exports
+  imports: boolean; // Enable data imports
+  advancedReports: boolean; // Enable advanced analytics/reports
+  dataRetentionDays: number; // Data retention period (0 = unlimited)
+
+  // Team & Access
+  teamMembers: number; // Max team members/sub-accounts (0 = unlimited)
+  maxConcurrentSessions: number; // Max concurrent login sessions per user
+
+  // Support
+  liveSupport: boolean; // Enable live chat support
+  prioritySupport: boolean; // Enable priority support queue
+
+  // Customization
+  customBranding: boolean; // Enable white-label/custom branding
+  customDomain: boolean; // Enable custom domain
+}
+
+/**
+ * Subscription Usage Tracking Interface
+ * Tracks current usage against limits
+ */
+export interface ISubscriptionUsage {
+  // Core Usage
+  leads: number; // Leads used this billing period
+  callSeconds: number; // Call seconds used this billing period
+  forms: number; // Active forms count
+  buyers: number; // Registered buyers count
+
+  // Campaign Usage
+  emailCampaigns: number; // Email campaigns sent this month
+  smsCampaigns: number; // SMS campaigns sent this month
+
+  // Automation Usage
+  workflowExecutions: number; // Workflow executions this billing period
+
+  // Invoice Usage
+  invoices: number; // Invoices created this month
+
+  // Team Usage
+  activeSessions: number; // Current active sessions
+  teamMembersCount: number; // Current team members
+
+  // Reset tracking
+  usagePeriodStart: Date; // Start of current billing/usage period
+  usagePeriodEnd: Date; // End of current billing/usage period
 }

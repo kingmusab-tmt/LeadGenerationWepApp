@@ -33,6 +33,7 @@ const RoleSelectionPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [trialIntent, setTrialIntent] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -48,6 +49,16 @@ const RoleSelectionPage: React.FC = () => {
   const { csrfToken, loading: csrfLoading, refreshToken } = useCSRF();
   const fetchWithCSRF = useCSRFFetch();
   const { data: session, status, update: updateSession } = useSession();
+
+  // Check for trial intent on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const trialIntentStored = sessionStorage.getItem("trialIntent");
+      if (trialIntentStored === "true") {
+        setTrialIntent(true);
+      }
+    }
+  }, []);
 
   // Check if user already has a role - redirect them to the right place
   useEffect(() => {
@@ -80,11 +91,63 @@ const RoleSelectionPage: React.FC = () => {
     }
   }, [session, status, router, isRedirecting]);
 
-  const redirectBasedOnRole = (role: UserRole) => {
+  const redirectBasedOnRole = async (role: UserRole) => {
     if (!role || role === "user") return;
 
-    // Redirect sellers and business-admins to plan selection
+    // Handle sellers and business-admins
     if (role === "seller" || role === "business-admin") {
+      // If trial intent is set, start the trial automatically
+      if (trialIntent) {
+        try {
+          setSnackbar({
+            open: true,
+            message: "Starting your 14-day free trial...",
+            severity: "info",
+          });
+
+          const trialResponse = await fetch("/api/subscriptions/trial/start", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (trialResponse.ok) {
+            // Clear trial intent from sessionStorage
+            sessionStorage.removeItem("trialIntent");
+
+            // Update session to reflect new subscription status
+            await updateSession();
+
+            setSnackbar({
+              open: true,
+              message:
+                "Your 14-day free trial has started! Redirecting to dashboard...",
+              severity: "success",
+            });
+
+            // Small delay so user sees the success message
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Redirect to dashboard since trial is now active
+            router.push("/dashboard/seller/overview");
+            return;
+          } else {
+            // Trial failed (possibly already used), redirect to plan page
+            console.error("[CompleteRegistration] Failed to start trial");
+            sessionStorage.removeItem("trialIntent");
+            router.push("/plan");
+            return;
+          }
+        } catch (error) {
+          console.error("[CompleteRegistration] Error starting trial:", error);
+          sessionStorage.removeItem("trialIntent");
+          router.push("/plan");
+          return;
+        }
+      }
+
+      // No trial intent, redirect to plan selection
       router.push("/plan");
       return;
     }
@@ -139,7 +202,7 @@ const RoleSelectionPage: React.FC = () => {
           "[CompleteRegistration] Session refreshed, redirecting based on role:",
           role,
         );
-        redirectBasedOnRole(role);
+        await redirectBasedOnRole(role);
       } else {
         const errorData = await response.json();
         setSnackbar({

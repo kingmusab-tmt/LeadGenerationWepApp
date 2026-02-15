@@ -19,6 +19,7 @@ export interface User {
   mobileNumber?: string;
   isSubActive?: boolean;
   preferredDistribution?: "Automatic" | "Manual" | "Both" | string;
+  tierUserType?: "seller" | "business";
 }
 
 interface UserState {

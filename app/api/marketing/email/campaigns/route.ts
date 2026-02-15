@@ -17,11 +17,13 @@ import {
 import {
   successResponse,
   unauthorized,
+  forbidden,
   internalError,
   handleValidationError,
   badRequest,
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +116,19 @@ export async function POST(req: NextRequest) {
     }
 
     await dbConnect();
+
+    // Check subscription limit for email campaigns
+    const usageCheck = await checkAndIncrementUsage(
+      session.user.id,
+      "emailCampaignsPerMonth",
+      1,
+    );
+    if (!usageCheck.allowed) {
+      return forbidden(
+        usageCheck.message ||
+          "Email campaign limit reached for your subscription",
+      );
+    }
 
     // Validate template if provided
     if (validatedData.template) {

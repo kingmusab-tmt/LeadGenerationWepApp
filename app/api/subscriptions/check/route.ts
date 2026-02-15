@@ -38,11 +38,13 @@ export async function GET(req: Request) {
       email: session.user.email,
       isSubscriptionActive: subscription?.isSubscriptionActive,
       subscriptionExpiryDate: subscription?.subscriptionExpiryDate,
+      isTrial: subscription?.isTrial,
       currentDate: currentDate.toISOString(),
     });
 
     // Determine if subscription is active based on multiple factors
     let isSubscriptionActive = false;
+    let daysRemaining = 0;
 
     if (
       subscription?.isSubscriptionActive === true &&
@@ -52,7 +54,13 @@ export async function GET(req: Request) {
       const expiryDate = new Date(subscription.subscriptionExpiryDate);
       if (expiryDate > currentDate) {
         isSubscriptionActive = true;
-        console.log("[Subscriptions/Check] Subscription is ACTIVE");
+        // Calculate days remaining
+        const timeDiff = expiryDate.getTime() - currentDate.getTime();
+        daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        console.log(
+          "[Subscriptions/Check] Subscription is ACTIVE, days remaining:",
+          daysRemaining,
+        );
       } else {
         // Subscription has expired, update the user's subscription status
         isSubscriptionActive = false;
@@ -65,15 +73,27 @@ export async function GET(req: Request) {
       }
     }
 
+    const isTrial = subscription?.isTrial === true;
+    const isTrialExpired =
+      isTrial && !isSubscriptionActive && subscription?.usedTrial === true;
+
     console.log("[Subscriptions/Check] Final response:", {
       isActive: isSubscriptionActive,
       expiryDate: subscription?.subscriptionExpiryDate || null,
+      isTrial,
+      isTrialExpired,
+      daysRemaining,
     });
 
     return successResponse({
       isActive: isSubscriptionActive,
       expiryDate: subscription?.subscriptionExpiryDate || null,
       usedTrial: subscription?.usedTrial || false,
+      isTrial,
+      isTrialExpired,
+      daysRemaining,
+      planName: subscription?.subscriptionPlan || null,
+      tierType: subscription?.subscriptionTierType || null,
     });
   } catch (error) {
     console.error("[GET /api/subscriptions/check]", error);

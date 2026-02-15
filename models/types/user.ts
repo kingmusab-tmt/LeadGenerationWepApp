@@ -77,9 +77,6 @@ export interface IUser extends Document {
     stripeSecretKey: string;
     stripePublishableKey: string;
     stripeWebhookSecret: string;
-    paypalClientId: string;
-    paypalSecret: string;
-    paypalAccessToken: string;
   };
 
   // **Unit Pricing Options** (New Field)
@@ -99,7 +96,6 @@ export interface IUser extends Document {
   stripeAccountId?: string;
   stripeOnboarded?: boolean;
   stripeCustomerId?: string;
-  paypalCustomerId?: string;
 
   tosAcceptance?: {
     accepted: boolean;

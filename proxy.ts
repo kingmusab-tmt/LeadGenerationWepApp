@@ -144,7 +144,7 @@ export async function proxy(request: NextRequest) {
  * Protects only sensitive API routes from Cross-Site Request Forgery attacks
  *
  * CSRF protection is applied to:
- * - Payment operations (stripe, paypal, refunds, payouts)
+ * - Payment operations (stripe, refunds, payouts)
  * - Account/profile changes
  * - Role changes
  * - API key management

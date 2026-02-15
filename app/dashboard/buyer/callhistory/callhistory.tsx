@@ -795,6 +795,7 @@ const LoadingSkeleton = () => (
 
 // Utility functions
 const extractRecordingSid = (url: string) => {
+  if (!url) return null;
   const matches = url.match(/Recordings\/([^/]+)/);
   return matches ? matches[1] : null;
 };

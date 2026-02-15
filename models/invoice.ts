@@ -26,7 +26,7 @@ export interface IInvoice extends Document {
   discountPercent?: number; // Percentage
   total: number;
   status: "draft" | "sent" | "viewed" | "paid" | "overdue" | "cancelled";
-  paymentMethod?: "stripe" | "paypal" | "bank_transfer" | "check";
+  paymentMethod?: "stripe" | "bank_transfer" | "check";
   paymentDate?: Date;
   notes?: string;
   termsConditions?: string;
@@ -95,7 +95,7 @@ const invoiceSchema = new Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["stripe", "paypal", "bank_transfer", "check"],
+      enum: ["stripe", "bank_transfer", "check"],
     },
     paymentDate: Date,
     notes: String,

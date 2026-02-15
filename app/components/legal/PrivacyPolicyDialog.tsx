@@ -79,7 +79,7 @@ export default function PrivacyPolicyDialog({
         </Typography>
         <List dense>
           <ListItem>
-            <ListItemText primary="Payment processors (Stripe, PayPal) as necessary to complete transactions" />
+            <ListItemText primary="Payment processors (Stripe) as necessary to complete transactions" />
           </ListItem>
           <ListItem>
             <ListItemText primary="Service providers who assist in our operations (under confidentiality agreements)" />

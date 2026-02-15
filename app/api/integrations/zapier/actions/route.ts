@@ -21,6 +21,7 @@ import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/userModel";
 import { ZapierActionsService } from "@/lib/integrations/services/zapierActionsService";
 import crypto from "crypto";
+import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,18 @@ async function authenticateApiKey(
       return {
         success: false,
         error: "Invalid API key",
+      };
+    }
+
+    // Check Zapier integration feature access
+    const featureCheck = await checkFeatureAccess(
+      (user._id as any).toString(),
+      "zapierIntegration",
+    );
+    if (!featureCheck.allowed) {
+      return {
+        success: false,
+        error: "Zapier integration is not available on your current plan",
       };
     }
 

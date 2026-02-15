@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import {
   Button,
   Box,
@@ -11,6 +12,7 @@ import {
   useTheme,
   useMediaQuery,
   Link,
+  Alert,
 } from "@mui/material";
 import { FcGoogle } from "react-icons/fc";
 import Image from "next/image";
@@ -29,8 +31,10 @@ export const SignInPage: React.FC<SignInPageProps> = () => {
   const [openTerms, setOpenTerms] = useState(false);
   const [openPrivacy, setOpenPrivacy] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [trialIntent, setTrialIntent] = useState(false);
   const theme = useTheme();
   const isMobileQuery = useMediaQuery(theme.breakpoints.down("sm"));
+  const searchParams = useSearchParams();
 
   // Use a state for isMobile that only updates after mount to prevent hydration mismatch
   const [isMobile, setIsMobile] = useState(false);
@@ -38,7 +42,17 @@ export const SignInPage: React.FC<SignInPageProps> = () => {
   useEffect(() => {
     setIsMounted(true);
     setIsMobile(isMobileQuery);
-  }, [isMobileQuery]);
+
+    // Check for trial intent from URL params or session storage
+    const trialParam = searchParams.get("trial");
+    if (trialParam === "true") {
+      setTrialIntent(true);
+      // Store in sessionStorage to persist through OAuth flow
+      sessionStorage.setItem("trialIntent", "true");
+    } else if (sessionStorage.getItem("trialIntent") === "true") {
+      setTrialIntent(true);
+    }
+  }, [isMobileQuery, searchParams]);
 
   const handleGoogleSignIn = () => {
     setLoading(true);
@@ -121,11 +135,20 @@ export const SignInPage: React.FC<SignInPageProps> = () => {
             textAlign: "center",
           }}
         >
-          Welcome
+          {trialIntent ? "Start Your Free Trial" : "Welcome"}
         </Typography>
 
+        {trialIntent && (
+          <Alert severity="info" sx={{ width: "100%", mb: 1 }}>
+            Sign in to start your <strong>14-day free trial</strong> with full
+            access to all features. No credit card required!
+          </Alert>
+        )}
+
         <Typography variant="body1" sx={{ textAlign: "center", mb: 2 }}>
-          Sign in or create an account with Google to get started
+          {trialIntent
+            ? "Create an account or sign in with Google to begin"
+            : "Sign in or create an account with Google to get started"}
         </Typography>
 
         <Tooltip

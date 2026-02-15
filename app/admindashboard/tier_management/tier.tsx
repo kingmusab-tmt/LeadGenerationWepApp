@@ -28,6 +28,7 @@ import {
   FormLabel,
   Tooltip,
   Badge,
+  MenuItem,
 } from "@mui/material";
 import {
   DndContext,
@@ -56,16 +57,72 @@ import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useNotification } from "@/lib/useNotification";
 
 interface TierLimits {
-  leads: number;
-  twilioNumbers: number;
-  numbers: number;
-  callSeconds: number;
+  // Core Limits
   forms: number;
+  leads: number;
   buyers: number;
+  industries: number;
+
+  // Call Tracking & Telephony
+  numbers: number;
+  twilioNumbers: number;
+  callSeconds: number;
+  callRecording: boolean;
+  callTranscription: boolean;
+  callAIAnalysis: boolean;
+  multiRingForwarding: boolean;
+  geoRouting: boolean;
+  scheduledCallbacks: boolean;
+  concurrentCallLimit: number;
+
+  // Marketing & Campaigns
+  emailCampaignsPerMonth: number;
+  smsCampaignsPerMonth: number;
+  emailRecipientsPerCampaign: number;
+  smsRecipientsPerCampaign: number;
+
+  // Automation & Workflows
+  automationWorkflows: number;
+  automationActionsPerWorkflow: number;
+
+  // AI & Advanced Features
+  chatbotEnabled: boolean;
+  leadScoringEnabled: boolean;
+  sentimentAnalysisEnabled: boolean;
+  aiSummariesEnabled: boolean;
+
+  // Invoicing & Payments
+  invoicesPerMonth: number;
+  customInvoiceBranding: boolean;
+
+  // Integrations
+  zapierIntegration: boolean;
+  webhookIntegration: boolean;
+  apiAccess: boolean;
+  maxWebhooks: number;
+
+  // Marketplace & Distribution
+  marketplaceAccess: boolean;
+  exclusiveLeads: boolean;
+  leadDistributionRules: boolean;
+
+  // Data & Reporting
   exports: boolean;
   imports: boolean;
+  advancedReports: boolean;
+  dataRetentionDays: number;
+
+  // Team & Access
+  teamMembers: number;
+  maxConcurrentSessions: number;
+
+  // Support
   liveSupport: boolean;
-  industries: number;
+  prioritySupport: boolean;
+
+  // Customization
+  customBranding: boolean;
+  customDomain: boolean;
 }
 
 interface Tier {
@@ -84,20 +141,78 @@ interface Tier {
   discountedPrice?: string;
   renewalPrice?: string;
   annualPrice?: string;
+  discountDuration?: "once" | "forever" | "repeating";
+  discountDurationMonths?: number;
   tierLimits: TierLimits;
 }
 
 const defaultTierLimits: TierLimits = {
-  leads: 0,
+  // Core Limits
+  forms: 1,
+  leads: 100,
+  buyers: 5,
+  industries: 1,
+
+  // Call Tracking & Telephony
+  numbers: 1,
   twilioNumbers: 0,
-  numbers: 0,
-  callSeconds: 0,
-  forms: 0,
-  buyers: 0,
+  callSeconds: 1000,
+  callRecording: false,
+  callTranscription: false,
+  callAIAnalysis: false,
+  multiRingForwarding: false,
+  geoRouting: false,
+  scheduledCallbacks: false,
+  concurrentCallLimit: 1,
+
+  // Marketing & Campaigns
+  emailCampaignsPerMonth: 0,
+  smsCampaignsPerMonth: 0,
+  emailRecipientsPerCampaign: 100,
+  smsRecipientsPerCampaign: 50,
+
+  // Automation & Workflows
+  automationWorkflows: 0,
+  automationActionsPerWorkflow: 3,
+
+  // AI & Advanced Features
+  chatbotEnabled: false,
+  leadScoringEnabled: false,
+  sentimentAnalysisEnabled: false,
+  aiSummariesEnabled: false,
+
+  // Invoicing & Payments
+  invoicesPerMonth: 10,
+  customInvoiceBranding: false,
+
+  // Integrations
+  zapierIntegration: false,
+  webhookIntegration: false,
+  apiAccess: false,
+  maxWebhooks: 0,
+
+  // Marketplace & Distribution
+  marketplaceAccess: false,
+  exclusiveLeads: false,
+  leadDistributionRules: false,
+
+  // Data & Reporting
   exports: false,
   imports: false,
+  advancedReports: false,
+  dataRetentionDays: 90,
+
+  // Team & Access
+  teamMembers: 1,
+  maxConcurrentSessions: 1,
+
+  // Support
   liveSupport: false,
-  industries: 0,
+  prioritySupport: false,
+
+  // Customization
+  customBranding: false,
+  customDomain: false,
 };
 
 const TierManagement = () => {
@@ -186,6 +301,8 @@ const TierManagement = () => {
       tierUserType: "seller",
       discountPercentage: 0,
       renewalPrice: "",
+      discountDuration: "once",
+      discountDurationMonths: 1,
       tierLimits: { ...defaultTierLimits },
     };
 
@@ -205,14 +322,20 @@ const TierManagement = () => {
     setShowLimits(false);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value, type } = e.target;
+    const checked =
+      type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
     const newValue = type === "checkbox" ? checked : value;
 
     setCurrentTier((prev) => {
       const updatedTier = {
         ...prev,
-        [name]: newValue,
+        [name]: type === "number" ? Number(newValue) : newValue,
       };
 
       // Automatically update tierType when price changes
@@ -252,7 +375,7 @@ const TierManagement = () => {
   const calculateDiscountedPrice = () => {
     if (!currentTier?.price || !currentTier?.discountPercentage) return "";
     const price = parseFloat(currentTier.price);
-    const discount = (price * (currentTier.discountPercentage / 100)) / 12;
+    const discount = price * (currentTier.discountPercentage / 100);
     return (price - discount).toFixed(2);
   };
 
@@ -613,6 +736,42 @@ const TierManagement = () => {
                         (currentTier?.tierType as "free" | "paid") === "free"
                       }
                     />
+                    {currentTier.discountPercentage &&
+                      currentTier.discountPercentage > 0 && (
+                        <>
+                          <TextField
+                            select
+                            fullWidth
+                            label="Discount Duration"
+                            name="discountDuration"
+                            value={currentTier.discountDuration || "once"}
+                            onChange={handleChange}
+                            margin="normal"
+                            helperText="When the discount applies"
+                          >
+                            <MenuItem value="once">First payment only</MenuItem>
+                            <MenuItem value="forever">
+                              Forever (all payments)
+                            </MenuItem>
+                            <MenuItem value="repeating">
+                              Repeating (N months)
+                            </MenuItem>
+                          </TextField>
+                          {currentTier.discountDuration === "repeating" && (
+                            <TextField
+                              fullWidth
+                              label="Discount Duration (months)"
+                              name="discountDurationMonths"
+                              value={currentTier.discountDurationMonths || ""}
+                              onChange={handleChange}
+                              margin="normal"
+                              type="number"
+                              inputProps={{ min: "1", step: "1" }}
+                              helperText="Number of months to apply discount"
+                            />
+                          )}
+                        </>
+                      )}
                     <TextField
                       fullWidth
                       label="Renewal Price ($)"
@@ -724,122 +883,750 @@ const TierManagement = () => {
                       p: 2,
                       border: "1px dashed #ccc",
                       borderRadius: 1,
+                      maxHeight: "60vh",
+                      overflowY: "auto",
                     }}
                   >
-                    <Typography variant="subtitle1" gutterBottom>
-                      Tier Limits
+                    <Typography
+                      variant="subtitle1"
+                      gutterBottom
+                      fontWeight="bold"
+                    >
+                      Tier Limits Configuration
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ mb: 2, display: "block" }}
+                    >
+                      Set 0 for unlimited. Toggle switches to enable/disable
+                      features.
+                    </Typography>
+
+                    {/* Core Limits */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 2, mb: 1, color: "primary.main" }}
+                    >
+                      📊 Core Limits
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid size={{ xs: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Leads"
-                          name="leads"
-                          type="number"
-                          value={currentTier.tierLimits?.leads || 0}
-                          onChange={handleLimitsChange}
-                          margin="normal"
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Twilio Numbers"
-                          name="twilioNumbers"
-                          type="number"
-                          value={currentTier.tierLimits?.twilioNumbers || 0}
-                          onChange={handleLimitsChange}
-                          margin="normal"
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Numbers"
-                          name="numbers"
-                          type="number"
-                          value={currentTier.tierLimits?.numbers || 0}
-                          onChange={handleLimitsChange}
-                          margin="normal"
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Call Seconds"
-                          name="callSeconds"
-                          type="number"
-                          value={currentTier.tierLimits?.callSeconds || 0}
-                          onChange={handleLimitsChange}
-                          margin="normal"
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
                         <TextField
                           fullWidth
                           label="Max Forms"
                           name="forms"
                           type="number"
-                          value={currentTier.tierLimits?.forms || 0}
+                          size="small"
+                          value={currentTier.tierLimits?.forms ?? 1}
                           onChange={handleLimitsChange}
-                          margin="normal"
+                          helperText="0 = unlimited"
                         />
                       </Grid>
-                      <Grid size={{ xs: 6 }}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="Max Leads/Month"
+                          name="leads"
+                          type="number"
+                          size="small"
+                          value={currentTier.tierLimits?.leads ?? 100}
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
                         <TextField
                           fullWidth
                           label="Max Buyers"
                           name="buyers"
                           type="number"
-                          value={currentTier.tierLimits?.buyers || 0}
+                          size="small"
+                          value={currentTier.tierLimits?.buyers ?? 5}
                           onChange={handleLimitsChange}
-                          margin="normal"
+                          helperText="0 = unlimited"
                         />
                       </Grid>
-                      <Grid size={{ xs: 6 }}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
                         <TextField
                           fullWidth
                           label="Max Industries"
                           name="industries"
                           type="number"
-                          value={currentTier.tierLimits?.industries || 0}
+                          size="small"
+                          value={currentTier.tierLimits?.industries ?? 1}
                           onChange={handleLimitsChange}
-                          margin="normal"
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                    </Grid>
+
+                    {/* Call Tracking & Telephony */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      📞 Call Tracking & Telephony
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="Tracking Numbers"
+                          name="numbers"
+                          type="number"
+                          size="small"
+                          value={currentTier.tierLimits?.numbers ?? 1}
+                          onChange={handleLimitsChange}
+                          helperText="Manual numbers"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="Twilio Numbers"
+                          name="twilioNumbers"
+                          type="number"
+                          size="small"
+                          value={currentTier.tierLimits?.twilioNumbers ?? 0}
+                          onChange={handleLimitsChange}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="Call Seconds/Month"
+                          name="callSeconds"
+                          type="number"
+                          size="small"
+                          value={currentTier.tierLimits?.callSeconds ?? 1000}
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="Concurrent Calls"
+                          name="concurrentCallLimit"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits?.concurrentCallLimit ?? 1
+                          }
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
                         />
                       </Grid>
                       <Grid size={{ xs: 12 }}>
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              name="exports"
-                              checked={currentTier.tierLimits?.exports || false}
-                              onChange={handleLimitsChange}
-                            />
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="callRecording"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.callRecording ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Call Recording"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="callTranscription"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.callTranscription ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Transcription"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="callAIAnalysis"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.callAIAnalysis ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="AI Analysis"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="multiRingForwarding"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.multiRingForwarding ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Multi-Ring"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="geoRouting"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.geoRouting ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Geo-Routing"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="scheduledCallbacks"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.scheduledCallbacks ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Scheduled Callbacks"
+                          />
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Marketing & Campaigns */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      📧 Marketing & Campaigns
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="Email Campaigns/Month"
+                          name="emailCampaignsPerMonth"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits?.emailCampaignsPerMonth ?? 0
                           }
-                          label="Allow Exports"
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
                         />
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              name="imports"
-                              checked={currentTier.tierLimits?.imports || false}
-                              onChange={handleLimitsChange}
-                            />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="SMS Campaigns/Month"
+                          name="smsCampaignsPerMonth"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits?.smsCampaignsPerMonth ?? 0
                           }
-                          label="Allow Imports"
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
                         />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="Email Recipients/Campaign"
+                          name="emailRecipientsPerCampaign"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits
+                              ?.emailRecipientsPerCampaign ?? 100
+                          }
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="SMS Recipients/Campaign"
+                          name="smsRecipientsPerCampaign"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits?.smsRecipientsPerCampaign ??
+                            50
+                          }
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                    </Grid>
+
+                    {/* Automation & Workflows */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      ⚙️ Automation & Workflows
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Max Workflows"
+                          name="automationWorkflows"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits?.automationWorkflows ?? 0
+                          }
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Actions per Workflow"
+                          name="automationActionsPerWorkflow"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits
+                              ?.automationActionsPerWorkflow ?? 3
+                          }
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                    </Grid>
+
+                    {/* AI & Advanced Features */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      🤖 AI & Advanced Features
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="chatbotEnabled"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.chatbotEnabled ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Chatbot"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="leadScoringEnabled"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.leadScoringEnabled ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Lead Scoring"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="sentimentAnalysisEnabled"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits
+                                    ?.sentimentAnalysisEnabled ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Sentiment Analysis"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="aiSummariesEnabled"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.aiSummariesEnabled ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="AI Summaries"
+                          />
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Invoicing & Payments */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      💳 Invoicing & Payments
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Invoices per Month"
+                          name="invoicesPerMonth"
+                          type="number"
+                          size="small"
+                          value={currentTier.tierLimits?.invoicesPerMonth ?? 10}
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
                         <FormControlLabel
                           control={
                             <Switch
-                              name="liveSupport"
+                              name="customInvoiceBranding"
+                              size="small"
                               checked={
-                                currentTier.tierLimits?.liveSupport || false
+                                currentTier.tierLimits?.customInvoiceBranding ??
+                                false
                               }
                               onChange={handleLimitsChange}
                             />
                           }
-                          label="Live Support Access"
+                          label="Custom Invoice Branding"
                         />
+                      </Grid>
+                    </Grid>
+
+                    {/* Integrations */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      🔗 Integrations
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          label="Max Webhooks"
+                          name="maxWebhooks"
+                          type="number"
+                          size="small"
+                          value={currentTier.tierLimits?.maxWebhooks ?? 0}
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="zapierIntegration"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.zapierIntegration ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Zapier"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="webhookIntegration"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.webhookIntegration ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Webhooks"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="apiAccess"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.apiAccess ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="API Access"
+                          />
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Marketplace & Distribution */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      🏪 Marketplace & Distribution
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="marketplaceAccess"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.marketplaceAccess ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Marketplace Access"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="exclusiveLeads"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.exclusiveLeads ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Exclusive Leads"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="leadDistributionRules"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits
+                                    ?.leadDistributionRules ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Distribution Rules"
+                          />
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Data & Reporting */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      📈 Data & Reporting
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Data Retention (days)"
+                          name="dataRetentionDays"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits?.dataRetentionDays ?? 90
+                          }
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="exports"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.exports ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Exports"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="imports"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.imports ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Imports"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="advancedReports"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.advancedReports ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Advanced Reports"
+                          />
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Team & Access */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      👥 Team & Access
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Team Members"
+                          name="teamMembers"
+                          type="number"
+                          size="small"
+                          value={currentTier.tierLimits?.teamMembers ?? 1}
+                          onChange={handleLimitsChange}
+                          helperText="0 = unlimited"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Concurrent Sessions"
+                          name="maxConcurrentSessions"
+                          type="number"
+                          size="small"
+                          value={
+                            currentTier.tierLimits?.maxConcurrentSessions ?? 1
+                          }
+                          onChange={handleLimitsChange}
+                          helperText="Max logins at same time"
+                        />
+                      </Grid>
+                    </Grid>
+
+                    {/* Support */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      🎧 Support
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="liveSupport"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.liveSupport ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Live Support"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="prioritySupport"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.prioritySupport ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Priority Support"
+                          />
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Customization */}
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ mt: 3, mb: 1, color: "primary.main" }}
+                    >
+                      🎨 Customization
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="customBranding"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.customBranding ??
+                                  false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Custom Branding"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                name="customDomain"
+                                size="small"
+                                checked={
+                                  currentTier.tierLimits?.customDomain ?? false
+                                }
+                                onChange={handleLimitsChange}
+                              />
+                            }
+                            label="Custom Domain"
+                          />
+                        </Box>
                       </Grid>
                     </Grid>
                   </Box>
@@ -990,16 +1777,13 @@ const TierManagement = () => {
       <Dialog open={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)}>
         <DialogTitle>Delete Tier</DialogTitle>
         <DialogContent>
-          <Typography>
-            Are you sure you want to delete this tier?
-            {deleteConfirmId && subscriberCounts[deleteConfirmId] > 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                This tier currently has {subscriberCounts[deleteConfirmId]}{" "}
-                active subscriber(s). They will need to be migrated to another
-                tier.
-              </Alert>
-            )}
-          </Typography>
+          <Typography>Are you sure you want to delete this tier?</Typography>
+          {deleteConfirmId && subscriberCounts[deleteConfirmId] > 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              This tier currently has {subscriberCounts[deleteConfirmId]} active
+              subscriber(s). They will need to be migrated to another tier.
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmId(null)}>Cancel</Button>

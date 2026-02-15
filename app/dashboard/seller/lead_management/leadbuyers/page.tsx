@@ -259,6 +259,7 @@ export default function LeadTracking() {
   );
 
   const extractRecordingSid = (url: string) => {
+    if (!url) return null;
     const matches = url.match(/Recordings\/([^/]+)/);
     return matches ? matches[1] : null;
   };
@@ -754,6 +755,7 @@ const LoadingSkeleton = () => (
 
 // Utility function
 const extractRecordingSid = (url: string) => {
+  if (!url) return null;
   const matches = url.match(/Recordings\/([^/]+)/);
   return matches ? matches[1] : null;
 };

@@ -17,10 +17,12 @@ import LoadingComponent from "@/app/components/generalComponent/loadingcomponent
 import TawkSetupForm from "./tawksetting/page";
 import { useRouter } from "next/navigation";
 import StripeOnboardingPage from "./stripeonboarding/page";
-import PaypalPayOutPage from "./paypalpayout/page";
 import LeadDistributionSettings from "./leadsellersetting/page";
 import EmailSettingsPage from "./emailsetting/page";
 import APISettingsPage from "./apisetting/page";
+import SubscriptionManagement from "./subscription/SubscriptionManagement";
+import ChangePlanModal from "./subscription/ChangePlanModal";
+import PaymentMethodsManager from "./subscription/PaymentMethodsManager";
 import { useInitializeUser, useAppDispatch } from "@/lib/hooks";
 import { updateUser } from "@/lib/userSlice";
 import { useNotification } from "@/lib/useNotification";
@@ -66,6 +68,7 @@ const AccountSettings = () => {
     username?: string;
     mobileNumber?: string;
   }>({});
+  const [changePlanModalOpen, setChangePlanModalOpen] = useState(false);
 
   const router = useRouter();
   const tabMap = [
@@ -76,7 +79,7 @@ const AccountSettings = () => {
     "email-settings",
     "api-settings",
     "stripe-onboarding",
-    "paypal-payout",
+    "subscription",
   ];
 
   useEffect(() => {
@@ -292,7 +295,7 @@ const AccountSettings = () => {
         <Tab label="Email Settings" />
         <Tab label="API Settings" />
         <Tab label="Stripe Onboarding" />
-        <Tab label="Paypal Payout" />
+        <Tab label="Subscription" />
       </Tabs>
 
       {isProfileLoading ? (
@@ -443,7 +446,23 @@ const AccountSettings = () => {
       {tabValue === 4 && <EmailSettingsPage />}
       {tabValue === 5 && <APISettingsPage />}
       {tabValue === 6 && <StripeOnboardingPage />}
-      {tabValue === 7 && <PaypalPayOutPage />}
+      {tabValue === 7 && (
+        <Box>
+          <SubscriptionManagement
+            onOpenChangePlanModal={() => setChangePlanModalOpen(true)}
+          />
+          <Box sx={{ mt: 4 }}>
+            <PaymentMethodsManager />
+          </Box>
+          <ChangePlanModal
+            open={changePlanModalOpen}
+            onClose={() => setChangePlanModalOpen(false)}
+            onSuccess={() => {
+              setChangePlanModalOpen(false);
+            }}
+          />
+        </Box>
+      )}
     </Box>
   );
 };

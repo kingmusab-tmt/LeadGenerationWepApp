@@ -7,6 +7,7 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { EmailCampaign } from "@/models/emailCampaign";
 import { emailMarketingEngine } from "@/lib/emailMarketingEngine";
+import { getSubscriptionLimits } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,22 @@ export async function POST(
 
     // ==================== SEND ====================
     if (action === "send") {
+      // Check recipient limit
+      const recipientCount = campaign.recipientEmails?.length || 0;
+      const limits = await getSubscriptionLimits(session.user.id);
+      const maxRecipients = limits?.emailRecipientsPerCampaign || 0;
+
+      if (maxRecipients > 0 && recipientCount > maxRecipients) {
+        return NextResponse.json(
+          {
+            error: `Recipient limit exceeded. Your plan allows ${maxRecipients} recipients per campaign, but this campaign has ${recipientCount}.`,
+            limit: maxRecipients,
+            current: recipientCount,
+          },
+          { status: 403 },
+        );
+      }
+
       const result = await emailMarketingEngine.sendCampaignImmediate(id);
 
       if (!result.success) {

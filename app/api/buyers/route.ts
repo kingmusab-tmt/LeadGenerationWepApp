@@ -5,6 +5,7 @@ import { Buyer } from "@/models/leadbuyers";
 import { User } from "@/models";
 import { authOptions } from "@/auth";
 import mongoose from "mongoose";
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 export async function GET(req: NextRequest) {
   await dbConnect();
@@ -72,6 +73,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 },
+      );
+    }
+
+    // Check subscription limit for buyers
+    const usageCheck = await checkAndIncrementUsage(
+      session.user.id,
+      "buyers",
+      1,
+    );
+    if (!usageCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Buyer limit reached (${usageCheck.currentUsage}/${usageCheck.limit}). Please upgrade your plan.`,
+        },
+        { status: 403 },
       );
     }
 

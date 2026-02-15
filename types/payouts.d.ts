@@ -28,19 +28,3 @@ interface StripePayoutResponse {
   status?: string;
   error?: string;
 }
-
-interface PayPalPayoutRequest {
-  receiverEmail: string;
-  amount: number;
-  currency: string;
-  note?: string;
-}
-
-interface PayPalPayoutResponse {
-  message: string;
-  payoutId?: string;
-  status?: string;
-  amount?: number;
-  currency?: string;
-  error?: string;
-}

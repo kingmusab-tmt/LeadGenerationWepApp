@@ -61,7 +61,7 @@ async function verifyWebhookOwnership(webhookId: string) {
     return { error: "Unauthorized", status: 401 };
   }
 
-  if (!webhookId.match(/^[0-9a-fA-F]{24}$/)) {
+  if (!webhookId || !webhookId.match(/^[0-9a-fA-F]{24}$/)) {
     return { error: "Invalid webhook ID", status: 400 };
   }
 

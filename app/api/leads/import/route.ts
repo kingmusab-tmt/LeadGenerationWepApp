@@ -4,6 +4,7 @@ import { Lead } from "@/models/leads";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import Papa from "papaparse";
+import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
 interface Field {
   id: string;
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     if (!file) {
       return NextResponse.json(
         { success: false, message: "No file provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -48,11 +49,29 @@ export async function POST(request: Request) {
           success: false,
           message: "CSV must have at least a header row and one data row",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const [headers, ...rows] = results.data;
+
+    // Check subscription limit for leads (check for total import count)
+    const importCount = rows.length;
+    const usageCheck = await checkAndIncrementUsage(
+      session.user.id,
+      "leads",
+      importCount,
+    );
+    if (!usageCheck.allowed) {
+      const remaining = Math.max(0, usageCheck.limit - usageCheck.currentUsage);
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Lead limit would be exceeded. You can import ${remaining} more leads (current: ${usageCheck.currentUsage}/${usageCheck.limit}). Please upgrade your plan.`,
+        },
+        { status: 403 },
+      );
+    }
 
     // Prepare leads for import
     const leadsToImport = rows.map((row) => {
@@ -94,7 +113,7 @@ export async function POST(request: Request) {
         message: "Failed to import leads.",
         error: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

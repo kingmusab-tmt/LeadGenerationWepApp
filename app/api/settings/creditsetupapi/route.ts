@@ -18,19 +18,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const {
-      stripeSecretKey,
-      stripePublishableKey,
-      stripeWebhookSecret,
-      paypalClientId,
-      paypalSecret,
-    } = body;
+    const { stripeSecretKey, stripePublishableKey, stripeWebhookSecret } = body;
 
     // Encrypt sensitive data before saving
     const encryptedStripeSecretKey = encryptData(stripeSecretKey);
     const encryptedStripeWebhookSecret = encryptData(stripeWebhookSecret);
-
-    const encryptedPaypalSecret = encryptData(paypalSecret);
 
     // Update the seller's payment details
     await User.findByIdAndUpdate(session.user.id, {
@@ -38,8 +30,6 @@ export async function POST(req: NextRequest) {
         stripeSecretKey: encryptedStripeSecretKey,
         stripePublishableKey,
         stripeWebhookSecret: encryptedStripeWebhookSecret,
-        paypalClientId,
-        paypalSecret: encryptedPaypalSecret,
       },
     });
 
