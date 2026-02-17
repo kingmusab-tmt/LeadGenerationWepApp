@@ -1,6 +1,7 @@
 "use client";
 
 import { useInitializeUser } from "@/lib/hooks";
+import { useCSRFFetch } from "@/app/hooks";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { SignInPage } from "./signin";
 import { Box } from "@mui/material";
@@ -10,6 +11,7 @@ import { useSession } from "next-auth/react";
 
 const SignInContent: React.FC = () => {
   const { currentUser, loading: userLoading } = useInitializeUser();
+  const csrfFetch = useCSRFFetch();
   const { data: session, status, update: updateSession } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,7 +29,7 @@ const SignInContent: React.FC = () => {
     setStartingTrial(true);
 
     try {
-      const response = await fetch("/api/subscriptions/trial/start", {
+      const response = await csrfFetch("/api/subscriptions/trial/start", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

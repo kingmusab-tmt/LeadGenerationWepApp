@@ -65,15 +65,19 @@ interface ReactivateResult {
 /**
  * Hook for managing subscription cancellation
  *
+ * This hook needs to be used from a client component that can access useCSRFFetch
+ * and pass it as a required parameter
+ *
  * @example
  * ```tsx
+ * const csrfFetch = useCSRFFetch();
  * const {
  *   cancelSubscription,
  *   reactivateSubscription,
  *   getCancellationStatus,
  *   isLoading,
  *   error,
- * } = useSubscriptionCancel();
+ * } = useSubscriptionCancel(csrfFetch);
  *
  * // Cancel at end of billing period with feedback
  * const handleCancel = async () => {
@@ -88,10 +92,18 @@ interface ReactivateResult {
  * };
  * ```
  */
-export function useSubscriptionCancel() {
+export function useSubscriptionCancel(
+  csrfFetch?: (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ) => Promise<Response>,
+) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<CancellationStatus | null>(null);
+
+  // Fallback to regular fetch if csrfFetch not provided
+  const fetchFn = csrfFetch || fetch;
 
   /**
    * Get current cancellation status
@@ -102,7 +114,7 @@ export function useSubscriptionCancel() {
       setError(null);
 
       try {
-        const response = await fetch("/api/subscriptions/cancel", {
+        const response = await fetchFn("/api/subscriptions/cancel", {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
@@ -124,7 +136,7 @@ export function useSubscriptionCancel() {
       } finally {
         setIsLoading(false);
       }
-    }, []);
+    }, [fetchFn]);
 
   /**
    * Cancel the subscription
@@ -139,7 +151,7 @@ export function useSubscriptionCancel() {
       setError(null);
 
       try {
-        const response = await fetch("/api/subscriptions/cancel", {
+        const response = await fetchFn("/api/subscriptions/cancel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(options),
@@ -170,7 +182,7 @@ export function useSubscriptionCancel() {
         setIsLoading(false);
       }
     },
-    [getCancellationStatus],
+    [getCancellationStatus, fetchFn],
   );
 
   /**
@@ -182,7 +194,7 @@ export function useSubscriptionCancel() {
       setError(null);
 
       try {
-        const response = await fetch("/api/subscriptions/cancel", {
+        const response = await fetchFn("/api/subscriptions/cancel", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
         });
@@ -210,7 +222,7 @@ export function useSubscriptionCancel() {
       } finally {
         setIsLoading(false);
       }
-    }, [getCancellationStatus]);
+    }, [getCancellationStatus, fetchFn]);
 
   return {
     cancelSubscription,

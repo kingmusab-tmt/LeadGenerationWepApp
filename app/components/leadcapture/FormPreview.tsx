@@ -48,6 +48,7 @@ import {
 import Grid from "@mui/material/Grid";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import GoogleCityAutocomplete from "../GoogleCityAutocomplete";
 
 // Declare grecaptcha for TypeScript
 declare global {
@@ -71,6 +72,8 @@ interface Field {
   pattern?: string;
   helperText?: string;
   headingLevel?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+  disabled?: boolean;
+  linkedTo?: string;
 }
 
 interface SortableFieldItemProps {
@@ -962,6 +965,51 @@ const FormPreview = ({
                             </FormHelperText>
                           ) : null}
                         </FormControl>
+                      )}
+
+                      {/* City Autocomplete Field (Powered by Google) */}
+                      {field.type === "city_autocomplete" && (
+                        <GoogleCityAutocomplete
+                          label={field.label}
+                          value={(formData[field.id]?.value as string) || ""}
+                          onChange={(cityValue) =>
+                            handleChange(field.id, cityValue)
+                          }
+                          onSelectWithState={(stateValue) => {
+                            // Auto-populate linked state field
+                            if (field.linkedTo) {
+                              handleChange(field.linkedTo, stateValue);
+                            }
+                          }}
+                          onBlur={() => handleBlur(field.id)}
+                          required={field.required}
+                          error={touched[field.id] && !!fieldErrors[field.id]}
+                          errorText={fieldErrors[field.id]}
+                          helperText={field.helperText}
+                          placeholder={field.placeholder || "Search city..."}
+                        />
+                      )}
+
+                      {/* State Auto-populated Field (Linked to City) */}
+                      {field.type === "state_auto" && (
+                        <TextField
+                          label={field.label}
+                          value={(formData[field.id]?.value as string) || ""}
+                          fullWidth
+                          disabled
+                          helperText="Auto-populated based on city selection"
+                          slotProps={{
+                            input: {
+                              readOnly: true,
+                            },
+                          }}
+                          sx={{
+                            "& .MuiInputBase-input.Mui-disabled": {
+                              WebkitTextFillColor: "rgba(0, 0, 0, 0.6)",
+                              color: "rgba(0, 0, 0, 0.6)",
+                            },
+                          }}
+                        />
                       )}
 
                       {/* Radio Field */}

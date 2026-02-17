@@ -81,13 +81,21 @@ interface IncrementResult extends CheckResult {
  * ))}
  * ```
  */
-export function useUsageTracking() {
+export function useUsageTracking(
+  csrfFetch?: (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ) => Promise<Response>,
+) {
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [limits, setLimits] = useState<UsageLimits | null>(null);
   const [percentages, setPercentages] = useState<Record<string, number>>({});
   const [warnings, setWarnings] = useState<UsageWarning[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fallback to regular fetch if csrfFetch not provided
+  const fetchFn = csrfFetch || fetch;
 
   /**
    * Fetch current usage summary and warnings
@@ -135,7 +143,7 @@ export function useUsageTracking() {
   const checkLimit = useCallback(
     async (usageKey: string, amount: number = 1): Promise<CheckResult> => {
       try {
-        const response = await fetch("/api/subscriptions/usage", {
+        const response = await fetchFn("/api/subscriptions/usage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -178,7 +186,7 @@ export function useUsageTracking() {
       enforceSoftLimit: boolean = false,
     ): Promise<IncrementResult> => {
       try {
-        const response = await fetch("/api/subscriptions/usage", {
+        const response = await fetchFn("/api/subscriptions/usage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

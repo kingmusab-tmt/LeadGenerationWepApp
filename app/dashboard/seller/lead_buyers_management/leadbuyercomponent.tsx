@@ -8,6 +8,13 @@ import {
   Alert,
   Button,
   Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
   useTheme,
   useMediaQuery,
   IconButton,
@@ -40,11 +47,13 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   WarningAmber as WarningIcon,
+  Email as EmailIcon,
 } from "@mui/icons-material";
 import BuyerTable from "@/app/components/leadbuyers/buyertable";
 import BuyerFormEnhanced from "@/app/components/leadbuyers/BuyerFormEnhanced";
 import { IBuyer } from "@/models/leadbuyers";
 import { useInitializeUser } from "@/lib/hooks";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
 // ---------- Stats Card ----------
@@ -98,6 +107,7 @@ const statusChipColor: Record<
 
 const BuyersPage: React.FC = () => {
   const { currentUser } = useInitializeUser();
+  const csrfFetch = useCSRFFetch();
   const [buyers, setBuyers] = useState<IBuyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +122,12 @@ const BuyersPage: React.FC = () => {
     message: "",
     severity: "info" as "success" | "error" | "info" | "warning",
   });
+  const [successModal, setSuccessModal] = useState<{
+    open: boolean;
+    buyerName?: string;
+    buyerEmail?: string;
+    emailSent?: boolean;
+  }>({ open: false });
   const [subscriptionLimits, setSubscriptionLimits] = useState({
     currentCount: 0,
     maxAllowed: 0,
@@ -167,7 +183,7 @@ const BuyersPage: React.FC = () => {
       setLoading(true);
 
       // Update buyer statuses from "new" to "active" if they have purchased leads
-      await fetch("/api/sellers/update-buyer-status", { method: "POST" });
+      await csrfFetch("/api/sellers/update-buyer-status", { method: "POST" });
 
       const buyersResponse = await fetch("/api/buyers");
       if (!buyersResponse.ok) throw new Error("Failed to fetch buyers");
@@ -228,6 +244,7 @@ const BuyersPage: React.FC = () => {
 
   const handleSaveBuyer = async (buyerData: Partial<IBuyer>) => {
     try {
+      const isNewBuyer = !selectedBuyer;
       const response = selectedBuyer
         ? await fetch(`/api/buyers?id=${selectedBuyer._id}`, {
             method: "PUT",
@@ -242,14 +259,26 @@ const BuyersPage: React.FC = () => {
 
       if (!response.ok) throw new Error("Failed to save buyer");
 
-      setSnackbar({
-        open: true,
-        message: selectedBuyer ? "Buyer updated!" : "Buyer added!",
-        severity: "success",
-      });
+      const result = await response.json();
 
       fetchData();
       setOpenBuyerForm(false);
+
+      // Show success modal for new buyers
+      if (isNewBuyer) {
+        setSuccessModal({
+          open: true,
+          buyerName: buyerData.name,
+          buyerEmail: buyerData.email,
+          emailSent: result.emailSent ?? true,
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: "Buyer updated!",
+          severity: "success",
+        });
+      }
     } catch (error) {
       setSnackbar({
         open: true,
@@ -613,6 +642,131 @@ const BuyersPage: React.FC = () => {
           initialValues={selectedBuyer || undefined}
           sellerId={sellerId}
         />
+      </Dialog>
+
+      {/* Success Modal - New Buyer Registration */}
+      <Dialog
+        open={successModal.open}
+        onClose={() => setSuccessModal({ open: false })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <ActiveIcon sx={{ color: "success.main", fontSize: 28 }} />
+            <Typography variant="h6">
+              Buyer Registered Successfully! 🎉
+            </Typography>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              mb: 2,
+              p: 1.5,
+              bgcolor: successModal.emailSent
+                ? "success.lighter"
+                : "warning.lighter",
+              borderRadius: 1,
+            }}
+          >
+            <EmailIcon
+              sx={{
+                color: successModal.emailSent ? "success.main" : "warning.main",
+              }}
+            />
+            <Typography variant="body2">
+              {successModal.emailSent
+                ? `An email has been sent to ${successModal.buyerEmail} with sign-in instructions.`
+                : `Buyer created, but email notification could not be sent. Please inform the buyer manually.`}
+            </Typography>
+          </Box>
+
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            <strong>{successModal.buyerName}</strong> has been registered as a
+            lead buyer.
+          </Typography>
+
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+            The buyer will receive an email with instructions to:
+          </Typography>
+
+          <List sx={{ mb: 2 }}>
+            <ListItem sx={{ pl: 0, py: 0.5 }}>
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <Typography sx={{ fontWeight: 600, color: "primary.main" }}>
+                  1.
+                </Typography>
+              </ListItemIcon>
+              <ListItemText
+                primary="Sign in with their Google account"
+                primaryTypographyProps={{ variant: "body2" }}
+              />
+            </ListItem>
+            <ListItem sx={{ pl: 0, py: 0.5 }}>
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <Typography sx={{ fontWeight: 600, color: "primary.main" }}>
+                  2.
+                </Typography>
+              </ListItemIcon>
+              <ListItemText
+                primary='Select "Buyer" on the role selection page'
+                primaryTypographyProps={{ variant: "body2" }}
+              />
+            </ListItem>
+            <ListItem sx={{ pl: 0, py: 0.5 }}>
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <Typography sx={{ fontWeight: 600, color: "primary.main" }}>
+                  3.
+                </Typography>
+              </ListItemIcon>
+              <ListItemText
+                primary="Access their buyer dashboard"
+                primaryTypographyProps={{ variant: "body2" }}
+              />
+            </ListItem>
+            <ListItem sx={{ pl: 0, py: 0.5 }}>
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <Typography sx={{ fontWeight: 600, color: "primary.main" }}>
+                  4.
+                </Typography>
+              </ListItemIcon>
+              <ListItemText
+                primary="Update their profile information if needed"
+                primaryTypographyProps={{ variant: "body2" }}
+              />
+            </ListItem>
+          </List>
+
+          <Box
+            sx={{
+              bgcolor: "info.lighter",
+              p: 1.5,
+              borderRadius: 1,
+              border: "1px solid",
+              borderColor: "info.light",
+            }}
+          >
+            <Typography variant="caption" display="block">
+              <strong>Note:</strong> The email includes your company information
+              and the registration details you provided. The buyer can update
+              their information from their dashboard.
+            </Typography>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            variant="contained"
+            onClick={() => setSuccessModal({ open: false })}
+          >
+            Got It
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Snackbar */}

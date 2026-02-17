@@ -27,7 +27,6 @@ import AddIcon from "@mui/icons-material/Add";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import FormPreview from "./FormPreview";
 import { industryNiches } from "@/utils/industryNiches";
-import { usCities } from "@/utils/citiesInUsUk";
 import { LEAD_SOURCES } from "@/utils/leadSources";
 import { useRouter } from "next/navigation";
 
@@ -38,6 +37,8 @@ interface Field {
   required?: boolean;
   options?: string[];
   headingLevel?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+  disabled?: boolean;
+  linkedTo?: string; // ID of the field this is linked to (e.g., state linked to city)
 }
 
 const FormBuilder = () => {
@@ -103,6 +104,8 @@ const FormBuilder = () => {
 
   // Add lead contact fields
   const addLeadContactFields = () => {
+    const cityFieldId = Math.random().toString();
+    const stateFieldId = Math.random().toString();
     const contactFields: Field[] = [
       {
         id: Math.random().toString(),
@@ -123,17 +126,19 @@ const FormBuilder = () => {
         required: false,
       },
       {
-        id: Math.random().toString(),
-        type: "select",
+        id: cityFieldId,
+        type: "city_autocomplete",
         label: "City",
         required: false,
-        options: usCities, // Use imported city list for dropdown options
+        linkedTo: stateFieldId, // Link city to state for auto-population
       },
       {
-        id: Math.random().toString(),
-        type: "text",
-        label: "Address",
+        id: stateFieldId,
+        type: "state_auto",
+        label: "State",
         required: false,
+        disabled: true,
+        linkedTo: cityFieldId, // This state field is linked to the city field
       },
       {
         id: Math.random().toString(),

@@ -2,9 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { Container, Typography, TextField, Button, Box } from "@mui/material";
 import { styled } from "@mui/system";
-import axios from "axios";
+import axios from "@/lib/axiosInstance";
 import { toast } from "react-toastify";
-import { useCSRF } from "@/app/hooks";
 
 const SettingsContainer = styled(Container)({
   marginTop: "20px",
@@ -21,7 +20,6 @@ const Section = styled(Box)({
 });
 
 const APISettingsPage = () => {
-  const { csrfToken } = useCSRF();
   const [apiSettings, setApiSettings] = useState({
     twilioSid: "",
     twilioAuthToken: "",
@@ -52,17 +50,9 @@ const APISettingsPage = () => {
 
   const handleSave = async () => {
     try {
-      await axios.post(
-        "/api/settings",
-        {
-          apiSettings,
-        },
-        {
-          headers: {
-            "X-CSRF-Token": csrfToken || "",
-          },
-        },
-      );
+      await axios.post("/api/settings", {
+        apiSettings,
+      });
       toast.success("API settings updated");
     } catch (e) {
       toast.error("Failed to update API settings");

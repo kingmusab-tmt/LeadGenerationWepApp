@@ -29,7 +29,7 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string(),
   TWILIO_PHONE_NUMBER: z.string(),
   STRIPE_WEBHOOK_SECRET: z.string(),
-  STRIPE_PUBLIC_KEY: z.string(),
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string(),
   STRIPE_SECRET_KEY: z.string(),
   NEXT_PUBLIC_RECAPTCHA_SITE_KEY: z.string().optional(),
   RECAPTCHA_SECRET_KEY: z.string().optional(),

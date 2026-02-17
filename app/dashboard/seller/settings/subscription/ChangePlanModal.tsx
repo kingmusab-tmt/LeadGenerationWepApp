@@ -29,6 +29,7 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 import { useNotification } from "@/lib/useNotification";
+import { useCSRFFetch } from "@/app/hooks";
 
 interface Tier {
   _id: string;
@@ -76,6 +77,7 @@ export default function ChangePlanModal({
   onSuccess,
 }: ChangePlanModalProps) {
   const notify = useNotification();
+  const csrfFetch = useCSRFFetch();
   const [loading, setLoading] = useState(true);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [currentSubscription, setCurrentSubscription] =
@@ -150,7 +152,7 @@ export default function ChangePlanModal({
           isTrial: currentSubscription?.isTrial,
         });
 
-        const response = await fetch("/api/subscriptions/manage", {
+        const response = await csrfFetch("/api/subscriptions/manage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -195,7 +197,7 @@ export default function ChangePlanModal({
     try {
       setChangingPlan(true);
 
-      const response = await fetch("/api/subscriptions/manage", {
+      const response = await csrfFetch("/api/subscriptions/manage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -227,7 +229,9 @@ export default function ChangePlanModal({
         // Refresh page after a short delay to allow webhook to process
         // This ensures user sees updated subscription limits and features
         setTimeout(() => {
-          window.location.reload();
+          if (typeof window !== "undefined") {
+            window.location.reload();
+          }
         }, 2000);
       } else {
         notify(data.message || "Failed to change plan", "error");

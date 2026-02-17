@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import axios from "@/lib/axiosInstance";
 import {
   Box,
   Button,
@@ -20,11 +20,8 @@ import {
   FormControlLabel,
   Paper,
   Divider,
-  Autocomplete,
 } from "@mui/material";
 import { styled } from "@mui/system";
-import { usCities } from "@/utils/citiesInUsUk";
-import { US_STATES, getStatesFromCities } from "@/utils/usStates";
 import { industryNiches } from "@/utils/industryNiches";
 import { industryServices } from "@/utils/industryServices";
 import { LEAD_SOURCES } from "@/utils/leadSources";
@@ -33,6 +30,7 @@ import LoadingComponent from "@/app/components/generalComponent/loadingcomponent
 import { useInitializeUser, useAppDispatch, normalizeUser } from "@/lib/hooks";
 import { setUser, updateUser } from "@/lib/userSlice";
 import { useNotification } from "@/lib/useNotification";
+import GooglePlacesAutocomplete from "@/app/components/GooglePlacesAutocomplete";
 // import cityAreaCodes from "@/utils/cityareacodes";
 
 const Section = styled(Paper)({
@@ -1712,89 +1710,55 @@ const AccountSettings = () => {
                 </Typography>
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid size={{ xs: 12, md: 4 }}>
-                    <Autocomplete
-                      multiple
-                      freeSolo
-                      options={usCities}
+                    <GooglePlacesAutocomplete
+                      label="Preferred Cities"
+                      type="city"
                       value={preferredCitiesInput
                         .split(",")
                         .map((c) => c.trim())
                         .filter(Boolean)}
-                      onChange={(event, newValue) => {
-                        setPreferredCitiesInput(newValue.join(", "));
+                      onChange={(values) => {
+                        setPreferredCitiesInput(values.join(", "));
                       }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Preferred Cities"
-                          placeholder="Select cities you want"
-                          helperText="Cities to include only"
-                        />
-                      )}
-                      renderTags={(value, getTagProps) =>
-                        value.map((option, index) => {
-                          const { key: _, ...tagProps } = getTagProps({
-                            index,
-                          });
-                          return (
-                            <Chip key={index} label={option} {...tagProps} />
-                          );
-                        })
-                      }
+                      onSelectWithState={(extractedStates) => {
+                        // Auto-populate states from selected cities
+                        const currentStates = preferredStatesInput
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean);
+                        const mergedStates = [
+                          ...new Set([...currentStates, ...extractedStates]),
+                        ];
+                        setPreferredStatesInput(mergedStates.join(", "));
+                      }}
+                      onSelectWithZipCodes={(extractedZips) => {
+                        // Auto-populate zip codes from selected cities
+                        const currentZips = preferredZipsInput
+                          .split(",")
+                          .map((z) => z.trim())
+                          .filter(Boolean);
+                        const mergedZips = [
+                          ...new Set([...currentZips, ...extractedZips]),
+                        ];
+                        setPreferredZipsInput(mergedZips.join(", "));
+                      }}
+                      placeholder="Search cities..."
+                      helperText="States & zip codes auto-populated from cities"
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 4 }}>
-                    <Autocomplete
-                      multiple
-                      options={getStatesFromCities(usCities).map((state) => {
-                        const stateObj = US_STATES.find(
-                          (s) => s.value === state,
-                        );
-                        return {
-                          value: state,
-                          label: stateObj?.label || state,
-                        };
-                      })}
-                      getOptionLabel={(option) =>
-                        typeof option === "string" ? option : option.label
-                      }
+                    <GooglePlacesAutocomplete
+                      label="Preferred States"
+                      type="state"
                       value={preferredStatesInput
                         .split(",")
                         .map((s) => s.trim())
-                        .filter(Boolean)
-                        .map((state) => ({
-                          value: state,
-                          label:
-                            US_STATES.find((s) => s.value === state)?.label ||
-                            state,
-                        }))}
-                      onChange={(event, newValue) => {
-                        setPreferredStatesInput(
-                          newValue.map((v) => v.value).join(", "),
-                        );
+                        .filter(Boolean)}
+                      onChange={(values) => {
+                        setPreferredStatesInput(values.join(", "));
                       }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Preferred States"
-                          placeholder="Select states you want"
-                          helperText="States to include only"
-                        />
-                      )}
-                      renderTags={(value, getTagProps) =>
-                        value.map((option, index) => {
-                          const { key: _, ...tagProps } = getTagProps({
-                            index,
-                          });
-                          return (
-                            <Chip
-                              key={index}
-                              label={option.label}
-                              {...tagProps}
-                            />
-                          );
-                        })
-                      }
+                      placeholder="Search states..."
+                      helperText="Auto-populated from cities, or add manually"
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 4 }}>
@@ -1802,7 +1766,7 @@ const AccountSettings = () => {
                       fullWidth
                       label="Preferred Zip Codes"
                       placeholder="e.g. 10001, 10002"
-                      helperText="Zipcodes to include only (comma separated)"
+                      helperText="Auto-populated from cities, or add manually"
                       value={preferredZipsInput}
                       onChange={(event) =>
                         setPreferredZipsInput(event.target.value)

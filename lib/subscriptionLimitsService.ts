@@ -1078,3 +1078,107 @@ export const TIER_LIMIT_PRESETS = {
 };
 
 export type TierPresetName = keyof typeof TIER_LIMIT_PRESETS;
+
+/**
+ * Build subscription limits from tier limits
+ * This ensures all limit fields are properly set with fallback defaults
+ * Use this when activating/updating subscriptions to maintain consistency
+ */
+export function buildSubscriptionLimitsFromTier(
+  tierLimits: Partial<ISubscriptionLimits> | null | undefined,
+): ISubscriptionLimits {
+  return {
+    // Core Limits
+    forms: tierLimits?.forms ?? 1,
+    leads: tierLimits?.leads ?? 100,
+    buyers: tierLimits?.buyers ?? 5,
+    industries: tierLimits?.industries ?? 1,
+
+    // Call Tracking & Telephony
+    numbers: tierLimits?.numbers ?? 1,
+    twilioNumbers: tierLimits?.twilioNumbers ?? 0,
+    callSeconds: tierLimits?.callSeconds ?? 1000,
+    callRecording: tierLimits?.callRecording ?? false,
+    callTranscription: tierLimits?.callTranscription ?? false,
+    callAIAnalysis: tierLimits?.callAIAnalysis ?? false,
+    multiRingForwarding: tierLimits?.multiRingForwarding ?? false,
+    geoRouting: tierLimits?.geoRouting ?? false,
+    scheduledCallbacks: tierLimits?.scheduledCallbacks ?? false,
+    concurrentCallLimit: tierLimits?.concurrentCallLimit ?? 1,
+
+    // Marketing & Campaigns
+    emailCampaignsPerMonth: tierLimits?.emailCampaignsPerMonth ?? 0,
+    smsCampaignsPerMonth: tierLimits?.smsCampaignsPerMonth ?? 0,
+    emailRecipientsPerCampaign: tierLimits?.emailRecipientsPerCampaign ?? 100,
+    smsRecipientsPerCampaign: tierLimits?.smsRecipientsPerCampaign ?? 50,
+
+    // Automation & Workflows
+    automationWorkflows: tierLimits?.automationWorkflows ?? 0,
+    automationActionsPerWorkflow: tierLimits?.automationActionsPerWorkflow ?? 3,
+
+    // AI & Advanced Features
+    chatbotEnabled: tierLimits?.chatbotEnabled ?? false,
+    leadScoringEnabled: tierLimits?.leadScoringEnabled ?? false,
+    sentimentAnalysisEnabled: tierLimits?.sentimentAnalysisEnabled ?? false,
+    aiSummariesEnabled: tierLimits?.aiSummariesEnabled ?? false,
+
+    // Invoicing & Payments
+    invoicesPerMonth: tierLimits?.invoicesPerMonth ?? 10,
+    customInvoiceBranding: tierLimits?.customInvoiceBranding ?? false,
+
+    // Integrations
+    zapierIntegration: tierLimits?.zapierIntegration ?? false,
+    webhookIntegration: tierLimits?.webhookIntegration ?? false,
+    apiAccess: tierLimits?.apiAccess ?? false,
+    maxWebhooks: tierLimits?.maxWebhooks ?? 0,
+
+    // Marketplace & Distribution
+    marketplaceAccess: tierLimits?.marketplaceAccess ?? false,
+    exclusiveLeads: tierLimits?.exclusiveLeads ?? false,
+    leadDistributionRules: tierLimits?.leadDistributionRules ?? false,
+
+    // Data & Reporting
+    exports: tierLimits?.exports ?? false,
+    imports: tierLimits?.imports ?? false,
+    advancedReports: tierLimits?.advancedReports ?? false,
+    dataRetentionDays: tierLimits?.dataRetentionDays ?? 90,
+
+    // Team & Access
+    teamMembers: tierLimits?.teamMembers ?? 1,
+    maxConcurrentSessions: tierLimits?.maxConcurrentSessions ?? 1,
+
+    // Support
+    liveSupport: tierLimits?.liveSupport ?? false,
+    prioritySupport: tierLimits?.prioritySupport ?? false,
+
+    // Customization
+    customBranding: tierLimits?.customBranding ?? false,
+    customDomain: tierLimits?.customDomain ?? false,
+  };
+}
+
+/**
+ * Build default subscription usage for a new billing period
+ */
+export function buildDefaultSubscriptionUsage(
+  startDate: Date = new Date(),
+  endDate?: Date,
+) {
+  const usagePeriodEnd =
+    endDate || new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000); // Default 30 days
+
+  return {
+    leads: 0,
+    callSeconds: 0,
+    forms: 0,
+    buyers: 0,
+    emailCampaigns: 0,
+    smsCampaigns: 0,
+    workflowExecutions: 0,
+    invoices: 0,
+    activeSessions: 0,
+    teamMembersCount: 0,
+    usagePeriodStart: startDate,
+    usagePeriodEnd,
+  };
+}

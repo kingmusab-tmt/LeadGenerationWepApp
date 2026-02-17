@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import axios from "@/lib/axiosInstance";
 import {
   Box,
   Button,
@@ -83,10 +83,16 @@ const AccountSettings = () => {
   ];
 
   useEffect(() => {
-    const url = new URL(window.location.href);
-    const tabParam = url.searchParams.get("tab");
-    const index = tabMap.indexOf(tabParam || "general");
-    setTabValue(index >= 0 ? index : 0);
+    if (typeof window === "undefined") return;
+    try {
+      const url = new URL(window.location.href);
+      const tabParam = url.searchParams.get("tab");
+      const index = tabMap.indexOf(tabParam || "general");
+      setTabValue(index >= 0 ? index : 0);
+    } catch (error) {
+      console.error("Error parsing tab from URL:", error);
+      setTabValue(0);
+    }
   }, []);
 
   useEffect(() => {

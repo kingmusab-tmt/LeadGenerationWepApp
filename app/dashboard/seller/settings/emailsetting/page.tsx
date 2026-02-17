@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Container, Typography, TextField, Button, Box } from "@mui/material";
 import { styled } from "@mui/system";
-import axios from "axios";
+import axios from "@/lib/axiosInstance";
 import { toast } from "react-toastify";
 
 const SettingsContainer = styled(Container)({

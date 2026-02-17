@@ -437,16 +437,93 @@ async function handleSubscriptionPurchase(
         "subscription.subscriptionRenewalPrice":
           parseFloat(tier.renewalPrice || "0") * subscriptionDurationMonths,
         "subscription.subscriptionLimits": {
-          leads: tier.tierLimits?.leads || 0,
+          // Core Limits
+          forms: tier.tierLimits?.forms || 1,
+          leads: tier.tierLimits?.leads || 100,
+          buyers: tier.tierLimits?.buyers || 5,
+          industries: tier.tierLimits?.industries || 1,
+
+          // Call Tracking & Telephony
+          numbers: tier.tierLimits?.numbers || 1,
           twilioNumbers: tier.tierLimits?.twilioNumbers || 0,
-          numbers: tier.tierLimits?.numbers || 0,
-          callSeconds: tier.tierLimits?.callSeconds || 0,
-          forms: tier.tierLimits?.forms || 0,
-          buyers: tier.tierLimits?.buyers || 0,
+          callSeconds: tier.tierLimits?.callSeconds || 1000,
+          callRecording: tier.tierLimits?.callRecording || false,
+          callTranscription: tier.tierLimits?.callTranscription || false,
+          callAIAnalysis: tier.tierLimits?.callAIAnalysis || false,
+          multiRingForwarding: tier.tierLimits?.multiRingForwarding || false,
+          geoRouting: tier.tierLimits?.geoRouting || false,
+          scheduledCallbacks: tier.tierLimits?.scheduledCallbacks || false,
+          concurrentCallLimit: tier.tierLimits?.concurrentCallLimit || 1,
+
+          // Marketing & Campaigns
+          emailCampaignsPerMonth: tier.tierLimits?.emailCampaignsPerMonth || 0,
+          smsCampaignsPerMonth: tier.tierLimits?.smsCampaignsPerMonth || 0,
+          emailRecipientsPerCampaign:
+            tier.tierLimits?.emailRecipientsPerCampaign || 100,
+          smsRecipientsPerCampaign:
+            tier.tierLimits?.smsRecipientsPerCampaign || 50,
+
+          // Automation & Workflows
+          automationWorkflows: tier.tierLimits?.automationWorkflows || 0,
+          automationActionsPerWorkflow:
+            tier.tierLimits?.automationActionsPerWorkflow || 3,
+
+          // AI & Advanced Features
+          chatbotEnabled: tier.tierLimits?.chatbotEnabled || false,
+          leadScoringEnabled: tier.tierLimits?.leadScoringEnabled || false,
+          sentimentAnalysisEnabled:
+            tier.tierLimits?.sentimentAnalysisEnabled || false,
+          aiSummariesEnabled: tier.tierLimits?.aiSummariesEnabled || false,
+
+          // Invoicing & Payments
+          invoicesPerMonth: tier.tierLimits?.invoicesPerMonth || 10,
+          customInvoiceBranding:
+            tier.tierLimits?.customInvoiceBranding || false,
+
+          // Integrations
+          zapierIntegration: tier.tierLimits?.zapierIntegration || false,
+          webhookIntegration: tier.tierLimits?.webhookIntegration || false,
+          apiAccess: tier.tierLimits?.apiAccess || false,
+          maxWebhooks: tier.tierLimits?.maxWebhooks || 0,
+
+          // Marketplace & Distribution
+          marketplaceAccess: tier.tierLimits?.marketplaceAccess || false,
+          exclusiveLeads: tier.tierLimits?.exclusiveLeads || false,
+          leadDistributionRules:
+            tier.tierLimits?.leadDistributionRules || false,
+
+          // Data & Reporting
           exports: tier.tierLimits?.exports || false,
           imports: tier.tierLimits?.imports || false,
+          advancedReports: tier.tierLimits?.advancedReports || false,
+          dataRetentionDays: tier.tierLimits?.dataRetentionDays || 90,
+
+          // Team & Access
+          teamMembers: tier.tierLimits?.teamMembers || 1,
+          maxConcurrentSessions: tier.tierLimits?.maxConcurrentSessions || 1,
+
+          // Support
           liveSupport: tier.tierLimits?.liveSupport || false,
-          industries: tier.tierLimits?.industries || 0,
+          prioritySupport: tier.tierLimits?.prioritySupport || false,
+
+          // Customization
+          customBranding: tier.tierLimits?.customBranding || false,
+          customDomain: tier.tierLimits?.customDomain || false,
+        },
+        // Reset usage for new billing period
+        "subscription.subscriptionUsage": {
+          leads: 0,
+          callSeconds: 0,
+          forms: 0,
+          buyers: 0,
+          emailCampaigns: 0,
+          smsCampaigns: 0,
+          workflowExecutions: 0,
+          invoices: 0,
+          activeSessions: 0,
+          teamMembersCount: 0,
+          usagePeriodStart: startDate,
+          usagePeriodEnd: expiryDate,
         },
       },
     },

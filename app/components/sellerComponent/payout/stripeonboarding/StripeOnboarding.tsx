@@ -66,18 +66,24 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
     }
 
     // Handle onboarding redirects
-    const query = new URLSearchParams(window.location.search);
-    const onboardingStatus = query.get("stripe_onboarding");
-    const accountIdParam = query.get("account_id");
+    if (typeof window === "undefined") return;
 
-    if (onboardingStatus === "success") {
-      setAccountId(accountIdParam);
-      checkInitialStatus();
-      router.replace(window.location.pathname);
-    } else if (onboardingStatus === "restart") {
-      setError("Onboarding was interrupted - please try again");
-      setAccountId(accountIdParam);
-      router.replace(window.location.pathname);
+    try {
+      const query = new URLSearchParams(window.location.search);
+      const onboardingStatus = query.get("stripe_onboarding");
+      const accountIdParam = query.get("account_id");
+
+      if (onboardingStatus === "success") {
+        setAccountId(accountIdParam);
+        checkInitialStatus();
+        router.replace(window.location.pathname);
+      } else if (onboardingStatus === "restart") {
+        setError("Onboarding was interrupted - please try again");
+        setAccountId(accountIdParam);
+        router.replace(window.location.pathname);
+      }
+    } catch (err) {
+      console.error("Failed to handle onboarding redirect:", err);
     }
   }, [userEmail]);
 

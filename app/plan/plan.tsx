@@ -30,6 +30,7 @@ import WarningIcon from "@mui/icons-material/Warning";
 import BusinessIcon from "@mui/icons-material/Business";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import { useInitializeUser } from "@/lib/hooks";
+import { useCSRFFetch } from "@/app/hooks";
 
 interface Tier {
   discountPercentage: number;
@@ -61,6 +62,7 @@ export default function PricingSection() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [loading, setLoading] = useState(true);
   const { currentUser } = useInitializeUser();
+  const csrfFetch = useCSRFFetch();
   const { data: session, update: updateSession } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -189,7 +191,7 @@ export default function PricingSection() {
     try {
       if (tier.tierType === "free") {
         // Call API to update user's subscription to free tier
-        const response = await fetch("/api/subscriptions/update", {
+        const response = await csrfFetch("/api/subscriptions/update", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

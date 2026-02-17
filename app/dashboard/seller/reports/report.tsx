@@ -22,7 +22,7 @@ import {
   MenuItem,
 } from "@mui/material";
 import { Edit, Delete, Add } from "@mui/icons-material";
-import axios from "axios";
+import axios from "@/lib/axiosInstance";
 import UserDashboard from "../layout";
 
 // Define the interface for a report
@@ -72,7 +72,7 @@ const ReportsManagement: React.FC = () => {
           // Update report
           await axios.put(
             `/api/reports/${selectedReport.reportId}`,
-            selectedReport
+            selectedReport,
           );
         } else {
           // Create report

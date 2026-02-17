@@ -47,6 +47,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import { industryNiches } from "@/utils/industryNiches";
 import cityAreaCodes from "@/utils/cityareacodes";
+import GoogleCityAutocomplete from "@/app/components/GoogleCityAutocomplete";
 import CallMethodForm from "./callMethodForm";
 import TrackingNumbersTable from "./TrackingNumberTable";
 import LeadTracking from "./sellerleadtracking";
@@ -1137,20 +1138,13 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                     gap: 2,
                   }}
                 >
-                  <FormControl fullWidth size="small">
-                    <InputLabel>City (Area Code)</InputLabel>
-                    <Select
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      label="City (Area Code)"
-                    >
-                      {Object.keys(cityAreaCodes).map((c) => (
-                        <MenuItem key={c} value={c}>
-                          {c}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <GoogleCityAutocomplete
+                    label="City (Area Code)"
+                    value={city}
+                    onChange={(val) => setCity(val)}
+                    placeholder="Search city..."
+                    helperText={areaCode ? `Area Code: ${areaCode}` : undefined}
+                  />
 
                   <FormControl fullWidth size="small">
                     <InputLabel>Industry / Niche</InputLabel>
@@ -1178,16 +1172,6 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                     onChange={(e) => setCustomIndustry(e.target.value)}
                     sx={{ mt: 2 }}
                   />
-                )}
-
-                {areaCode && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    Area Code: <strong>{areaCode}</strong>
-                  </Typography>
                 )}
 
                 <Button

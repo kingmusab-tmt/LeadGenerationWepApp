@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { useCSRFFetch } from "@/app/hooks";
 import {
   Table,
   TableBody,
@@ -30,6 +31,7 @@ interface UnitPricingOption {
 }
 
 const UnitPricingComponent: React.FC = () => {
+  const csrfFetch = useCSRFFetch();
   const [unitPricingOptions, setUnitPricingOptions] = useState<
     UnitPricingOption[]
   >([]);
@@ -48,7 +50,7 @@ const UnitPricingComponent: React.FC = () => {
     severity: "success",
   });
   const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm")
+    theme.breakpoints.down("sm"),
   );
 
   // Fetch unit pricing options on component mount
@@ -134,7 +136,7 @@ const UnitPricingComponent: React.FC = () => {
 
   const handleDelete = async (index: number) => {
     try {
-      const response = await fetch("/api/unit-pricing", {
+      const response = await csrfFetch("/api/unit-pricing", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ index }),

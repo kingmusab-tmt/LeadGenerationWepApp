@@ -30,63 +30,9 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { IBuyer } from "@/models/leadbuyers";
 import { industryNiches } from "@/utils/industryNiches";
-import { usCities } from "@/utils/citiesInUsUk";
 import LoadingComponent from "../generalComponent/loadingcomponent";
 import { timezones } from "@/utils/timezones";
-
-// US States
-const US_STATES = [
-  "Alabama",
-  "Alaska",
-  "Arizona",
-  "Arkansas",
-  "California",
-  "Colorado",
-  "Connecticut",
-  "Delaware",
-  "Florida",
-  "Georgia",
-  "Hawaii",
-  "Idaho",
-  "Illinois",
-  "Indiana",
-  "Iowa",
-  "Kansas",
-  "Kentucky",
-  "Louisiana",
-  "Maine",
-  "Maryland",
-  "Massachusetts",
-  "Michigan",
-  "Minnesota",
-  "Mississippi",
-  "Missouri",
-  "Montana",
-  "Nebraska",
-  "Nevada",
-  "New Hampshire",
-  "New Jersey",
-  "New Mexico",
-  "New York",
-  "North Carolina",
-  "North Dakota",
-  "Ohio",
-  "Oklahoma",
-  "Oregon",
-  "Pennsylvania",
-  "Rhode Island",
-  "South Carolina",
-  "South Dakota",
-  "Tennessee",
-  "Texas",
-  "Utah",
-  "Vermont",
-  "Virginia",
-  "Washington",
-  "West Virginia",
-  "Wisconsin",
-  "Wyoming",
-];
+import GooglePlacesAutocomplete from "../GooglePlacesAutocomplete";
 
 interface BuyerFormProps {
   open: boolean;
@@ -591,67 +537,60 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                   </Grid>
 
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Preferred Cities</InputLabel>
-                      <Select
-                        name="preferredCities"
-                        value={
-                          formData.preferredZones?.[0]?.city
+                    <GooglePlacesAutocomplete
+                      label="Preferred Cities"
+                      type="city"
+                      value={
+                        formData.preferredZones?.[0]?.city
+                          ?.split(", ")
+                          .filter(Boolean) || []
+                      }
+                      onChange={(values) =>
+                        handlePreferredZoneChange("city", values)
+                      }
+                      onSelectWithState={(extractedStates) => {
+                        // Auto-populate states from selected cities
+                        const currentStates =
+                          formData.preferredZones?.[0]?.state
                             ?.split(", ")
-                            .filter(Boolean) || []
-                        }
-                        onChange={(e) =>
-                          handlePreferredZoneChange("city", e.target.value)
-                        }
-                        label="Preferred Cities"
-                        multiple
-                      >
-                        {usCities.map((city) => (
-                          <MenuItem key={city} value={city}>
-                            {city}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        sx={{ mt: 0.5 }}
-                      >
-                        Cities to include only
-                      </Typography>
-                    </FormControl>
+                            .filter(Boolean) || [];
+                        const mergedStates = [
+                          ...new Set([...currentStates, ...extractedStates]),
+                        ];
+                        handlePreferredZoneChange("state", mergedStates);
+                      }}
+                      onSelectWithZipCodes={(extractedZips) => {
+                        // Auto-populate zip codes from selected cities
+                        const currentZips =
+                          formData.preferredZones?.[0]?.zipCodes || [];
+                        const mergedZips = [
+                          ...new Set([...currentZips, ...extractedZips]),
+                        ];
+                        handlePreferredZoneChange(
+                          "zipCodes",
+                          mergedZips.join(", "),
+                        );
+                      }}
+                      placeholder="Search cities..."
+                      helperText="States & zip codes auto-populated from cities"
+                    />
                   </Grid>
 
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Preferred States</InputLabel>
-                      <Select
-                        name="preferredStates"
-                        value={
-                          formData.preferredZones?.[0]?.state
-                            ?.split(", ")
-                            .filter(Boolean) || []
-                        }
-                        onChange={(e) =>
-                          handlePreferredZoneChange("state", e.target.value)
-                        }
-                        label="Preferred States"
-                        multiple
-                      >
-                        {US_STATES.map((state) => (
-                          <MenuItem key={state} value={state}>
-                            {state}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        sx={{ mt: 0.5 }}
-                      >
-                        States to include only
-                      </Typography>
-                    </FormControl>
+                    <GooglePlacesAutocomplete
+                      label="Preferred States"
+                      type="state"
+                      value={
+                        formData.preferredZones?.[0]?.state
+                          ?.split(", ")
+                          .filter(Boolean) || []
+                      }
+                      onChange={(values) =>
+                        handlePreferredZoneChange("state", values)
+                      }
+                      placeholder="Search states..."
+                      helperText="Auto-populated from cities, or add manually"
+                    />
                   </Grid>
 
                   <Grid size={{ xs: 12 }}>
@@ -666,7 +605,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                       }
                       fullWidth
                       placeholder="e.g. 88901, 89104"
-                      helperText="Zipcodes to include only (comma separated)"
+                      helperText="Auto-populated from cities, or add manually (comma separated)"
                     />
                   </Grid>
 

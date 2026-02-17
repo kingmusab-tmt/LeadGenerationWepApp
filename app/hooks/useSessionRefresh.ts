@@ -34,9 +34,17 @@ interface SessionRefreshResult {
  * }, []);
  * ```
  */
-export function useSessionRefresh() {
+export function useSessionRefresh(
+  csrfFetch?: (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ) => Promise<Response>,
+) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fallback to regular fetch if csrfFetch not provided
+  const fetchFn = csrfFetch || fetch;
 
   const refreshSession =
     useCallback(async (): Promise<SessionRefreshResult> => {
@@ -44,7 +52,7 @@ export function useSessionRefresh() {
       setError(null);
 
       try {
-        const response = await fetch("/api/auth/refresh-session", {
+        const response = await fetchFn("/api/auth/refresh-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });
@@ -64,7 +72,7 @@ export function useSessionRefresh() {
       } finally {
         setIsRefreshing(false);
       }
-    }, []);
+    }, [fetchFn]);
 
   const checkSession = useCallback(async () => {
     try {

@@ -36,7 +36,9 @@ import Head from "next/head";
 import axios from "axios";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY!);
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
+);
 
 interface Tier {
   _id: string;

@@ -34,6 +34,7 @@ import {
   Upgrade as UpgradeIcon,
 } from "@mui/icons-material";
 import { useNotification } from "@/lib/useNotification";
+import { useCSRFFetch } from "@/app/hooks";
 import UsageLimitsCard from "./UsageLimitsCard";
 import {
   CANCELLATION_REASON_LABELS,
@@ -137,6 +138,7 @@ export default function SubscriptionManagement({
   onOpenChangePlanModal,
 }: SubscriptionManagementProps) {
   const notify = useNotification();
+  const csrfFetch = useCSRFFetch();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(
@@ -175,7 +177,7 @@ export default function SubscriptionManagement({
   const handleCancel = async () => {
     try {
       setActionLoading(true);
-      const response = await fetch("/api/subscriptions/manage", {
+      const response = await csrfFetch("/api/subscriptions/manage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -211,7 +213,7 @@ export default function SubscriptionManagement({
   const handleReactivate = async () => {
     try {
       setActionLoading(true);
-      const response = await fetch("/api/subscriptions/manage", {
+      const response = await csrfFetch("/api/subscriptions/manage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reactivate" }),
@@ -236,7 +238,14 @@ export default function SubscriptionManagement({
   const handleOpenBillingPortal = async () => {
     try {
       setActionLoading(true);
-      const response = await fetch("/api/subscriptions/manage", {
+
+      if (typeof window === "undefined") {
+        notify("Window object not available", "error");
+        setActionLoading(false);
+        return;
+      }
+
+      const response = await csrfFetch("/api/subscriptions/manage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

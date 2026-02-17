@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import axios from "@/lib/axiosInstance";
 import Papa from "papaparse";
 import {
   Box,

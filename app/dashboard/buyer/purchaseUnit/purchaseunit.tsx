@@ -78,15 +78,29 @@ const UnitPurchase: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const status = urlParams.get("status");
+    if (typeof window === "undefined") return;
 
-    if (status === "success") {
-      setShowSuccessModal(true);
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (status === "canceled") {
-      setShowFailureModal(true);
-      window.history.replaceState({}, document.title, window.location.pathname);
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get("status");
+
+      if (status === "success") {
+        setShowSuccessModal(true);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname,
+        );
+      } else if (status === "canceled") {
+        setShowFailureModal(true);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname,
+        );
+      }
+    } catch (error) {
+      console.error("Error parsing URL parameters:", error);
     }
   }, []);
 

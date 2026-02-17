@@ -6,7 +6,7 @@ import { authOptions } from "@/auth";
 /**
  * API Route: GET /api/csrf-token
  *
- * Generates and returns a CSRF token for the authenticated user
+ * Generates and returns a CSRF token for the authenticated user or public access
  *
  * @returns { csrfToken: string }
  *
@@ -19,12 +19,15 @@ export async function GET(request: NextRequest) {
     // Get authenticated session
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Use email if authenticated, otherwise use IP or fallback to "public"
+    const clientIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "public";
+    const identifier = session?.user?.email || clientIp;
 
-    // Generate CSRF token for user
-    const { token } = generateCSRFToken(session.user.email);
+    // Generate CSRF token for user or public access
+    const { token } = generateCSRFToken(identifier);
 
     const response = NextResponse.json({
       csrfToken: token,
@@ -59,13 +62,16 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Use email if authenticated, otherwise use IP or fallback to "public"
+    const clientIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "public";
+    const identifier = session?.user?.email || clientIp;
 
     // Refresh token
     const { refreshCSRFToken } = await import("@/lib/csrf");
-    const { token } = refreshCSRFToken(session.user.email);
+    const { token } = refreshCSRFToken(identifier);
 
     const response = NextResponse.json({
       csrfToken: token,

@@ -16,10 +16,9 @@ import {
   Divider,
   CircularProgress,
 } from "@mui/material";
-import axios from "axios";
+import axios from "@/lib/axiosInstance";
 import { styled } from "@mui/system";
 import { toast } from "react-toastify";
-import { useCSRF } from "@/app/hooks";
 
 const SettingsContainer = styled(Container)({
   marginTop: "20px",
@@ -46,7 +45,6 @@ const SectionHeader = styled(Typography)({
 });
 
 const LeadSettings = () => {
-  const { csrfToken } = useCSRF();
   // Lead distribution configuration state
   const [autoAssignLeads, setAutoAssignLeads] = useState<boolean>(false);
   const [distributionMode, setDistributionMode] = useState<
@@ -103,24 +101,18 @@ const LeadSettings = () => {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      await axios.post(
-        "/api/settings",
-        {
-          autoAssignLeads,
-          distributionMode,
-          maxAutoAssignPerDay,
-          aiQualityThreshold,
-          marketplaceFallback,
-          leadPricing,
-        },
-        {
-          headers: {
-            "X-CSRF-Token": csrfToken || "",
-          },
-        },
-      );
+      await axios.post("/api/settings", {
+        autoAssignLeads,
+        distributionMode,
+        maxAutoAssignPerDay,
+        aiQualityThreshold,
+        marketplaceFallback,
+        leadPricing,
+      });
       toast.success("Settings updated successfully");
-      window.location.reload();
+      if (typeof window !== "undefined") {
+        window.location.reload();
+      }
     } catch (error) {
       toast.error("Failed to update settings");
       setSaving(false);

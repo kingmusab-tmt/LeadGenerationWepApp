@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useCSRFFetch } from "@/app/hooks";
 import {
   Typography,
   Paper,
@@ -55,6 +56,7 @@ interface FormData {
 
 export default function FormPage() {
   const params = useParams();
+  const csrfFetch = useCSRFFetch();
   const formId =
     typeof params.formId === "string"
       ? params.formId
@@ -172,7 +174,7 @@ export default function FormPage() {
     }
 
     try {
-      const response = await fetch("/api/form/submit", {
+      const response = await csrfFetch("/api/form/submit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -19,6 +19,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import FileCopyIcon from "@mui/icons-material/FileCopy";
 import { useRouter } from "next/navigation";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 type FormType = {
   formName: string;
@@ -30,6 +31,7 @@ export default function SellerForms() {
   const [forms, setForms] = useState<FormType[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const csrfFetch = useCSRFFetch();
   const [formToDelete, setFormToDelete] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -86,7 +88,7 @@ export default function SellerForms() {
     if (!formToDelete) return;
 
     try {
-      const response = await fetch(`/api/form/delete?id=${formToDelete}`, {
+      const response = await csrfFetch(`/api/form/delete?id=${formToDelete}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete form");
@@ -123,7 +125,7 @@ export default function SellerForms() {
     }
 
     try {
-      const response = await fetch(`/api/form/delete?id=${formId}`, {
+      const response = await csrfFetch(`/api/form/delete?id=${formId}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete form");
@@ -231,7 +233,10 @@ export default function SellerForms() {
         <Paper elevation={3} sx={{ p: 3 }}>
           <List>
             {forms.map((form) => {
-              const formUrl = `${window.location.origin}/forms/${form.formId}`;
+              const formUrl =
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/forms/${form.formId}`
+                  : `/forms/${form.formId}`;
               const iframeId = `iframeID-${form.formId}`;
               const iframeCode = `<script type="text/javascript">
 \twindow.addEventListener("message", function (event) {

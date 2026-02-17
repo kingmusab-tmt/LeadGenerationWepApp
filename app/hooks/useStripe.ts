@@ -29,7 +29,7 @@ export function useStripePromise() {
     const initializeStripe = async () => {
       try {
         const stripe = await loadStripe(
-          process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || "",
+          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
         );
         if (!stripe) throw new Error("Stripe failed to initialize");
         setStripePromise(stripe);

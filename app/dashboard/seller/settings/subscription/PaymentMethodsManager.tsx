@@ -25,7 +25,7 @@ import {
   Star as StarIcon,
   StarBorder as StarBorderIcon,
 } from "@mui/icons-material";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, Stripe } from "@stripe/stripe-js";
 import {
   Elements,
   CardElement,
@@ -33,11 +33,35 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { useNotification } from "@/lib/useNotification";
+import { useCSRFFetch } from "@/app/hooks";
 
-// Initialize Stripe
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
-);
+// Initialize Stripe - lazy load only on client side
+let stripePromise: ReturnType<typeof loadStripe> | null = null;
+
+function getStripePromise() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  if (!publishableKey) {
+    console.warn(
+      "[PaymentMethods] Stripe publishable key not configured. Payment methods unavailable.",
+    );
+    return null;
+  }
+
+  if (!stripePromise) {
+    try {
+      stripePromise = loadStripe(publishableKey);
+    } catch (err) {
+      console.error("[PaymentMethods] Failed to initialize Stripe:", err);
+      stripePromise = null;
+      return null;
+    }
+  }
+  return stripePromise;
+}
 
 interface PaymentMethod {
   id: string;
@@ -70,6 +94,7 @@ function AddPaymentMethodForm({
   const stripe = useStripe();
   const elements = useElements();
   const notify = useNotification();
+  const csrfFetch = useCSRFFetch();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,11 +110,14 @@ function AddPaymentMethodForm({
 
     try {
       // Get setup intent client secret
-      const setupResponse = await fetch("/api/subscriptions/payment-methods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "setup-intent" }),
-      });
+      const setupResponse = await csrfFetch(
+        "/api/subscriptions/payment-methods",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "setup-intent" }),
+        },
+      );
 
       const setupData = await setupResponse.json();
 
@@ -118,7 +146,7 @@ function AddPaymentMethodForm({
 
       if (setupIntent?.payment_method) {
         // Attach payment method to customer
-        const attachResponse = await fetch(
+        const attachResponse = await csrfFetch(
           "/api/subscriptions/payment-methods",
           {
             method: "POST",
@@ -208,6 +236,7 @@ function AddPaymentMethodForm({
 
 function PaymentMethodsContent() {
   const notify = useNotification();
+  const csrfFetch = useCSRFFetch();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -245,7 +274,7 @@ function PaymentMethodsContent() {
   const handleSetDefault = async (paymentMethodId: string) => {
     try {
       setActionLoading(paymentMethodId);
-      const response = await fetch("/api/subscriptions/payment-methods", {
+      const response = await csrfFetch("/api/subscriptions/payment-methods", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -275,7 +304,7 @@ function PaymentMethodsContent() {
 
     try {
       setActionLoading(selectedMethod.id);
-      const response = await fetch("/api/subscriptions/payment-methods", {
+      const response = await csrfFetch("/api/subscriptions/payment-methods", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -468,8 +497,49 @@ function PaymentMethodsContent() {
 }
 
 export default function PaymentMethodsManager() {
+  const [stripe, setStripe] = useState<Stripe | null>(null);
+  const [stripeError, setStripeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Only load Stripe after component mounts on client
+    const promise = getStripePromise();
+    if (promise) {
+      promise
+        .then((stripeInstance) => {
+          setStripe(stripeInstance);
+          setStripeError(null);
+        })
+        .catch((err) => {
+          console.error("[PaymentMethods] Failed to load Stripe:", err);
+          setStripeError(
+            err instanceof Error ? err.message : "Failed to load Stripe",
+          );
+          setStripe(null);
+        });
+    }
+  }, []);
+
+  if (stripeError) {
+    return (
+      <Box
+        sx={{
+          p: 2,
+          color: "error.main",
+          border: "1px solid",
+          borderColor: "error.main",
+          borderRadius: 1,
+        }}
+      >
+        <p>Payment methods unavailable: {stripeError}</p>
+        <p style={{ fontSize: "0.875rem", marginTop: 8 }}>
+          Please check your Stripe configuration and refresh the page.
+        </p>
+      </Box>
+    );
+  }
+
   return (
-    <Elements stripe={stripePromise}>
+    <Elements stripe={stripe}>
       <PaymentMethodsContent />
     </Elements>
   );
