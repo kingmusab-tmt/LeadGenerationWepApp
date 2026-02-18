@@ -7,7 +7,6 @@ interface UsageLimits {
   callSeconds?: number;
   forms?: number;
   buyers?: number;
-  emailCampaignsPerMonth?: number;
   smsCampaignsPerMonth?: number;
   invoicesPerMonth?: number;
   [key: string]: number | boolean | undefined;
@@ -18,7 +17,6 @@ interface UsageData {
   callSeconds?: number;
   forms?: number;
   buyers?: number;
-  emailCampaigns?: number;
   smsCampaigns?: number;
   invoices?: number;
   [key: string]: number | Date | undefined;

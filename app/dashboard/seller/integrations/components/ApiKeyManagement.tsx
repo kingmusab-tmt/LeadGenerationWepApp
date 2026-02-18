@@ -34,6 +34,7 @@ import {
   VisibilityOff as VisibilityOffIcon,
   Info as InfoIcon,
 } from "@mui/icons-material";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Props {
   onNotify: (
@@ -43,6 +44,7 @@ interface Props {
 }
 
 export default function ApiKeyManagement({ onNotify }: Props) {
+  const fetchWithCSRF = useCSRFFetch();
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [apiKeyExists, setApiKeyExists] = useState(false);
   const [truncatedKey, setTruncatedKey] = useState<string | null>(null);
@@ -122,7 +124,7 @@ export default function ApiKeyManagement({ onNotify }: Props) {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/integrations/zapier/api-key", {
+      const res = await fetchWithCSRF("/api/integrations/zapier/api-key", {
         method: "DELETE",
       });
 

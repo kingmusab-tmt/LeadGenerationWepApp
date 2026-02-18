@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import {
-  Container,
   Typography,
   TextField,
   Button,
@@ -12,37 +11,23 @@ import {
   MenuItem,
   FormControlLabel,
   Switch,
-  Paper,
+  Card,
+  CardContent,
   Divider,
   CircularProgress,
+  Alert,
+  Chip,
 } from "@mui/material";
+import {
+  Share as ShareIcon,
+  EmojiEvents as QualityIcon,
+  AttachMoney as MoneyIcon,
+  Store as MarketplaceIcon,
+  TrendingUp as VolumeIcon,
+  CheckCircle,
+} from "@mui/icons-material";
 import axios from "@/lib/axiosInstance";
-import { styled } from "@mui/system";
 import { toast } from "react-toastify";
-
-const SettingsContainer = styled(Container)({
-  marginTop: "20px",
-  padding: "20px",
-  backgroundColor: "#ffffff",
-  borderRadius: "8px",
-});
-
-const Section = styled(Paper)({
-  marginBottom: "24px",
-  padding: "20px",
-  border: "1px solid #ffffff",
-  borderRadius: "8px",
-  backgroundColor: "#ffffff",
-});
-
-const SectionHeader = styled(Typography)({
-  fontSize: "16px",
-  fontWeight: 600,
-  marginBottom: "16px",
-  color: "#1976d2",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-});
 
 const LeadSettings = () => {
   // Lead distribution configuration state
@@ -59,6 +44,7 @@ const LeadSettings = () => {
     low: number;
   }>({ high: 10, medium: 5, low: 2 });
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
 
   // Load current settings
   useEffect(() => {
@@ -110,6 +96,8 @@ const LeadSettings = () => {
         leadPricing,
       });
       toast.success("Settings updated successfully");
+      const now = new Date().toLocaleTimeString();
+      setLastSaved(now);
       if (typeof window !== "undefined") {
         window.location.reload();
       }
@@ -120,31 +108,51 @@ const LeadSettings = () => {
   };
 
   return (
-    <SettingsContainer>
-      {/* LEAD DISTRIBUTION SECTION */}
-      <Section>
-        <SectionHeader>📊 Lead Distribution</SectionHeader>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={autoAssignLeads}
-              onChange={(e) => setAutoAssignLeads(e.target.checked)}
-              disabled={distributionMode !== "marketplace"}
-            />
-          }
-          label="Enable Auto-Assignment of Leads"
-        />
-        <Typography
-          variant="caption"
-          sx={{ display: "block", mt: 1, mb: 2, color: "#666" }}
-        >
-          {distributionMode === "marketplace"
-            ? "Automatically assign matching leads to buyers based on your preferences"
-            : "Auto-assignment is controlled by Distribution Mode selection"}
-        </Typography>
+    <Box sx={{ mt: -2 }}>
+      <Alert severity="info" icon={<ShareIcon />} sx={{ mb: 3 }}>
+        Configure how leads are distributed to buyers - automatically assign to
+        registered buyers or post to marketplace for manual purchase.
+      </Alert>
 
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2 }}>
-          <Box>
+      {/* LEAD DISTRIBUTION SECTION */}
+      <Card
+        elevation={0}
+        sx={{ mb: 3, border: "1px solid", borderColor: "divider" }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+            <ShareIcon color="primary" />
+            <Box>
+              <Typography variant="h6" fontWeight="600">
+                Lead Distribution Mode
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Choose how leads are distributed to buyers
+              </Typography>
+            </Box>
+          </Box>
+          <Divider sx={{ mb: 3 }} />
+
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={autoAssignLeads}
+                  onChange={(e) => setAutoAssignLeads(e.target.checked)}
+                  disabled={distributionMode !== "marketplace"}
+                />
+              }
+              label="Enable Auto-Assignment of Leads"
+            />
+            <Typography
+              variant="caption"
+              sx={{ display: "block", mt: -1, mb: 1, color: "text.secondary" }}
+            >
+              {distributionMode === "marketplace"
+                ? "Automatically assign matching leads to buyers based on your preferences"
+                : "Auto-assignment is controlled by Distribution Mode selection"}
+            </Typography>
+
             <FormControl fullWidth>
               <InputLabel>Distribution Mode</InputLabel>
               <Select
@@ -154,37 +162,77 @@ const LeadSettings = () => {
                   setDistributionMode(e.target.value as typeof distributionMode)
                 }
               >
-                <MenuItem value="automatic">Automatic Only</MenuItem>
-                <MenuItem value="marketplace">Marketplace Only</MenuItem>
-                <MenuItem value="both">Both (by quality score)</MenuItem>
+                <MenuItem value="automatic">
+                  <Box>
+                    <Typography variant="body2" fontWeight="600">
+                      Automatic Only
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Auto-assign all leads to buyers
+                    </Typography>
+                  </Box>
+                </MenuItem>
+                <MenuItem value="marketplace">
+                  <Box>
+                    <Typography variant="body2" fontWeight="600">
+                      Marketplace Only
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Post all leads to marketplace
+                    </Typography>
+                  </Box>
+                </MenuItem>
+                <MenuItem value="both">
+                  <Box>
+                    <Typography variant="body2" fontWeight="600">
+                      Both (by quality score)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      High quality auto-assigned, low quality to marketplace
+                    </Typography>
+                  </Box>
+                </MenuItem>
               </Select>
             </FormControl>
           </Box>
-        </Box>
-      </Section>
+        </CardContent>
+      </Card>
 
       {/* LEAD PRICING BY QUALITY LEVEL */}
-      <Section>
-        <SectionHeader>💰 Lead Pricing by Quality Level</SectionHeader>
-        <Typography
-          variant="caption"
-          sx={{ display: "block", mb: 2, color: "#666" }}
-        >
-          Set the unit price for leads based on their AI quality level. This
-          replaces the default flat price — each lead will be priced according
-          to its quality score.
-        </Typography>
+      <Card
+        elevation={0}
+        sx={{ mb: 3, border: "1px solid", borderColor: "divider" }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+            <MoneyIcon color="primary" />
+            <Box>
+              <Typography variant="h6" fontWeight="600">
+                Lead Pricing by Quality
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Set prices based on AI-detected quality scores
+              </Typography>
+            </Box>
+          </Box>
+          <Divider sx={{ mb: 3 }} />
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" },
-            gap: 2,
-          }}
-        >
-          <Box>
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              Each lead will be priced according to its AI quality score,
+              replacing any default flat pricing.
+            </Typography>
+          </Alert>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+              gap: 2.5,
+            }}
+          >
             <TextField
-              label="🟢 High Quality (units)"
+              label="🟢 High Quality"
               type="number"
               value={leadPricing.high}
               onChange={(e) =>
@@ -195,12 +243,10 @@ const LeadSettings = () => {
               }
               inputProps={{ min: 0 }}
               fullWidth
-              helperText="AI spam score 0–30"
+              helperText="Spam score 0–30"
             />
-          </Box>
-          <Box>
             <TextField
-              label="🟡 Medium Quality (units)"
+              label="🟡 Medium Quality"
               type="number"
               value={leadPricing.medium}
               onChange={(e) =>
@@ -211,12 +257,10 @@ const LeadSettings = () => {
               }
               inputProps={{ min: 0 }}
               fullWidth
-              helperText="AI spam score 31–69"
+              helperText="Spam score 31–69"
             />
-          </Box>
-          <Box>
             <TextField
-              label="🔴 Low Quality (units)"
+              label="🔴 Low Quality"
               type="number"
               value={leadPricing.low}
               onChange={(e) =>
@@ -227,85 +271,113 @@ const LeadSettings = () => {
               }
               inputProps={{ min: 0 }}
               fullWidth
-              helperText="AI spam score 70–100"
+              helperText="Spam score 70–100"
             />
           </Box>
-        </Box>
-      </Section>
+        </CardContent>
+      </Card>
 
       {/* MARKETPLACE FALLBACK */}
-      <Section>
-        <SectionHeader>🏪 Marketplace Fallback</SectionHeader>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={marketplaceFallback}
-              onChange={(e) => setMarketplaceFallback(e.target.checked)}
-            />
-          }
-          label="Post to Marketplace if Not Auto-Assigned"
-        />
-        <Typography
-          variant="caption"
-          sx={{ display: "block", mt: 1, color: "#666" }}
-        >
-          Leads that don't auto-assign (no match, quality too low, or limit
-          reached) will be available in the marketplace for manual purchase
-        </Typography>
-      </Section>
+      <Card
+        elevation={0}
+        sx={{ mb: 3, border: "1px solid", borderColor: "divider" }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+            <MarketplaceIcon color="primary" />
+            <Box>
+              <Typography variant="h6" fontWeight="600">
+                Marketplace Fallback
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Handle unassigned leads automatically
+              </Typography>
+            </Box>
+          </Box>
+          <Divider sx={{ mb: 3 }} />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={marketplaceFallback}
+                onChange={(e) => setMarketplaceFallback(e.target.checked)}
+              />
+            }
+            label="Post to Marketplace if Not Auto-Assigned"
+          />
+          <Typography
+            variant="caption"
+            sx={{ display: "block", mt: 1, color: "text.secondary" }}
+          >
+            Leads that don't auto-assign will be available in the marketplace
+            for manual purchase
+          </Typography>
+        </CardContent>
+      </Card>
 
       {/* VOLUME & LIMITS SECTION */}
-      <Section>
-        <SectionHeader>📈 Volume & Daily Limits</SectionHeader>
-        <Typography
-          variant="caption"
-          sx={{ display: "block", mb: 2, color: "#666" }}
-        >
-          Control how many leads you receive per day
-        </Typography>
+      <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider" }}>
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+            <VolumeIcon color="primary" />
+            <Box>
+              <Typography variant="h6" fontWeight="600">
+                Daily Volume Limits
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Control maximum leads per day
+              </Typography>
+            </Box>
+          </Box>
+          <Divider sx={{ mb: 3 }} />
 
+          <TextField
+            label="Maximum Leads Per Day"
+            type="number"
+            value={maxAutoAssignPerDay}
+            onChange={(e) =>
+              setMaxAutoAssignPerDay(parseInt(e.target.value || "0", 10))
+            }
+            inputProps={{ min: 0 }}
+            fullWidth
+            helperText="Set to 0 for unlimited daily leads"
+          />
+        </CardContent>
+        <Divider />
         <Box
           sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-            gap: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            p: 2.5,
+            bgcolor: "grey.50",
           }}
         >
-          <Box>
-            <TextField
-              label="Maximum Leads Per Day"
-              type="number"
-              value={maxAutoAssignPerDay}
-              onChange={(e) =>
-                setMaxAutoAssignPerDay(parseInt(e.target.value || "0", 10))
-              }
-              inputProps={{ min: 0 }}
-              fullWidth
-              helperText="Set to 0 for unlimited"
+          {lastSaved && (
+            <Chip
+              icon={<CheckCircle />}
+              label={`Saved at ${lastSaved}`}
+              color="success"
+              size="small"
+              variant="outlined"
             />
-          </Box>
+          )}
+          <Button
+            variant="contained"
+            size="large"
+            onClick={handleSaveSettings}
+            disabled={saving}
+            startIcon={
+              saving ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : undefined
+            }
+          >
+            {saving ? "Saving..." : "Save All Settings"}
+          </Button>
         </Box>
-      </Section>
-
-      <Divider sx={{ my: 3 }} />
-
-      <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-        <Button variant="outlined" color="inherit">
-          Reset to Defaults
-        </Button>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSaveSettings}
-          disabled={saving}
-          startIcon={
-            saving ? <CircularProgress size={18} color="inherit" /> : undefined
-          }
-        >
-          {saving ? "Saving..." : "Save All Settings"}
-        </Button>
-      </Box>
-    </SettingsContainer>
+      </Card>
+    </Box>
   );
 };
 

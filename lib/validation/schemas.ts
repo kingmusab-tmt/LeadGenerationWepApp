@@ -163,6 +163,7 @@ export const createSMSCampaignSchema = z.object({
       recurring: z.boolean().optional(),
     })
     .optional(),
+  template: z.string().optional(),
 });
 
 export const updateSMSCampaignSchema = createSMSCampaignSchema.partial();
@@ -438,10 +439,20 @@ export const updateSettingsSchema = z.object({
   emailSettings: z
     .object({
       smtpServer: z.string().optional(),
-      smtpUser: z.string().email().optional(),
+      smtpUser: z
+        .string()
+        .refine((val) => !val || z.string().email().safeParse(val).success, {
+          message: "Invalid email format",
+        })
+        .optional(),
       smtpPassword: z.string().optional(),
       port: z.number().min(1).max(65535).optional(),
-      fromEmail: z.string().email().optional(),
+      fromEmail: z
+        .string()
+        .refine((val) => !val || z.string().email().safeParse(val).success, {
+          message: "Invalid email format",
+        })
+        .optional(),
       fromName: z.string().optional(),
     })
     .optional(),

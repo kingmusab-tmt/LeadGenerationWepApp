@@ -23,6 +23,8 @@ import {
 import { Send as SendIcon, Save as SaveIcon } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import RecipientPicker from "@/app/components/RecipientPicker";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface CampaignDetail {
   _id: string;
@@ -70,10 +72,10 @@ export default function CampaignEditor() {
 
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tabValue, setTabValue] = useState(0);
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const [formData, setFormData] = useState({
     name: "",
     subject: "",
@@ -121,21 +123,10 @@ export default function CampaignEditor() {
     }
   }, [campaignId]);
 
-  const fetchTemplates = useCallback(async () => {
-    try {
-      const response = await fetch("/api/marketing/email/templates");
-      const data = await response.json();
-      setTemplates(data || []);
-    } catch {
-      // Templates are optional — don't block
-    }
-  }, []);
-
   useEffect(() => {
     void fetchCampaign();
     void fetchAnalytics();
-    void fetchTemplates();
-  }, [fetchCampaign, fetchAnalytics, fetchTemplates]);
+  }, [fetchCampaign, fetchAnalytics]);
 
   const handleSave = async () => {
     try {
@@ -177,13 +168,13 @@ export default function CampaignEditor() {
   };
 
   const handleSend = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to send this campaign to all recipients?",
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Send Campaign",
+      message: "Are you sure you want to send this campaign to all recipients?",
+      confirmText: "Send Now",
+      confirmColor: "primary",
+    });
+    if (!confirmed) return;
 
     try {
       setSaving(true);
@@ -317,43 +308,6 @@ export default function CampaignEditor() {
                 disabled={campaign.status !== "draft"}
               />
             </Grid>
-            {/* Template Picker */}
-            {campaign.status === "draft" && templates.length > 0 && (
-              <Grid size={{ xs: 12 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Load Template</InputLabel>
-                  <Select
-                    value=""
-                    onChange={async (e) => {
-                      const templateId = e.target.value;
-                      if (!templateId) return;
-                      try {
-                        const response = await fetch(
-                          `/api/marketing/email/templates/${templateId}`,
-                        );
-                        const tmpl = await response.json();
-                        setFormData((prev) => ({
-                          ...prev,
-                          subject: tmpl.subject || prev.subject,
-                          htmlContent: tmpl.htmlContent || prev.htmlContent,
-                          textContent: tmpl.textContent || prev.textContent,
-                        }));
-                        toast.success("Template loaded into campaign");
-                      } catch {
-                        toast.error("Failed to load template");
-                      }
-                    }}
-                    label="Load Template"
-                  >
-                    {templates.map((t) => (
-                      <MenuItem key={t._id} value={t._id}>
-                        {t.name} ({t.category})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            )}
             <Grid size={{ xs: 12 }}>
               <TextField
                 label="HTML Content"
@@ -491,6 +445,18 @@ export default function CampaignEditor() {
           </Grid>
         </Grid>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message || ""}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Box>
   );
 }

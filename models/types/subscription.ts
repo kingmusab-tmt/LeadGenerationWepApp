@@ -53,10 +53,10 @@ export interface ISubscriptionLimits {
   concurrentCallLimit: number; // Max concurrent calls (0 = unlimited)
 
   // Marketing & Campaigns
-  emailCampaignsPerMonth: number; // Max email campaigns per month (0 = unlimited)
+  emailCampaignsEnabled: boolean; // Enable email campaigns feature (users provide their own SMTP)
   smsCampaignsPerMonth: number; // Max SMS campaigns per month (0 = unlimited)
-  emailRecipientsPerCampaign: number; // Max recipients per email campaign
   smsRecipientsPerCampaign: number; // Max recipients per SMS campaign
+  smsPhoneNumbers: number; // Max Twilio phone numbers for SMS (allocated from twilioNumbers limit)
 
   // Automation & Workflows
   automationWorkflows: number; // Max active automation workflows
@@ -114,7 +114,6 @@ export interface ISubscriptionUsage {
   buyers: number; // Registered buyers count
 
   // Campaign Usage
-  emailCampaigns: number; // Email campaigns sent this month
   smsCampaigns: number; // SMS campaigns sent this month
 
   // Automation Usage

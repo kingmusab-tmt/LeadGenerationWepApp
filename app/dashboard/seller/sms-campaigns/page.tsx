@@ -26,6 +26,10 @@ import {
   Alert,
   Tab,
   Tabs,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -37,6 +41,11 @@ import {
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import SmsRecipientPicker from "@/app/components/SmsRecipientPicker";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
+import TwilioNumberGenerator from "@/app/components/TwilioNumberGenerator";
+import { Phone as PhoneIcon } from "@mui/icons-material";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface SmsCampaign {
   _id: string;
@@ -66,15 +75,34 @@ export default function SmsCampaignsPage() {
     null,
   );
   const [editMode, setEditMode] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     textContent: "",
     recipientList: "",
+    fromPhoneNumber: "",
   });
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiIncludeRecipientName, setAiIncludeRecipientName] = useState(true);
+  const [aiRecipientSource, setAiRecipientSource] = useState<
+    "leads" | "buyers" | "leadsAndBuyers" | "all"
+  >("leads");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [smsEditorMode, setSmsEditorMode] = useState<"visual" | "text">(
+    "visual",
+  );
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
+  const fetchWithCSRF = useCSRFFetch();
+  const [twilioGeneratorOpen, setTwilioGeneratorOpen] = useState(false);
+  const [smsPhoneNumbers, setSmsPhoneNumbers] = useState<string[]>([]);
+  const [smsPhoneNumbersCount, setSmsPhoneNumbersCount] = useState(0);
+  const [smsPhoneNumbersLimit, setSmsPhoneNumbersLimit] = useState(0);
 
   useEffect(() => {
     if (currentUser) {
       fetchCampaigns();
+      fetchSmsPhoneNumbers();
     }
   }, [currentUser]);
 
@@ -88,6 +116,33 @@ export default function SmsCampaignsPage() {
       toast.error("Failed to fetch SMS campaigns");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSmsPhoneNumbers = async () => {
+    try {
+      // Fetch subscription limits
+      const limitResponse = await fetch("/api/subscriptions/limits");
+      const limitData = await limitResponse.json();
+      if (limitData?.subscriptionLimits) {
+        setSmsPhoneNumbersLimit(
+          limitData.subscriptionLimits.smsPhoneNumbers || 0,
+        );
+      }
+
+      // Fetch SMS phone numbers from tracking numbers
+      const numbersResponse = await fetch("/api/calls/twilio/get_numbers");
+      if (numbersResponse.ok) {
+        const allNumbers = await numbersResponse.json();
+        // Filter to only SMS numbers
+        const smsNumbers = (allNumbers || [])
+          .filter((num: any) => num.purpose === "sms")
+          .map((num: any) => num.phoneNumber);
+        setSmsPhoneNumbers(smsNumbers);
+        setSmsPhoneNumbersCount(smsNumbers.length);
+      }
+    } catch (error) {
+      console.error("Failed to fetch SMS phone numbers:", error);
     }
   };
 
@@ -107,6 +162,7 @@ export default function SmsCampaignsPage() {
           name: fullCampaign.name || campaign.name,
           textContent: fullCampaign.textContent || "",
           recipientList: phones,
+          fromPhoneNumber: fullCampaign.fromPhoneNumber || "",
         });
       } catch {
         setFormData({
@@ -115,12 +171,18 @@ export default function SmsCampaignsPage() {
           recipientList: (campaign.recipients || [])
             .map((r) => r.phone)
             .join(", "),
+          fromPhoneNumber: (campaign as any).fromPhoneNumber || "",
         });
       }
     } else {
       setEditMode(false);
       setSelectedCampaign(null);
-      setFormData({ name: "", textContent: "", recipientList: "" });
+      setFormData({
+        name: "",
+        textContent: "",
+        recipientList: "",
+        fromPhoneNumber: "",
+      });
     }
     setOpenDialog(true);
   };
@@ -131,6 +193,49 @@ export default function SmsCampaignsPage() {
     setEditMode(false);
   };
 
+  const handleGenerateWithAI = async () => {
+    if (!aiDescription.trim()) {
+      toast.error("Please provide a campaign description");
+      return;
+    }
+
+    try {
+      setAiGenerating(true);
+      const response = await fetchWithCSRF("/api/ai/generate-campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignType: "sms",
+          description: aiDescription,
+          includeRecipientName: aiIncludeRecipientName,
+          recipientSource: aiRecipientSource,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate campaign");
+      }
+
+      const result = await response.json();
+      const { name, textContent } = result.data;
+
+      setFormData({
+        ...formData,
+        name,
+        textContent,
+      });
+
+      setAiDialogOpen(false);
+      setAiDescription("");
+      toast.success("Campaign generated successfully! You can edit it now.");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to generate campaign");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const handleSaveCampaign = async () => {
     try {
       if (!formData.name || !formData.textContent) {
@@ -138,6 +243,7 @@ export default function SmsCampaignsPage() {
         return;
       }
 
+      setSaving(true);
       const method = editMode ? "PUT" : "POST";
       const url = editMode
         ? `/api/marketing/sms/campaigns/${selectedCampaign?._id}`
@@ -149,35 +255,50 @@ export default function SmsCampaignsPage() {
         .filter((p) => p.length > 0)
         .map((phone) => ({ phone }));
 
-      const response = await fetch(url, {
+      const response = await fetchWithCSRF(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
           textContent: formData.textContent,
           recipients: recipientArray.length > 0 ? recipientArray : undefined,
+          fromPhoneNumber: formData.fromPhoneNumber || undefined,
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to save campaign");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save campaign");
+      }
 
       toast.success(
         editMode ? "Campaign updated" : "Campaign created successfully",
       );
       handleCloseDialog();
       fetchCampaigns();
-    } catch {
-      toast.error("Error saving campaign");
+    } catch (error: any) {
+      toast.error(error?.message || "Error saving campaign");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDeleteCampaign = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this campaign?"))
-      return;
+    const confirmed = await confirm({
+      title: "Delete Campaign",
+      message:
+        "Are you sure you want to delete this campaign? This action cannot be undone.",
+      confirmText: "Delete",
+      confirmColor: "error",
+    });
+    if (!confirmed) return;
     try {
-      const response = await fetch(`/api/marketing/sms/campaigns/${id}`, {
-        method: "DELETE",
-      });
+      const response = await fetchWithCSRF(
+        `/api/marketing/sms/campaigns/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (!response.ok) throw new Error("Failed to delete campaign");
       toast.success("Campaign deleted");
       fetchCampaigns();
@@ -187,14 +308,16 @@ export default function SmsCampaignsPage() {
   };
 
   const handleSendCampaign = async (id: string) => {
-    if (
-      !window.confirm(
+    const confirmed = await confirm({
+      title: "Send SMS Campaign",
+      message:
         "Are you sure you want to send this SMS campaign to all recipients?",
-      )
-    )
-      return;
+      confirmText: "Send Now",
+      confirmColor: "primary",
+    });
+    if (!confirmed) return;
     try {
-      const response = await fetch(
+      const response = await fetchWithCSRF(
         `/api/marketing/sms/campaigns/${id}/actions?action=send`,
         { method: "POST" },
       );
@@ -214,7 +337,7 @@ export default function SmsCampaignsPage() {
 
   const handlePauseCampaign = async (id: string) => {
     try {
-      const response = await fetch(
+      const response = await fetchWithCSRF(
         `/api/marketing/sms/campaigns/${id}/actions?action=pause`,
         { method: "POST" },
       );
@@ -228,7 +351,7 @@ export default function SmsCampaignsPage() {
 
   const handleResumeCampaign = async (id: string) => {
     try {
-      const response = await fetch(
+      const response = await fetchWithCSRF(
         `/api/marketing/sms/campaigns/${id}/actions?action=resume`,
         { method: "POST" },
       );
@@ -274,9 +397,10 @@ export default function SmsCampaignsPage() {
         <Box sx={{ display: "flex", gap: 1 }}>
           <Button
             variant="outlined"
-            href="/dashboard/seller/sms-campaigns/templates"
+            startIcon={<PhoneIcon />}
+            onClick={() => setTwilioGeneratorOpen(true)}
           >
-            Templates
+            Get SMS Number
           </Button>
           <Button
             variant="contained"
@@ -490,6 +614,15 @@ export default function SmsCampaignsPage() {
         <DialogContent
           sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}
         >
+          {!editMode && (
+            <Button
+              variant="outlined"
+              onClick={() => setAiDialogOpen(true)}
+              fullWidth
+            >
+              Generate Campaign with AI
+            </Button>
+          )}
           <TextField
             label="Campaign Name"
             value={formData.name}
@@ -497,30 +630,247 @@ export default function SmsCampaignsPage() {
             fullWidth
             required
           />
-          <TextField
-            label="SMS Message"
-            value={formData.textContent}
-            onChange={(e) =>
-              setFormData({ ...formData, textContent: e.target.value })
-            }
-            fullWidth
-            multiline
-            minRows={4}
-            required
-            helperText={`${charCount}/160 characters${smsSegments > 1 ? ` (${smsSegments} SMS segments)` : ""} — Use {{variable}} for personalization`}
-          />
+          <FormControl fullWidth>
+            <InputLabel>From Phone Number</InputLabel>
+            <Select
+              value={formData.fromPhoneNumber}
+              onChange={(e) =>
+                setFormData({ ...formData, fromPhoneNumber: e.target.value })
+              }
+              label="From Phone Number"
+            >
+              <MenuItem value="">
+                <em>None selected</em>
+              </MenuItem>
+              {smsPhoneNumbers.map((phone) => (
+                <MenuItem key={phone} value={phone}>
+                  {phone}
+                </MenuItem>
+              ))}
+            </Select>
+            {smsPhoneNumbers.length === 0 && (
+              <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                No phone numbers available. Generate one using the "Generate
+                Phone Number" button at the top.
+              </Typography>
+            )}
+          </FormControl>
+          <Box>
+            <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 1 }}>
+              <Tabs
+                value={smsEditorMode}
+                onChange={(_, newValue) => setSmsEditorMode(newValue)}
+                aria-label="SMS content editor mode"
+              >
+                <Tab label="Visual Preview" value="visual" />
+                <Tab label="Text Editor" value="text" />
+              </Tabs>
+            </Box>
+            {smsEditorMode === "visual" ? (
+              <Box
+                sx={{
+                  border: "1px solid #ccc",
+                  borderRadius: 1,
+                  p: 2,
+                  minHeight: 120,
+                  backgroundColor: "#f9f9f9",
+                }}
+              >
+                <Box
+                  sx={{
+                    backgroundColor: "#fff",
+                    border: "1px solid #ddd",
+                    borderRadius: 2,
+                    p: 2,
+                    fontFamily: "system-ui, -apple-system, sans-serif",
+                    fontSize: "14px",
+                    lineHeight: "1.5",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {formData.textContent
+                    .split(/(\{\{[^}]+\}\})/g)
+                    .map((part, idx) => {
+                      if (part.match(/\{\{[^}]+\}\}/)) {
+                        return (
+                          <span
+                            key={idx}
+                            style={{
+                              backgroundColor: "#e3f2fd",
+                              color: "#1976d2",
+                              padding: "2px 4px",
+                              borderRadius: "3px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {part}
+                          </span>
+                        );
+                      }
+                      return <span key={idx}>{part}</span>;
+                    })}
+                </Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mt: 1 }}
+                >
+                  {charCount}/160 characters
+                  {smsSegments > 1 ? ` (${smsSegments} SMS segments)` : ""} —
+                  Variables like {`{{recipientName}}`} are highlighted in blue
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setSmsEditorMode("text")}
+                  sx={{ mt: 1 }}
+                >
+                  Edit Text
+                </Button>
+              </Box>
+            ) : (
+              <TextField
+                label="SMS Message"
+                value={formData.textContent}
+                onChange={(e) =>
+                  setFormData({ ...formData, textContent: e.target.value })
+                }
+                fullWidth
+                multiline
+                minRows={4}
+                required
+                helperText={`${charCount}/160 characters${smsSegments > 1 ? ` (${smsSegments} SMS segments)` : ""} — Use {{variable}} for personalization`}
+              />
+            )}
+          </Box>
           <SmsRecipientPicker
             value={formData.recipientList}
             onChange={(val) => setFormData({ ...formData, recipientList: val })}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveCampaign} variant="contained">
-            {editMode ? "Update" : "Create"}
+          <Button onClick={handleCloseDialog} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveCampaign}
+            variant="contained"
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={20} /> : null}
+          >
+            {saving ? "Saving..." : editMode ? "Update" : "Create"}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* AI Generation Dialog */}
+      <Dialog
+        open={aiDialogOpen}
+        onClose={() => !aiGenerating && setAiDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Generate Campaign with AI</DialogTitle>
+        <DialogContent
+          sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}
+        >
+          <TextField
+            label="Campaign Description"
+            value={aiDescription}
+            onChange={(e) => setAiDescription(e.target.value)}
+            fullWidth
+            multiline
+            rows={4}
+            required
+            placeholder="Describe what this campaign is about. E.g., 'Remind leads about our open house event' or 'Send a follow-up to buyers'"
+          />
+          <FormControl fullWidth>
+            <InputLabel>Recipient Source</InputLabel>
+            <Select
+              value={aiRecipientSource}
+              onChange={(e) =>
+                setAiRecipientSource(
+                  e.target.value as
+                    | "leads"
+                    | "buyers"
+                    | "leadsAndBuyers"
+                    | "all",
+                )
+              }
+              label="Recipient Source"
+            >
+              <MenuItem value="leads">Leads</MenuItem>
+              <MenuItem value="buyers">Buyers</MenuItem>
+              <MenuItem value="leadsAndBuyers">Leads and Buyers</MenuItem>
+              <MenuItem value="all">All (Leads, Buyers & Manual)</MenuItem>
+            </Select>
+          </FormControl>
+          <Box>
+            <FormControl component="fieldset">
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                Include recipient name?
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Button
+                  size="small"
+                  variant={aiIncludeRecipientName ? "contained" : "outlined"}
+                  onClick={() => setAiIncludeRecipientName(true)}
+                >
+                  Yes
+                </Button>
+                <Button
+                  size="small"
+                  variant={!aiIncludeRecipientName ? "contained" : "outlined"}
+                  onClick={() => setAiIncludeRecipientName(false)}
+                >
+                  No
+                </Button>
+              </Box>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setAiDialogOpen(false)}
+            disabled={aiGenerating}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleGenerateWithAI}
+            variant="contained"
+            disabled={aiGenerating || !aiDescription.trim()}
+            startIcon={aiGenerating ? <CircularProgress size={20} /> : null}
+          >
+            {aiGenerating ? "Generating..." : "Generate"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message || ""}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+
+      {/* Twilio Number Generator Modal */}
+      <TwilioNumberGenerator
+        open={twilioGeneratorOpen}
+        onClose={() => setTwilioGeneratorOpen(false)}
+        onNumberGenerated={(phoneNumber: string) => {
+          setSmsPhoneNumbers([...smsPhoneNumbers, phoneNumber]);
+          fetchSmsPhoneNumbers();
+        }}
+        currentCount={smsPhoneNumbersCount}
+        maxAllowed={smsPhoneNumbersLimit}
+      />
     </Box>
   );
 }

@@ -103,10 +103,10 @@ const TierSchema = new Schema<ITier>(
       concurrentCallLimit: { type: Number, default: 1 },
 
       // Marketing & Campaigns
-      emailCampaignsPerMonth: { type: Number, default: 0 },
+      emailCampaignsEnabled: { type: Boolean, default: false },
       smsCampaignsPerMonth: { type: Number, default: 0 },
-      emailRecipientsPerCampaign: { type: Number, default: 100 },
       smsRecipientsPerCampaign: { type: Number, default: 50 },
+      smsPhoneNumbers: { type: Number, default: 0 },
 
       // Automation & Workflows
       automationWorkflows: { type: Number, default: 0 },

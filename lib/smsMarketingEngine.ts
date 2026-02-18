@@ -82,7 +82,12 @@ class SmsQueueManager {
 
   static async processBatch(userId: string, campaignId: string) {
     const client = await TwilioManager.getClient(userId);
-    const fromNumber = await TwilioManager.getFromNumber(userId);
+    const campaign = await SmsCampaign.findById(campaignId);
+    if (!campaign) throw new Error("Campaign not found");
+
+    // Use campaign-specific Twilio number if available, otherwise fall back to default
+    const fromNumber =
+      campaign.fromPhoneNumber || (await TwilioManager.getFromNumber(userId));
 
     const batchItems = await SmsQueue.find({
       campaignId,
@@ -94,7 +99,7 @@ class SmsQueueManager {
     for (const item of batchItems) {
       try {
         const text = SmsTemplateEngine.render(
-          (await SmsCampaign.findById(campaignId))!.textContent,
+          campaign.textContent,
           item.recipient.variables || {},
         );
         const message = await client.messages.create({
@@ -205,7 +210,10 @@ class SmsMarketingEngine {
     if (!campaign) return { success: false, message: "Campaign not found" };
 
     const client = await TwilioManager.getClient(campaign.userId);
-    const fromNumber = await TwilioManager.getFromNumber(campaign.userId);
+    // Use campaign-specific Twilio number if available, otherwise fall back to default
+    const fromNumber =
+      campaign.fromPhoneNumber ||
+      (await TwilioManager.getFromNumber(campaign.userId));
     const text = SmsTemplateEngine.render(campaign.textContent, {});
 
     await client.messages.create({

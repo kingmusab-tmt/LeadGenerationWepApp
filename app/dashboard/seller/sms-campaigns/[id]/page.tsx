@@ -22,6 +22,9 @@ import {
 import { useParams } from "next/navigation";
 import { toast } from "react-toastify";
 import SmsRecipientPicker from "@/app/components/SmsRecipientPicker";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface CampaignData {
   _id: string;
@@ -42,11 +45,13 @@ interface CampaignData {
 }
 
 export default function SmsCampaignEditorPage() {
+  const fetchWithCSRF = useCSRFFetch();
   const params = useParams<{ id: string }>();
   const campaignId = params?.id as string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [campaign, setCampaign] = useState<CampaignData | null>(null);
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const [formData, setFormData] = useState({
     name: "",
     textContent: "",
@@ -87,15 +92,18 @@ export default function SmsCampaignEditorPage() {
         .filter((p) => p.length > 0)
         .map((phone) => ({ phone }));
 
-      const res = await fetch(`/api/marketing/sms/campaigns/${campaignId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name,
-          textContent: formData.textContent,
-          recipients: recipientArray,
-        }),
-      });
+      const res = await fetchWithCSRF(
+        `/api/marketing/sms/campaigns/${campaignId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            textContent: formData.textContent,
+            recipients: recipientArray,
+          }),
+        },
+      );
       if (!res.ok) throw new Error("Failed to save");
       const updated = await res.json();
       setCampaign(updated);
@@ -108,8 +116,13 @@ export default function SmsCampaignEditorPage() {
   };
 
   const handleSend = async () => {
-    if (!window.confirm("Send this SMS campaign to all recipients now?"))
-      return;
+    const confirmed = await confirm({
+      title: "Send SMS Campaign",
+      message: "Send this SMS campaign to all recipients now?",
+      confirmText: "Send Now",
+      confirmColor: "primary",
+    });
+    if (!confirmed) return;
     try {
       setSaving(true);
       const res = await fetch(
@@ -465,6 +478,18 @@ export default function SmsCampaignEditorPage() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message || ""}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Box>
   );
 }

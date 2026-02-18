@@ -46,31 +46,52 @@ export class EmailTemplateEngine {
    * @param trackingToken Unique tracking token
    * @returns HTML with tracking pixel
    */
-  static addTrackingPixel(html: string, trackingToken: string): string {
+  static addTrackingPixel(
+    html: string,
+    campaignId: string,
+    recipientEmail: string,
+  ): string {
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXTAUTH_URL ||
-      "https://localhost:3000";
-    const pixel = `<img src="${baseUrl}/api/marketing/email/track/open/${trackingToken}" width="1" height="1" alt="" />`;
+      "http://localhost:3000";
+    const pixel = `<img src="${baseUrl}/api/marketing/email/track?action=open&campaignId=${campaignId}&email=${encodeURIComponent(recipientEmail)}" width="1" height="1" alt="" style="display:none" />`;
+    // Insert before closing body tag if exists, otherwise append
+    if (html.includes("</body>")) {
+      return html.replace("</body>", `${pixel}</body>`);
+    }
     return html + pixel;
   }
 
   /**
    * Add click tracking to links
    * @param html Email HTML content
-   * @param trackingToken Unique tracking token
+   * @param campaignId Campaign ID
+   * @param recipientEmail Recipient email
    * @returns HTML with tracked links
    */
-  static addLinkTracking(html: string, trackingToken: string): string {
+  static addLinkTracking(
+    html: string,
+    campaignId: string,
+    recipientEmail: string,
+  ): string {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
+      "http://localhost:3000";
     const linkRegex = /href="([^"]*)"/g;
     return html.replace(linkRegex, (match, url) => {
+      // Skip tracking for unsubscribe, mailto, and anchor links
+      if (
+        url.startsWith("mailto:") ||
+        url.startsWith("#") ||
+        url.includes("/unsubscribe")
+      ) {
+        return match;
+      }
       if (url.startsWith("http")) {
-        const encodedUrl = Buffer.from(url).toString("base64");
-        const baseUrl =
-          process.env.NEXT_PUBLIC_APP_URL ||
-          process.env.NEXTAUTH_URL ||
-          "https://localhost:3000";
-        return `href="${baseUrl}/api/marketing/email/track/click/${trackingToken}?url=${encodedUrl}"`;
+        const trackingUrl = `${baseUrl}/api/marketing/email/track?action=click&campaignId=${campaignId}&email=${encodeURIComponent(recipientEmail)}&url=${encodeURIComponent(url)}`;
+        return `href="${trackingUrl}"`;
       }
       return match;
     });
@@ -247,14 +268,16 @@ export class EmailQueueManager {
         if (campaign.trackingPixel) {
           htmlContent = EmailTemplateEngine.addTrackingPixel(
             htmlContent,
-            queueItem.trackingToken!,
+            campaignId,
+            queueItem.recipientEmail,
           );
         }
 
         if (campaign.trackLinks) {
           htmlContent = EmailTemplateEngine.addLinkTracking(
             htmlContent,
-            queueItem.trackingToken!,
+            campaignId,
+            queueItem.recipientEmail,
           );
         }
 

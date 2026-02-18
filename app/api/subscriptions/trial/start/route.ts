@@ -69,7 +69,6 @@ export async function POST(req: Request) {
       // Slightly adjust for trial - give good access but not full professional
       leads: 500, // Half of professional
       callSeconds: 5000, // Half of professional
-      emailCampaignsPerMonth: 25, // Half of professional
       smsCampaignsPerMonth: 10, // Less than professional
     };
 

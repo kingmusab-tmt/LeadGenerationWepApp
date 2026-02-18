@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import {
   Box,
   Card,
@@ -38,7 +39,9 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
     useState<StripeAccountStatus | null>(null);
   const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
   const router = useRouter();
+  const fetchWithCSRF = useCSRFFetch();
 
   // Check account status on component mount
   useEffect(() => {
@@ -52,7 +55,7 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
 
         if (response.ok) {
           setAccountStatus(data);
-          setAccountId(data.accountId);
+          setAccountId(data.accountId || null);
         }
       } catch (err) {
         console.error("Failed to check account status:", err);
@@ -70,8 +73,15 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
 
     try {
       const query = new URLSearchParams(window.location.search);
-      const onboardingStatus = query.get("stripe_onboarding");
+      let onboardingStatus = query.get("stripe_onboarding");
       const accountIdParam = query.get("account_id");
+
+      if (!onboardingStatus) {
+        const tabParam = query.get("tab");
+        if (tabParam?.startsWith("stripe_onboarding")) {
+          onboardingStatus = tabParam.split("=")[1] || null;
+        }
+      }
 
       if (onboardingStatus === "success") {
         setAccountId(accountIdParam);
@@ -92,7 +102,7 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
     setError(null);
 
     try {
-      const response = await fetch("/api/payments/stripe/onboard", {
+      const response = await fetchWithCSRF("/api/payments/stripe/onboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -124,6 +134,41 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
       "individual.id_number": "Government-issued ID number",
     };
     return labels[requirement] || requirement;
+  };
+
+  const openStripeDashboard = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    setDashboardLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/payments/stripe/login-link", {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to open Stripe dashboard");
+      }
+
+      if (data.url) {
+        const newTab = window.open(data.url, "_blank", "noopener,noreferrer");
+        if (!newTab || newTab.closed || typeof newTab.closed === "undefined") {
+          setError(
+            "Please allow popups for this site to open the Stripe dashboard.",
+          );
+        }
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "An unknown error occurred",
+      );
+    } finally {
+      setDashboardLoading(false);
+    }
   };
 
   const renderRequirements = () => {
@@ -246,9 +291,24 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
   const renderAccountStatus = () => {
     if (!accountStatus) return null;
 
+    const isFullyEnabled =
+      accountStatus.chargesEnabled && accountStatus.payoutsEnabled;
+    const needsAttention = accountStatus.detailsSubmitted && !isFullyEnabled;
+
     return (
       <Paper sx={{ p: 2, mb: 3, bgcolor: "background.default" }}>
         <Stack spacing={1.5}>
+          {isFullyEnabled && (
+            <Alert severity="success" icon={<CheckCircleIcon />}>
+              Your Stripe account is fully connected and payouts are enabled.
+            </Alert>
+          )}
+          {needsAttention && (
+            <Alert severity="warning" icon={<ErrorIcon />}>
+              Stripe is still reviewing or requires more details before payouts
+              can be enabled.
+            </Alert>
+          )}
           <Box
             sx={{
               display: "flex",
@@ -265,20 +325,12 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
                 px: 1.5,
                 py: 0.5,
                 borderRadius: 1,
-                bgcolor:
-                  accountStatus.chargesEnabled && accountStatus.payoutsEnabled
-                    ? "success.light"
-                    : "warning.light",
-                color:
-                  accountStatus.chargesEnabled && accountStatus.payoutsEnabled
-                    ? "success.dark"
-                    : "warning.dark",
+                bgcolor: isFullyEnabled ? "success.light" : "warning.light",
+                color: isFullyEnabled ? "success.dark" : "warning.dark",
                 fontWeight: 600,
               }}
             >
-              {accountStatus.chargesEnabled && accountStatus.payoutsEnabled
-                ? "Fully Connected"
-                : "Partially Connected"}
+              {isFullyEnabled ? "Fully Connected" : "Partially Connected"}
             </Typography>
           </Box>
 
@@ -320,6 +372,28 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
             >
               {accountStatus.tosAccepted ? "✓ Yes" : "✗ No"}
             </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            <Button
+              variant="outlined"
+              onClick={openStripeDashboard}
+              disabled={dashboardLoading}
+            >
+              {dashboardLoading
+                ? "Opening Dashboard..."
+                : "Open Stripe Dashboard"}
+            </Button>
+            {!isFullyEnabled && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={createConnectedAccount}
+                disabled={loading}
+              >
+                {loading ? "Loading..." : "Continue Onboarding"}
+              </Button>
+            )}
           </Box>
         </Stack>
       </Paper>

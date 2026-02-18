@@ -73,7 +73,14 @@ export async function POST(req: NextRequest) {
     if (!session?.user) return unauthorized();
 
     const body = await req.json();
-    const { name, textContent, recipients, schedule } = body;
+    const {
+      name,
+      textContent,
+      recipients,
+      schedule,
+      template,
+      fromPhoneNumber,
+    } = body;
 
     if (!name || !textContent) {
       return badRequest("Campaign name and message are required");
@@ -84,7 +91,7 @@ export async function POST(req: NextRequest) {
     // Check subscription limit for SMS campaigns
     const usageCheck = await checkAndIncrementUsage(
       session.user.id,
-      "smsCampaignsPerMonth",
+      "smsCampaigns",
       1,
     );
     if (!usageCheck.allowed) {
@@ -98,7 +105,9 @@ export async function POST(req: NextRequest) {
       userId: session.user.id,
       name,
       textContent,
+      fromPhoneNumber: fromPhoneNumber || undefined,
       recipients: recipients || [],
+      templateId: template || undefined,
       scheduleAt: schedule?.scheduledTime
         ? new Date(schedule.scheduledTime)
         : undefined,

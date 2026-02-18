@@ -23,6 +23,7 @@ import { industryNiches } from "@/utils/industryNiches";
 import { usCities } from "@/utils/citiesInUsUk";
 import { LEAD_SOURCES } from "@/utils/leadSources";
 import { useRouter, useParams } from "next/navigation";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Field {
   id: string;
@@ -33,6 +34,7 @@ interface Field {
 }
 
 export default function EditForm() {
+  const fetchWithCSRF = useCSRFFetch();
   const router = useRouter();
   const params = useParams();
   const formId =
@@ -246,7 +248,7 @@ export default function EditForm() {
     setIsUpdating(true);
 
     try {
-      const response = await fetch("/api/form/update", {
+      const response = await fetchWithCSRF("/api/form/update", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -29,6 +29,8 @@ import FormPreview from "./FormPreview";
 import { industryNiches } from "@/utils/industryNiches";
 import { LEAD_SOURCES } from "@/utils/leadSources";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface Field {
   id: string;
@@ -46,6 +48,7 @@ const FormBuilder = () => {
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
   const [editOptions, setEditOptions] = useState<string[]>([]);
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const [editHeadingLevel, setEditHeadingLevel] = useState<
     "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
   >("h2");
@@ -892,12 +895,15 @@ const FormBuilder = () => {
             <Button
               variant="outlined"
               color="error"
-              onClick={() => {
-                if (
-                  window.confirm(
+              onClick={async () => {
+                const confirmed = await confirm({
+                  title: "Clear Form",
+                  message:
                     "Are you sure you want to clear all fields? This cannot be undone.",
-                  )
-                ) {
+                  confirmText: "Clear All",
+                  confirmColor: "error",
+                });
+                if (confirmed) {
                   setFields([]);
                   setFormName("");
                   setLeadSource("");
@@ -1004,6 +1010,18 @@ const FormBuilder = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message || ""}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Container>
   );
 };

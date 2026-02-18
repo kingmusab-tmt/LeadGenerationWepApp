@@ -28,6 +28,7 @@ import {
   Pagination,
 } from "@mui/material";
 import { CheckCircle, Cancel, Phone, Refresh } from "@mui/icons-material";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface ScheduledCallback {
   _id: string;
@@ -45,6 +46,7 @@ interface ScheduledCallback {
 }
 
 export default function ScheduledCallbacksPanel() {
+  const fetchWithCSRF = useCSRFFetch();
   const [callbacks, setCallbacks] = useState<ScheduledCallback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +87,7 @@ export default function ScheduledCallbacksPanel() {
     if (!actionDialog.callback) return;
     setActionLoading(true);
     try {
-      const res = await fetch("/api/calls/scheduled-callbacks", {
+      const res = await fetchWithCSRF("/api/calls/scheduled-callbacks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

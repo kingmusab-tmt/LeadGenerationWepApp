@@ -104,7 +104,7 @@ const UnitPricingComponent: React.FC = () => {
       editIndex !== null ? { units, cost, index: editIndex } : { units, cost };
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await csrfFetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

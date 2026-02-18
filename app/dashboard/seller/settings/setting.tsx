@@ -11,7 +11,24 @@ import {
   Tab,
   Grid,
   CircularProgress,
+  Paper,
+  Card,
+  CardContent,
+  Divider,
+  Chip,
+  Container,
 } from "@mui/material";
+import {
+  Settings as SettingsIcon,
+  Person as PersonIcon,
+  Share as ShareIcon,
+  AttachMoney as MoneyIcon,
+  Chat as ChatIcon,
+  Email as EmailIcon,
+  Code as CodeIcon,
+  AccountBalance as StripeIcon,
+  CreditCard as SubscriptionIcon,
+} from "@mui/icons-material";
 import UnitPricingComponent from "./unitsetting/page";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import TawkSetupForm from "./tawksetting/page";
@@ -86,9 +103,27 @@ const AccountSettings = () => {
     if (typeof window === "undefined") return;
     try {
       const url = new URL(window.location.href);
-      const tabParam = url.searchParams.get("tab");
+      const rawTabParam = url.searchParams.get("tab");
+      let tabParam = rawTabParam;
+      let onboardingStatusFromTab: string | null = null;
+
+      if (tabParam?.startsWith("stripe_onboarding")) {
+        const parts = tabParam.split("=");
+        onboardingStatusFromTab = parts[1] || null;
+        tabParam = "stripe-onboarding";
+      }
+
       const index = tabMap.indexOf(tabParam || "general");
       setTabValue(index >= 0 ? index : 0);
+
+      if (
+        onboardingStatusFromTab &&
+        !url.searchParams.get("stripe_onboarding")
+      ) {
+        url.searchParams.set("tab", "stripe-onboarding");
+        url.searchParams.set("stripe_onboarding", onboardingStatusFromTab);
+        window.history.replaceState({}, "", url);
+      }
     } catch (error) {
       console.error("Error parsing tab from URL:", error);
       setTabValue(0);
@@ -269,207 +304,259 @@ const AccountSettings = () => {
   const isProfileLoading = userLoading || !editableUser;
 
   return (
-    <Box
-      sx={{
-        width: "89vw",
-        maxWidth: 800,
-        mx: "auto",
-        p: 3,
-        bgcolor: darkMode ? "#333" : "#fff",
-        color: darkMode ? "#fff" : "#000",
-        borderRadius: 2,
-        boxShadow: 3,
-        overflowX: "hidden",
-      }}
-    >
-      <Typography variant="h5" sx={{ mb: 2, mt: 4, textAlign: "center" }}>
-        Account Settings
-      </Typography>
-
-      <Tabs
-        value={tabValue}
-        onChange={handleTabChange}
-        variant="scrollable"
-        scrollButtons
-        allowScrollButtonsMobile
-        sx={{ borderBottom: 1, borderColor: "divider" }}
-      >
-        <Tab label="General" />
-        <Tab label="Lead Distribution" />
-        <Tab label="Units Settings" />
-        <Tab label="Live Chat Setup" />
-        <Tab label="Email Settings" />
-        <Tab label="API Settings" />
-        <Tab label="Stripe Onboarding" />
-        <Tab label="Subscription" />
-      </Tabs>
-
-      {isProfileLoading ? (
-        <Box
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          height={200}
-        >
-          <LoadingComponent />
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
+          <SettingsIcon sx={{ fontSize: 32, color: "primary.main" }} />
+          <Typography variant="h4" component="h1" fontWeight="600">
+            Settings
+          </Typography>
         </Box>
-      ) : (
-        <>
-          {tabValue === 0 && (
-            <Box sx={{ mt: 3 }}>
-              <Grid container spacing={3}>
-                <Grid size={{ xs: 12, sm: 4 }}>
+        <Typography variant="body2" color="text.secondary">
+          Manage your account settings and preferences
+        </Typography>
+      </Box>
+
+      <Paper
+        elevation={0}
+        sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}
+      >
+        <Tabs
+          value={tabValue}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{
+            borderBottom: 1,
+            borderColor: "divider",
+            px: 2,
+            "& .MuiTab-root": {
+              minHeight: 64,
+              textTransform: "none",
+              fontSize: "0.95rem",
+              fontWeight: 500,
+            },
+          }}
+        >
+          <Tab icon={<PersonIcon />} iconPosition="start" label="General" />
+          <Tab
+            icon={<ShareIcon />}
+            iconPosition="start"
+            label="Lead Distribution"
+          />
+          <Tab
+            icon={<MoneyIcon />}
+            iconPosition="start"
+            label="Units Settings"
+          />
+          <Tab icon={<ChatIcon />} iconPosition="start" label="Live Chat" />
+          <Tab icon={<EmailIcon />} iconPosition="start" label="Email" />
+          <Tab icon={<CodeIcon />} iconPosition="start" label="API Keys" />
+          <Tab icon={<StripeIcon />} iconPosition="start" label="Stripe" />
+          <Tab
+            icon={<SubscriptionIcon />}
+            iconPosition="start"
+            label="Subscription"
+          />
+        </Tabs>
+
+        {isProfileLoading ? (
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            minHeight={400}
+            sx={{ p: 4 }}
+          >
+            <LoadingComponent />
+          </Box>
+        ) : (
+          <Box sx={{ p: 4 }}>
+            {tabValue === 0 && (
+              <Box>
+                <Card
+                  elevation={0}
+                  sx={{ mb: 3, border: "1px solid", borderColor: "divider" }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom fontWeight="600">
+                      Profile Information
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 3 }}
+                    >
+                      Update your account profile information and contact
+                      details
+                    </Typography>
+                    <Divider sx={{ mb: 3 }} />
+
+                    <Grid container spacing={3}>
+                      <Grid size={{ xs: 12, md: 4 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: 2,
+                          }}
+                        >
+                          <Avatar
+                            sx={{ width: 120, height: 120, boxShadow: 2 }}
+                            src={editableUser?.image}
+                            alt="Profile"
+                          />
+                          <Chip
+                            label="Connected Account"
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        </Box>
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 8 }}>
+                        <Grid container spacing={2.5}>
+                          <Grid size={{ xs: 12 }}>
+                            <TextField
+                              fullWidth
+                              label="Full Name"
+                              name="name"
+                              value={editableUser?.name || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.name}
+                              helperText={
+                                fieldErrors.name || "Your display name"
+                              }
+                              disabled={saving}
+                              placeholder="Enter your full name"
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Username"
+                              name="username"
+                              value={editableUser?.username || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.username}
+                              helperText={
+                                fieldErrors.username || "Your unique username"
+                              }
+                              disabled={saving}
+                              placeholder="Choose a username"
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Phone Number"
+                              name="mobileNumber"
+                              value={editableUser?.mobileNumber || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.mobileNumber}
+                              helperText={
+                                fieldErrors.mobileNumber ||
+                                "Your contact number"
+                              }
+                              disabled={saving}
+                              placeholder="+1234567890"
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12 }}>
+                            <TextField
+                              fullWidth
+                              label="Email Address"
+                              name="email"
+                              value={editableUser?.email || ""}
+                              disabled
+                              helperText="Email cannot be changed after account creation"
+                            />
+                          </Grid>
+                        </Grid>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                  <Divider />
                   <Box
                     sx={{
                       display: "flex",
-                      flexDirection: "column",
+                      justifyContent: "flex-end",
                       alignItems: "center",
+                      p: 2.5,
+                      gap: 2,
+                      bgcolor: "grey.50",
                     }}
                   >
-                    <Avatar
-                      sx={{ width: 80, height: 80, mb: 2 }}
-                      src={editableUser?.image}
-                      alt="Profile"
-                    />
-                    <Typography variant="body2" color="textSecondary">
-                      Profile picture from your account
-                    </Typography>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        const resetToCurrentUser = async () => {
+                          const latest = await refreshUser(true);
+                          if (latest) {
+                            setEditableUser({
+                              _id: latest.id || "",
+                              name: latest.name || "",
+                              username: latest.username || "",
+                              email: latest.email || "",
+                              mobileNumber:
+                                latest.mobileNumber || latest.mobile || "",
+                              image: latest.image || "",
+                            });
+                            clearFieldErrors();
+                            showSnackbar("Changes discarded", "info");
+                          } else {
+                            showSnackbar("Error resetting form", "error");
+                          }
+                        };
+                        resetToCurrentUser();
+                      }}
+                      disabled={saving}
+                    >
+                      Reset Changes
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={handleSaveChanges}
+                      disabled={saving}
+                      startIcon={saving ? <CircularProgress size={20} /> : null}
+                    >
+                      {saving ? "Saving..." : "Save Changes"}
+                    </Button>
                   </Box>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 8 }}>
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12 }}>
-                      <TextField
-                        fullWidth
-                        label="Full Name"
-                        name="name"
-                        value={editableUser?.name || ""}
-                        onChange={handleInputChange}
-                        error={!!fieldErrors.name}
-                        helperText={fieldErrors.name || "Your display name"}
-                        disabled={saving}
-                        placeholder="Enter your full name"
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        label="Username"
-                        name="username"
-                        value={editableUser?.username || ""}
-                        onChange={handleInputChange}
-                        error={!!fieldErrors.username}
-                        helperText={
-                          fieldErrors.username || "Your unique username"
-                        }
-                        disabled={saving}
-                        placeholder="Choose a username"
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        label="Phone Number"
-                        name="mobileNumber"
-                        value={editableUser?.mobileNumber || ""}
-                        onChange={handleInputChange}
-                        error={!!fieldErrors.mobileNumber}
-                        helperText={
-                          fieldErrors.mobileNumber || "Your contact number"
-                        }
-                        disabled={saving}
-                        placeholder="+1234567890"
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12 }}>
-                      <TextField
-                        fullWidth
-                        label="Email Address"
-                        name="email"
-                        value={editableUser?.email || ""}
-                        disabled
-                        helperText="Email cannot be changed"
-                      />
-                    </Grid>
-                  </Grid>
-                </Grid>
-              </Grid>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  alignItems: "center",
-                  mt: 3,
-                  gap: 2,
-                }}
-              >
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    const resetToCurrentUser = async () => {
-                      const latest = await refreshUser(true);
-                      if (latest) {
-                        setEditableUser({
-                          _id: latest.id || "",
-                          name: latest.name || "",
-                          username: latest.username || "",
-                          email: latest.email || "",
-                          mobileNumber:
-                            latest.mobileNumber || latest.mobile || "",
-                          image: latest.image || "",
-                        });
-                        clearFieldErrors();
-                        showSnackbar("Changes discarded", "info");
-                      } else {
-                        showSnackbar("Error resetting form", "error");
-                      }
-                    };
-
-                    resetToCurrentUser();
-                  }}
-                  disabled={saving}
-                >
-                  Reset
-                </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleSaveChanges}
-                  disabled={saving}
-                  startIcon={saving ? <CircularProgress size={20} /> : null}
-                >
-                  {saving ? "Saving..." : "Save Changes"}
-                </Button>
+                </Card>
               </Box>
-            </Box>
-          )}
-        </>
-      )}
+            )}
 
-      {tabValue === 1 && <LeadDistributionSettings />}
-      {tabValue === 2 && <UnitPricingComponent />}
-      {tabValue === 3 && <TawkSetupForm />}
-      {tabValue === 4 && <EmailSettingsPage />}
-      {tabValue === 5 && <APISettingsPage />}
-      {tabValue === 6 && <StripeOnboardingPage />}
-      {tabValue === 7 && (
-        <Box>
-          <SubscriptionManagement
-            onOpenChangePlanModal={() => setChangePlanModalOpen(true)}
-          />
-          <Box sx={{ mt: 4 }}>
-            <PaymentMethodsManager />
+            {tabValue === 1 && <LeadDistributionSettings />}
+            {tabValue === 2 && <UnitPricingComponent />}
+            {tabValue === 3 && <TawkSetupForm />}
+            {tabValue === 4 && <EmailSettingsPage />}
+            {tabValue === 5 && <APISettingsPage />}
+            {tabValue === 6 && <StripeOnboardingPage />}
+            {tabValue === 7 && (
+              <Box>
+                <SubscriptionManagement
+                  onOpenChangePlanModal={() => setChangePlanModalOpen(true)}
+                />
+                <Box sx={{ mt: 4 }}>
+                  <PaymentMethodsManager />
+                </Box>
+                <ChangePlanModal
+                  open={changePlanModalOpen}
+                  onClose={() => setChangePlanModalOpen(false)}
+                  onSuccess={() => {
+                    setChangePlanModalOpen(false);
+                  }}
+                />
+              </Box>
+            )}
           </Box>
-          <ChangePlanModal
-            open={changePlanModalOpen}
-            onClose={() => setChangePlanModalOpen(false)}
-            onSuccess={() => {
-              setChangePlanModalOpen(false);
-            }}
-          />
-        </Box>
-      )}
-    </Box>
+        )}
+      </Paper>
+    </Container>
   );
 };
 

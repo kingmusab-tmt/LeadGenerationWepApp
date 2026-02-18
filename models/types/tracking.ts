@@ -4,6 +4,7 @@
  */
 export interface ITrackingNumber {
   phoneNumber: string; // Tracking phone number
+  purpose?: "call" | "sms"; // Purpose of the number (call tracking or SMS campaigns)
   industry: string; // Industry/niche
   forwardingType: string; // Forwarding type
   method: "Manual" | "Automatic"; // Method of number acquisition

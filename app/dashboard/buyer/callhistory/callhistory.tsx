@@ -43,6 +43,7 @@ import {
 import { Container } from "@mui/material";
 import { formatDate, formatDuration } from "@/lib/formatUtils";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Call {
   _id: string;
@@ -66,6 +67,7 @@ interface Call {
 const PAGE_SIZE = 10;
 
 const CallHistory: React.FC = () => {
+  const fetchWithCSRF = useCSRFFetch();
   const [calls, setCalls] = useState<Call[]>([]);
   const [filteredCalls, setFilteredCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
@@ -535,13 +537,14 @@ const DispositionSelect = ({
   currentDisposition: string;
   onUpdate: (disposition: string) => void;
 }) => {
+  const fetchWithCSRF = useCSRFFetch();
   const [saving, setSaving] = useState(false);
 
   const handleChange = async (value: string) => {
     if (value === currentDisposition) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/calls/disposition", {
+      const res = await fetchWithCSRF("/api/calls/disposition", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ callId, disposition: value }),

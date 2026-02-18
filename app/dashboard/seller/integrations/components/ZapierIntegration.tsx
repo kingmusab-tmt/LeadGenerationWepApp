@@ -45,6 +45,7 @@ import {
   VisibilityOff as VisibilityOffIcon,
   Code as CodeIcon,
 } from "@mui/icons-material";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface ZapierConfig {
   id: string;
@@ -99,6 +100,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function ZapierIntegration({ onNotify }: Props) {
+  const fetchWithCSRF = useCSRFFetch();
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [configs, setConfigs] = useState<ZapierConfig[]>([]);
@@ -207,7 +209,7 @@ export default function ZapierIntegration({ onNotify }: Props) {
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/integrations/zapier/${configId}`, {
+      const res = await fetchWithCSRF(`/api/integrations/zapier/${configId}`, {
         method: "DELETE",
       });
 
@@ -614,6 +616,7 @@ export default function ZapierIntegration({ onNotify }: Props) {
 
 // API Key Management Tab Component
 function ApiKeyManagementTab({ onNotify }: Props) {
+  const fetchWithCSRF = useCSRFFetch();
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [apiKeyExists, setApiKeyExists] = useState(false);
   const [truncatedKey, setTruncatedKey] = useState<string | null>(null);
@@ -689,7 +692,7 @@ function ApiKeyManagementTab({ onNotify }: Props) {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/integrations/zapier/api-key", {
+      const res = await fetchWithCSRF("/api/integrations/zapier/api-key", {
         method: "DELETE",
       });
 

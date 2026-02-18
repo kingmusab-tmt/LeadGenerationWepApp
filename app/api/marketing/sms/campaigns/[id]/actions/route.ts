@@ -48,6 +48,17 @@ export async function POST(
         );
       }
 
+      // Ensure campaign has a Twilio phone number assigned
+      if (!campaign.fromPhoneNumber) {
+        return NextResponse.json(
+          {
+            error:
+              "No phone number assigned to this campaign. Please generate or assign a Twilio phone number before sending.",
+          },
+          { status: 400 },
+        );
+      }
+
       const result = await smsMarketingEngine.sendCampaignImmediate(id);
       if (!result.success)
         return NextResponse.json({ error: result.message }, { status: 400 });

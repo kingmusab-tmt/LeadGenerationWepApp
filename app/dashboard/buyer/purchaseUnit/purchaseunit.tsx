@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import {
@@ -29,6 +29,7 @@ const UnitPurchase: React.FC = () => {
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showFailureModal, setShowFailureModal] = useState(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -104,17 +105,31 @@ const UnitPurchase: React.FC = () => {
     }
   }, []);
 
+  const generateIdempotencyKey = (units: number, cost: number): string => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 15);
+    return `buyer-credit-${units}-${cost}-${timestamp}-${random}`;
+  };
+
   const handleStripePurchase = async () => {
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = generateIdempotencyKey(units, cost);
+    }
+
     setLoading(true);
     try {
       const response = await csrfFetch(
         "/api/payments/stripe/stripecheckoutapi",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-idempotency-key": idempotencyKeyRef.current,
+          },
           body: JSON.stringify({
             units,
             cost,
+            idempotencyKey: idempotencyKeyRef.current,
           }),
         },
       );
@@ -127,14 +142,20 @@ const UnitPurchase: React.FC = () => {
           data.message || "Failed to initiate Stripe payment",
           "error",
         );
+        idempotencyKeyRef.current = null;
       }
     } catch (error) {
       console.error("Error initiating Stripe payment:", error);
       showSnackbar("An error occurred. Please try again.", "error");
+      idempotencyKeyRef.current = null;
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    idempotencyKeyRef.current = null;
+  }, [units, cost]);
 
   return (
     <Container sx={{ mt: 6 }}>

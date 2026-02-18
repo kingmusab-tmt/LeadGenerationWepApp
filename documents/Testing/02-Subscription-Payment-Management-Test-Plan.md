@@ -178,18 +178,7 @@ Test each tier displays:
 
 ### 2.1 Stripe Integration
 
-#### 2.1.1 Stripe Customer Creation
-
-**Endpoint:** `POST /api/payments/stripe/create-connected-account`
-
-##### Test Scenarios:
-
-- Create Stripe customer on first payment
-- Verify stripeCustomerId stored
-- Test customer update on profile change
-- Handle duplicate customer creation
-
-#### 2.1.2 Stripe Checkout
+#### 2.1.1 Stripe Checkout
 
 **Endpoint:** `POST /api/payments/stripe/stripecheckoutapi`
 
@@ -287,15 +276,8 @@ Test each tier displays:
 
 #### 2.1.6 Stripe Transfers
 
-**Endpoint:** `POST /api/payments/stripe/transfer`
-
-##### Test Scenarios:
-
-- Transfer funds to seller account
-- Verify transfer amount
-- Check transfer status
-- Test transfer reversals
-- Verify transfer webhooks
+- Transfers are handled via destination charges in Stripe Checkout.
+- Verify transfer events via webhooks and reconciliation logs instead of a direct transfer endpoint.
 
 ### 2.2 General Payment Operations
 

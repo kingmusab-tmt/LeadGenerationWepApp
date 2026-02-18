@@ -65,7 +65,6 @@ export const SOFT_LIMIT_KEYS: (keyof ISubscriptionLimits)[] = [
 export const HARD_LIMIT_KEYS: (keyof ISubscriptionLimits)[] = [
   "forms",
   "buyers",
-  "emailCampaignsPerMonth",
   "smsCampaignsPerMonth",
   "invoicesPerMonth",
   "automationWorkflows",
@@ -79,7 +78,6 @@ export const USAGE_TO_LIMIT_MAP: Record<string, keyof ISubscriptionLimits> = {
   callSeconds: "callSeconds",
   forms: "forms",
   buyers: "buyers",
-  emailCampaigns: "emailCampaignsPerMonth",
   smsCampaigns: "smsCampaignsPerMonth",
   invoices: "invoicesPerMonth",
   workflowExecutions: "automationWorkflows",
@@ -105,7 +103,6 @@ const RESOURCE_DISPLAY_NAMES: Record<string, string> = {
   callSeconds: "call minutes",
   forms: "forms",
   buyers: "buyers",
-  emailCampaigns: "email campaigns",
   smsCampaigns: "SMS campaigns",
   invoices: "invoices",
   workflowExecutions: "automation workflows",
@@ -616,7 +613,6 @@ export async function resetMonthlyUsage(userId: string): Promise<boolean> {
     $set: {
       "subscription.subscriptionUsage.leads": 0,
       "subscription.subscriptionUsage.callSeconds": 0,
-      "subscription.subscriptionUsage.emailCampaigns": 0,
       "subscription.subscriptionUsage.smsCampaigns": 0,
       "subscription.subscriptionUsage.workflowExecutions": 0,
       "subscription.subscriptionUsage.invoices": 0,
@@ -754,7 +750,6 @@ export async function getUsageSummary(userId: string): Promise<{
       "callSeconds",
       "forms",
       "buyers",
-      "emailCampaignsPerMonth",
       "smsCampaignsPerMonth",
       "invoicesPerMonth",
       "automationWorkflows",
@@ -767,7 +762,6 @@ export async function getUsageSummary(userId: string): Promise<{
       callSeconds: "callSeconds",
       forms: "forms",
       buyers: "buyers",
-      emailCampaignsPerMonth: "emailCampaigns",
       smsCampaignsPerMonth: "smsCampaigns",
       invoicesPerMonth: "invoices",
       automationWorkflows: "workflowExecutions",
@@ -820,10 +814,10 @@ export const TIER_LIMIT_PRESETS = {
     concurrentCallLimit: 1,
 
     // Marketing & Campaigns
-    emailCampaignsPerMonth: 2,
+    emailCampaignsEnabled: false,
     smsCampaignsPerMonth: 0,
-    emailRecipientsPerCampaign: 50,
     smsRecipientsPerCampaign: 0,
+    smsPhoneNumbers: 0,
 
     // Automation & Workflows
     automationWorkflows: 1,
@@ -889,10 +883,10 @@ export const TIER_LIMIT_PRESETS = {
     concurrentCallLimit: 2,
 
     // Marketing & Campaigns
-    emailCampaignsPerMonth: 10,
+    emailCampaignsEnabled: true,
     smsCampaignsPerMonth: 5,
-    emailRecipientsPerCampaign: 250,
     smsRecipientsPerCampaign: 100,
+    smsPhoneNumbers: 1,
 
     // Automation & Workflows
     automationWorkflows: 3,
@@ -958,10 +952,10 @@ export const TIER_LIMIT_PRESETS = {
     concurrentCallLimit: 5,
 
     // Marketing & Campaigns
-    emailCampaignsPerMonth: 50,
+    emailCampaignsEnabled: true,
     smsCampaignsPerMonth: 25,
-    emailRecipientsPerCampaign: 1000,
     smsRecipientsPerCampaign: 500,
+    smsPhoneNumbers: 5,
 
     // Automation & Workflows
     automationWorkflows: 10,
@@ -1027,10 +1021,10 @@ export const TIER_LIMIT_PRESETS = {
     concurrentCallLimit: 0,
 
     // Marketing & Campaigns
-    emailCampaignsPerMonth: 0,
+    emailCampaignsEnabled: true,
     smsCampaignsPerMonth: 0,
-    emailRecipientsPerCampaign: 0,
     smsRecipientsPerCampaign: 0,
+    smsPhoneNumbers: 0,
 
     // Automation & Workflows
     automationWorkflows: 0,
@@ -1107,10 +1101,10 @@ export function buildSubscriptionLimitsFromTier(
     concurrentCallLimit: tierLimits?.concurrentCallLimit ?? 1,
 
     // Marketing & Campaigns
-    emailCampaignsPerMonth: tierLimits?.emailCampaignsPerMonth ?? 0,
+    emailCampaignsEnabled: tierLimits?.emailCampaignsEnabled ?? false,
     smsCampaignsPerMonth: tierLimits?.smsCampaignsPerMonth ?? 0,
-    emailRecipientsPerCampaign: tierLimits?.emailRecipientsPerCampaign ?? 100,
     smsRecipientsPerCampaign: tierLimits?.smsRecipientsPerCampaign ?? 50,
+    smsPhoneNumbers: tierLimits?.smsPhoneNumbers ?? 0,
 
     // Automation & Workflows
     automationWorkflows: tierLimits?.automationWorkflows ?? 0,

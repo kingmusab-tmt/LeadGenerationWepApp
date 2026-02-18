@@ -1,6 +1,7 @@
 // The following code snippet modifies the checkout session creation to route credit purchases to the seller's Stripe account.
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createHash, randomBytes } from "crypto";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
@@ -16,7 +17,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(req: NextRequest) {
   await dbConnect();
 
-  const { units, cost, tierId, billingInterval = "month" } = await req.json();
+  const {
+    units,
+    cost,
+    tierId,
+    billingInterval = "month",
+    idempotencyKey: bodyIdempotencyKey,
+  } = await req.json();
   const userSession = await getServerSession(authOptions);
 
   if (!userSession) {
@@ -106,6 +113,31 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const sellerAccount = await stripe.accounts.retrieve(
+        seller.stripeAccountId,
+      );
+
+      if (!sellerAccount.charges_enabled || !sellerAccount.payouts_enabled) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Seller payout account is not fully enabled. Please complete Stripe onboarding.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const headerIdempotencyKey = req.headers.get("x-idempotency-key");
+      const idempotencyKey =
+        bodyIdempotencyKey ||
+        headerIdempotencyKey ||
+        createHash("sha256")
+          .update(
+            `${userSession.user.id}:${sellerId}:${units}:${cost}:${randomBytes(8).toString("hex")}`,
+          )
+          .digest("hex");
+
       sessionParams = {
         payment_method_types: ["card"],
         line_items: [
@@ -131,8 +163,6 @@ export async function POST(req: NextRequest) {
           transfer_data: {
             destination: seller.stripeAccountId,
           },
-          // You can set application fee amount here if you take a platform cut
-          application_fee_amount: Math.round(cost * 100 * 0.1), // 10% platform fee
         },
         success_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=success`,
         cancel_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
@@ -145,12 +175,15 @@ export async function POST(req: NextRequest) {
         },
       };
 
-      const session = await stripe.checkout.sessions.create(sessionParams);
+      const session = await stripe.checkout.sessions.create(sessionParams, {
+        idempotencyKey,
+      });
 
       return NextResponse.json({
         success: true,
         sessionId: session.id,
         sessionUrl: session.url,
+        idempotencyKey,
       });
     }
   } catch (error: any) {

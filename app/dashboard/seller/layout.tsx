@@ -113,27 +113,11 @@ const navItems: NavItem[] = [
     title: "Email Campaigns",
     path: "email-campaigns",
     icon: <Email />,
-    children: [
-      { title: "All Campaigns", path: "email-campaigns", icon: <ViewList /> },
-      {
-        title: "Templates",
-        path: "email-campaigns/templates",
-        icon: <FormatListBulleted />,
-      },
-    ],
   },
   {
     title: "SMS Campaigns",
     path: "sms-campaigns",
     icon: <Sms />,
-    children: [
-      { title: "All Campaigns", path: "sms-campaigns", icon: <ViewList /> },
-      {
-        title: "Templates",
-        path: "sms-campaigns/templates",
-        icon: <FormatListBulleted />,
-      },
-    ],
   },
   {
     title: "Call Tracking",

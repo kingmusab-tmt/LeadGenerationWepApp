@@ -22,15 +22,22 @@ export async function GET(req: NextRequest) {
       });
     }
     await dbConnect();
-    const sellerId = req.nextUrl.searchParams.get("sellerId");
 
-    const seller = await User.findById(sellerId);
+    const purpose = req.nextUrl.searchParams.get("purpose");
+    const seller = await User.findById(session.user.id);
     if (!seller)
       return new NextResponse(JSON.stringify({ error: "Seller not found" }), {
         status: 404,
       });
 
-    return new NextResponse(JSON.stringify(seller.trackingNumbers), {
+    let numbers = seller.trackingNumbers || [];
+
+    // Filter by purpose if provided
+    if (purpose) {
+      numbers = numbers.filter((num: any) => num.purpose === purpose);
+    }
+
+    return new NextResponse(JSON.stringify(numbers), {
       status: 200,
     });
   } catch (error) {

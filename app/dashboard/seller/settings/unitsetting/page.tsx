@@ -23,8 +23,10 @@ import {
   Alert,
   Box,
   Divider,
+  CircularProgress,
 } from "@mui/material";
 import { Edit, Delete } from "@mui/icons-material";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface UnitPricingOption {
   units: number;
@@ -42,6 +44,7 @@ interface SettingsData {
 }
 
 const UnitPricingComponent: React.FC = () => {
+  const fetchWithCSRF = useCSRFFetch();
   const [settings, setSettings] = useState<SettingsData>({
     unitPricingOptions: [],
     callChargeOptions: [],
@@ -54,6 +57,7 @@ const UnitPricingComponent: React.FC = () => {
   const [callSeconds, setCallSeconds] = useState<number>(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -64,7 +68,7 @@ const UnitPricingComponent: React.FC = () => {
     severity: "success",
   });
   const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm")
+    theme.breakpoints.down("sm"),
   );
 
   // Fetch settings on component mount
@@ -121,8 +125,9 @@ const UnitPricingComponent: React.FC = () => {
         index: editIndex,
       };
 
+      setIsSaving(true);
       try {
-        const response = await fetch(endpoint, {
+        const response = await fetchWithCSRF(endpoint, {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -156,6 +161,8 @@ const UnitPricingComponent: React.FC = () => {
           message: "An error occurred",
           severity: "error",
         });
+      } finally {
+        setIsSaving(false);
       }
     } else {
       // Handle call charge options
@@ -176,8 +183,9 @@ const UnitPricingComponent: React.FC = () => {
         index: editIndex,
       };
 
+      setIsSaving(true);
       try {
-        const response = await fetch(endpoint, {
+        const response = await fetchWithCSRF(endpoint, {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -211,13 +219,15 @@ const UnitPricingComponent: React.FC = () => {
           message: "An error occurred",
           severity: "error",
         });
+      } finally {
+        setIsSaving(false);
       }
     }
   };
 
   const handleDelete = async (type: "unit" | "call", index: number) => {
     try {
-      const response = await fetch("/api/settings/unitsettingapi", {
+      const response = await fetchWithCSRF("/api/settings/unitsettingapi", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, index }),
@@ -346,9 +356,17 @@ const UnitPricingComponent: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDialogClose}>Cancel</Button>
-          <Button onClick={handleAddOrUpdate} color="primary">
-            {editIndex !== null ? "Update" : "Add"}
+          <Button onClick={handleDialogClose} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddOrUpdate}
+            color="primary"
+            disabled={isSaving}
+            variant="contained"
+            startIcon={isSaving ? <CircularProgress size={20} /> : undefined}
+          >
+            {isSaving ? "Saving..." : editIndex !== null ? "Update" : "Add"}
           </Button>
         </DialogActions>
       </Dialog>

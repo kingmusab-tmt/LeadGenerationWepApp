@@ -32,6 +32,7 @@ import {
 } from "@mui/icons-material";
 import Link from "next/link";
 import { toast } from "react-toastify";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Invoice {
   _id: string;
@@ -54,6 +55,7 @@ interface InvoiceStats {
 }
 
 export default function InvoicesPage() {
+  const fetchWithCSRF = useCSRFFetch();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +107,7 @@ export default function InvoicesPage() {
     if (!selectedInvoice) return;
 
     try {
-      const res = await fetch(`/api/invoices/${selectedInvoice._id}`, {
+      const res = await fetchWithCSRF(`/api/invoices/${selectedInvoice._id}`, {
         method: "DELETE",
       });
 

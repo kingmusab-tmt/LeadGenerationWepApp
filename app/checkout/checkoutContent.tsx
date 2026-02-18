@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Container,
   Typography,
@@ -72,8 +72,22 @@ const StripeCheckoutButton = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const csrfFetch = useCSRFFetch();
+  const idempotencyKeyRef = useRef<string | null>(null);
+
+  const generateIdempotencyKey = (tierId: string, interval: string): string => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 15);
+    return `subscription-${tierId}-${interval}-${timestamp}-${random}`;
+  };
 
   const handleCheckout = async () => {
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = generateIdempotencyKey(
+        tier._id,
+        billingInterval,
+      );
+    }
+
     setLoading(true);
     onError("");
 
@@ -82,10 +96,14 @@ const StripeCheckoutButton = ({
         "/api/payments/stripe/stripecheckoutapi",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-idempotency-key": idempotencyKeyRef.current,
+          },
           body: JSON.stringify({
             tierId: tier._id,
             billingInterval: billingInterval,
+            idempotencyKey: idempotencyKeyRef.current,
           }),
         },
       );
@@ -95,12 +113,18 @@ const StripeCheckoutButton = ({
         window.location.href = data.sessionUrl;
       } else {
         onError(data.message || "Failed to initiate Stripe payment");
+        idempotencyKeyRef.current = null;
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : "Payment failed");
+      idempotencyKeyRef.current = null;
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    idempotencyKeyRef.current = null;
+  }, [tier._id, billingInterval]);
 
   // Calculate display price based on billing interval
   const displayPrice =

@@ -14,6 +14,11 @@ export const TrackingNumberSchema = {
       message: "Invalid phone number format",
     },
   }, // Tracking phone number
+  purpose: {
+    type: String,
+    enum: ["call", "sms"],
+    default: "call",
+  }, // Purpose of the number (call tracking or SMS campaigns)
   industry: {
     type: String,
     required: [true, "Industry is required"],
@@ -322,10 +327,10 @@ export const SubscriptionSchema = {
     concurrentCallLimit: { type: Number, default: 1, min: 0 },
 
     // Marketing & Campaigns
-    emailCampaignsPerMonth: { type: Number, default: 0, min: 0 },
+    emailCampaignsEnabled: { type: Boolean, default: false },
     smsCampaignsPerMonth: { type: Number, default: 0, min: 0 },
-    emailRecipientsPerCampaign: { type: Number, default: 100, min: 0 },
     smsRecipientsPerCampaign: { type: Number, default: 50, min: 0 },
+    smsPhoneNumbers: { type: Number, default: 0, min: 0 },
 
     // Automation & Workflows
     automationWorkflows: { type: Number, default: 0, min: 0 },

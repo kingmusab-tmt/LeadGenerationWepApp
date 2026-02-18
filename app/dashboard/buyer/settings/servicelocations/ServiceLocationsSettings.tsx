@@ -29,6 +29,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import EditIcon from "@mui/icons-material/Edit";
 import InfoIcon from "@mui/icons-material/Info";
 import { usCities } from "@/utils/citiesInUsUk";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface ServiceLocation {
   city: string;
@@ -39,6 +40,7 @@ interface ServiceLocation {
 }
 
 export default function ServiceLocationsSettings() {
+  const fetchWithCSRF = useCSRFFetch();
   const [serviceLocations, setServiceLocations] = useState<ServiceLocation[]>(
     [],
   );
@@ -141,7 +143,7 @@ export default function ServiceLocationsSettings() {
         updatedLocations = [...serviceLocations, locationToSave];
       }
 
-      const response = await fetch("/api/buyers/service-locations", {
+      const response = await fetchWithCSRF("/api/buyers/service-locations", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -188,7 +190,7 @@ export default function ServiceLocationsSettings() {
     try {
       const updatedLocations = serviceLocations.filter((_, i) => i !== index);
 
-      const response = await fetch("/api/buyers/service-locations", {
+      const response = await fetchWithCSRF("/api/buyers/service-locations", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -221,7 +223,7 @@ export default function ServiceLocationsSettings() {
     const newValue = !locationMatchingStrict;
 
     try {
-      const response = await fetch("/api/buyers/service-locations", {
+      const response = await fetchWithCSRF("/api/buyers/service-locations", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

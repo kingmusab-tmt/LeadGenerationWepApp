@@ -38,6 +38,7 @@ export interface ISmsCampaign extends Document {
   name: string;
   templateId?: mongoose.Types.ObjectId;
   segmentId?: mongoose.Types.ObjectId;
+  fromPhoneNumber?: string; // Twilio number allocated for this campaign
   recipients: ISmsRecipient[];
   textContent: string;
   scheduleAt?: Date;
@@ -91,7 +92,7 @@ const SmsTemplateSchema = new Schema<ISmsTemplate>(
     category: { type: String, default: "custom" },
     textContent: { type: String, required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const SmsSegmentSchema = new Schema<ISmsSegment>(
@@ -108,7 +109,7 @@ const SmsSegmentSchema = new Schema<ISmsSegment>(
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const SmsCampaignSchema = new Schema<ISmsCampaign>(
@@ -117,6 +118,7 @@ const SmsCampaignSchema = new Schema<ISmsCampaign>(
     name: { type: String, required: true },
     templateId: { type: Schema.Types.ObjectId, ref: "SmsTemplate" },
     segmentId: { type: Schema.Types.ObjectId, ref: "SmsSegment" },
+    fromPhoneNumber: { type: String }, // Twilio number for this campaign
     recipients: [
       {
         phone: { type: String, required: true },
@@ -141,7 +143,7 @@ const SmsCampaignSchema = new Schema<ISmsCampaign>(
       optOuts: { type: Number, default: 0 },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const SmsQueueSchema = new Schema<ISmsQueue>(
@@ -167,7 +169,7 @@ const SmsQueueSchema = new Schema<ISmsQueue>(
     error: { type: String },
     messageSid: { type: String, index: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const SmsEventSchema = new Schema<ISmsEvent>(
@@ -195,7 +197,7 @@ const SmsEventSchema = new Schema<ISmsEvent>(
     phone: { type: String, required: true, index: true },
     meta: { type: Object },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 SmsTemplateSchema.index({ userId: 1, name: 1 }, { unique: true });

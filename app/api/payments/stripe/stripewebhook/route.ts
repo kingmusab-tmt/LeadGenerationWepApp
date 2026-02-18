@@ -74,9 +74,7 @@ export async function POST(req: NextRequest) {
           typeof account === "object" &&
           "charges_enabled" in account &&
           "details_submitted" in account &&
-          "payouts_enabled" in account &&
-          "type" in account &&
-          account.type === "custom"
+          "payouts_enabled" in account
         ) {
           await handleAccountUpdated(account as Stripe.Account);
         }
@@ -250,18 +248,7 @@ async function handleTransferEvent(
   );
 
   if (transaction) {
-    // Update seller's balance if the transfer is confirmed
-    // Stripe.Transfer may not have a 'status' property in all versions; assume transfer is paid if eventType is 'transfer.paid'
-    if (eventType === "transfer.paid") {
-      const sellerId = transaction.metadata?.sellerId;
-      if (sellerId) {
-        await User.findByIdAndUpdate(
-          sellerId,
-          { $inc: { walletBalance: transaction.amount } },
-          { new: true },
-        );
-      }
-    }
+    // Transfer events are recorded for reconciliation only.
   }
 }
 
@@ -456,12 +443,12 @@ async function handleSubscriptionPurchase(
           concurrentCallLimit: tier.tierLimits?.concurrentCallLimit || 1,
 
           // Marketing & Campaigns
-          emailCampaignsPerMonth: tier.tierLimits?.emailCampaignsPerMonth || 0,
+          emailCampaignsEnabled:
+            tier.tierLimits?.emailCampaignsEnabled || false,
           smsCampaignsPerMonth: tier.tierLimits?.smsCampaignsPerMonth || 0,
-          emailRecipientsPerCampaign:
-            tier.tierLimits?.emailRecipientsPerCampaign || 100,
           smsRecipientsPerCampaign:
             tier.tierLimits?.smsRecipientsPerCampaign || 50,
+          smsPhoneNumbers: tier.tierLimits?.smsPhoneNumbers || 0,
 
           // Automation & Workflows
           automationWorkflows: tier.tierLimits?.automationWorkflows || 0,
@@ -701,13 +688,12 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
             concurrentCallLimit: tier.tierLimits?.concurrentCallLimit || 1,
 
             // Marketing & Campaigns
-            emailCampaignsPerMonth:
-              tier.tierLimits?.emailCampaignsPerMonth || 0,
+            emailCampaignsEnabled:
+              tier.tierLimits?.emailCampaignsEnabled || false,
             smsCampaignsPerMonth: tier.tierLimits?.smsCampaignsPerMonth || 0,
-            emailRecipientsPerCampaign:
-              tier.tierLimits?.emailRecipientsPerCampaign || 100,
             smsRecipientsPerCampaign:
               tier.tierLimits?.smsRecipientsPerCampaign || 50,
+            smsPhoneNumbers: tier.tierLimits?.smsPhoneNumbers || 0,
 
             // Automation & Workflows
             automationWorkflows: tier.tierLimits?.automationWorkflows || 0,

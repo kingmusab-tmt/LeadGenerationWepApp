@@ -51,13 +51,15 @@ export async function GET(req: NextRequest) {
         { status: 200 },
       );
     } else if (session.user.role === "seller") {
-      //("Property", process.env.NEXT_PUBLIC_TAWKPROPERTYID!);
-      //("widget", process.env.NEXT_PUBLIC_TAWKWIDGETID!);
+      const seller = await User.findOne({ email: session.user.email });
+
       return NextResponse.json(
         {
           success: true,
-          propertyId: process.env.NEXT_PUBLIC_TAWKPROPERTYID!,
-          widgetId: process.env.NEXT_PUBLIC_TAWKWIDGETID!,
+          propertyId:
+            seller?.tawkPropertyId || process.env.NEXT_PUBLIC_TAWKPROPERTYID!,
+          widgetId:
+            seller?.tawkWidgetId || process.env.NEXT_PUBLIC_TAWKWIDGETID!,
         },
         { status: 200 },
       );
@@ -98,7 +100,15 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json(
-      { success: true, seller: updatedSeller },
+      {
+        success: true,
+        message: "Tawk.to configuration updated successfully!",
+        data: {
+          tawkPropertyId: updatedSeller.tawkPropertyId,
+          tawkWidgetId: updatedSeller.tawkWidgetId,
+        },
+        seller: updatedSeller,
+      },
       { status: 200 },
     );
   } catch (error: any) {

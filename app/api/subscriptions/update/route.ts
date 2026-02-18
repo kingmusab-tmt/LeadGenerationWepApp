@@ -141,12 +141,11 @@ export async function POST(req: Request) {
         concurrentCallLimit: tier.tierLimits?.concurrentCallLimit || 1,
 
         // Marketing & Campaigns
-        emailCampaignsPerMonth: tier.tierLimits?.emailCampaignsPerMonth || 0,
+        emailCampaignsEnabled: tier.tierLimits?.emailCampaignsEnabled || false,
         smsCampaignsPerMonth: tier.tierLimits?.smsCampaignsPerMonth || 0,
-        emailRecipientsPerCampaign:
-          tier.tierLimits?.emailRecipientsPerCampaign || 100,
         smsRecipientsPerCampaign:
           tier.tierLimits?.smsRecipientsPerCampaign || 50,
+        smsPhoneNumbers: tier.tierLimits?.smsPhoneNumbers || 0,
 
         // Automation & Workflows
         automationWorkflows: tier.tierLimits?.automationWorkflows || 0,

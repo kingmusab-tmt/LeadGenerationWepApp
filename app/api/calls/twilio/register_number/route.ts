@@ -27,19 +27,25 @@ export async function POST(req: NextRequest) {
 
     await dbConnect();
 
-    const { sellerId, areaCode, industry, method, twilioNumber } =
+    const { sellerId, areaCode, industry, method, twilioNumber, purpose } =
       await req.json();
 
+    // Use sellerId from request or fall back to session user
+    const userId = sellerId || userSession.user.id;
+
     // Validate required fields
-    if (!sellerId || !industry || !method) {
+    if (!industry || !method) {
       return NextResponse.json(
-        { error: "sellerId, industry, and method are required" },
+        { error: "industry and method are required" },
         { status: 400 },
       );
     }
 
+    // For SMS, areaCode is optional - we'll use a default if not provided
+    const finalAreaCode = areaCode || "212"; // Default to NYC area code
+
     // Check if the seller exists and populate subscription
-    const user = await User.findById(sellerId).select(
+    const user = await User.findById(userId).select(
       "+subscription +trackingNumbers",
     );
     if (!user) {
@@ -77,18 +83,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if the seller already has a number for this industry
-    const hasExistingNumber = user.trackingNumbers.some(
-      (num) => num.industry === industry,
-    );
-
-    if (hasExistingNumber) {
-      return NextResponse.json(
-        {
-          error: "You already have a number for this industry.",
-        },
-        { status: 400 },
+    // Check if the seller already has a number for this industry (only for call tracking, not SMS)
+    if (purpose !== "sms") {
+      const hasExistingNumber = user.trackingNumbers.some(
+        (num) => num.industry === industry,
       );
+
+      if (hasExistingNumber) {
+        return NextResponse.json(
+          {
+            error: "You already have a number for this industry.",
+          },
+          { status: 400 },
+        );
+      }
     }
 
     let purchasedNumber: string;
@@ -96,7 +104,7 @@ export async function POST(req: NextRequest) {
     if (method === "Manual") {
       if (twilioNumber) {
         purchasedNumber = twilioNumber;
-      } else if (areaCode) {
+      } else if (finalAreaCode) {
         if (!user.twilioAccountSid || !user.twilioAuthToken) {
           return NextResponse.json(
             {
@@ -111,7 +119,7 @@ export async function POST(req: NextRequest) {
         const numbers = await userClient
           .availablePhoneNumbers("US")
           .local.list({
-            areaCode,
+            areaCode: finalAreaCode,
             limit: 1,
             smsEnabled: true,
             voiceEnabled: true,
@@ -126,8 +134,8 @@ export async function POST(req: NextRequest) {
 
         const purchased = await userClient.incomingPhoneNumbers.create({
           phoneNumber: numbers[0].phoneNumber,
-          friendlyName: `Seller ${sellerId} - ${industry}`,
-          voiceUrl: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${sellerId}`,
+          friendlyName: `Seller ${userId} - ${industry}`,
+          voiceUrl: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${userId}`,
           voiceMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
@@ -141,43 +149,79 @@ export async function POST(req: NextRequest) {
         );
       }
     } else if (method === "Automatic") {
-      if (!areaCode) {
-        return NextResponse.json(
-          { error: "areaCode is required for Automatic method." },
-          { status: 400 },
-        );
-      }
-
-      if (!/^\d{3}$/.test(areaCode)) {
+      if (finalAreaCode && !/^\d{3}$/.test(finalAreaCode)) {
         return NextResponse.json(
           { error: "Invalid area code. It must be a 3-digit number." },
           { status: 400 },
         );
       }
 
-      const numbers = await systemClient
-        .availablePhoneNumbers("US")
-        .local.list({
-          areaCode,
-          limit: 1,
-          smsEnabled: true,
-          voiceEnabled: true,
+      // For SMS, always use system credentials
+      if (purpose === "sms") {
+        if (!SYSTEM_TWILIO_ACCOUNT_SID || !SYSTEM_TWILIO_AUTH_TOKEN) {
+          return NextResponse.json(
+            {
+              error:
+                "System Twilio credentials not configured. Please contact administrator to set up TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.",
+            },
+            { status: 500 },
+          );
+        }
+
+        const numbers = await systemClient
+          .availablePhoneNumbers("US")
+          .local.list({
+            areaCode: finalAreaCode,
+            limit: 1,
+            smsEnabled: true,
+            voiceEnabled: true,
+          });
+
+        if (numbers.length === 0) {
+          return NextResponse.json(
+            { error: "No available phone numbers for the provided area code." },
+            { status: 404 },
+          );
+        }
+
+        const purchased = await systemClient.incomingPhoneNumbers.create({
+          phoneNumber: numbers[0].phoneNumber,
+          friendlyName: `SMS - ${userId}`,
+          smsUrl: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/marketing/sms/inbound`,
+          smsMethod: "POST",
         });
+        purchasedNumber = purchased.phoneNumber;
+      } else {
+        // For call tracking, use user credentials if available
+        let clientToUse = systemClient;
+        if (user.twilioAccountSid && user.twilioAuthToken) {
+          clientToUse = twilio(user.twilioAccountSid, user.twilioAuthToken);
+        }
 
-      if (numbers.length === 0) {
-        return NextResponse.json(
-          { error: "No available phone numbers for the provided area code." },
-          { status: 404 },
-        );
+        const numbers = await clientToUse
+          .availablePhoneNumbers("US")
+          .local.list({
+            areaCode: finalAreaCode,
+            limit: 1,
+            smsEnabled: true,
+            voiceEnabled: true,
+          });
+
+        if (numbers.length === 0) {
+          return NextResponse.json(
+            { error: "No available phone numbers for the provided area code." },
+            { status: 404 },
+          );
+        }
+
+        const purchased = await clientToUse.incomingPhoneNumbers.create({
+          phoneNumber: numbers[0].phoneNumber,
+          friendlyName: `Seller ${userId} - ${industry}`,
+          voiceUrl: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${userId}`,
+          voiceMethod: "POST",
+        });
+        purchasedNumber = purchased.phoneNumber;
       }
-
-      const purchased = await systemClient.incomingPhoneNumbers.create({
-        phoneNumber: numbers[0].phoneNumber,
-        friendlyName: `Seller ${sellerId} - ${industry}`,
-        voiceUrl: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${sellerId}`,
-        voiceMethod: "POST",
-      });
-      purchasedNumber = purchased.phoneNumber;
     } else {
       return NextResponse.json(
         { error: "Invalid method. Must be 'Manual' or 'Automatic'." },
@@ -191,6 +235,7 @@ export async function POST(req: NextRequest) {
     try {
       user.trackingNumbers.push({
         phoneNumber: purchasedNumber,
+        purpose: purpose || "call",
         industry,
         forwardingType: "direct",
         method,

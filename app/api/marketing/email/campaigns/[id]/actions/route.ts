@@ -43,17 +43,13 @@ export async function POST(
 
     // ==================== SEND ====================
     if (action === "send") {
-      // Check recipient limit
-      const recipientCount = campaign.recipientEmails?.length || 0;
+      // Check if email campaigns feature is enabled
       const limits = await getSubscriptionLimits(session.user.id);
-      const maxRecipients = limits?.emailRecipientsPerCampaign || 0;
-
-      if (maxRecipients > 0 && recipientCount > maxRecipients) {
+      if (!limits?.emailCampaignsEnabled) {
         return NextResponse.json(
           {
-            error: `Recipient limit exceeded. Your plan allows ${maxRecipients} recipients per campaign, but this campaign has ${recipientCount}.`,
-            limit: maxRecipients,
-            current: recipientCount,
+            error:
+              "Email campaigns feature is not included in your subscription plan. Please upgrade to access this feature.",
           },
           { status: 403 },
         );

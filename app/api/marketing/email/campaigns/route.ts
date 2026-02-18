@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
     // Check subscription limit for email campaigns
     const usageCheck = await checkAndIncrementUsage(
       session.user.id,
-      "emailCampaignsPerMonth",
+      "emailCampaigns",
       1,
     );
     if (!usageCheck.allowed) {

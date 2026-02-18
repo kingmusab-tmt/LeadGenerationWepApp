@@ -37,6 +37,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
+        accountId: user.stripeAccountId,
         detailsSubmitted: account.details_submitted,
         chargesEnabled: account.charges_enabled,
         payoutsEnabled: account.payouts_enabled,
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
           eventuallyDue: account.requirements?.eventually_due || [],
           pastDue: account.requirements?.past_due || [],
         },
-        tosAccepted: user.tosAcceptance?.accepted || false,
+        tosAccepted: !!account.tos_acceptance?.date,
       },
       { status: 200 },
     );

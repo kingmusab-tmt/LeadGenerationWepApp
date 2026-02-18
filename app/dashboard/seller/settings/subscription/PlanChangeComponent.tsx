@@ -28,6 +28,7 @@ import {
   Star as StarIcon,
 } from "@mui/icons-material";
 import { useNotification } from "@/lib/useNotification";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Tier {
   _id: string;
@@ -65,6 +66,7 @@ interface ProrationPreview {
 
 export default function PlanChangeComponent() {
   const notify = useNotification();
+  const fetchWithCSRF = useCSRFFetch();
   const [loading, setLoading] = useState(true);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [currentSubscription, setCurrentSubscription] =
@@ -128,7 +130,7 @@ export default function PlanChangeComponent() {
         setPreviewLoading(true);
         setPreview(null);
 
-        const response = await fetch("/api/subscriptions/manage", {
+        const response = await fetchWithCSRF("/api/subscriptions/manage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -181,7 +183,7 @@ export default function PlanChangeComponent() {
     try {
       setChangingPlan(true);
 
-      const response = await fetch("/api/subscriptions/manage", {
+      const response = await fetchWithCSRF("/api/subscriptions/manage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
