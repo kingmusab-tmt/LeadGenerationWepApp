@@ -51,10 +51,7 @@ export class EmailTemplateEngine {
     campaignId: string,
     recipientEmail: string,
   ): string {
-    const baseUrl =
-      process.env.NEXTAUTH_URL ||
-      process.env.NEXTAUTH_URL ||
-      "http://localhost:3000";
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     const pixel = `<img src="${baseUrl}/api/marketing/email/track?action=open&campaignId=${campaignId}&email=${encodeURIComponent(recipientEmail)}" width="1" height="1" alt="" style="display:none" />`;
     // Insert before closing body tag if exists, otherwise append
     if (html.includes("</body>")) {
@@ -75,10 +72,7 @@ export class EmailTemplateEngine {
     campaignId: string,
     recipientEmail: string,
   ): string {
-    const baseUrl =
-      process.env.NEXTAUTH_URL ||
-      process.env.NEXTAUTH_URL ||
-      "http://localhost:3000";
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     const linkRegex = /href="([^"]*)"/g;
     return html.replace(linkRegex, (match, url) => {
       // Skip tracking for unsubscribe, mailto, and anchor links
@@ -109,10 +103,7 @@ export class EmailTemplateEngine {
     unsubscribeToken: string,
     campaignId: string,
   ): string {
-    const baseUrl =
-      process.env.NEXTAUTH_URL ||
-      process.env.NEXTAUTH_URL ||
-      "https://localhost:3000";
+    const baseUrl = process.env.NEXTAUTH_URL || "https://localhost:3000";
     const unsubscribeLink = `<a href="${baseUrl}/api/marketing/email/unsubscribe/${unsubscribeToken}?campaign=${campaignId}">Unsubscribe</a>`;
     const footer = `<footer style="margin-top: 40px; text-align: center; font-size: 12px; color: #999;">${unsubscribeLink}</footer>`;
     return html.replace("</body>", `${footer}</body>`);
