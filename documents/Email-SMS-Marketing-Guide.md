@@ -450,7 +450,7 @@ A simpler generic campaign model exists at `/dashboard/seller/campaigns` with ba
    - **(Option B)** Update all `fetch()` calls in the UI pages to use the correct `/api/marketing/email/...` and `/api/marketing/sms/...` paths.
    - Option B is recommended as it's a clean fix.
 
-2. **Fix email tracking URLs** — Replace hardcoded `https://yourapp.com/` with `process.env.NEXT_PUBLIC_DOMAIN` or `process.env.NEXT_PUBLIC_APP_URL` in `EmailTemplateEngine`.
+2. **Fix email tracking URLs** — Replace hardcoded `https://yourapp.com/` with `process.env.NEXT_PUBLIC_DOMAIN` or `process.env.NEXTAUTH_URL` in `EmailTemplateEngine`.
 
 3. **Fix Twilio status callback URL** — Update the callback URL in `SmsQueueManager` to `/api/marketing/sms/track/status`.
 

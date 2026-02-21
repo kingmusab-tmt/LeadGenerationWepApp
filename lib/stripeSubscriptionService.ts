@@ -156,6 +156,35 @@ export async function createSubscriptionCheckout(
         `[StripeSubscription] Price mismatch for tier ${tier.name}: ${priceValidation.message}`,
       );
       // Log warning but continue - Stripe price is authoritative
+    } else if (!priceValidation.valid && priceValidation.stripePrice === null) {
+      console.warn(
+        `[StripeSubscription] Invalid Stripe price ID for tier ${tier.name}, attempting price sync repair`,
+      );
+
+      const syncResult = await syncTierPricesWithStripe(tierId);
+      if (syncResult.success) {
+        const repairedPriceId =
+          billingInterval === "year"
+            ? syncResult.annualPriceId
+            : syncResult.monthlyPriceId;
+
+        if (repairedPriceId) {
+          stripePriceId = repairedPriceId;
+          console.log(
+            `[StripeSubscription] Repaired Stripe price ID for tier ${tier.name}: ${repairedPriceId}`,
+          );
+        } else {
+          stripePriceId = undefined;
+          console.warn(
+            `[StripeSubscription] Price sync completed without a usable price ID for tier ${tier.name}, falling back to dynamic pricing`,
+          );
+        }
+      } else {
+        stripePriceId = undefined;
+        console.warn(
+          `[StripeSubscription] Price sync repair failed for tier ${tier.name}: ${syncResult.errors.join("; ")}. Falling back to dynamic pricing`,
+        );
+      }
     }
   }
 

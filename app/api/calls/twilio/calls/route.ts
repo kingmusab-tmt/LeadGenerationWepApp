@@ -738,7 +738,7 @@ async function handleNoAnswer(
       debugLog("No-answer fallback: overflow", { overflowNumber });
     } else if (scheduledCallbackEnabled) {
       const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "";
+        process.env.NEXTAUTH_URL || process.env.NEXTAUTH_URL || "";
       twiml.say("All of our representatives are currently unavailable.");
       const gather = twiml.gather({
         numDigits: 1,

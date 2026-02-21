@@ -52,7 +52,7 @@ export class EmailTemplateEngine {
     recipientEmail: string,
   ): string {
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
       process.env.NEXTAUTH_URL ||
       "http://localhost:3000";
     const pixel = `<img src="${baseUrl}/api/marketing/email/track?action=open&campaignId=${campaignId}&email=${encodeURIComponent(recipientEmail)}" width="1" height="1" alt="" style="display:none" />`;
@@ -76,7 +76,7 @@ export class EmailTemplateEngine {
     recipientEmail: string,
   ): string {
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
       process.env.NEXTAUTH_URL ||
       "http://localhost:3000";
     const linkRegex = /href="([^"]*)"/g;
@@ -110,7 +110,7 @@ export class EmailTemplateEngine {
     campaignId: string,
   ): string {
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
       process.env.NEXTAUTH_URL ||
       "https://localhost:3000";
     const unsubscribeLink = `<a href="${baseUrl}/api/marketing/email/unsubscribe/${unsubscribeToken}?campaign=${campaignId}">Unsubscribe</a>`;

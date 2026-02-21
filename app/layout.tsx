@@ -62,9 +62,7 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://brixcot.com",
-  ),
+  metadataBase: new URL(process.env.NEXTAUTH_URL || "https://brixcot.com"),
   alternates: {
     canonical: "/",
   },

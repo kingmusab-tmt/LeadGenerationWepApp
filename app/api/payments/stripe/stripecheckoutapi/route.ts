@@ -62,8 +62,8 @@ export async function POST(req: NextRequest) {
         userSession.user.id,
         tierId,
         billingInterval as "month" | "year",
-        `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
-        `${process.env.FRONTEND_URL}/checkout?plan=${tierId}&payment=canceled`,
+        `${process.env.NEXTAUTH_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        `${process.env.NEXTAUTH_URL}/checkout?plan=${tierId}&payment=canceled`,
       );
 
       if (!result.success) {
@@ -164,8 +164,8 @@ export async function POST(req: NextRequest) {
             destination: seller.stripeAccountId,
           },
         },
-        success_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=success`,
-        cancel_url: `${process.env.FRONTEND_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
+        success_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
+        cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
         customer_email: userSession.user.email,
         metadata: {
           units: units.toString(),

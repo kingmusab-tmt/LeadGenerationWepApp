@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
     if (session?.user?.id) {
       try {
         const seller = await User.findById(session.user.id);
-        const signInUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/sign-in`;
+        const signInUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/auth/sign-in`;
 
         await sendBuyerWelcomeEmail(
           email,

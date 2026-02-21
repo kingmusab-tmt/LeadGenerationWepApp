@@ -530,10 +530,20 @@ export async function syncTierPricesWithStripe(tierId: string): Promise<{
   } else {
     // Validate existing price
     const validation = await validateTierPrice(tierId, "month");
-    if (!validation.valid && validation.stripePrice !== null) {
+    if (!validation.valid && validation.stripePrice === null) {
+      const monthlyRepair = await createStripePriceForTier(tierId, "month");
+      if (monthlyRepair.success) {
+        monthlyPriceId = monthlyRepair.priceId;
+      } else {
+        errors.push(`Monthly price missing/invalid: ${monthlyRepair.error}`);
+        monthlyPriceId = tier.stripeMonthlyPriceId;
+      }
+    } else if (!validation.valid && validation.stripePrice !== null) {
       errors.push(`Monthly price mismatch: ${validation.message}`);
+      monthlyPriceId = tier.stripeMonthlyPriceId;
+    } else {
+      monthlyPriceId = tier.stripeMonthlyPriceId;
     }
-    monthlyPriceId = tier.stripeMonthlyPriceId;
   }
 
   // Create or validate annual price
@@ -547,10 +557,20 @@ export async function syncTierPricesWithStripe(tierId: string): Promise<{
   } else {
     // Validate existing price
     const validation = await validateTierPrice(tierId, "year");
-    if (!validation.valid && validation.stripePrice !== null) {
+    if (!validation.valid && validation.stripePrice === null) {
+      const annualRepair = await createStripePriceForTier(tierId, "year");
+      if (annualRepair.success) {
+        annualPriceId = annualRepair.priceId;
+      } else {
+        errors.push(`Annual price missing/invalid: ${annualRepair.error}`);
+        annualPriceId = tier.stripeAnnualPriceId;
+      }
+    } else if (!validation.valid && validation.stripePrice !== null) {
       errors.push(`Annual price mismatch: ${validation.message}`);
+      annualPriceId = tier.stripeAnnualPriceId;
+    } else {
+      annualPriceId = tier.stripeAnnualPriceId;
     }
-    annualPriceId = tier.stripeAnnualPriceId;
   }
 
   // Get or create coupon for discount

@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
             {
               callerId: call.from,
               timeout: 20, // 20 seconds before retrying
-              action: `https://${process.env.NEXT_TEST_PUBLIC_DOMAIN}/api/call_twillo/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+              action: `https://${process.env.NEXTAUTH_URL}/api/call_twillo/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
             },
             nextBuyer.phone,
           );
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
             {
               callerId: call.from,
               timeout: 20, // 20 seconds before retrying
-              action: `https://${process.env.NEXT_TEST_PUBLIC_DOMAIN}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+              action: `https://${process.env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
             },
             num,
           );
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
               {
                 callerId: call.from,
                 timeout: 20, // 20 seconds before retrying
-                action: `https://${process.env.NEXT_TEST_PUBLIC_DOMAIN}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+                action: `https://${process.env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
               },
               buyer.phone,
             );
