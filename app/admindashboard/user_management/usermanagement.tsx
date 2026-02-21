@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   Box,
   Container,
@@ -43,7 +42,6 @@ import {
 } from "@mui/icons-material";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useNotification } from "@/lib/useNotification";
-import { useInitializeUser } from "@/lib/hooks";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface User {
@@ -61,9 +59,7 @@ interface User {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const UserManagement = () => {
-  const { currentUser, loading: userLoading } = useInitializeUser();
   const notify = useNotification();
-  const router = useRouter();
   const csrfFetch = useCSRFFetch();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +83,9 @@ const UserManagement = () => {
       const response = await fetch(
         `/api/admin/users?search=${encodeURIComponent(searchTerm)}&role=${roleFilter}&status=${statusFilter}`,
       );
+      if (!response.ok) {
+        throw new Error("Failed to fetch users");
+      }
       const data = await response.json();
       setUsers(data.users || []);
     } catch (error) {
@@ -98,15 +97,8 @@ const UserManagement = () => {
   }, [searchTerm, roleFilter, statusFilter, notify]);
 
   useEffect(() => {
-    if (userLoading) return;
-
-    if (!currentUser || currentUser.role !== "admin") {
-      router.push("/auth/sign-in");
-      return;
-    }
-
     fetchUsers();
-  }, [currentUser, userLoading, fetchUsers, router]);
+  }, [searchTerm, roleFilter, statusFilter]);
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -225,7 +217,7 @@ const UserManagement = () => {
     page * rowsPerPage + rowsPerPage,
   );
 
-  if (userLoading || loading) {
+  if (loading) {
     return (
       <Box
         sx={{
@@ -269,6 +261,7 @@ const UserManagement = () => {
             variant="outlined"
             size="small"
             fullWidth
+            value={searchTerm}
             InputProps={{
               startAdornment: <Search sx={{ mr: 1, color: "action.active" }} />,
             }}

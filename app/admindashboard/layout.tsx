@@ -34,9 +34,9 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
 import { useRouter, usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
-import { useInitializeUser } from "@/lib/hooks";
 
 const navItems = [
   { label: "Overview", path: "overview", icon: <Dashboard /> },
@@ -60,7 +60,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
-  const { currentUser, loading: userLoading } = useInitializeUser();
+  const { status, data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const theme = useTheme();
@@ -69,11 +69,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
   const pathname = usePathname();
   const [loading, setLoading] = useState(false);
 
+  const currentUser = session?.user;
+
   useEffect(() => {
-    if (!userLoading && (!currentUser || currentUser.role !== "admin")) {
-      router.push("/auth/sign-in");
+    if (status === "loading") return;
+    if (
+      status === "unauthenticated" ||
+      !currentUser ||
+      currentUser.role !== "admin"
+    ) {
+      router.replace("/auth/sign-in");
     }
-  }, [userLoading, currentUser, router]);
+  }, [status, currentUser, router]);
 
   const avatarSrc = currentUser?.image || "";
   const displayName = currentUser?.name || "User";
@@ -114,6 +121,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
   const handleMenuClose = () => {
     setAnchorEl(null);
   };
+
+  if (status === "loading") {
+    return <LoadingComponent />;
+  }
 
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>

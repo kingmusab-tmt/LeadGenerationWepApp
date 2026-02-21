@@ -7,6 +7,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Tooltip,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Buyer } from "@/types/buyer";
@@ -232,8 +233,10 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
               <strong>Timezone:</strong> {buyer.timezone || "Not specified"}
             </Typography>
             <Typography>
-              <strong>Lead Location:</strong>{" "}
-              {buyer.leadPreferences?.location || "Not specified"}
+              <strong>Lead Location(s):</strong>{" "}
+              {Array.isArray(buyer.leadPreferences?.location)
+                ? buyer.leadPreferences.location.join(", ") || "Not specified"
+                : buyer.leadPreferences?.location || "Not specified"}
             </Typography>
 
             {/* Service Locations */}
@@ -420,10 +423,12 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
               </Box>
             )}
 
-            <Typography>
-              <strong>Min Qualification Score:</strong>{" "}
-              {buyer.qualificationScoreMinimum ?? 0}
-            </Typography>
+            <Tooltip title="Minimum quality threshold for auto-assignment:\n• 100: Only High Quality (0-40 spam score)\n• 60: High + Medium Quality (0-70 spam score)\n• 30 or less: Accept any quality level">
+              <Typography>
+                <strong>Min Qualification Score:</strong>{" "}
+                {buyer.qualificationScoreMinimum ?? 0}
+              </Typography>
+            </Tooltip>
             <Typography>
               <strong>Max Credits Per Lead:</strong>{" "}
               {buyer.maxPricePerLead ?? 0} credits

@@ -20,9 +20,9 @@ import {
 } from "@mui/material";
 import { IBuyer } from "@/models/leadbuyers";
 import { industryNiches } from "@/utils/industryNiches";
-import { usCities } from "@/utils/citiesInUsUk";
 import LoadingComponent from "../generalComponent/loadingcomponent";
-import { timezones } from "@/utils/timezones"; // You'll need to create this timezone data
+import GooglePlacesAutocomplete from "../GooglePlacesAutocomplete";
+import GoogleTimezoneAutocomplete from "../GoogleTimezoneAutocomplete";
 
 interface BuyerFormProps {
   open: boolean;
@@ -46,7 +46,7 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
     phone: "",
     status: "new",
     leadPreferences: {
-      location: "",
+      location: [],
       industries: [],
       industryServicePairs: [],
     },
@@ -73,7 +73,11 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
       setFormData({
         ...initialValues,
         leadPreferences: {
-          location: initialValues.leadPreferences?.location || "",
+          location: Array.isArray(initialValues.leadPreferences?.location)
+            ? initialValues.leadPreferences.location
+            : initialValues.leadPreferences?.location
+              ? [initialValues.leadPreferences.location]
+              : [],
           industries: initialValues.leadPreferences?.industries || [],
           industryServicePairs:
             initialValues.leadPreferences?.industryServicePairs || [],
@@ -99,8 +103,11 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
     if (!formData.company) newErrors.company = "Company is required";
     if (!formData.email) newErrors.email = "Email is required";
     if (!formData.phone) newErrors.phone = "Phone Number is required";
-    if (!formData.leadPreferences?.location)
-      newErrors.location = "Location is required";
+    if (
+      !formData.leadPreferences?.location ||
+      formData.leadPreferences.location.length === 0
+    )
+      newErrors.location = "At least one location is required";
     if (!formData.leadPreferences?.industries?.length)
       newErrors.industry = "Industry is required";
     if (!formData.timezone) newErrors.timezone = "Timezone is required";
@@ -178,18 +185,24 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
     }));
   };
 
+  const handleLocationChange = (locations: string[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      leadPreferences: {
+        ...prev.leadPreferences!,
+        location: locations,
+      },
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
       setIsSubmitting(true);
       try {
         await onSave({ ...formData, sellerId });
-        setSnackbar({
-          open: true,
-          message: "Buyer saved successfully!",
-          severity: "success",
-        });
-        onClose();
+        // Don't close the form here - let the parent component handle it
+        // This allows the parent to show a success modal without interference
       } catch (error) {
         console.error("Failed to save buyer:", error);
         setSnackbar({
@@ -284,65 +297,42 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
               </Grid>
 
               <Grid size={{ xs: 12, md: 6 }}>
-                <FormControl fullWidth required error={!!errors.timezone}>
-                  <InputLabel>Timezone</InputLabel>
-                  <Select
-                    name="timezone"
-                    value={formData.timezone}
-                    onChange={handleSelectChange}
-                    label="Timezone"
-                  >
-                    {timezones
-                      .filter(
-                        (tz: {
-                          value:
-                            | string
-                            | readonly string[]
-                            | number
-                            | null
-                            | undefined;
-                        }) => tz.value !== null && tz.value !== undefined,
-                      )
-                      .map(
-                        (tz: {
-                          value: string | readonly string[] | number;
-                          label: React.ReactNode;
-                        }) => (
-                          <MenuItem key={String(tz.value)} value={tz.value}>
-                            {tz.label}
-                          </MenuItem>
-                        ),
-                      )}
-                  </Select>
-                  {errors.timezone && (
-                    <Typography color="error" variant="caption">
-                      {errors.timezone}
-                    </Typography>
-                  )}
-                </FormControl>
+                <GoogleTimezoneAutocomplete
+                  label="Timezone"
+                  value={formData.timezone || ""}
+                  onChange={(timezone) =>
+                    setFormData((prev) => ({ ...prev, timezone }))
+                  }
+                  placeholder="Search for timezone..."
+                  helperText={
+                    errors.timezone || "Search and select your timezone"
+                  }
+                  error={!!errors.timezone}
+                  errorText={errors.timezone}
+                  required
+                />
               </Grid>
 
               <Grid size={{ xs: 12, md: 6 }}>
-                <FormControl fullWidth required error={!!errors.location}>
-                  <InputLabel>Lead Preference Location</InputLabel>
-                  <Select
-                    name="location"
-                    value={formData.leadPreferences?.location}
-                    onChange={handleLeadPreferencesChange}
-                    label="Lead Preference Location"
-                  >
-                    {usCities.map((city) => (
-                      <MenuItem key={city} value={city}>
-                        {city}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  {errors.location && (
-                    <Typography color="error" variant="caption">
-                      {errors.location}
-                    </Typography>
-                  )}
-                </FormControl>
+                <GooglePlacesAutocomplete
+                  label="Lead Preference Location(s)"
+                  value={
+                    Array.isArray(formData.leadPreferences?.location)
+                      ? formData.leadPreferences.location
+                      : formData.leadPreferences?.location
+                        ? [formData.leadPreferences.location]
+                        : []
+                  }
+                  onChange={handleLocationChange}
+                  type="city"
+                  placeholder="Search and select cities..."
+                  helperText={
+                    errors.location ||
+                    "Select one or more cities for lead preferences"
+                  }
+                  error={!!errors.location}
+                  errorText={errors.location}
+                />
               </Grid>
 
               <Grid size={{ xs: 12, md: 6 }}>

@@ -17,6 +17,7 @@ import {
   CircularProgress,
   Alert,
   Chip,
+  Tooltip,
 } from "@mui/material";
 import {
   Share as ShareIcon,
@@ -185,10 +186,11 @@ const LeadSettings = () => {
                 <MenuItem value="both">
                   <Box>
                     <Typography variant="body2" fontWeight="600">
-                      Both (by quality score)
+                      Both (Smart Distribution)
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      High quality auto-assigned, low quality to marketplace
+                      Auto-assign High Quality (spam 0-40), marketplace for Low
+                      Quality (spam 70-100)
                     </Typography>
                   </Box>
                 </MenuItem>
@@ -219,8 +221,15 @@ const LeadSettings = () => {
 
           <Alert severity="info" sx={{ mb: 3 }}>
             <Typography variant="body2">
-              Each lead will be priced according to its AI quality score,
-              replacing any default flat pricing.
+              Set prices for each AI quality tier. Leads are automatically
+              priced based on their spam score:
+              <br />
+              🟢 <strong>High Quality (0-40):</strong> Clean, legitimate leads
+              <br />
+              🟡 <strong>Medium Quality (40-70):</strong> Some red flags but
+              still viable
+              <br />
+              🔴 <strong>Low Quality (70-100):</strong> Spam or suspicious leads
             </Typography>
           </Alert>
 
@@ -231,48 +240,54 @@ const LeadSettings = () => {
               gap: 2.5,
             }}
           >
-            <TextField
-              label="🟢 High Quality"
-              type="number"
-              value={leadPricing.high}
-              onChange={(e) =>
-                setLeadPricing((prev) => ({
-                  ...prev,
-                  high: Math.max(0, parseInt(e.target.value || "0", 10)),
-                }))
-              }
-              inputProps={{ min: 0 }}
-              fullWidth
-              helperText="Spam score 0–30"
-            />
-            <TextField
-              label="🟡 Medium Quality"
-              type="number"
-              value={leadPricing.medium}
-              onChange={(e) =>
-                setLeadPricing((prev) => ({
-                  ...prev,
-                  medium: Math.max(0, parseInt(e.target.value || "0", 10)),
-                }))
-              }
-              inputProps={{ min: 0 }}
-              fullWidth
-              helperText="Spam score 31–69"
-            />
-            <TextField
-              label="🔴 Low Quality"
-              type="number"
-              value={leadPricing.low}
-              onChange={(e) =>
-                setLeadPricing((prev) => ({
-                  ...prev,
-                  low: Math.max(0, parseInt(e.target.value || "0", 10)),
-                }))
-              }
-              inputProps={{ min: 0 }}
-              fullWidth
-              helperText="Spam score 70–100"
-            />
+            <Tooltip title="High Quality leads are clean and legitimate (AI spam score 0-40). These are your best leads - price them higher to maximize earnings on premium quality leads.">
+              <TextField
+                label="🟢 High Quality"
+                type="number"
+                value={leadPricing.high}
+                onChange={(e) =>
+                  setLeadPricing((prev) => ({
+                    ...prev,
+                    high: Math.max(0, parseInt(e.target.value || "0", 10)),
+                  }))
+                }
+                inputProps={{ min: 0 }}
+                fullWidth
+                helperText="Spam score 0–40 (Best leads)"
+              />
+            </Tooltip>
+            <Tooltip title="Medium Quality leads have some minor red flags but are still worth pursuing (AI spam score 40-70). Price these moderately to attract buyers while maintaining reasonable earnings.">
+              <TextField
+                label="🟡 Medium Quality"
+                type="number"
+                value={leadPricing.medium}
+                onChange={(e) =>
+                  setLeadPricing((prev) => ({
+                    ...prev,
+                    medium: Math.max(0, parseInt(e.target.value || "0", 10)),
+                  }))
+                }
+                inputProps={{ min: 0 }}
+                fullWidth
+                helperText="Spam score 40–70 (Mixed signals)"
+              />
+            </Tooltip>
+            <Tooltip title="Low Quality leads are likely spam or suspicious (AI spam score 70-100). Price these very low, or even give them away to clear inventory and maintain marketplace reputation.">
+              <TextField
+                label="🔴 Low Quality"
+                type="number"
+                value={leadPricing.low}
+                onChange={(e) =>
+                  setLeadPricing((prev) => ({
+                    ...prev,
+                    low: Math.max(0, parseInt(e.target.value || "0", 10)),
+                  }))
+                }
+                inputProps={{ min: 0 }}
+                fullWidth
+                helperText="Spam score 70–100 (Likely spam)"
+              />
+            </Tooltip>
           </Box>
         </CardContent>
       </Card>

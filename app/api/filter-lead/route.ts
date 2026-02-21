@@ -27,23 +27,53 @@ export async function POST(req: Request) {
 
     // 2. The Strict Prompt
     const prompt = `
-      You are a Lead Quality Gatekeeper. Your job is to filter out spam, bots, and low-quality inquiries.
+      You are a Lead Quality Gatekeeper. Your job is to assess lead quality on a spam scale.
       
       Analyze this lead submission:
       ${fieldsText}
 
-      Rules for "Bad Leads":
-      1. Field values are gibberish (e.g., "asdf", "test", random characters), too short (<3 words), or irrelevant.
-      2. Names are clearly fake (e.g., "Mickey Mouse", "John Doe", obvious test names).
-      3. Budgets/prices are completely unrealistic (e.g., "$1", "0", negative values).
-      4. Contact information (email, phone) appears fake or invalid.
-      5. Aggressive, offensive, or spammy language in any field.
+      SPAM SCORING SCALE (0-100):
+      Score 0-20 (Clean/Legitimate):
+      - All fields are genuine and specific
+      - Names look real and complete (First + Last)
+      - Valid email and phone format
+      - Company name is specific and real
+      - Reasonable budget amounts
+      - Professional tone
+
+      Score 21-40 (Minor Red Flags):
+      - Mostly valid information but some generic responses
+      - Email/phone format looks correct
+      - Some fields are vague or generic
+      - Reasonable but not detailed
+
+      Score 41-60 (Moderate Red Flags):
+      - Mix of valid and suspicious information
+      - Some unusual field values
+      - Incomplete or generic company information
+      - Vague contact details
+
+      Score 61-80 (High Red Flags):
+      - Multiple suspicious indicators
+      - Obvious test names (John Doe, Test User, Admin, etc)
+      - Fake email patterns (test@test.com, abc@abc.com)
+      - Gibberish in multiple fields
+      - Unrealistic budget values ($0, $1, -$100)
+      - Obviously fake contact info
+
+      Score 81-100 (Definite Spam/Fake):
+      - Clearly gibberish submission (asdf, xyzabc, random chars)
+      - Aggressive/offensive language
+      - Obvious spam keywords
+      - Multiple nonsensical fields
+      - Clearly automated bot submission
+      - Deliberately misleading information
 
       Return a JSON object with this exact schema:
       {
         "is_valid": boolean,
-        "spam_score": number (0-100, where 100 is definite spam),
-        "reason": "short explanation"
+        "spam_score": number (0-100, where 0=clean legitimate lead, 100=definite spam/bot),
+        "reason": "short explanation of why this score"
       }
     `;
 

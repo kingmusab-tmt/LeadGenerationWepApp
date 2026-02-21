@@ -261,10 +261,10 @@ export class ZapierActionsService {
                 : 50;
 
           let qualityLevel: "High" | "Medium" | "Low" = "Medium";
-          if (spamScore <= 30) {
-            qualityLevel = "High";
+          if (spamScore <= 40) {
+            qualityLevel = "High";   // Low spam = High quality lead
           } else if (spamScore >= 70) {
-            qualityLevel = "Low";
+            qualityLevel = "Low";    // High spam = Low quality lead
           }
 
           const normalizedReason =

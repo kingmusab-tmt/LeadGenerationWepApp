@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useInitializeUser } from "@/lib/hooks";
-import { useRouter } from "next/navigation";
 import {
   Box,
   Container,
@@ -88,8 +86,6 @@ interface Payout {
 }
 
 const FinancialManagement = () => {
-  const { currentUser } = useInitializeUser();
-  const router = useRouter();
   const csrfFetch = useCSRFFetch();
   const notify = useNotification();
   const [activeTab, setActiveTab] = useState(0);
@@ -133,13 +129,8 @@ const FinancialManagement = () => {
   }, []);
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== "admin") {
-      router.push("/auth/sign-in");
-      return;
-    }
-
     fetchData();
-  }, [currentUser, router, fetchData]);
+  }, [fetchData]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -489,6 +480,7 @@ const FinancialManagement = () => {
             variant="outlined"
             size="small"
             sx={{ flexGrow: 1 }}
+            value={searchTerm}
             InputProps={{
               startAdornment: <Search sx={{ mr: 1, color: "action.active" }} />,
             }}

@@ -37,6 +37,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useInitializeUser } from "@/lib/hooks";
@@ -47,6 +48,7 @@ interface UserDashboardProps {
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const { currentUser, loading: userLoading } = useInitializeUser();
+  const { status } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [subMenuAnchorEl, setSubMenuAnchorEl] = useState<null | HTMLElement>(
@@ -60,10 +62,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   let subMenuTimeout: NodeJS.Timeout;
 
   useEffect(() => {
-    if (!userLoading && !currentUser) {
-      router.push("/auth/sign-in");
+    if (status === "loading" || userLoading) return;
+    if (status === "unauthenticated" && !currentUser) {
+      router.replace("/auth/sign-in");
     }
-  }, [userLoading, currentUser, router]);
+  }, [status, userLoading, currentUser, router]);
 
   const avatarSrc = currentUser?.image || "";
   const displayName = currentUser?.name || "User";
@@ -114,6 +117,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   };
 
   // const subMenuOpen = Boolean(subMenuAnchorEl);
+
+  if (status === "loading" || userLoading) {
+    return <LoadingComponent />;
+  }
 
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>

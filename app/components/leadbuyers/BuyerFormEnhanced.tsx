@@ -31,8 +31,8 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { IBuyer } from "@/models/leadbuyers";
 import { industryNiches } from "@/utils/industryNiches";
 import LoadingComponent from "../generalComponent/loadingcomponent";
-import { timezones } from "@/utils/timezones";
 import GooglePlacesAutocomplete from "../GooglePlacesAutocomplete";
+import GoogleTimezoneAutocomplete from "../GoogleTimezoneAutocomplete";
 
 interface BuyerFormProps {
   open: boolean;
@@ -56,7 +56,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
     phone: "",
     status: "new",
     leadPreferences: {
-      location: "",
+      location: [],
       industries: [],
       industryServicePairs: [],
     },
@@ -118,7 +118,11 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
       setFormData({
         ...initialValues,
         leadPreferences: {
-          location: initialValues.leadPreferences?.location || "",
+          location: Array.isArray(initialValues.leadPreferences?.location)
+            ? initialValues.leadPreferences.location
+            : initialValues.leadPreferences?.location
+              ? [initialValues.leadPreferences.location]
+              : [],
           industries: initialValues.leadPreferences?.industries || [],
           industryServicePairs:
             initialValues.leadPreferences?.industryServicePairs || [],
@@ -492,28 +496,20 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                 <Grid container spacing={3}>
                   {/* Timezone */}
                   <Grid size={{ xs: 12 }}>
-                    <FormControl fullWidth required error={!!errors.timezone}>
-                      <InputLabel>Timezone</InputLabel>
-                      <Select
-                        name="timezone"
-                        value={formData.timezone}
-                        onChange={handleSelectChange}
-                        label="Timezone"
-                      >
-                        {timezones
-                          .filter((tz: any) => tz.value)
-                          .map((tz: any) => (
-                            <MenuItem key={tz.value} value={tz.value}>
-                              {tz.label}
-                            </MenuItem>
-                          ))}
-                      </Select>
-                      {errors.timezone && (
-                        <Typography color="error" variant="caption">
-                          {errors.timezone}
-                        </Typography>
-                      )}
-                    </FormControl>
+                    <GoogleTimezoneAutocomplete
+                      label="Timezone"
+                      value={formData.timezone || ""}
+                      onChange={(timezone) =>
+                        setFormData((prev) => ({ ...prev, timezone }))
+                      }
+                      placeholder="Search for timezone..."
+                      helperText={
+                        errors.timezone || "Search and select your timezone"
+                      }
+                      error={!!errors.timezone}
+                      errorText={errors.timezone}
+                      required
+                    />
                   </Grid>
 
                   {/* PREFERRED LOCATIONS (INCLUDE ONLY) */}
@@ -737,15 +733,18 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      label="Minimum Qualification Score"
-                      name="qualificationScoreMinimum"
-                      type="number"
-                      value={formData.qualificationScoreMinimum}
-                      onChange={handleNumberChange}
-                      fullWidth
-                      inputProps={{ min: 0 }}
-                    />
+                    <Tooltip title="Set the minimum quality level for leads you'll receive:\n\n• 100: Only High Quality leads (Clean, Legitimate - spam score 0-40)\n• 60: High + Medium Quality (some red flags - spam score 0-70)\n• 30: Accept any quality level\n\nHigher = Better leads, Lower = More volume">
+                      <TextField
+                        label="Minimum Qualification Score"
+                        name="qualificationScoreMinimum"
+                        type="number"
+                        value={formData.qualificationScoreMinimum}
+                        onChange={handleNumberChange}
+                        fullWidth
+                        inputProps={{ min: 0 }}
+                        helperText="Rating scale: 100 (Best) → 60 (Good) → 30 (Any)"
+                      />
+                    </Tooltip>
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
                     <TextField

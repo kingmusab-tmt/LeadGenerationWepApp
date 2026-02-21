@@ -200,6 +200,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Map leadPreferences.location array to preferredZones
+    const preferredZones =
+      Array.isArray(leadPreferences.location) &&
+      leadPreferences.location.length > 0
+        ? leadPreferences.location.map((city: string) => ({ city }))
+        : [];
+
+    // Create weeklySchedule from workingHours - apply to all weekdays
+    const weeklySchedule = {
+      Monday: {
+        enabled: true,
+        start: workingHours.start,
+        end: workingHours.end,
+      },
+      Tuesday: {
+        enabled: true,
+        start: workingHours.start,
+        end: workingHours.end,
+      },
+      Wednesday: {
+        enabled: true,
+        start: workingHours.start,
+        end: workingHours.end,
+      },
+      Thursday: {
+        enabled: true,
+        start: workingHours.start,
+        end: workingHours.end,
+      },
+      Friday: {
+        enabled: true,
+        start: workingHours.start,
+        end: workingHours.end,
+      },
+      Saturday: { enabled: false, start: "09:00", end: "17:00" },
+      Sunday: { enabled: false, start: "09:00", end: "17:00" },
+    };
+
     const newBuyer = new Buyer({
       name,
       company,
@@ -213,6 +251,8 @@ export async function POST(req: NextRequest) {
       timezone,
       maxLeadsPerDay,
       registeredWith: registrationSellerId,
+      preferredZones,
+      weeklySchedule,
     });
 
     await newBuyer.save();

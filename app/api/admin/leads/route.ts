@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
       id: lead._id.toString(),
       status: lead.status,
       qualityScore: lead.aiQualityScore,
+      qualityLevel: lead.qualityLevel || "Medium",
       source: lead.leadSource || "Unknown",
       createdAt: lead.createdAt.toISOString(),
       seller:

@@ -9,7 +9,7 @@ export interface ILead extends Document {
   company?: string;
   // AI Quality Assessment (replaces manual scoring)
   aiQualityScore: number; // 0-100 spam score from Gemini
-  qualityLevel: "High" | "Medium" | "Low"; // High (0-30), Medium (30-70), Low (70-100)
+  qualityLevel: "High" | "Medium" | "Low"; // High (0-40 spam=good), Medium (40-70), Low (70-100 spam=bad)
   aiQualityReason: string; // Explanation from AI
   aiQualityAssessment?: {
     isValid: boolean;

@@ -1266,7 +1266,7 @@ function ZapierLeadsTab({
                         <TableCell>
                           {lead.qualityLevel ? (
                             <Tooltip
-                              title={`AI Score: ${lead.aiQualityScore ?? "N/A"}`}
+                              title={`AI Spam Score: ${lead.aiQualityScore ?? "N/A"}/100\nLevel: ${lead.qualityLevel}\n\nScore Scale: 0-100 (Higher = More Spam = Lower Quality)\n0-30: Low Spam = Excellent\n30-70: Medium Spam = Good\n70-100: High Spam = Poor`}
                             >
                               <Chip
                                 label={lead.qualityLevel}
@@ -1545,21 +1545,25 @@ function ZapierLeadsTab({
                       <Typography variant="caption" color="text.secondary">
                         AI Quality Score
                       </Typography>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      <Tooltip
+                        title={`Score Range: 0-100 (Lower = Better Quality)\n\n0-40: High Quality (Clean, Legitimate)\n40-70: Medium Quality (Some Red Flags)\n70-100: Low Quality (Spam/Suspicious)\n\nCurrent Score: ${detailsLead.aiQualityScore ?? "Not scored"}`}
                       >
-                        <Typography variant="body2">
-                          {detailsLead.aiQualityScore ?? "Not scored"}
-                        </Typography>
-                        {detailsLead.qualityLevel && (
-                          <Chip
-                            label={detailsLead.qualityLevel}
-                            color={qualityColors[detailsLead.qualityLevel]}
-                            size="small"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <Typography variant="body2">
+                            {detailsLead.aiQualityScore ?? "Not scored"}
+                          </Typography>
+                          {detailsLead.qualityLevel && (
+                            <Chip
+                              label={detailsLead.qualityLevel}
+                              color={qualityColors[detailsLead.qualityLevel]}
+                              size="small"
+                              variant="outlined"
+                            />
+                          )}
+                        </Box>
+                      </Tooltip>
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <Typography variant="caption" color="text.secondary">

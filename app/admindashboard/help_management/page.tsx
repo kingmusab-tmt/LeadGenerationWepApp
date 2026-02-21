@@ -40,8 +40,6 @@ import {
 } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useNotification } from "@/lib/useNotification";
-import { useInitializeUser } from "@/lib/hooks";
-import { useRouter } from "next/navigation";
 
 interface Video {
   _id: string;
@@ -256,8 +254,6 @@ const HelpForm: React.FC<HelpFormProps> = ({
 };
 
 const HelpManagement = () => {
-  const { currentUser } = useInitializeUser();
-  const router = useRouter();
   const csrfFetch = useCSRFFetch();
   const notify = useNotification();
   const theme = useTheme();
@@ -438,11 +434,6 @@ const HelpManagement = () => {
   };
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== "admin") {
-      router.push("/auth/sign-in");
-      return;
-    }
-
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -454,7 +445,7 @@ const HelpManagement = () => {
       }
     };
     fetchData();
-  }, [currentUser, router]);
+  }, []);
 
   return (
     <Box sx={{ p: 3 }}>

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import axios from "@/lib/axiosInstance";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Box,
   Button,
@@ -20,17 +21,18 @@ import {
   FormControlLabel,
   Paper,
   Divider,
+  Tooltip,
 } from "@mui/material";
 import { styled } from "@mui/system";
 import { industryNiches } from "@/utils/industryNiches";
 import { industryServices } from "@/utils/industryServices";
 import { LEAD_SOURCES } from "@/utils/leadSources";
-import { timezones } from "@/utils/timezones";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useInitializeUser, useAppDispatch, normalizeUser } from "@/lib/hooks";
 import { setUser, updateUser } from "@/lib/userSlice";
 import { useNotification } from "@/lib/useNotification";
 import GooglePlacesAutocomplete from "@/app/components/GooglePlacesAutocomplete";
+import GoogleTimezoneAutocomplete from "@/app/components/GoogleTimezoneAutocomplete";
 // import cityAreaCodes from "@/utils/cityareacodes";
 
 const Section = styled(Paper)({
@@ -160,6 +162,8 @@ interface BuyerPreferences {
 }
 
 const AccountSettings = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
   const notify = useNotification();
   const {
@@ -167,7 +171,11 @@ const AccountSettings = () => {
     loading: userLoading,
     refreshUser,
   } = useInitializeUser();
-  const [tabValue, setTabValue] = useState(0);
+
+  // Initialize tab from URL search params, default to 0
+  const tabParam = searchParams.get("tab");
+  const initialTab = tabParam ? parseInt(tabParam, 10) : 0;
+  const [tabValue, setTabValue] = useState(initialTab);
   const [darkMode, setDarkMode] = useState(false);
   const [leadBuyerDetail, setLeadBuyerDetail] =
     useState<ILeadBuyerDetail | null>(null);
@@ -297,8 +305,23 @@ const AccountSettings = () => {
     }
   }, [dispatch, leadBuyerDetail]);
 
+  // Sync tab value with URL search params (for browser back/forward navigation)
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      const tabIndex = parseInt(tabParam, 10);
+      if (tabIndex >= 0 && tabIndex <= 4 && tabIndex !== tabValue) {
+        setTabValue(tabIndex);
+      }
+    }
+  }, [searchParams, tabValue]);
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    // Update URL to preserve tab state across refreshes
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", newValue.toString());
+    router.replace(`?${params.toString()}`, { scroll: false });
   };
 
   const handleDarkModeToggle = () => {
@@ -1292,17 +1315,19 @@ const AccountSettings = () => {
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      label="Quality Score Minimum"
-                      type="number"
-                      inputProps={{ min: 0, max: 100 }}
-                      value={preferences.qualificationScoreMinimum}
-                      onChange={handlePreferencesNumber(
-                        "qualificationScoreMinimum",
-                      )}
-                      helperText="0-100 scale (0 = any quality)"
-                    />
+                    <Tooltip title="Set the minimum quality level for leads you'll receive:\n\n• 100: Only High Quality leads (Clean, Legitimate - spam score 0-40)\n• 60: High + Medium Quality (some red flags - spam score 0-70)\n• 30: Accept any quality level\n\nHigher value = Better leads, Lower value = More volume">
+                      <TextField
+                        fullWidth
+                        label="Quality Score Minimum"
+                        type="number"
+                        inputProps={{ min: 0, max: 100 }}
+                        value={preferences.qualificationScoreMinimum}
+                        onChange={handlePreferencesNumber(
+                          "qualificationScoreMinimum",
+                        )}
+                        helperText="Rating scale: 100 (Best) → 60 (Good) → 30 (Any)"
+                      />
+                    </Tooltip>
                   </Grid>
                 </Grid>
               </Section>
@@ -1672,23 +1697,22 @@ const AccountSettings = () => {
                 {/* Timezone */}
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Timezone</InputLabel>
-                      <Select
-                        name="timezone"
-                        value={preferences?.timezone || "America/New_York"}
-                        onChange={handlePreferencesSelect}
-                        label="Timezone"
-                      >
-                        {timezones
-                          .filter((tz: any) => tz.value)
-                          .map((tz: any) => (
-                            <MenuItem key={tz.value} value={tz.value}>
-                              {tz.label}
-                            </MenuItem>
-                          ))}
-                      </Select>
-                    </FormControl>
+                    <GoogleTimezoneAutocomplete
+                      label="Timezone"
+                      value={preferences?.timezone || "America/New_York"}
+                      onChange={(timezone) => {
+                        setPreferences((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                timezone,
+                              }
+                            : null,
+                        );
+                      }}
+                      placeholder="Search for timezone..."
+                      helperText="Search and select your timezone"
+                    />
                   </Grid>
                 </Grid>
 

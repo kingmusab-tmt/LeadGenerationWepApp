@@ -32,8 +32,6 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { useInitializeUser } from "@/lib/hooks";
-import { useRouter } from "next/navigation";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import {
   ArrowUpward,
@@ -140,34 +138,24 @@ const computeTrend = (
 
 const AdminOverview: React.FC = () => {
   const [overviewData, setOverviewData] = useState(initialOverviewData);
-  const { currentUser } = useInitializeUser();
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== "admin") {
-      router.push("/auth/sign-in");
-    }
-  }, [currentUser, router]);
-
-  useEffect(() => {
     const fetchOverviewData = async () => {
       try {
-        if (currentUser && currentUser.role === "admin") {
-          const response = await fetch("/api/admin/overview");
-          if (response.ok) {
-            const data = await response.json();
-            setOverviewData({
-              ...initialOverviewData,
-              ...data,
-            });
-            setError(null);
-          } else {
-            setError("Failed to load overview data. Please try again.");
-          }
+        const response = await fetch("/api/admin/overview");
+        if (response.ok) {
+          const data = await response.json();
+          setOverviewData({
+            ...initialOverviewData,
+            ...data,
+          });
+          setError(null);
+        } else {
+          setError("Failed to load overview data. Please try again.");
         }
       } catch (err) {
         console.error("Failed to fetch overview data", err);
@@ -178,7 +166,7 @@ const AdminOverview: React.FC = () => {
     };
 
     fetchOverviewData();
-  }, [currentUser]);
+  }, []);
 
   const COLORS = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"];
 

@@ -912,52 +912,60 @@ const TierManagement = () => {
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Forms"
-                          name="forms"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.forms ?? 1}
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of forms users can create in this tier. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Max Forms"
+                            name="forms"
+                            type="number"
+                            size="small"
+                            value={currentTier.tierLimits?.forms ?? 1}
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Leads/Month"
-                          name="leads"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.leads ?? 100}
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of leads that can be in the system per month. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Max Leads/Month"
+                            name="leads"
+                            type="number"
+                            size="small"
+                            value={currentTier.tierLimits?.leads ?? 100}
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Buyers"
-                          name="buyers"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.buyers ?? 5}
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of buyer accounts that can be created under a seller account. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Max Buyers"
+                            name="buyers"
+                            type="number"
+                            size="small"
+                            value={currentTier.tierLimits?.buyers ?? 5}
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Industries"
-                          name="industries"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.industries ?? 1}
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of different industries a user can target. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Max Industries"
+                            name="industries"
+                            type="number"
+                            size="small"
+                            value={currentTier.tierLimits?.industries ?? 1}
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                     </Grid>
 
@@ -970,53 +978,61 @@ const TierManagement = () => {
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Tracking Numbers"
-                          name="numbers"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.numbers ?? 1}
-                          onChange={handleLimitsChange}
-                          helperText="Manual numbers"
-                        />
+                        <Tooltip title="Maximum number of manually added phone tracking numbers. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Tracking Numbers"
+                            name="numbers"
+                            type="number"
+                            size="small"
+                            value={currentTier.tierLimits?.numbers ?? 1}
+                            onChange={handleLimitsChange}
+                            helperText="Manual numbers"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Twilio Numbers"
-                          name="twilioNumbers"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.twilioNumbers ?? 0}
-                          onChange={handleLimitsChange}
-                        />
+                        <Tooltip title="Maximum number of Twilio phone numbers that can be allocated to this tier. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Twilio Numbers"
+                            name="twilioNumbers"
+                            type="number"
+                            size="small"
+                            value={currentTier.tierLimits?.twilioNumbers ?? 0}
+                            onChange={handleLimitsChange}
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Call Seconds/Month"
-                          name="callSeconds"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.callSeconds ?? 1000}
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum total seconds of call recordings allowed per month. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Call Seconds/Month"
+                            name="callSeconds"
+                            type="number"
+                            size="small"
+                            value={currentTier.tierLimits?.callSeconds ?? 1000}
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Concurrent Calls"
-                          name="concurrentCallLimit"
-                          type="number"
-                          size="small"
-                          value={
-                            currentTier.tierLimits?.concurrentCallLimit ?? 1
-                          }
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of calls that can be active simultaneously. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Concurrent Calls"
+                            name="concurrentCallLimit"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits?.concurrentCallLimit ?? 1
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 12 }}>
                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
@@ -1115,62 +1131,71 @@ const TierManagement = () => {
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Email Campaigns/Month"
-                          name="emailCampaignsPerMonth"
-                          type="number"
-                          size="small"
-                          value={
-                            currentTier.tierLimits?.emailCampaignsPerMonth ?? 0
-                          }
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of email marketing campaigns that can be created per month. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Email Campaigns/Month"
+                            name="emailCampaignsPerMonth"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits?.emailCampaignsPerMonth ??
+                              0
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="SMS Campaigns/Month"
-                          name="smsCampaignsPerMonth"
-                          type="number"
-                          size="small"
-                          value={
-                            currentTier.tierLimits?.smsCampaignsPerMonth ?? 0
-                          }
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of SMS marketing campaigns that can be created per month. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="SMS Campaigns/Month"
+                            name="smsCampaignsPerMonth"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits?.smsCampaignsPerMonth ?? 0
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Email Recipients/Campaign"
-                          name="emailRecipientsPerCampaign"
-                          type="number"
-                          size="small"
-                          value={
-                            currentTier.tierLimits
-                              ?.emailRecipientsPerCampaign ?? 100
-                          }
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of email recipients per campaign. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Email Recipients/Campaign"
+                            name="emailRecipientsPerCampaign"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits
+                                ?.emailRecipientsPerCampaign ?? 100
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="SMS Recipients/Campaign"
-                          name="smsRecipientsPerCampaign"
-                          type="number"
-                          size="small"
-                          value={
-                            currentTier.tierLimits?.smsRecipientsPerCampaign ??
-                            50
-                          }
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of SMS recipients per campaign. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="SMS Recipients/Campaign"
+                            name="smsRecipientsPerCampaign"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits
+                                ?.smsRecipientsPerCampaign ?? 50
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                     </Grid>
 
@@ -1183,33 +1208,37 @@ const TierManagement = () => {
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Workflows"
-                          name="automationWorkflows"
-                          type="number"
-                          size="small"
-                          value={
-                            currentTier.tierLimits?.automationWorkflows ?? 0
-                          }
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of automation workflows that can be created. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Max Workflows"
+                            name="automationWorkflows"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits?.automationWorkflows ?? 0
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Actions per Workflow"
-                          name="automationActionsPerWorkflow"
-                          type="number"
-                          size="small"
-                          value={
-                            currentTier.tierLimits
-                              ?.automationActionsPerWorkflow ?? 3
-                          }
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of actions that can be added per workflow. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Actions per Workflow"
+                            name="automationActionsPerWorkflow"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits
+                                ?.automationActionsPerWorkflow ?? 3
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                     </Grid>
 
@@ -1292,16 +1321,20 @@ const TierManagement = () => {
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Invoices per Month"
-                          name="invoicesPerMonth"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.invoicesPerMonth ?? 10}
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of invoices that can be generated per month. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Invoices per Month"
+                            name="invoicesPerMonth"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits?.invoicesPerMonth ?? 10
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 6 }}>
                         <FormControlLabel
@@ -1330,16 +1363,18 @@ const TierManagement = () => {
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                          fullWidth
-                          label="Max Webhooks"
-                          name="maxWebhooks"
-                          type="number"
-                          size="small"
-                          value={currentTier.tierLimits?.maxWebhooks ?? 0}
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Maximum number of webhooks that can be configured. Use 0 for unlimited.">
+                          <TextField
+                            fullWidth
+                            label="Max Webhooks"
+                            name="maxWebhooks"
+                            type="number"
+                            size="small"
+                            value={currentTier.tierLimits?.maxWebhooks ?? 0}
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 12 }}>
                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
@@ -1453,18 +1488,20 @@ const TierManagement = () => {
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Data Retention (days)"
-                          name="dataRetentionDays"
-                          type="number"
-                          size="small"
-                          value={
-                            currentTier.tierLimits?.dataRetentionDays ?? 90
-                          }
-                          onChange={handleLimitsChange}
-                          helperText="0 = unlimited"
-                        />
+                        <Tooltip title="Number of days to retain data before automatic deletion. Use 0 for unlimited retention.">
+                          <TextField
+                            fullWidth
+                            label="Data Retention (days)"
+                            name="dataRetentionDays"
+                            type="number"
+                            size="small"
+                            value={
+                              currentTier.tierLimits?.dataRetentionDays ?? 90
+                            }
+                            onChange={handleLimitsChange}
+                            helperText="0 = unlimited"
+                          />
+                        </Tooltip>
                       </Grid>
                       <Grid size={{ xs: 12 }}>
                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>

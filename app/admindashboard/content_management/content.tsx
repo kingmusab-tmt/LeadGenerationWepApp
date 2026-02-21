@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useInitializeUser } from "@/lib/hooks";
-import { useRouter } from "next/navigation";
 import {
   Box,
   Container,
@@ -60,6 +58,7 @@ interface Lead {
   id: string;
   status: "new" | "available" | "sold" | "assigned" | "flagged";
   qualityScore: number;
+  qualityLevel: "High" | "Medium" | "Low";
   source: string;
   createdAt: string;
   seller: {
@@ -102,8 +101,6 @@ interface CallRecord {
 }
 
 const ContentVerification = () => {
-  const { currentUser } = useInitializeUser();
-  const router = useRouter();
   const csrfFetch = useCSRFFetch();
   const notify = useNotification();
   const [activeTab, setActiveTab] = useState(0);
@@ -139,16 +136,11 @@ const ContentVerification = () => {
     } finally {
       setLoading(false);
     }
-  }, [notify]);
+  }, []);
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== "admin") {
-      router.push("/auth/sign-in");
-      return;
-    }
-
     fetchData();
-  }, [currentUser, router, fetchData]);
+  }, [fetchData]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -332,6 +324,7 @@ const ContentVerification = () => {
             variant="outlined"
             size="small"
             fullWidth
+            value={searchTerm}
             InputProps={{
               startAdornment: <Search sx={{ mr: 1, color: "action.active" }} />,
             }}
@@ -408,17 +401,21 @@ const ContentVerification = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={`${lead.qualityScore}/10`}
-                        size="small"
-                        color={
-                          lead.qualityScore >= 8
-                            ? "success"
-                            : lead.qualityScore >= 5
-                              ? "warning"
-                              : "error"
-                        }
-                      />
+                      <Tooltip
+                        title={`AI Spam Score: ${(lead.qualityScore / 10).toFixed(1)}/10\nQuality Level: ${lead.qualityLevel}\n\nScore Range: 0-100 (Lower = Better Quality)\n\n0-40: High Quality (Clean, Legitimate)\n40-70: Medium Quality (Some Red Flags)\n70-100: Low Quality (Spam/Suspicious)`}
+                      >
+                        <Chip
+                          label={`${(lead.qualityScore / 10).toFixed(1)}/10`}
+                          size="small"
+                          color={
+                            lead.qualityScore <= 40
+                              ? "success"
+                              : lead.qualityScore <= 70
+                                ? "warning"
+                                : "error"
+                          }
+                        />
+                      </Tooltip>
                     </TableCell>
                     <TableCell>
                       {new Date(lead.createdAt).toLocaleDateString()}
@@ -675,18 +672,22 @@ const ContentVerification = () => {
                     <ListItemText
                       primary="Quality Score"
                       secondary={
-                        <Chip
-                          label={`${selectedLead.qualityScore}/10`}
-                          size="small"
-                          color={
-                            selectedLead.qualityScore >= 8
-                              ? "success"
-                              : selectedLead.qualityScore >= 5
-                                ? "warning"
-                                : "error"
-                          }
-                          component="span"
-                        />
+                        <Tooltip
+                          title={`AI Spam Score: ${(selectedLead.qualityScore / 10).toFixed(1)}/10\nQuality Level: ${selectedLead.qualityLevel}\n\nScore Range: 0-100 (Lower = Better Quality)\n\n0-40: High Quality (Clean, Legitimate)\n40-70: Medium Quality (Some Red Flags)\n70-100: Low Quality (Spam/Suspicious)`}
+                        >
+                          <Chip
+                            label={`${(selectedLead.qualityScore / 10).toFixed(1)}/10`}
+                            size="small"
+                            color={
+                              selectedLead.qualityScore <= 40
+                                ? "success"
+                                : selectedLead.qualityScore <= 70
+                                  ? "warning"
+                                  : "error"
+                            }
+                            component="span"
+                          />
+                        </Tooltip>
                       }
                     />
                   </ListItem>

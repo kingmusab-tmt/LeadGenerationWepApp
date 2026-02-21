@@ -38,6 +38,7 @@ const RegisterBuyerPageContent: React.FC = () => {
     open: boolean;
     buyerName?: string;
   }>({ open: false });
+  const [formOpen, setFormOpen] = useState(true);
 
   // Extract sellerId from query parameters
   useEffect(() => {
@@ -74,7 +75,8 @@ const RegisterBuyerPageContent: React.FC = () => {
       const result = await response.json();
       console.log("Buyer created:", result);
 
-      // Show success modal instead of snackbar
+      // Close the form and show success modal
+      setFormOpen(false);
       setSuccessModal({
         open: true,
         buyerName: buyerData.name,
@@ -111,7 +113,7 @@ const RegisterBuyerPageContent: React.FC = () => {
   return (
     <div>
       <BuyerForm
-        open={true}
+        open={formOpen}
         onClose={handleCancel}
         onSave={handleSave}
         sellerId={sellerId}
@@ -120,7 +122,13 @@ const RegisterBuyerPageContent: React.FC = () => {
       {/* Success Modal */}
       <Dialog
         open={successModal.open}
-        onClose={() => setSuccessModal({ open: false })}
+        onClose={(event, reason) => {
+          // Prevent closing by clicking outside or pressing escape
+          if (reason === "backdropClick" || reason === "escapeKeyDown") {
+            return;
+          }
+        }}
+        disableEscapeKeyDown
         maxWidth="sm"
         fullWidth
       >

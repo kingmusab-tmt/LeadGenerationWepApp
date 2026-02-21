@@ -6,6 +6,7 @@ import { clearStaleTokens } from "./lib/clearStaleTokensServerAction";
 import { NextAuthOptions } from "next-auth";
 import dbConnect from "./lib/connectdb";
 import { User } from "./models";
+import { Buyer } from "./models/leadbuyers";
 import { createTransport } from "nodemailer";
 import { getCachedSession } from "./lib/cachedSession";
 
@@ -112,6 +113,29 @@ export const authOptions = {
           .lean();
 
         if (dbUser) {
+          // Check if user is a registered buyer but still has "user" role
+          if (dbUser.role === "user") {
+            const existingBuyer = await Buyer.findOne({
+              email: token.email as string,
+            })
+              .select("_id")
+              .lean();
+
+            if (existingBuyer) {
+              // Automatically assign buyer role
+              await User.updateOne(
+                { email: token.email as string },
+                { $set: { role: "buyer" } },
+              );
+              dbUser.role = "buyer";
+              console.log(
+                "[JWT] Auto-assigned buyer role to:",
+                token.email,
+                "- found in Buyer collection",
+              );
+            }
+          }
+
           // Update token with latest data from database
           token.role = dbUser.role;
           token.isSubActive =

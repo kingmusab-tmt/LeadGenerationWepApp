@@ -32,7 +32,7 @@ export interface IBuyer extends Document {
   preferredDistribution: "Automatic" | "Manual" | "Both";
   notificationPreferences: ("Email" | "SMS" | "In-App Notification")[];
   leadPreferences: {
-    location: string;
+    location: string | string[]; // Support both single location (legacy) and multiple locations
     industries: string[]; // Preferred industries (multiple)
     industryServicePairs?: { industry: string; services: string[] }[]; // Industry with specific services
   };
@@ -342,7 +342,7 @@ const BuyerSchema: Schema = new Schema({
     default: "new",
   },
   leadPreferences: {
-    location: { type: String, default: "" },
+    location: { type: Schema.Types.Mixed, default: [] }, // Support both string and string[] for backward compatibility
     industries: [{ type: String }], // Multiple preferred industries
     industryServicePairs: [
       {
