@@ -46,6 +46,8 @@ import {
   Code as CodeIcon,
 } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface ZapierConfig {
   id: string;
@@ -101,6 +103,7 @@ function TabPanel(props: TabPanelProps) {
 
 export default function ZapierIntegration({ onNotify }: Props) {
   const fetchWithCSRF = useCSRFFetch();
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [configs, setConfigs] = useState<ZapierConfig[]>([]);
@@ -203,9 +206,13 @@ export default function ZapierIntegration({ onNotify }: Props) {
   };
 
   const handleDelete = async (configId: string) => {
-    if (!confirm("Are you sure you want to remove this Zapier webhook?")) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Remove Webhook",
+      message: "Are you sure you want to remove this Zapier webhook?",
+      confirmText: "Remove",
+      confirmColor: "error",
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -610,6 +617,18 @@ export default function ZapierIntegration({ onNotify }: Props) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Box>
   );
 }
@@ -617,6 +636,7 @@ export default function ZapierIntegration({ onNotify }: Props) {
 // API Key Management Tab Component
 function ApiKeyManagementTab({ onNotify }: Props) {
   const fetchWithCSRF = useCSRFFetch();
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [apiKeyExists, setApiKeyExists] = useState(false);
   const [truncatedKey, setTruncatedKey] = useState<string | null>(null);
@@ -643,13 +663,15 @@ function ApiKeyManagementTab({ onNotify }: Props) {
   };
 
   const generateApiKey = async () => {
-    if (
-      apiKeyExists &&
-      !confirm(
-        "Generating a new key will invalidate your current API key. Any existing Zapier integrations using the old key will stop working. Continue?",
-      )
-    ) {
-      return;
+    if (apiKeyExists) {
+      const confirmed = await confirm({
+        title: "Generate New Key",
+        message:
+          "Generating a new key will invalidate your current API key. Any existing Zapier integrations using the old key will stop working. Continue?",
+        confirmText: "Generate",
+        confirmColor: "warning",
+      });
+      if (!confirmed) return;
     }
 
     setLoading(true);
@@ -682,13 +704,14 @@ function ApiKeyManagementTab({ onNotify }: Props) {
   };
 
   const revokeApiKey = async () => {
-    if (
-      !confirm(
+    const confirmed = await confirm({
+      title: "Revoke API Key",
+      message:
         "Are you sure? This will break all existing Zapier actions using this key.",
-      )
-    ) {
-      return;
-    }
+      confirmText: "Revoke",
+      confirmColor: "error",
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -907,6 +930,18 @@ function ApiKeyManagementTab({ onNotify }: Props) {
           </List>
         </CardContent>
       </Card>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Box>
   );
 }

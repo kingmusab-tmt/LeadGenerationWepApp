@@ -327,7 +327,8 @@ export const SubscriptionSchema = {
     concurrentCallLimit: { type: Number, default: 1, min: 0 },
 
     // Marketing & Campaigns
-    emailCampaignsEnabled: { type: Boolean, default: false },
+    emailCampaignsEnabled: { type: Boolean, default: true },
+    smsCampaignsEnabled: { type: Boolean, default: true },
     smsCampaignsPerMonth: { type: Number, default: 0, min: 0 },
     smsRecipientsPerCampaign: { type: Number, default: 50, min: 0 },
     smsPhoneNumbers: { type: Number, default: 0, min: 0 },
@@ -341,6 +342,7 @@ export const SubscriptionSchema = {
     leadScoringEnabled: { type: Boolean, default: false },
     sentimentAnalysisEnabled: { type: Boolean, default: false },
     aiSummariesEnabled: { type: Boolean, default: false },
+    aiGenerativeEnabled: { type: Boolean, default: true },
 
     // Invoicing & Payments
     invoicesPerMonth: { type: Number, default: 10, min: 0 },

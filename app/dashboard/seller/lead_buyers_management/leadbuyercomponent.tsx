@@ -48,6 +48,8 @@ import {
   ExpandLess as ExpandLessIcon,
   WarningAmber as WarningIcon,
   Email as EmailIcon,
+  FileDownload as FileDownloadIcon,
+  FileUpload as FileUploadIcon,
 } from "@mui/icons-material";
 import BuyerTable from "@/app/components/leadbuyers/buyertable";
 import BuyerFormEnhanced from "@/app/components/leadbuyers/BuyerFormEnhanced";
@@ -55,6 +57,9 @@ import { IBuyer } from "@/models/leadbuyers";
 import { useInitializeUser } from "@/lib/hooks";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
+import Papa from "papaparse";
+import axios from "@/lib/axiosInstance";
 
 // ---------- Stats Card ----------
 
@@ -132,6 +137,11 @@ const BuyersPage: React.FC = () => {
     currentCount: 0,
     maxAllowed: 0,
   });
+
+  // Subscription limits for export/import permissions
+  const { limits: subLimits } = useSubscriptionLimits();
+  const canExport = subLimits?.exports ?? false;
+  const canImport = subLimits?.imports ?? false;
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -307,6 +317,73 @@ const BuyersPage: React.FC = () => {
         message: "Failed to delete buyer.",
         severity: "error",
       });
+    }
+  };
+
+  // ---------- Export/Import ----------
+
+  const exportToCSV = () => {
+    const csvData = filteredBuyers.map((buyer) => ({
+      Name: buyer.name || "",
+      Email: buyer.email || "",
+      Phone: buyer.phone || "",
+      Company: buyer.company || "",
+      "Business Description": buyer.businessDescription || "",
+      Priority: buyer.priority || 5,
+      "Max Leads Per Day": buyer.maxLeadsPerDay || 10,
+      Status: buyer.status || "new",
+      "Preferred Distribution": buyer.preferredDistribution || "Automatic",
+      Location: buyer.leadPreferences?.location
+        ? Array.isArray(buyer.leadPreferences.location)
+          ? buyer.leadPreferences.location.join(", ")
+          : buyer.leadPreferences.location
+        : "",
+      Industries: buyer.leadPreferences?.industries?.join(", ") || "",
+    }));
+
+    const csv = Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "buyers-export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const importFromCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await axios.post("/api/buyers/import", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (res.data.success) {
+        setSnackbar({
+          open: true,
+          message: res.data.message || "Buyers imported successfully",
+          severity: "success",
+        });
+        await fetchData();
+      } else {
+        setSnackbar({
+          open: true,
+          message: "Import failed: " + res.data.message,
+          severity: "error",
+        });
+      }
+    } catch (err) {
+      console.error("Error importing buyers:", err);
+      setSnackbar({
+        open: true,
+        message: "Error importing buyers",
+        severity: "error",
+      });
+    } finally {
+      event.target.value = "";
     }
   };
 
@@ -577,6 +654,49 @@ const BuyersPage: React.FC = () => {
             <MenuItem value="suspended">Suspended</MenuItem>
           </Select>
         </FormControl>
+
+        {/* Export/Import Buttons */}
+        {canExport && (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FileDownloadIcon />}
+            onClick={exportToCSV}
+          >
+            Export
+          </Button>
+        )}
+        {canImport && (
+          <>
+            <Button
+              variant="text"
+              size="small"
+              href="/templates/buyers-import-template.csv"
+              download="buyers-import-template.csv"
+              sx={{ textTransform: "none" }}
+            >
+              Download Template
+            </Button>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={importFromCSV}
+              style={{ display: "none" }}
+              id="csv-upload-buyers"
+            />
+            <label htmlFor="csv-upload-buyers">
+              <Button
+                variant="outlined"
+                size="small"
+                component="span"
+                startIcon={<FileUploadIcon />}
+              >
+                Import
+              </Button>
+            </label>
+          </>
+        )}
+
         <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
           {filteredBuyers.length} of {buyers.length} buyer
           {buyers.length !== 1 ? "s" : ""}

@@ -103,7 +103,8 @@ const TierSchema = new Schema<ITier>(
       concurrentCallLimit: { type: Number, default: 1 },
 
       // Marketing & Campaigns
-      emailCampaignsEnabled: { type: Boolean, default: false },
+      emailCampaignsEnabled: { type: Boolean, default: true },
+      smsCampaignsEnabled: { type: Boolean, default: true },
       smsCampaignsPerMonth: { type: Number, default: 0 },
       smsRecipientsPerCampaign: { type: Number, default: 50 },
       smsPhoneNumbers: { type: Number, default: 0 },
@@ -117,6 +118,7 @@ const TierSchema = new Schema<ITier>(
       leadScoringEnabled: { type: Boolean, default: false },
       sentimentAnalysisEnabled: { type: Boolean, default: false },
       aiSummariesEnabled: { type: Boolean, default: false },
+      aiGenerativeEnabled: { type: Boolean, default: true },
 
       // Invoicing & Payments
       invoicesPerMonth: { type: Number, default: 10 },

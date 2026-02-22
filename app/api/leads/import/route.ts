@@ -75,6 +75,43 @@ export async function POST(request: Request) {
 
     // Prepare leads for import
     const leadsToImport = rows.map((row) => {
+      // Create a map of header to value for easy lookup
+      const rowData: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        rowData[header.toLowerCase().trim()] = row[index] || "";
+      });
+
+      // Extract standard fields from CSV columns
+      const name =
+        rowData["name"] || rowData["full name"] || rowData["fullname"] || "";
+      const email =
+        rowData["email"] || rowData["e-mail"] || rowData["email address"] || "";
+      const phone =
+        rowData["phone"] ||
+        rowData["mobile"] ||
+        rowData["phone number"] ||
+        rowData["contact"] ||
+        "";
+      const company =
+        rowData["company"] ||
+        rowData["company name"] ||
+        rowData["organization"] ||
+        "";
+      const industry = rowData["industry"] || rowData["sector"] || "";
+
+      // Location fields
+      const city = rowData["city"] || "";
+      const state = rowData["state"] || rowData["province"] || "";
+      const country = rowData["country"] || "USA";
+      const zipCode =
+        rowData["zip code"] ||
+        rowData["zipcode"] ||
+        rowData["zip"] ||
+        rowData["postal code"] ||
+        "";
+      const address = rowData["address"] || rowData["street address"] || "";
+
+      // Build fields array for all columns
       const fields: Field[] = headers.map((header, index) => ({
         id: header.toLowerCase().replace(/\s+/g, "_"),
         label:
@@ -86,11 +123,24 @@ export async function POST(request: Request) {
 
       return {
         userId: session.user.id,
+        name,
+        email,
+        phone,
+        company,
+        industry,
+        location: {
+          city,
+          state,
+          country,
+          zipCode,
+          address,
+        },
         fields: fields,
         status: "new",
         isFavorite: false,
         isManual: false,
         distributionMethod: "marketplace",
+        leadSource: "import",
         shared: false,
         shareNumber: 1,
         exclusive: false,

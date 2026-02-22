@@ -23,7 +23,6 @@ import {
   Person as PersonIcon,
   Share as ShareIcon,
   AttachMoney as MoneyIcon,
-  Chat as ChatIcon,
   Email as EmailIcon,
   Code as CodeIcon,
   AccountBalance as StripeIcon,
@@ -31,7 +30,6 @@ import {
 } from "@mui/icons-material";
 import UnitPricingComponent from "./unitsetting/page";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
-import TawkSetupForm from "./tawksetting/page";
 import { useRouter } from "next/navigation";
 import StripeOnboardingPage from "./stripeonboarding/page";
 import LeadDistributionSettings from "./leadsellersetting/page";
@@ -92,7 +90,6 @@ const AccountSettings = () => {
     "general",
     "lead-distribution",
     "units-settings",
-    "live-chat-setup",
     "email-settings",
     "api-settings",
     "stripe-onboarding",
@@ -350,7 +347,6 @@ const AccountSettings = () => {
             iconPosition="start"
             label="Units Settings"
           />
-          <Tab icon={<ChatIcon />} iconPosition="start" label="Live Chat" />
           <Tab icon={<EmailIcon />} iconPosition="start" label="Email" />
           <Tab icon={<CodeIcon />} iconPosition="start" label="API Keys" />
           <Tab icon={<StripeIcon />} iconPosition="start" label="Stripe" />
@@ -532,11 +528,10 @@ const AccountSettings = () => {
 
             {tabValue === 1 && <LeadDistributionSettings />}
             {tabValue === 2 && <UnitPricingComponent />}
-            {tabValue === 3 && <TawkSetupForm />}
-            {tabValue === 4 && <EmailSettingsPage />}
-            {tabValue === 5 && <APISettingsPage />}
-            {tabValue === 6 && <StripeOnboardingPage />}
-            {tabValue === 7 && (
+            {tabValue === 3 && <EmailSettingsPage />}
+            {tabValue === 4 && <APISettingsPage />}
+            {tabValue === 5 && <StripeOnboardingPage />}
+            {tabValue === 6 && (
               <Box>
                 <SubscriptionManagement
                   onOpenChangePlanModal={() => setChangePlanModalOpen(true)}

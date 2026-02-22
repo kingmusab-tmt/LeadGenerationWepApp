@@ -54,6 +54,7 @@ export interface ISubscriptionLimits {
 
   // Marketing & Campaigns
   emailCampaignsEnabled: boolean; // Enable email campaigns feature (users provide their own SMTP)
+  smsCampaignsEnabled: boolean; // Enable SMS campaigns feature
   smsCampaignsPerMonth: number; // Max SMS campaigns per month (0 = unlimited)
   smsRecipientsPerCampaign: number; // Max recipients per SMS campaign
   smsPhoneNumbers: number; // Max Twilio phone numbers for SMS (allocated from twilioNumbers limit)
@@ -67,6 +68,7 @@ export interface ISubscriptionLimits {
   leadScoringEnabled: boolean; // Enable AI lead scoring
   sentimentAnalysisEnabled: boolean; // Enable sentiment analysis
   aiSummariesEnabled: boolean; // Enable AI summaries
+  aiGenerativeEnabled: boolean; // Enable AI generative features (Form Builder, Email/SMS Campaigns)
 
   // Invoicing & Payments
   invoicesPerMonth: number; // Max invoices per month (0 = unlimited)

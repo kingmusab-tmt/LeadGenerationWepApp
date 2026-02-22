@@ -35,6 +35,8 @@ import {
   Info as InfoIcon,
 } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface Props {
   onNotify: (
@@ -45,6 +47,7 @@ interface Props {
 
 export default function ApiKeyManagement({ onNotify }: Props) {
   const fetchWithCSRF = useCSRFFetch();
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [apiKeyExists, setApiKeyExists] = useState(false);
   const [truncatedKey, setTruncatedKey] = useState<string | null>(null);
@@ -74,13 +77,15 @@ export default function ApiKeyManagement({ onNotify }: Props) {
   };
 
   const generateApiKey = async () => {
-    if (
-      apiKeyExists &&
-      !confirm(
-        "Generating a new key will invalidate your current API key. Any existing integrations using the old key will stop working. Continue?",
-      )
-    ) {
-      return;
+    if (apiKeyExists) {
+      const confirmed = await confirm({
+        title: "Generate New Key",
+        message:
+          "Generating a new key will invalidate your current API key. Any existing integrations using the old key will stop working. Continue?",
+        confirmText: "Generate",
+        confirmColor: "warning",
+      });
+      if (!confirmed) return;
     }
 
     setLoading(true);
@@ -114,13 +119,14 @@ export default function ApiKeyManagement({ onNotify }: Props) {
   };
 
   const revokeApiKey = async () => {
-    if (
-      !confirm(
+    const confirmed = await confirm({
+      title: "Revoke API Key",
+      message:
         "Are you sure? This will break all existing integrations using this key.",
-      )
-    ) {
-      return;
-    }
+      confirmText: "Revoke",
+      confirmColor: "error",
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -371,6 +377,18 @@ export default function ApiKeyManagement({ onNotify }: Props) {
           </List>
         </CardContent>
       </Card>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Box>
   );
 }

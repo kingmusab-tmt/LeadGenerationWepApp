@@ -30,6 +30,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import InfoIcon from "@mui/icons-material/Info";
 import { usCities } from "@/utils/citiesInUsUk";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 interface ServiceLocation {
   city: string;
@@ -53,6 +55,7 @@ export default function ServiceLocationsSettings() {
     message: "",
     severity: "success" as "success" | "error",
   });
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 
   // Form state
   const [newLocation, setNewLocation] = useState<ServiceLocation>({
@@ -183,9 +186,13 @@ export default function ServiceLocationsSettings() {
   };
 
   const handleDeleteLocation = async (index: number) => {
-    if (!confirm("Are you sure you want to remove this service location?")) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Remove Location",
+      message: "Are you sure you want to remove this service location?",
+      confirmText: "Remove",
+      confirmColor: "error",
+    });
+    if (!confirmed) return;
 
     try {
       const updatedLocations = serviceLocations.filter((_, i) => i !== index);
@@ -564,6 +571,18 @@ export default function ServiceLocationsSettings() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Box>
   );
 }

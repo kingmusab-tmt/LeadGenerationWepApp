@@ -18,6 +18,7 @@ import { IUser } from "@/models/types/user";
 import mongoose from "mongoose";
 import { processLeadDistribution } from "@/lib/leadAssignmentService";
 import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
+import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 
 /**
  * Zapier action result structure
@@ -209,156 +210,177 @@ export class ZapierActionsService {
       // Create lead
       const lead = await Lead.create(leadData);
 
-      // Run AI quality scoring (same as form submit)
-      try {
-        const leadFieldsData: Record<string, unknown> = {};
-        if (input.name) leadFieldsData["Name"] = input.name;
-        if (input.email) leadFieldsData["Email"] = input.email;
-        if (input.phone) leadFieldsData["Phone"] = input.phone;
-        if (input.company) leadFieldsData["Company"] = input.company;
-        if (input.industry) leadFieldsData["Industry"] = input.industry;
-        if (input.city) leadFieldsData["City"] = input.city;
-        if (input.state) leadFieldsData["State"] = input.state;
-        if (input.country) leadFieldsData["Country"] = input.country;
-        if (input.customFields) {
-          Object.entries(input.customFields).forEach(([key, value]) => {
-            leadFieldsData[key] = value;
-          });
-        }
+      // Check if user has leadScoringEnabled feature
+      const hasLeadScoringFeature = await checkFeatureAccess(
+        this.userId,
+        "leadScoringEnabled",
+      );
 
-        console.log(
-          "[AI Scoring] Sending lead data to /api/filter-lead:",
-          JSON.stringify(leadFieldsData),
-        );
-        const scoringUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/filter-lead`;
-        console.log("[AI Scoring] URL:", scoringUrl);
-
-        const filterResponse = await fetch(scoringUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(leadFieldsData),
-        });
-
-        console.log(
-          "[AI Scoring] Response status:",
-          filterResponse.status,
-          filterResponse.statusText,
-        );
-
-        // filter-lead always returns 200 with scoring data
-        if (filterResponse.ok) {
-          const filterResult = await filterResponse.json();
-          console.log(
-            "[AI Scoring] Raw response:",
-            JSON.stringify(filterResult),
-          );
-
-          const spamScore =
-            typeof filterResult.spam_score === "number"
-              ? filterResult.spam_score
-              : typeof filterResult.spamScore === "number"
-                ? filterResult.spamScore
-                : 50;
-
-          let qualityLevel: "High" | "Medium" | "Low" = "Medium";
-          if (spamScore <= 40) {
-            qualityLevel = "High";   // Low spam = High quality lead
-          } else if (spamScore >= 70) {
-            qualityLevel = "Low";    // High spam = Low quality lead
+      // Run AI quality scoring (same as form submit) - only if feature is enabled
+      if (hasLeadScoringFeature.allowed) {
+        try {
+          const leadFieldsData: Record<string, unknown> = {};
+          if (input.name) leadFieldsData["Name"] = input.name;
+          if (input.email) leadFieldsData["Email"] = input.email;
+          if (input.phone) leadFieldsData["Phone"] = input.phone;
+          if (input.company) leadFieldsData["Company"] = input.company;
+          if (input.industry) leadFieldsData["Industry"] = input.industry;
+          if (input.city) leadFieldsData["City"] = input.city;
+          if (input.state) leadFieldsData["State"] = input.state;
+          if (input.country) leadFieldsData["Country"] = input.country;
+          if (input.customFields) {
+            Object.entries(input.customFields).forEach(([key, value]) => {
+              leadFieldsData[key] = value;
+            });
           }
 
-          const normalizedReason =
-            typeof filterResult.reason === "string"
-              ? filterResult.reason
-              : typeof filterResult.debug_reason === "string"
-                ? filterResult.debug_reason
-                : typeof filterResult.message === "string"
-                  ? filterResult.message
-                  : "";
-
           console.log(
-            "[AI Scoring] Computed: spamScore=%d, qualityLevel=%s, reason=%s",
-            spamScore,
-            qualityLevel,
-            normalizedReason,
+            "[AI Scoring] Sending lead data to /api/filter-lead:",
+            JSON.stringify(leadFieldsData),
           );
+          const scoringUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/filter-lead`;
+          console.log("[AI Scoring] URL:", scoringUrl);
 
-          await Lead.findByIdAndUpdate(lead._id, {
-            aiQualityScore: spamScore,
-            qualityLevel,
-            aiQualityReason: normalizedReason,
-            aiQualityAssessment: {
-              isValid: filterResult.is_valid !== false,
-              spamScore,
-              reason: normalizedReason,
-              evaluatedAt: new Date(),
-            },
-            exclusive: qualityLevel === "High",
-            shared: qualityLevel !== "High",
+          const filterResponse = await fetch(scoringUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(leadFieldsData),
           });
 
           console.log(
-            "[AI Scoring] ✅ Lead %s updated with AI score: %d/%s",
-            lead._id,
-            spamScore,
-            qualityLevel,
+            "[AI Scoring] Response status:",
+            filterResponse.status,
+            filterResponse.statusText,
           );
 
-          // Apply seller's quality-based lead pricing
-          try {
-            const seller = await User.findById(this.userId)
-              .select("leadPricing")
-              .lean();
-            const pricing = (seller as any)?.leadPricing || {
-              high: 10,
-              medium: 5,
-              low: 2,
-            };
-            const unitPrice =
-              qualityLevel === "High"
-                ? pricing.high
-                : qualityLevel === "Low"
-                  ? pricing.low
-                  : pricing.medium;
-            await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
-            console.log("[AI Scoring] ✅ Lead unit price set:", {
+          // filter-lead always returns 200 with scoring data
+          if (filterResponse.ok) {
+            const filterResult = await filterResponse.json();
+            console.log(
+              "[AI Scoring] Raw response:",
+              JSON.stringify(filterResult),
+            );
+
+            const spamScore =
+              typeof filterResult.spam_score === "number"
+                ? filterResult.spam_score
+                : typeof filterResult.spamScore === "number"
+                  ? filterResult.spamScore
+                  : 50;
+
+            let qualityLevel: "High" | "Medium" | "Low" = "Medium";
+            if (spamScore <= 40) {
+              qualityLevel = "High"; // Low spam = High quality lead
+            } else if (spamScore >= 70) {
+              qualityLevel = "Low"; // High spam = Low quality lead
+            }
+
+            const normalizedReason =
+              typeof filterResult.reason === "string"
+                ? filterResult.reason
+                : typeof filterResult.debug_reason === "string"
+                  ? filterResult.debug_reason
+                  : typeof filterResult.message === "string"
+                    ? filterResult.message
+                    : "";
+
+            console.log(
+              "[AI Scoring] Computed: spamScore=%d, qualityLevel=%s, reason=%s",
+              spamScore,
               qualityLevel,
-              unitPrice,
+              normalizedReason,
+            );
+
+            await Lead.findByIdAndUpdate(lead._id, {
+              aiQualityScore: spamScore,
+              qualityLevel,
+              aiQualityReason: normalizedReason,
+              aiQualityAssessment: {
+                isValid: filterResult.is_valid !== false,
+                spamScore,
+                reason: normalizedReason,
+                evaluatedAt: new Date(),
+              },
+              exclusive: qualityLevel === "High",
+              shared: qualityLevel !== "High",
             });
-          } catch (pricingError) {
+
+            console.log(
+              "[AI Scoring] ✅ Lead %s updated with AI score: %d/%s",
+              lead._id,
+              spamScore,
+              qualityLevel,
+            );
+
+            // Apply seller's quality-based lead pricing
+            try {
+              const seller = await User.findById(this.userId)
+                .select("leadPricing")
+                .lean();
+              const pricing = (seller as any)?.leadPricing || {
+                high: 10,
+                medium: 5,
+                low: 2,
+              };
+              const unitPrice =
+                qualityLevel === "High"
+                  ? pricing.high
+                  : qualityLevel === "Low"
+                    ? pricing.low
+                    : pricing.medium;
+              await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
+              console.log("[AI Scoring] ✅ Lead unit price set:", {
+                qualityLevel,
+                unitPrice,
+              });
+            } catch (pricingError) {
+              console.error(
+                "[AI Scoring] ⚠️ Error setting lead pricing:",
+                pricingError,
+              );
+            }
+          } else {
+            const errorBody = await filterResponse.text();
             console.error(
-              "[AI Scoring] ⚠️ Error setting lead pricing:",
-              pricingError,
+              "[AI Scoring] ❌ Unexpected status:",
+              filterResponse.status,
+              errorBody,
+            );
+            // Fallback to default only for truly unexpected errors (500, etc.)
+            await Lead.findByIdAndUpdate(lead._id, {
+              aiQualityScore: 50,
+              qualityLevel: "Medium",
+              aiQualityReason: `AI scoring failed: HTTP ${filterResponse.status}`,
+            });
+            console.log(
+              "[AI Scoring] ⚠️ Fell back to default (50/Medium) due to unexpected API error",
             );
           }
-        } else {
-          const errorBody = await filterResponse.text();
-          console.error(
-            "[AI Scoring] ❌ Unexpected status:",
-            filterResponse.status,
-            errorBody,
-          );
-          // Fallback to default only for truly unexpected errors (500, etc.)
+        } catch (aiError) {
+          console.error("[AI Scoring] ❌ Exception (non-fatal):", aiError);
+          // Non-fatal: lead is already saved, just with default score
           await Lead.findByIdAndUpdate(lead._id, {
             aiQualityScore: 50,
             qualityLevel: "Medium",
-            aiQualityReason: `AI scoring failed: HTTP ${filterResponse.status}`,
+            aiQualityReason: "AI evaluation unavailable - using default",
           });
           console.log(
-            "[AI Scoring] ⚠️ Fell back to default (50/Medium) due to unexpected API error",
+            "[AI Scoring] ⚠️ Fell back to default (50/Medium) due to exception",
           );
         }
-      } catch (aiError) {
-        console.error("[AI Scoring] ❌ Exception (non-fatal):", aiError);
-        // Non-fatal: lead is already saved, just with default score
+      } else {
+        // User doesn't have lead scoring feature - set default values without AI
+        console.log(
+          "[AI Scoring] ⏭️ Skipped - feature not enabled for user:",
+          this.userId,
+        );
         await Lead.findByIdAndUpdate(lead._id, {
           aiQualityScore: 50,
           qualityLevel: "Medium",
-          aiQualityReason: "AI evaluation unavailable - using default",
+          aiQualityReason: "AI scoring not enabled in subscription",
+          exclusive: false,
+          shared: true,
         });
-        console.log(
-          "[AI Scoring] ⚠️ Fell back to default (50/Medium) due to exception",
-        );
       }
 
       // ========================================

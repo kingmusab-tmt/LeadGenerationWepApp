@@ -57,6 +57,9 @@ import {
 } from "@mui/icons-material";
 import LeadForm from "@/app/components/leadmanagement/leadform";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 // ---------- Types ----------
 
@@ -214,6 +217,14 @@ const LeadManagement: React.FC = () => {
 
   const theme = useTheme();
 
+  // Subscription limits for export/import permissions
+  const { limits } = useSubscriptionLimits();
+  const canExport = limits?.exports ?? false;
+  const canImport = limits?.imports ?? false;
+
+  // Confirm dialog hook
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
+
   const extractLeads = (data: any): Lead[] => {
     if (Array.isArray(data)) return data;
     if (Array.isArray(data?.leads)) return data.leads;
@@ -263,7 +274,14 @@ const LeadManagement: React.FC = () => {
   };
 
   const handleDeleteLead = async (leadId: string) => {
-    if (!confirm("Are you sure you want to delete this lead?")) return;
+    const confirmed = await confirm({
+      title: "Delete Lead",
+      message:
+        "Are you sure you want to delete this lead? This action cannot be undone.",
+      confirmText: "Delete",
+      confirmColor: "error",
+    });
+    if (!confirmed) return;
     try {
       await axios.delete(`/api/leads?id=${leadId}`);
       setLeads((prev) => prev.filter((l) => l._id !== leadId));
@@ -536,6 +554,8 @@ const LeadManagement: React.FC = () => {
           onExportCSV={() => exportToCSV(formBuilderLeads, "formbuilder-leads")}
           onImportCSV={importFromCSV}
           notify={notify}
+          canExport={canExport}
+          canImport={canImport}
         />
       </TabPanel>
 
@@ -548,6 +568,7 @@ const LeadManagement: React.FC = () => {
           onExportCSV={() => exportToCSV(zapierLeads, "zapier-leads")}
           notify={notify}
           onRefresh={fetchLeads}
+          canExport={canExport}
         />
       </TabPanel>
 
@@ -583,6 +604,18 @@ const LeadManagement: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Box>
   );
 };
@@ -599,6 +632,8 @@ interface FormBuilderLeadsTabProps {
   onExportCSV: () => void;
   onImportCSV: (event: React.ChangeEvent<HTMLInputElement>) => void;
   notify: (msg: string, sev?: "success" | "error" | "info" | "warning") => void;
+  canExport?: boolean;
+  canImport?: boolean;
 }
 
 function FormBuilderLeadsTab({
@@ -609,6 +644,8 @@ function FormBuilderLeadsTab({
   onExportCSV,
   onImportCSV,
   notify,
+  canExport = false,
+  canImport = false,
 }: FormBuilderLeadsTabProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -724,31 +761,46 @@ function FormBuilderLeadsTab({
 
         <Box sx={{ flex: 1 }} />
 
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<FileDownloadIcon />}
-          onClick={onExportCSV}
-        >
-          Export
-        </Button>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={onImportCSV}
-          style={{ display: "none" }}
-          id="csv-upload-fb"
-        />
-        <label htmlFor="csv-upload-fb">
+        {canExport && (
           <Button
             variant="outlined"
             size="small"
-            component="span"
-            startIcon={<FileUploadIcon />}
+            startIcon={<FileDownloadIcon />}
+            onClick={onExportCSV}
           >
-            Import
+            Export
           </Button>
-        </label>
+        )}
+        {canImport && (
+          <>
+            <Button
+              variant="text"
+              size="small"
+              href="/templates/leads-import-template.csv"
+              download="leads-import-template.csv"
+              sx={{ textTransform: "none", mr: 0.5 }}
+            >
+              Download Template
+            </Button>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={onImportCSV}
+              style={{ display: "none" }}
+              id="csv-upload-fb"
+            />
+            <label htmlFor="csv-upload-fb">
+              <Button
+                variant="outlined"
+                size="small"
+                component="span"
+                startIcon={<FileUploadIcon />}
+              >
+                Import
+              </Button>
+            </label>
+          </>
+        )}
       </Box>
 
       {/* Table */}
@@ -1009,6 +1061,7 @@ interface ZapierLeadsTabProps {
   onExportCSV: () => void;
   notify: (msg: string, sev?: "success" | "error" | "info" | "warning") => void;
   onRefresh: () => Promise<void>;
+  canExport?: boolean;
 }
 
 function ZapierLeadsTab({
@@ -1018,6 +1071,7 @@ function ZapierLeadsTab({
   onExportCSV,
   notify,
   onRefresh,
+  canExport = false,
 }: ZapierLeadsTabProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -1151,14 +1205,16 @@ function ZapierLeadsTab({
 
         <Box sx={{ flex: 1 }} />
 
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<FileDownloadIcon />}
-          onClick={onExportCSV}
-        >
-          Export
-        </Button>
+        {canExport && (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FileDownloadIcon />}
+            onClick={onExportCSV}
+          >
+            Export
+          </Button>
+        )}
       </Box>
 
       {/* Info banner */}

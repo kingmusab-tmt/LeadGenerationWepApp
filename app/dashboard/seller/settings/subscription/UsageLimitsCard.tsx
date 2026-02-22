@@ -36,7 +36,6 @@ interface UsageLimitsCardProps {
     callSeconds?: number;
     forms?: number;
     buyers?: number;
-    emailCampaigns?: number;
     smsCampaigns?: number;
     invoices?: number;
   };
@@ -45,10 +44,11 @@ interface UsageLimitsCardProps {
     callSeconds?: number;
     forms?: number;
     buyers?: number;
-    emailCampaignsPerMonth?: number;
     smsCampaignsPerMonth?: number;
+    smsCampaignsEnabled?: boolean;
     invoicesPerMonth?: number;
     callRecording?: boolean;
+    emailCampaignsEnabled?: boolean;
     callTranscription?: boolean;
     callAIAnalysis?: boolean;
     chatbotEnabled?: boolean;
@@ -56,6 +56,8 @@ interface UsageLimitsCardProps {
     zapierIntegration?: boolean;
     apiAccess?: boolean;
     exports?: boolean;
+    imports?: boolean;
+    aiGenerativeEnabled?: boolean;
     advancedReports?: boolean;
     liveSupport?: boolean;
     prioritySupport?: boolean;
@@ -202,14 +204,9 @@ export default function UsageLimitsCard({
       unit: "min",
     },
     {
-      label: "Email Campaigns",
-      used: usage.emailCampaigns || 0,
-      limit: limits.emailCampaignsPerMonth || 0,
-    },
-    {
       label: "SMS Campaigns",
       used: usage.smsCampaigns || 0,
-      limit: limits.smsCampaignsPerMonth || 0,
+      limit: limits.smsCampaignsEnabled ? limits.smsCampaignsPerMonth || 0 : 0,
     },
     {
       label: "Invoices",
@@ -220,6 +217,9 @@ export default function UsageLimitsCard({
 
   // Build feature items
   const features: FeatureItem[] = [
+    { label: "Email Campaigns", enabled: !!limits.emailCampaignsEnabled },
+    { label: "SMS Campaigns", enabled: !!limits.smsCampaignsEnabled },
+    { label: "AI Generative", enabled: !!limits.aiGenerativeEnabled },
     { label: "Call Recording", enabled: !!limits.callRecording },
     { label: "Call Transcription", enabled: !!limits.callTranscription },
     { label: "AI Call Analysis", enabled: !!limits.callAIAnalysis },
@@ -228,6 +228,7 @@ export default function UsageLimitsCard({
     { label: "Zapier Integration", enabled: !!limits.zapierIntegration },
     { label: "API Access", enabled: !!limits.apiAccess },
     { label: "Data Exports", enabled: !!limits.exports },
+    { label: "Data Imports", enabled: !!limits.imports },
     { label: "Advanced Reports", enabled: !!limits.advancedReports },
     { label: "Live Support", enabled: !!limits.liveSupport },
     { label: "Priority Support", enabled: !!limits.prioritySupport },

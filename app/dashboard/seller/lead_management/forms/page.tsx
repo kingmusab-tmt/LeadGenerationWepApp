@@ -20,6 +20,8 @@ import FileCopyIcon from "@mui/icons-material/FileCopy";
 import { useRouter } from "next/navigation";
 import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useConfirm } from "@/app/hooks/useConfirm";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 type FormType = {
   formName: string;
@@ -42,6 +44,12 @@ export default function SellerForms() {
     message: "",
     severity: "success",
   });
+  const {
+    confirm,
+    confirmState,
+    handleConfirm: onConfirm,
+    handleCancel: onCancel,
+  } = useConfirm();
 
   useEffect(() => {
     const fetchForms = async () => {
@@ -120,9 +128,13 @@ export default function SellerForms() {
   };
 
   const handleDelete = async (formId: string) => {
-    if (!confirm("Are you sure you want to delete this form?")) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Delete Form",
+      message: "Are you sure you want to delete this form?",
+      confirmText: "Delete",
+      confirmColor: "error",
+    });
+    if (!confirmed) return;
 
     try {
       const response = await csrfFetch(`/api/form/delete?id=${formId}`, {
@@ -372,6 +384,18 @@ export default function SellerForms() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        confirmColor={confirmState.confirmColor}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
     </Box>
   );
 }

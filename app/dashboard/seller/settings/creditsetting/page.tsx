@@ -7,6 +7,8 @@ import {
   Paper,
   Typography,
   CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 
 const PaymentSetupForm: React.FC = () => {
@@ -14,6 +16,11 @@ const PaymentSetupForm: React.FC = () => {
   const [stripePublishableKey, setStripePublishableKey] = useState("");
   const [stripeWebhookSecret, setStripeWebhookSecret] = useState("");
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error" | "info" | "warning";
+  }>({ open: false, message: "", severity: "info" });
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -25,13 +32,25 @@ const PaymentSetupForm: React.FC = () => {
       });
 
       if (response.data.success) {
-        alert("Payment details updated successfully!");
+        setSnackbar({
+          open: true,
+          message: "Payment details updated successfully!",
+          severity: "success",
+        });
       } else {
-        alert("Failed to update payment details.");
+        setSnackbar({
+          open: true,
+          message: "Failed to update payment details.",
+          severity: "error",
+        });
       }
     } catch (error) {
       console.error("Error updating payment details:", error);
-      alert("An error occurred. Please try again.");
+      setSnackbar({
+        open: true,
+        message: "An error occurred. Please try again.",
+        severity: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -71,6 +90,21 @@ const PaymentSetupForm: React.FC = () => {
       >
         {loading ? <CircularProgress size={24} /> : "Save Payment Details"}
       </Button>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 };

@@ -815,7 +815,8 @@ export const TIER_LIMIT_PRESETS = {
     concurrentCallLimit: 1,
 
     // Marketing & Campaigns
-    emailCampaignsEnabled: false,
+    emailCampaignsEnabled: true,
+    smsCampaignsEnabled: true,
     smsCampaignsPerMonth: 0,
     smsRecipientsPerCampaign: 0,
     smsPhoneNumbers: 0,
@@ -829,6 +830,7 @@ export const TIER_LIMIT_PRESETS = {
     leadScoringEnabled: false,
     sentimentAnalysisEnabled: false,
     aiSummariesEnabled: false,
+    aiGenerativeEnabled: true,
 
     // Invoicing & Payments
     invoicesPerMonth: 5,
@@ -885,6 +887,7 @@ export const TIER_LIMIT_PRESETS = {
 
     // Marketing & Campaigns
     emailCampaignsEnabled: true,
+    smsCampaignsEnabled: true,
     smsCampaignsPerMonth: 5,
     smsRecipientsPerCampaign: 100,
     smsPhoneNumbers: 1,
@@ -898,6 +901,7 @@ export const TIER_LIMIT_PRESETS = {
     leadScoringEnabled: true,
     sentimentAnalysisEnabled: false,
     aiSummariesEnabled: false,
+    aiGenerativeEnabled: true,
 
     // Invoicing & Payments
     invoicesPerMonth: 25,
@@ -954,6 +958,7 @@ export const TIER_LIMIT_PRESETS = {
 
     // Marketing & Campaigns
     emailCampaignsEnabled: true,
+    smsCampaignsEnabled: true,
     smsCampaignsPerMonth: 25,
     smsRecipientsPerCampaign: 500,
     smsPhoneNumbers: 5,
@@ -967,6 +972,7 @@ export const TIER_LIMIT_PRESETS = {
     leadScoringEnabled: true,
     sentimentAnalysisEnabled: true,
     aiSummariesEnabled: true,
+    aiGenerativeEnabled: true,
 
     // Invoicing & Payments
     invoicesPerMonth: 100,
@@ -1023,6 +1029,7 @@ export const TIER_LIMIT_PRESETS = {
 
     // Marketing & Campaigns
     emailCampaignsEnabled: true,
+    smsCampaignsEnabled: true,
     smsCampaignsPerMonth: 0,
     smsRecipientsPerCampaign: 0,
     smsPhoneNumbers: 0,
@@ -1036,6 +1043,7 @@ export const TIER_LIMIT_PRESETS = {
     leadScoringEnabled: true,
     sentimentAnalysisEnabled: true,
     aiSummariesEnabled: true,
+    aiGenerativeEnabled: true,
 
     // Invoicing & Payments
     invoicesPerMonth: 0,
@@ -1102,7 +1110,8 @@ export function buildSubscriptionLimitsFromTier(
     concurrentCallLimit: tierLimits?.concurrentCallLimit ?? 1,
 
     // Marketing & Campaigns
-    emailCampaignsEnabled: tierLimits?.emailCampaignsEnabled ?? false,
+    emailCampaignsEnabled: tierLimits?.emailCampaignsEnabled ?? true,
+    smsCampaignsEnabled: tierLimits?.smsCampaignsEnabled ?? true,
     smsCampaignsPerMonth: tierLimits?.smsCampaignsPerMonth ?? 0,
     smsRecipientsPerCampaign: tierLimits?.smsRecipientsPerCampaign ?? 50,
     smsPhoneNumbers: tierLimits?.smsPhoneNumbers ?? 0,
@@ -1116,6 +1125,7 @@ export function buildSubscriptionLimitsFromTier(
     leadScoringEnabled: tierLimits?.leadScoringEnabled ?? false,
     sentimentAnalysisEnabled: tierLimits?.sentimentAnalysisEnabled ?? false,
     aiSummariesEnabled: tierLimits?.aiSummariesEnabled ?? false,
+    aiGenerativeEnabled: tierLimits?.aiGenerativeEnabled ?? true,
 
     // Invoicing & Payments
     invoicesPerMonth: tierLimits?.invoicesPerMonth ?? 10,

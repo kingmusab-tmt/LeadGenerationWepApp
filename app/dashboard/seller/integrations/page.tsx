@@ -25,6 +25,7 @@ import {
   Info as InfoIcon,
 } from "@mui/icons-material";
 import { useSession } from "next-auth/react";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import ZapierIntegration from "./components/ZapierIntegration";
 import WebhookStatistics from "./components/WebhookStatistics";
 import ApiKeyManagement from "./components/ApiKeyManagement";
@@ -53,6 +54,7 @@ function TabPanel(props: TabPanelProps) {
 
 export default function IntegrationsPage() {
   const { data: session, status } = useSession();
+  const { limits, loading: limitsLoading } = useSubscriptionLimits();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -95,6 +97,36 @@ export default function IntegrationsPage() {
     return (
       <Box sx={{ p: { xs: 2, sm: 3 } }}>
         <Alert severity="warning">Please sign in to manage integrations.</Alert>
+      </Box>
+    );
+  }
+
+  // Check if user has zapierIntegration feature
+  if (limits && !limits.zapierIntegration) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+          p: 3,
+        }}
+      >
+        <InfoIcon sx={{ fontSize: 64, color: "text.secondary", mb: 2 }} />
+        <Typography variant="h5" gutterBottom>
+          Integrations Not Available
+        </Typography>
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          textAlign="center"
+          sx={{ mb: 3 }}
+        >
+          Your current subscription plan does not include integrations. Upgrade
+          your plan to access Zapier and CRM integrations.
+        </Typography>
       </Box>
     );
   }

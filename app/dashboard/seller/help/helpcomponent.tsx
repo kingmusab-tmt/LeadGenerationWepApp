@@ -36,8 +36,10 @@ import axios from "axios";
 import TicketForm from "@/app/components/generalComponent/ticketForm";
 import TicketStatusForm from "@/app/components/generalComponent/TicketStatusForm";
 import TawkChatWidget from "@/app/components/generalComponent/livechat";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 
 const HelpSection = () => {
+  const { limits } = useSubscriptionLimits();
   const [videos, setVideos] = useState<
     {
       id: string;
@@ -369,16 +371,18 @@ const HelpSection = () => {
                         Follow-Up Ticket Status
                       </Button>
                     </ListItem>
-                    <ListItem>
-                      <Button
-                        startIcon={<Chat />}
-                        fullWidth
-                        sx={{ justifyContent: "flex-start" }}
-                        onClick={() => handleQuickHelpClick("chat")}
-                      >
-                        Live Chat
-                      </Button>
-                    </ListItem>
+                    {limits?.liveSupport && (
+                      <ListItem>
+                        <Button
+                          startIcon={<Chat />}
+                          fullWidth
+                          sx={{ justifyContent: "flex-start" }}
+                          onClick={() => handleQuickHelpClick("chat")}
+                        >
+                          Live Chat
+                        </Button>
+                      </ListItem>
+                    )}
                   </List>
                 </CardContent>
               </Card>
@@ -405,8 +409,14 @@ const HelpSection = () => {
         )}
       </Dialog>
 
-      {/* Tawk Chat Widget */}
-      <TawkChatWidget open={true} propertyId={propertyId} widgetId={widgetId} />
+      {/* Tawk Chat Widget - only show for users with liveSupport */}
+      {limits?.liveSupport && (
+        <TawkChatWidget
+          open={true}
+          propertyId={propertyId}
+          widgetId={widgetId}
+        />
+      )}
     </Box>
   );
 };

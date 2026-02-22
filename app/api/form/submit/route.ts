@@ -4,6 +4,7 @@ import { Lead } from "@/models/leads";
 import Form from "@/models/form";
 import { User } from "@/models/userModel";
 import { processLeadDistribution } from "@/lib/leadAssignmentService";
+import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 import { sendNotification } from "@/lib/notificationService";
 import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
 
@@ -275,106 +276,127 @@ export async function POST(request: Request) {
     // ========================================
     // 1. AI-BASED LEAD QUALITY EVALUATION
     // ========================================
-    try {
-      // Get all field values for AI evaluation
-      const allFieldsData = data.fields.reduce(
-        (acc, field) => {
-          acc[field.label] = field.value || "";
-          return acc;
-        },
-        {} as Record<string, unknown>,
-      );
+    // Check if seller has leadScoringEnabled feature
+    const hasLeadScoringFeature = await checkFeatureAccess(
+      formOwnerId,
+      "leadScoringEnabled",
+    );
 
-      // Call the Gatekeeper API to get AI quality score
-      const filterResponse = await fetch(
-        `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/filter-lead`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(allFieldsData),
-        },
-      );
-
-      const filterResult = await filterResponse.json();
-      const normalizedIsValid =
-        typeof filterResult.is_valid === "boolean"
-          ? filterResult.is_valid
-          : typeof filterResult.isValid === "boolean"
-            ? filterResult.isValid
-            : true;
-      const normalizedReason =
-        typeof filterResult.reason === "string"
-          ? filterResult.reason
-          : typeof filterResult.message === "string"
-            ? filterResult.message
-            : "";
-
-      // Map AI spam_score to quality level: High (0-30), Medium (30-70), Low (70-100)
-      let qualityLevel: "High" | "Medium" | "Low" = "Medium";
-      const spamScore =
-        typeof filterResult.spam_score === "number"
-          ? filterResult.spam_score
-          : typeof filterResult.spamScore === "number"
-            ? filterResult.spamScore
-            : 50;
-
-      if (spamScore <= 30) {
-        qualityLevel = "High";
-      } else if (spamScore >= 70) {
-        qualityLevel = "Low";
-      }
-
-      // Update the lead with AI quality assessment
-      await Lead.findByIdAndUpdate(lead._id, {
-        aiQualityScore: spamScore,
-        qualityLevel: qualityLevel,
-        aiQualityReason: normalizedReason,
-        aiQualityAssessment: {
-          isValid: normalizedIsValid,
-          spamScore: spamScore,
-          reason: normalizedReason,
-          evaluatedAt: new Date(),
-        },
-        exclusive: qualityLevel === "High",
-        shared: qualityLevel !== "High",
-      });
-
-      console.log("✅ AI quality assessment completed:", {
-        leadId: lead._id,
-        qualityLevel: qualityLevel,
-        spamScore: spamScore,
-        isValid: normalizedIsValid,
-        reason: normalizedReason,
-      });
-
-      // Apply seller's quality-based lead pricing
+    if (hasLeadScoringFeature.allowed) {
       try {
-        const seller = await User.findById(formOwnerId)
-          .select("leadPricing")
-          .lean();
-        const pricing = (seller as any)?.leadPricing || {
-          high: 10,
-          medium: 5,
-          low: 2,
-        };
-        const unitPrice =
-          qualityLevel === "High"
-            ? pricing.high
-            : qualityLevel === "Low"
-              ? pricing.low
-              : pricing.medium;
-        await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
-        console.log("✅ Lead unit price set:", { qualityLevel, unitPrice });
-      } catch (pricingError) {
-        console.error("⚠️ Error setting lead pricing:", pricingError);
+        // Get all field values for AI evaluation
+        const allFieldsData = data.fields.reduce(
+          (acc, field) => {
+            acc[field.label] = field.value || "";
+            return acc;
+          },
+          {} as Record<string, unknown>,
+        );
+
+        // Call the Gatekeeper API to get AI quality score
+        const filterResponse = await fetch(
+          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/filter-lead`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(allFieldsData),
+          },
+        );
+
+        const filterResult = await filterResponse.json();
+        const normalizedIsValid =
+          typeof filterResult.is_valid === "boolean"
+            ? filterResult.is_valid
+            : typeof filterResult.isValid === "boolean"
+              ? filterResult.isValid
+              : true;
+        const normalizedReason =
+          typeof filterResult.reason === "string"
+            ? filterResult.reason
+            : typeof filterResult.message === "string"
+              ? filterResult.message
+              : "";
+
+        // Map AI spam_score to quality level: High (0-30), Medium (30-70), Low (70-100)
+        let qualityLevel: "High" | "Medium" | "Low" = "Medium";
+        const spamScore =
+          typeof filterResult.spam_score === "number"
+            ? filterResult.spam_score
+            : typeof filterResult.spamScore === "number"
+              ? filterResult.spamScore
+              : 50;
+
+        if (spamScore <= 30) {
+          qualityLevel = "High";
+        } else if (spamScore >= 70) {
+          qualityLevel = "Low";
+        }
+
+        // Update the lead with AI quality assessment
+        await Lead.findByIdAndUpdate(lead._id, {
+          aiQualityScore: spamScore,
+          qualityLevel: qualityLevel,
+          aiQualityReason: normalizedReason,
+          aiQualityAssessment: {
+            isValid: normalizedIsValid,
+            spamScore: spamScore,
+            reason: normalizedReason,
+            evaluatedAt: new Date(),
+          },
+          exclusive: qualityLevel === "High",
+          shared: qualityLevel !== "High",
+        });
+
+        console.log("✅ AI quality assessment completed:", {
+          leadId: lead._id,
+          qualityLevel: qualityLevel,
+          spamScore: spamScore,
+          isValid: normalizedIsValid,
+          reason: normalizedReason,
+        });
+
+        // Apply seller's quality-based lead pricing
+        try {
+          const seller = await User.findById(formOwnerId)
+            .select("leadPricing")
+            .lean();
+          const pricing = (seller as any)?.leadPricing || {
+            high: 10,
+            medium: 5,
+            low: 2,
+          };
+          const unitPrice =
+            qualityLevel === "High"
+              ? pricing.high
+              : qualityLevel === "Low"
+                ? pricing.low
+                : pricing.medium;
+          await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
+          console.log("✅ Lead unit price set:", { qualityLevel, unitPrice });
+        } catch (pricingError) {
+          console.error("⚠️ Error setting lead pricing:", pricingError);
+        }
+      } catch (aiError) {
+        console.error("❌ Error in AI quality assessment:", aiError);
+        // Don't fail the entire request - assign default medium quality
+        await Lead.findByIdAndUpdate(lead._id, {
+          aiQualityScore: 50,
+          qualityLevel: "Medium",
+          aiQualityReason: "AI evaluation unavailable - using default",
+          exclusive: false,
+          shared: true,
+        });
       }
-    } catch (aiError) {
-      console.error("❌ Error in AI quality assessment:", aiError);
-      // Don't fail the entire request - assign default medium quality
+    } else {
+      // User doesn't have lead scoring feature - set default values without AI
+      console.log(
+        "⏭️ AI lead scoring skipped - feature not enabled for user:",
+        formOwnerId,
+      );
       await Lead.findByIdAndUpdate(lead._id, {
         aiQualityScore: 50,
         qualityLevel: "Medium",
-        aiQualityReason: "AI evaluation unavailable - using default",
+        aiQualityReason: "AI scoring not enabled in subscription",
         exclusive: false,
         shared: true,
       });

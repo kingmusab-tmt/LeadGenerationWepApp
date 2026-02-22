@@ -46,6 +46,7 @@ import ConfirmDialog from "@/app/components/ConfirmDialog";
 import TwilioNumberGenerator from "@/app/components/TwilioNumberGenerator";
 import { Phone as PhoneIcon } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 
 interface SmsCampaign {
   _id: string;
@@ -66,6 +67,7 @@ interface SmsCampaign {
 
 export default function SmsCampaignsPage() {
   const { currentUser } = useInitializeUser();
+  const { limits } = useSubscriptionLimits();
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -387,6 +389,39 @@ export default function SmsCampaignsPage() {
   const charCount = formData.textContent.length;
   const smsSegments = Math.ceil(charCount / 160) || 0;
 
+  // Check if user has access to SMS campaigns
+  if (limits && !limits.smsCampaignsEnabled) {
+    return (
+      <Box
+        sx={{
+          p: 3,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "50vh",
+          textAlign: "center",
+        }}
+      >
+        <Typography variant="h5" gutterBottom>
+          SMS Campaigns Not Available
+        </Typography>
+        <Typography color="text.secondary" sx={{ mb: 2, maxWidth: 400 }}>
+          Your current subscription plan does not include SMS Campaigns. Please
+          upgrade your plan to access this feature.
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={() =>
+            (window.location.href = "/dashboard/seller/settings/subscription")
+          }
+        >
+          View Subscription Plans
+        </Button>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -614,7 +649,7 @@ export default function SmsCampaignsPage() {
         <DialogContent
           sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}
         >
-          {!editMode && (
+          {!editMode && limits?.aiGenerativeEnabled && (
             <Button
               variant="outlined"
               onClick={() => setAiDialogOpen(true)}

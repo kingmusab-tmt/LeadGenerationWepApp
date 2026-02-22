@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import {
   Select,
   MenuItem,
@@ -98,6 +99,7 @@ export default function CallMethodForm({
   initialValues,
   onUpdateForwarding,
 }: CallMethodFormProps) {
+  const { limits } = useSubscriptionLimits();
   const [selectedNumber, setSelectedNumber] = useState(
     initialValues?.phoneNumber || "",
   );
@@ -928,25 +930,27 @@ export default function CallMethodForm({
 
       {/* Toggles */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
-        <Box>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={recordCall}
-                onChange={() => setRecordCall(!recordCall)}
-              />
-            }
-            label="Record Call"
-          />
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", ml: 4 }}
-          >
-            Records the call from the moment it is answered. Pair with Recording
-            Consent to notify callers.
-          </Typography>
-        </Box>
+        {limits?.callRecording && (
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={recordCall}
+                  onChange={() => setRecordCall(!recordCall)}
+                />
+              }
+              label="Record Call"
+            />
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", ml: 4 }}
+            >
+              Records the call from the moment it is answered. Pair with
+              Recording Consent to notify callers.
+            </Typography>
+          </Box>
+        )}
         <Box>
           <FormControlLabel
             control={
@@ -1024,36 +1028,38 @@ export default function CallMethodForm({
       </Typography>
 
       {/* Recording Consent */}
-      <Accordion disableGutters sx={{ mb: 1 }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <FormControlLabel
-            onClick={(e) => e.stopPropagation()}
-            control={
-              <Switch
-                checked={recordingConsent}
-                onChange={() => setRecordingConsent(!recordingConsent)}
-              />
-            }
-            label="Recording Consent Announcement"
-          />
-        </AccordionSummary>
-        <AccordionDetails>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Play a consent message before recording starts (required in many
-            jurisdictions).
-          </Typography>
-          <TextField
-            fullWidth
-            size="small"
-            label="Consent Message"
-            value={recordingConsentMessage}
-            onChange={(e) => setRecordingConsentMessage(e.target.value)}
-            multiline
-            rows={2}
-            disabled={!recordingConsent}
-          />
-        </AccordionDetails>
-      </Accordion>
+      {limits?.callRecording && (
+        <Accordion disableGutters sx={{ mb: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <FormControlLabel
+              onClick={(e) => e.stopPropagation()}
+              control={
+                <Switch
+                  checked={recordingConsent}
+                  onChange={() => setRecordingConsent(!recordingConsent)}
+                />
+              }
+              label="Recording Consent Announcement"
+            />
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Play a consent message before recording starts (required in many
+              jurisdictions).
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              label="Consent Message"
+              value={recordingConsentMessage}
+              onChange={(e) => setRecordingConsentMessage(e.target.value)}
+              multiline
+              rows={2}
+              disabled={!recordingConsent}
+            />
+          </AccordionDetails>
+        </Accordion>
+      )}
 
       {/* Spam Filter */}
       <Accordion disableGutters sx={{ mb: 1 }}>
@@ -1306,69 +1312,75 @@ export default function CallMethodForm({
         </AccordionDetails>
       </Accordion>
 
-      <Divider sx={{ my: 3 }} />
-      <Typography
-        variant="h6"
-        sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}
-      >
-        <SmartToyIcon fontSize="small" /> AI & Analytics
-      </Typography>
-
-      {/* Transcription */}
-      <Accordion disableGutters sx={{ mb: 1 }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <FormControlLabel
-            onClick={(e) => e.stopPropagation()}
-            control={
-              <Switch
-                checked={transcriptionEnabled}
-                onChange={() => setTranscriptionEnabled(!transcriptionEnabled)}
-              />
-            }
-            label="Call Transcription"
-          />
-        </AccordionSummary>
-        <AccordionDetails>
-          <Typography variant="body2" color="text.secondary">
-            Automatically transcribe recorded calls. Transcriptions appear in
-            call details and can be used for AI analysis. Requires call
-            recording to be enabled.
+      {limits?.callAIAnalysis && (
+        <>
+          <Divider sx={{ my: 3 }} />
+          <Typography
+            variant="h6"
+            sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+          >
+            <SmartToyIcon fontSize="small" /> AI & Analytics
           </Typography>
-          {transcriptionEnabled && !recordCall && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              Call recording must be enabled for transcription to work.
-            </Alert>
-          )}
-        </AccordionDetails>
-      </Accordion>
 
-      {/* AI Summary */}
-      <Accordion disableGutters sx={{ mb: 1 }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <FormControlLabel
-            onClick={(e) => e.stopPropagation()}
-            control={
-              <Switch
-                checked={aiSummaryEnabled}
-                onChange={() => setAiSummaryEnabled(!aiSummaryEnabled)}
+          {/* Transcription */}
+          <Accordion disableGutters sx={{ mb: 1 }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <FormControlLabel
+                onClick={(e) => e.stopPropagation()}
+                control={
+                  <Switch
+                    checked={transcriptionEnabled}
+                    onChange={() =>
+                      setTranscriptionEnabled(!transcriptionEnabled)
+                    }
+                  />
+                }
+                label="Call Transcription"
               />
-            }
-            label="AI Call Summary & Lead Scoring"
-          />
-        </AccordionSummary>
-        <AccordionDetails>
-          <Typography variant="body2" color="text.secondary">
-            Uses Google AI to generate call summaries, sentiment analysis, and
-            lead quality scores (A-D grading) from transcriptions. Requires
-            transcription to be enabled.
-          </Typography>
-          {aiSummaryEnabled && !transcriptionEnabled && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              Call transcription must be enabled for AI analysis to work.
-            </Alert>
-          )}
-        </AccordionDetails>
-      </Accordion>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary">
+                Automatically transcribe recorded calls. Transcriptions appear
+                in call details and can be used for AI analysis. Requires call
+                recording to be enabled.
+              </Typography>
+              {transcriptionEnabled && !recordCall && (
+                <Alert severity="warning" sx={{ mt: 1 }}>
+                  Call recording must be enabled for transcription to work.
+                </Alert>
+              )}
+            </AccordionDetails>
+          </Accordion>
+
+          {/* AI Summary */}
+          <Accordion disableGutters sx={{ mb: 1 }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <FormControlLabel
+                onClick={(e) => e.stopPropagation()}
+                control={
+                  <Switch
+                    checked={aiSummaryEnabled}
+                    onChange={() => setAiSummaryEnabled(!aiSummaryEnabled)}
+                  />
+                }
+                label="AI Call Summary & Lead Scoring"
+              />
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary">
+                Uses Google AI to generate call summaries, sentiment analysis,
+                and lead quality scores (A-D grading) from transcriptions.
+                Requires transcription to be enabled.
+              </Typography>
+              {aiSummaryEnabled && !transcriptionEnabled && (
+                <Alert severity="warning" sx={{ mt: 1 }}>
+                  Call transcription must be enabled for AI analysis to work.
+                </Alert>
+              )}
+            </AccordionDetails>
+          </Accordion>
+        </>
+      )}
 
       {/* Save Button */}
       <Button

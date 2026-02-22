@@ -31,6 +31,7 @@ import { LEAD_SOURCES } from "@/utils/leadSources";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/app/hooks/useConfirm";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 
 interface Field {
   id: string;
@@ -49,6 +50,7 @@ const FormBuilder = () => {
   const [editLabel, setEditLabel] = useState<string>("");
   const [editOptions, setEditOptions] = useState<string[]>([]);
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
+  const { limits } = useSubscriptionLimits();
   const [editHeadingLevel, setEditHeadingLevel] = useState<
     "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
   >("h2");
@@ -849,28 +851,30 @@ const FormBuilder = () => {
               </Button>
             </Tooltip>
 
-            <Tooltip
-              title="Use AI to automatically generate form fields based on your requirements"
-              placement="left"
-              arrow
-            >
-              <Button
-                variant="contained"
-                fullWidth
-                size="small"
-                onClick={() => setAiDialogOpen(true)}
-                startIcon={<AutoFixHighIcon sx={{ fontSize: "0.85rem" }} />}
-                sx={{
-                  mb: 1,
-                  fontSize: "0.7rem",
-                  py: 0.5,
-                  backgroundColor: "#9c27b0",
-                  "&:hover": { backgroundColor: "#7b1fa2" },
-                }}
+            {limits?.aiGenerativeEnabled && (
+              <Tooltip
+                title="Use AI to automatically generate form fields based on your requirements"
+                placement="left"
+                arrow
               >
-                AI Generate
-              </Button>
-            </Tooltip>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  size="small"
+                  onClick={() => setAiDialogOpen(true)}
+                  startIcon={<AutoFixHighIcon sx={{ fontSize: "0.85rem" }} />}
+                  sx={{
+                    mb: 1,
+                    fontSize: "0.7rem",
+                    py: 0.5,
+                    backgroundColor: "#9c27b0",
+                    "&:hover": { backgroundColor: "#7b1fa2" },
+                  }}
+                >
+                  AI Generate
+                </Button>
+              </Tooltip>
+            )}
 
             <Tooltip
               title="Add a single-line text input field for short text responses"

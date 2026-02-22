@@ -44,6 +44,7 @@ import RecipientPicker from "@/app/components/RecipientPicker";
 import { useConfirm } from "@/app/hooks/useConfirm";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 
 interface Campaign {
   _id: string;
@@ -63,6 +64,7 @@ interface Campaign {
 export default function EmailCampaigns() {
   const fetchWithCSRF = useCSRFFetch();
   const { currentUser } = useInitializeUser();
+  const { limits } = useSubscriptionLimits();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -396,6 +398,39 @@ export default function EmailCampaigns() {
       ? campaigns
       : campaigns.filter((c) => c.status === filterStatus);
 
+  // Check if user has access to email campaigns
+  if (limits && !limits.emailCampaignsEnabled) {
+    return (
+      <Box
+        sx={{
+          p: 3,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "50vh",
+          textAlign: "center",
+        }}
+      >
+        <Typography variant="h5" gutterBottom>
+          Email Campaigns Not Available
+        </Typography>
+        <Typography color="text.secondary" sx={{ mb: 2, maxWidth: 400 }}>
+          Your current subscription plan does not include Email Campaigns.
+          Please upgrade your plan to access this feature.
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={() =>
+            (window.location.href = "/dashboard/seller/settings/subscription")
+          }
+        >
+          View Subscription Plans
+        </Button>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -659,7 +694,7 @@ export default function EmailCampaigns() {
         <DialogContent
           sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}
         >
-          {!editMode && (
+          {!editMode && limits?.aiGenerativeEnabled && (
             <Button
               variant="outlined"
               onClick={() => setAiDialogOpen(true)}

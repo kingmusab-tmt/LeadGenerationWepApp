@@ -50,6 +50,7 @@ import { handleSignOut } from "@/lib/signOutServerAction";
 import InactivityLogout from "@/app/components/generalComponent/InactivityLogout";
 import { useInitializeUser } from "@/lib/hooks";
 import { useSession } from "next-auth/react";
+import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 
 interface UserDashboardProps {
   children: React.ReactNode;
@@ -147,6 +148,7 @@ const bottomNavItems: NavItem[] = [
 const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const { currentUser, loading: userLoading } = useInitializeUser();
   const { status } = useSession();
+  const { limits } = useSubscriptionLimits();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([
     "lead_management",
@@ -220,6 +222,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     }
     return isActive(item.path);
   };
+
+  // Filter nav items based on subscription limits
+  const filteredNavItems = navItems.filter((item) => {
+    if (item.path === "email-campaigns" && !limits?.emailCampaignsEnabled) {
+      return false;
+    }
+    if (item.path === "sms-campaigns" && !limits?.smsCampaignsEnabled) {
+      return false;
+    }
+    if (item.path === "integrations" && !limits?.zapierIntegration) {
+      return false;
+    }
+    return true;
+  });
 
   // Sidebar content
   const drawerContent = (
@@ -307,7 +323,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       {/* Main Navigation */}
       <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
         <List disablePadding>
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const hasChildren = item.children && item.children.length > 0;
             const isExpanded = expandedItems.includes(item.path);
             const active = hasChildren
