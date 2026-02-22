@@ -464,13 +464,13 @@ const CheckoutContent = () => {
                       </Select>
                     </FormControl>
 
-                    <List dense>
+                    {/* <List dense>
                       {tier.features.map((feature, index) => (
                         <ListItem key={index}>
                           <ListItemText primary={feature} />
                         </ListItem>
                       ))}
-                    </List>
+                    </List> */}
 
                     <Box mt={4} display="flex" gap={2}>
                       <Button
