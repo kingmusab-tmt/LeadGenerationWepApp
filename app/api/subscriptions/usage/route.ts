@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
  * Request body:
  * {
  *   action: "check" | "increment",
- *   usageKey: string (e.g., "leads", "forms", "emailCampaigns"),
+ *   usageKey: string (e.g., "leads", "forms", "smsCampaigns"),
  *   amount?: number (default: 1),
  *   enforceSoftLimit?: boolean (default: false)
  * }

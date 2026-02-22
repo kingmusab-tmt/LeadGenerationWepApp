@@ -23,7 +23,7 @@ import {
   badRequest,
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
-import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
+import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 
 export const dynamic = "force-dynamic";
 
@@ -117,16 +117,15 @@ export async function POST(req: NextRequest) {
 
     await dbConnect();
 
-    // Check subscription limit for email campaigns
-    const usageCheck = await checkAndIncrementUsage(
+    // Check feature access for email campaigns
+    const featureAccess = await checkFeatureAccess(
       session.user.id,
-      "emailCampaigns",
-      1,
+      "emailCampaignsEnabled",
     );
-    if (!usageCheck.allowed) {
+    if (!featureAccess.allowed) {
       return forbidden(
-        usageCheck.message ||
-          "Email campaign limit reached for your subscription",
+        featureAccess.message ||
+          "Email campaigns are not available for your subscription",
       );
     }
 

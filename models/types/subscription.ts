@@ -114,6 +114,7 @@ export interface ISubscriptionUsage {
   buyers: number; // Registered buyers count
 
   // Campaign Usage
+  emailCampaigns: number; // Email campaigns created this month
   smsCampaigns: number; // SMS campaigns sent this month
 
   // Automation Usage

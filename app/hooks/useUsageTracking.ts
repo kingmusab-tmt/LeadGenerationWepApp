@@ -301,7 +301,6 @@ export const USAGE_KEYS = {
   CALL_SECONDS: "callSeconds",
   FORMS: "forms",
   BUYERS: "buyers",
-  EMAIL_CAMPAIGNS: "emailCampaigns",
   SMS_CAMPAIGNS: "smsCampaigns",
   INVOICES: "invoices",
   WORKFLOW_EXECUTIONS: "workflowExecutions",

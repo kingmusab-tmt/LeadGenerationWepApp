@@ -402,33 +402,36 @@ const FormBuilder = () => {
   return (
     <Container sx={{ padding: { xs: 1, sm: 2 } }}>
       <Typography
-        variant="h4"
+        variant="h5"
         gutterBottom
         sx={{
-          fontSize: { xs: "1.5rem", sm: "2rem" },
           fontWeight: "bold",
           color: "primary.main",
         }}
       >
         Form Builder
       </Typography>
-      <Typography variant="body1" sx={{ mb: 4 }}>
-        Add field Label and click the field to Create your custom form. Preview
-        your form in real-time.
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Configure form details on the left, preview in the center, and add
+        fields from the right.
       </Typography>
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper elevation={3} sx={{ p: 2 }}>
+      <Grid container spacing={1.5}>
+        {/* LEFT COLUMN: Form Details & Style Configuration */}
+        <Grid size={{ xs: 12, md: 2 }}>
+          <Paper
+            elevation={2}
+            sx={{ p: 1, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}
+          >
             <Typography
-              variant="h6"
+              variant="subtitle2"
               gutterBottom
-              sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }}
+              sx={{ fontWeight: 600, fontSize: "0.8rem" }}
             >
               Form Details
             </Typography>
             <Tooltip
               title="Provide a name for your form to identify it later"
-              placement="top"
+              placement="right"
               arrow
             >
               <TextField
@@ -436,16 +439,17 @@ const FormBuilder = () => {
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 fullWidth
-                sx={{ mb: 2 }}
+                size="small"
+                sx={{ mb: 1, "& .MuiInputBase-input": { fontSize: "0.8rem" } }}
               />
             </Tooltip>
             <Tooltip
               title="Specify the source of the lead"
-              placement="top"
+              placement="right"
               arrow
             >
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Lead Source</InputLabel>
+              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+                <InputLabel sx={{ fontSize: "0.8rem" }}>Lead Source</InputLabel>
                 <Select
                   value={leadSource}
                   onChange={(e) => setLeadSource(e.target.value as string)}
@@ -461,15 +465,15 @@ const FormBuilder = () => {
             </Tooltip>
             <Tooltip
               title="Select the industry or niche for your form"
-              placement="top"
+              placement="right"
               arrow
             >
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Industry/Niche</InputLabel>
+              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+                <InputLabel sx={{ fontSize: "0.8rem" }}>Industry</InputLabel>
                 <Select
                   value={industry}
                   onChange={(e) => setIndustry(e.target.value as string)}
-                  label="Industry/Niche"
+                  label="Industry"
                 >
                   {industryNiches.map((ind) => (
                     <MenuItem key={ind.value} value={ind.value}>
@@ -480,92 +484,98 @@ const FormBuilder = () => {
               </FormControl>
             </Tooltip>
             <Typography
-              variant="h6"
+              variant="caption"
               gutterBottom
-              sx={{ fontSize: { xs: "1rem", sm: "1.25rem" }, mt: 3 }}
+              sx={{
+                fontWeight: 600,
+                mt: 1.5,
+                mb: 0.5,
+                display: "block",
+                fontSize: "0.75rem",
+              }}
             >
-              Style Configuration
+              Style
             </Typography>
             <Tooltip
               title="Choose the primary color for buttons and accents"
-              placement="top"
+              placement="right"
               arrow
             >
               <Box
-                sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+                sx={{ mb: 1, display: "flex", alignItems: "center", gap: 0.5 }}
               >
-                <Typography variant="body2">Primary Color:</Typography>
+                <Typography variant="caption" sx={{ fontSize: "0.7rem" }}>
+                  Primary:
+                </Typography>
                 <input
                   type="color"
                   value={primaryColor}
                   onChange={(e) => setPrimaryColor(e.target.value)}
                   style={{
-                    width: "50px",
-                    height: "40px",
+                    width: "28px",
+                    height: "22px",
                     border: "1px solid #ccc",
-                    borderRadius: "4px",
+                    borderRadius: "3px",
                     cursor: "pointer",
                   }}
                 />
-                <Typography variant="caption" color="textSecondary">
-                  {primaryColor}
-                </Typography>
               </Box>
             </Tooltip>
             <Tooltip
               title="Customize the background color of the form"
-              placement="top"
+              placement="right"
               arrow
             >
               <Box
-                sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+                sx={{ mb: 1, display: "flex", alignItems: "center", gap: 0.5 }}
               >
-                <Typography variant="body2">Form Background:</Typography>
+                <Typography variant="caption" sx={{ fontSize: "0.7rem" }}>
+                  BG:
+                </Typography>
                 <input
                   type="color"
                   value={formBackgroundColor}
                   onChange={(e) => setFormBackgroundColor(e.target.value)}
                   style={{
-                    width: "50px",
-                    height: "40px",
+                    width: "28px",
+                    height: "22px",
                     border: "1px solid #ccc",
-                    borderRadius: "4px",
+                    borderRadius: "3px",
                     cursor: "pointer",
                   }}
                 />
-                <Typography variant="caption" color="textSecondary">
-                  {formBackgroundColor}
-                </Typography>
               </Box>
             </Tooltip>
             <Tooltip
               title="Set the text label for the submit button"
-              placement="top"
+              placement="right"
               arrow
             >
               <TextField
-                label="Submit Button Text"
+                label="Button Text"
                 value={buttonText}
                 onChange={(e) => setButtonText(e.target.value)}
                 fullWidth
-                sx={{ mb: 2 }}
+                size="small"
+                sx={{ mb: 1, "& .MuiInputBase-input": { fontSize: "0.8rem" } }}
                 placeholder="Submit"
               />
             </Tooltip>
             <Tooltip
               title="Enter the success message shown after form submission"
-              placement="top"
+              placement="right"
               arrow
             >
               <TextField
-                label="Success Message"
+                label="Success Msg"
                 value={successMessage}
                 onChange={(e) => setSuccessMessage(e.target.value)}
                 fullWidth
-                sx={{ mb: 2 }}
+                size="small"
+                sx={{ mb: 1, "& .MuiInputBase-input": { fontSize: "0.8rem" } }}
                 multiline
                 rows={2}
-                placeholder="Thank you! Your form has been submitted successfully."
+                placeholder="Thank you!"
               />
             </Tooltip>
             <FormControlLabel
@@ -574,204 +584,26 @@ const FormBuilder = () => {
                   checked={recaptchaEnabled}
                   onChange={(e) => setRecaptchaEnabled(e.target.checked)}
                   color="primary"
+                  size="small"
                 />
               }
-              label="Enable Google reCAPTCHA"
-              sx={{ mb: 3 }}
+              label="reCAPTCHA"
+              sx={{ mb: 0.5 }}
+              slotProps={{
+                typography: { variant: "caption", sx: { fontSize: "0.7rem" } },
+              }}
             />
-            <Typography
-              variant="h6"
-              gutterBottom
-              sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }}
-            >
-              Add Fields
-            </Typography>
-            {/* Input for custom label */}
-            <TextField
-              label="Field Label"
-              value={newFieldLabel}
-              onChange={(e) => setNewFieldLabel(e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-
-            <Tooltip
-              title="Add a heading block to separate sections"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("header", "Section Header")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Header
-              </Button>
-            </Tooltip>
-
-            <Tooltip
-              title="Add a paragraph block for helper or intro text"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("paragraph", "Paragraph text")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Paragraph
-              </Button>
-            </Tooltip>
-            {/* Field Type Buttons with Tooltips */}
-            <Tooltip
-              title="Add preconfigured contact fields (Name, Email, Phone) for lead collection"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={addLeadContactFields}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Contact Fields
-              </Button>
-            </Tooltip>
-            <Tooltip
-              title="Use AI to automatically generate form fields based on your requirements"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="contained"
-                fullWidth
-                onClick={() => setAiDialogOpen(true)}
-                startIcon={<AutoFixHighIcon />}
-                sx={{
-                  mb: 2,
-                  fontSize: { xs: "0.8rem", sm: "0.9rem" },
-                  backgroundColor: "#9c27b0",
-                  "&:hover": { backgroundColor: "#7b1fa2" },
-                }}
-              >
-                Generate with AI
-              </Button>
-            </Tooltip>
-            <Tooltip
-              title="Add a single-line text input field for short text responses"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("text", "Text Input")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Text Input
-              </Button>
-            </Tooltip>
-
-            <Tooltip
-              title="Add a multi-line textarea field for longer text responses"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("textarea", "Long Text / Textarea")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Long Text / Textarea
-              </Button>
-            </Tooltip>
-
-            <Tooltip
-              title="Add a dropdown select field with predefined options"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("select", "Dropdown")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Dropdown List
-              </Button>
-            </Tooltip>
-
-            <Tooltip
-              title="Add a checkbox field for yes/no or multiple selection options"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("checkbox", "Checkbox")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Multiple Choice Field
-              </Button>
-            </Tooltip>
-
-            <Tooltip
-              title="Add radio buttons for single selection from multiple options"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("radio", "Radio Button")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Single Choice Field
-              </Button>
-            </Tooltip>
-
-            <Tooltip
-              title="Add a number input field for numeric values"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("number", "Number Input")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Number Input
-              </Button>
-            </Tooltip>
-
-            <Tooltip
-              title="Add a date picker field for date selection"
-              placement="top"
-              arrow
-            >
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => addField("date", "Date Picker")}
-                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
-              >
-                Date Picker
-              </Button>
-            </Tooltip>
           </Paper>
         </Grid>
-        <Grid size={{ xs: 12, sm: 8 }}>
+
+        {/* MIDDLE COLUMN: Form Preview */}
+        <Grid size={{ xs: 12, md: 8 }}>
           <FormPreview
             fields={fields}
             userId={"Null"}
             formId={"Null"}
-            isLoggedIn={true} // Pass whether the user is logged in
-            onEdit={startEditing} // Use startEditing to initialize edit states
+            isLoggedIn={true}
+            onEdit={startEditing}
             onDelete={deleteField}
             onToggleRequired={toggleRequired}
             onReorder={setFields}
@@ -791,11 +623,11 @@ const FormBuilder = () => {
             recaptchaEnabled={recaptchaEnabled}
           />
           {editingFieldId && (
-            <Paper elevation={3} sx={{ p: 2, mt: 2 }}>
+            <Paper elevation={2} sx={{ p: 1.5, mt: 2 }}>
               <Typography
-                variant="h6"
+                variant="subtitle1"
                 gutterBottom
-                sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }}
+                sx={{ fontWeight: 600 }}
               >
                 Edit Field
               </Typography>
@@ -804,9 +636,9 @@ const FormBuilder = () => {
                 value={editLabel}
                 onChange={(e) => setEditLabel(e.target.value)}
                 fullWidth
-                sx={{ mb: 2 }}
+                size="small"
+                sx={{ mb: 1.5 }}
               />
-              {/* Show options editor for Checkbox, Radio Button, and Dropdown */}
               {(fields.find((field) => field.id === editingFieldId)?.type ===
                 "checkbox" ||
                 fields.find((field) => field.id === editingFieldId)?.type ===
@@ -814,7 +646,7 @@ const FormBuilder = () => {
                 fields.find((field) => field.id === editingFieldId)?.type ===
                   "select") && (
                 <div>
-                  <Typography variant="body2" sx={{ mb: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
                     Options:
                   </Typography>
                   {editOptions.map((option, i) => (
@@ -827,7 +659,8 @@ const FormBuilder = () => {
                         setEditOptions(newOptions);
                       }}
                       fullWidth
-                      sx={{ mb: 1 }}
+                      size="small"
+                      sx={{ mb: 0.5 }}
                     />
                   ))}
                   <Button
@@ -842,7 +675,7 @@ const FormBuilder = () => {
 
               {fields.find((field) => field.id === editingFieldId)?.type ===
                 "header" && (
-                <FormControl fullWidth sx={{ mb: 2 }}>
+                <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
                   <InputLabel>Heading Level</InputLabel>
                   <Select
                     label="Heading Level"
@@ -868,20 +701,26 @@ const FormBuilder = () => {
                   </Select>
                 </FormControl>
               )}
-              <Button onClick={saveFieldChanges} size="small">
-                Save
-              </Button>
-              <Button
-                onClick={() => {
-                  setEditingFieldId(null);
-                  setEditLabel("");
-                  setEditOptions([]);
-                  setEditHeadingLevel("h2");
-                }}
-                size="small"
-              >
-                Cancel
-              </Button>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Button
+                  onClick={saveFieldChanges}
+                  size="small"
+                  variant="contained"
+                >
+                  Save
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEditingFieldId(null);
+                    setEditLabel("");
+                    setEditOptions([]);
+                    setEditHeadingLevel("h2");
+                  }}
+                  size="small"
+                >
+                  Cancel
+                </Button>
+              </Box>
             </Paper>
           )}
           <Box
@@ -895,6 +734,7 @@ const FormBuilder = () => {
             <Button
               variant="outlined"
               color="error"
+              size="small"
               onClick={async () => {
                 const confirmed = await confirm({
                   title: "Clear Form",
@@ -923,20 +763,227 @@ const FormBuilder = () => {
                   });
                 }
               }}
-              sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
             >
               Clear Form
             </Button>
             <Button
               variant="contained"
               color="primary"
+              size="small"
               disabled={isPublishing}
               onClick={handlePublish}
-              sx={{ fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
             >
-              {isPublishing ? "Publishing Your Form" : "Publish Form"}
+              {isPublishing ? "Publishing..." : "Publish Form"}
             </Button>
           </Box>
+        </Grid>
+
+        {/* RIGHT COLUMN: Add Fields */}
+        <Grid size={{ xs: 12, md: 2 }}>
+          <Paper
+            elevation={2}
+            sx={{ p: 1, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}
+          >
+            <Typography
+              variant="subtitle2"
+              gutterBottom
+              sx={{ fontWeight: 600, fontSize: "0.8rem" }}
+            >
+              Add Fields
+            </Typography>
+            {/* Input for custom label */}
+            <TextField
+              label="Field Label"
+              value={newFieldLabel}
+              onChange={(e) => setNewFieldLabel(e.target.value)}
+              fullWidth
+              size="small"
+              sx={{ mb: 1, "& .MuiInputBase-input": { fontSize: "0.8rem" } }}
+            />
+
+            <Tooltip
+              title="Add a heading block to separate sections"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("header", "Section Header")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Header
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a paragraph block for helper or intro text"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("paragraph", "Paragraph text")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Paragraph
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add preconfigured contact fields (Name, Email, Phone) for lead collection"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={addLeadContactFields}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Contact Fields
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Use AI to automatically generate form fields based on your requirements"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="contained"
+                fullWidth
+                size="small"
+                onClick={() => setAiDialogOpen(true)}
+                startIcon={<AutoFixHighIcon sx={{ fontSize: "0.85rem" }} />}
+                sx={{
+                  mb: 1,
+                  fontSize: "0.7rem",
+                  py: 0.5,
+                  backgroundColor: "#9c27b0",
+                  "&:hover": { backgroundColor: "#7b1fa2" },
+                }}
+              >
+                AI Generate
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a single-line text input field for short text responses"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("text", "Text Input")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Text
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a multi-line textarea field for longer text responses"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("textarea", "Long Text / Textarea")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Textarea
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a dropdown select field with predefined options"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("select", "Dropdown")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Dropdown
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a checkbox field for yes/no or multiple selection options"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("checkbox", "Checkbox")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Checkbox
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add radio buttons for single selection from multiple options"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("radio", "Radio Button")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Radio
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a number input field for numeric values"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("number", "Number Input")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Number
+              </Button>
+            </Tooltip>
+
+            <Tooltip
+              title="Add a date picker field for date selection"
+              placement="left"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                onClick={() => addField("date", "Date Picker")}
+                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+              >
+                Date
+              </Button>
+            </Tooltip>
+          </Paper>
         </Grid>
       </Grid>
 

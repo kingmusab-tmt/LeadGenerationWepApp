@@ -78,6 +78,7 @@ export const USAGE_TO_LIMIT_MAP: Record<string, keyof ISubscriptionLimits> = {
   callSeconds: "callSeconds",
   forms: "forms",
   buyers: "buyers",
+  maxWebhooks: "maxWebhooks",
   smsCampaigns: "smsCampaignsPerMonth",
   invoices: "invoicesPerMonth",
   workflowExecutions: "automationWorkflows",
