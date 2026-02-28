@@ -464,7 +464,7 @@ const LandingPage = () => {
         />
 
         <Slide direction="down" in={checked} mountOnEnter unmountOnExit>
-          <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
+          <Container maxWidth="xl" sx={{ position: "relative", zIndex: 1 }}>
             <Grid container spacing={6} alignItems="center">
               <Grid size={{ xs: 12, md: 7 }}>
                 {/* Trust badges row */}
@@ -713,7 +713,7 @@ const LandingPage = () => {
             </Grid>
 
             {/* Social proof stats */}
-            <Fade in={checked} timeout={1200}>
+            {/* <Fade in={checked} timeout={1200}>
               <Paper
                 elevation={0}
                 sx={{
@@ -764,7 +764,7 @@ const LandingPage = () => {
                   ))}
                 </Grid>
               </Paper>
-            </Fade>
+            </Fade> */}
           </Container>
         </Slide>
       </Box>
@@ -780,10 +780,10 @@ const LandingPage = () => {
           borderColor: "divider",
         }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Fade in={checked}>
             <Box textAlign="center" mb={5}>
-              <Chip label="Industry Solutions" color="primary" sx={{ mb: 2 }} />
+              {/* <Chip label="Industry Solutions" color="primary" sx={{ mb: 2 }} /> */}
               <Typography
                 variant="h3"
                 component="h2"
@@ -855,7 +855,7 @@ const LandingPage = () => {
 
       {/* How It Works Section */}
       <Box py={10} bgcolor="background.default" id="how-it-works">
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -940,7 +940,7 @@ const LandingPage = () => {
 
       {/* Features Section with Staggered Grow animations */}
       <Box py={10} bgcolor="background.paper" id="features">
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -1007,16 +1007,16 @@ const LandingPage = () => {
 
       {/* Call Tracking Showcase Section */}
       <Box py={10} bgcolor="background.default">
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Grid container spacing={6} alignItems="center">
             <Grid size={{ xs: 12, md: 6 }}>
               <Slide direction="right" in={checked} mountOnEnter unmountOnExit>
                 <Box>
-                  <Chip
+                  {/* <Chip
                     label="Enterprise-Grade Call Tracking"
                     color="primary"
                     sx={{ mb: 2 }}
-                  />
+                  /> */}
                   <Typography variant="h3" fontWeight="bold" gutterBottom>
                     The Most Advanced Call Tracking in the Industry
                   </Typography>
@@ -1102,7 +1102,7 @@ const LandingPage = () => {
 
       {/* For Sellers & Buyers Section */}
       <Box py={10} bgcolor="background.paper">
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -1236,8 +1236,8 @@ const LandingPage = () => {
       </Box>
 
       {/* Integrations Section */}
-      <Box py={10} bgcolor="background.default">
-        <Container maxWidth="lg">
+      {/* <Box py={10} bgcolor="background.default">
+        <Container maxWidth="xl">
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -1333,7 +1333,7 @@ const LandingPage = () => {
             </Button>
           </Box>
         </Container>
-      </Box>
+      </Box> */}
 
       {/* Pricing CTA Section */}
       <Fade in={checked}>
@@ -1344,7 +1344,7 @@ const LandingPage = () => {
             background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
           }}
         >
-          <Container maxWidth="md">
+          <Container maxWidth="lg">
             <Box textAlign="center" color="white">
               <Typography variant="h3" fontWeight="bold" gutterBottom>
                 Simple, Transparent Pricing
@@ -1405,7 +1405,7 @@ const LandingPage = () => {
 
       {/* Testimonials Section with Slide animations */}
       <Box py={10} bgcolor="background.paper">
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Slide direction="up" in={checked} mountOnEnter unmountOnExit>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -1484,7 +1484,7 @@ const LandingPage = () => {
       {/* CTA Section with Zoom animation */}
       <Zoom in={checked} style={{ transitionDelay: checked ? "500ms" : "0ms" }}>
         <Box py={12} bgcolor="primary.main" color="white">
-          <Container maxWidth="md" sx={{ textAlign: "center" }}>
+          <Container maxWidth="lg" sx={{ textAlign: "center" }}>
             <Rocket sx={{ fontSize: 64, mb: 2 }} />
             <Typography variant="h3" fontWeight="bold" gutterBottom>
               Ready to Transform Your Lead Business?
@@ -1548,7 +1548,7 @@ const LandingPage = () => {
         py={10}
         bgcolor="background.paper"
       >
-        <Container maxWidth="md">
+        <Container maxWidth="lg">
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Chip
@@ -1637,13 +1637,13 @@ const LandingPage = () => {
       </Box>
 
       {/* Final Trust Section */}
-      <Box
+      {/* <Box
         py={6}
         sx={{
           background: `linear-gradient(135deg, ${theme.palette.grey[100]} 0%, ${theme.palette.grey[50]} 100%)`,
         }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Grid
             container
             spacing={4}
@@ -1712,7 +1712,7 @@ const LandingPage = () => {
             </Grid>
           </Grid>
         </Container>
-      </Box>
+      </Box> */}
 
       <Footer />
     </>

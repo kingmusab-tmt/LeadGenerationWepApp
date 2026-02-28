@@ -20,26 +20,45 @@ import logo from "../../../public/BRIXCOT.png";
 const Footer = () => {
   const theme = useTheme();
   return (
-    <Box component="footer" bgcolor="background.paper" py={6}>
-      <Container maxWidth="lg">
-        <Grid container spacing={4}>
+    <Box
+      component="footer"
+      sx={{
+        bgcolor: "background.paper",
+        py: { xs: 6, md: 8 },
+        borderTop: "1px solid",
+        borderColor: "divider",
+      }}
+    >
+      <Container maxWidth={false} sx={{ px: { xs: 2, sm: 4, md: 6 } }}>
+        <Grid container spacing={{ xs: 4, md: 6 }} alignItems="flex-start">
           <Grid size={{ xs: 12, md: 4 }}>
             <Box display="flex" alignItems="center" mb={2}>
               <Image
-                src={logo} // Update this path to your actual logo
-                alt="LeadConnect Pro Logo"
+                src={logo}
+                alt="BRIXCOT Logo"
                 width={40}
                 height={40}
                 style={{ marginRight: theme.spacing(2) }}
               />
-              <Typography variant="h6">BRIXCOT</Typography>
+              <Typography variant="h6" fontWeight={700}>
+                BRIXCOT
+              </Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               The complete solution for modern lead management and distribution.
             </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              component={Link}
+              href="/demo"
+              sx={{ mt: 1 }}
+            >
+              Request Demo
+            </Button>
           </Grid>
           <Grid size={{ xs: 6, md: 2 }}>
-            <Typography variant="subtitle1" gutterBottom>
+            <Typography variant="subtitle1" fontWeight={700} gutterBottom>
               Product
             </Typography>
             <List dense>
@@ -49,6 +68,11 @@ const Footer = () => {
                     component={Link}
                     href={`/${text.toLowerCase()}`}
                     color="text.secondary"
+                    underline="hover"
+                    sx={{
+                      transition: "color 0.2s",
+                      "&:hover": { color: "primary.main" },
+                    }}
                   >
                     {text}
                   </MuiLink>
@@ -57,7 +81,7 @@ const Footer = () => {
             </List>
           </Grid>
           <Grid size={{ xs: 6, md: 2 }}>
-            <Typography variant="subtitle1" gutterBottom>
+            <Typography variant="subtitle1" fontWeight={700} gutterBottom>
               Resources
             </Typography>
             <List dense>
@@ -67,6 +91,11 @@ const Footer = () => {
                     component={Link}
                     href={`/${text.toLowerCase()}`}
                     color="text.secondary"
+                    underline="hover"
+                    sx={{
+                      transition: "color 0.2s",
+                      "&:hover": { color: "primary.main" },
+                    }}
                   >
                     {text}
                   </MuiLink>
@@ -75,31 +104,56 @@ const Footer = () => {
             </List>
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
-            <Typography variant="subtitle1" gutterBottom>
+            <Typography variant="subtitle1" fontWeight={700} gutterBottom>
               Contact Us
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Email: info@leadconnectpro.com
+              Email: support@brixcot.com
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Phone: (555) 123-4567
+              Phone: +1 (555) 123-4567
             </Typography>
-            <Box mt={2}>
-              <Button
-                variant="contained"
-                color="primary"
+            <Box mt={2.5}>
+              <MuiLink
                 component={Link}
-                href="/demo"
+                href="/contact"
+                underline="hover"
+                color="primary.main"
+                fontWeight={600}
               >
-                Request Demo
-              </Button>
+                Contact our team
+              </MuiLink>
             </Box>
           </Grid>
         </Grid>
         <Divider sx={{ my: 4 }} />
-        <Typography variant="body2" color="text.secondary" align="center">
-          © {new Date().getFullYear()} LeadConnect Pro. All rights reserved.
-        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 1,
+            textAlign: { xs: "center", md: "left" },
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            © {new Date().getFullYear()} BRIXCOT. All rights reserved.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Developed by{" "}
+            <MuiLink
+              href="https://triplemultipurposetechnology.com.ng"
+              target="_blank"
+              rel="noopener noreferrer"
+              color="primary.main"
+              underline="hover"
+              fontWeight={600}
+            >
+              Triple Multipurpose Technology
+            </MuiLink>
+          </Typography>
+        </Box>
       </Container>
     </Box>
   );
