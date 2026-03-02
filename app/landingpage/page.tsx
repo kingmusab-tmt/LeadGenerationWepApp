@@ -422,7 +422,8 @@ const LandingPage = () => {
         sx={{
           background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.dark} 100%)`,
           color: "white",
-          py: { xs: 8, md: 14 },
+          pt: { xs: 1, md: 3 },
+          pb: { xs: 6, md: 10 },
           position: "relative",
           overflow: "hidden",
           "&::before": {
@@ -443,8 +444,8 @@ const LandingPage = () => {
             position: "absolute",
             top: "10%",
             right: "10%",
-            width: 300,
-            height: 300,
+            width: 200,
+            height: 200,
             borderRadius: "50%",
             background: "rgba(255,255,255,0.05)",
             filter: "blur(60px)",
@@ -455,8 +456,8 @@ const LandingPage = () => {
             position: "absolute",
             bottom: "20%",
             left: "5%",
-            width: 200,
-            height: 200,
+            width: 150,
+            height: 150,
             borderRadius: "50%",
             background: "rgba(255,255,255,0.03)",
             filter: "blur(40px)",
@@ -464,7 +465,10 @@ const LandingPage = () => {
         />
 
         <Slide direction="down" in={checked} mountOnEnter unmountOnExit>
-          <Container maxWidth="xl" sx={{ position: "relative", zIndex: 1 }}>
+          <Container
+            maxWidth="xl"
+            sx={{ position: "relative", zIndex: 1, px: { xs: 6, sm: 8 } }}
+          >
             <Grid container spacing={6} alignItems="center">
               <Grid size={{ xs: 12, md: 7 }}>
                 {/* Trust badges row */}
@@ -780,7 +784,7 @@ const LandingPage = () => {
           borderColor: "divider",
         }}
       >
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ px: { xs: 6, sm: 8 } }}>
           <Fade in={checked}>
             <Box textAlign="center" mb={5}>
               {/* <Chip label="Industry Solutions" color="primary" sx={{ mb: 2 }} /> */}
@@ -789,6 +793,7 @@ const LandingPage = () => {
                 component="h2"
                 fontWeight="bold"
                 gutterBottom
+                color="primary.main"
               >
                 Lead Management for Every Industry
               </Typography>
@@ -855,7 +860,7 @@ const LandingPage = () => {
 
       {/* How It Works Section */}
       <Box py={10} bgcolor="background.default" id="how-it-works">
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ px: { xs: 3, sm: 4 } }}>
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -940,7 +945,7 @@ const LandingPage = () => {
 
       {/* Features Section with Staggered Grow animations */}
       <Box py={10} bgcolor="background.paper" id="features">
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ px: { xs: 6, sm: 8 } }}>
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -1007,7 +1012,7 @@ const LandingPage = () => {
 
       {/* Call Tracking Showcase Section */}
       <Box py={10} bgcolor="background.default">
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ px: { xs: 6, sm: 8 } }}>
           <Grid container spacing={6} alignItems="center">
             <Grid size={{ xs: 12, md: 6 }}>
               <Slide direction="right" in={checked} mountOnEnter unmountOnExit>
@@ -1102,7 +1107,7 @@ const LandingPage = () => {
 
       {/* For Sellers & Buyers Section */}
       <Box py={10} bgcolor="background.paper">
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ px: { xs: 6, sm: 8 } }}>
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -1111,7 +1116,7 @@ const LandingPage = () => {
                 gutterBottom
                 color="primary.main"
               >
-                Built for Both Sellers & Buyers
+                Built for Every Business and Industry
               </Typography>
               <Typography variant="h6" color="text.secondary">
                 Whether you generate leads or buy them, BRIXCOT has you covered.
@@ -1142,7 +1147,7 @@ const LandingPage = () => {
                       <TrendingUp />
                     </Avatar>
                     <Typography variant="h4" fontWeight="bold">
-                      For Lead Sellers
+                      For Lead Sellers/Businesses
                     </Typography>
                   </Box>
                   <Typography variant="body1" color="text.secondary" paragraph>
@@ -1201,7 +1206,7 @@ const LandingPage = () => {
                       <Store />
                     </Avatar>
                     <Typography variant="h4" fontWeight="bold">
-                      For Lead Buyers
+                      For Lead Buyers/Sales Teams
                     </Typography>
                   </Box>
                   <Typography variant="body1" color="text.secondary" paragraph>
@@ -1237,7 +1242,7 @@ const LandingPage = () => {
 
       {/* Integrations Section */}
       {/* <Box py={10} bgcolor="background.default">
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ px: { xs: 3, sm: 4 } }}>
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -1344,7 +1349,7 @@ const LandingPage = () => {
             background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
           }}
         >
-          <Container maxWidth="lg">
+          <Container maxWidth="lg" sx={{ px: { xs: 3, sm: 4 } }}>
             <Box textAlign="center" color="white">
               <Typography variant="h3" fontWeight="bold" gutterBottom>
                 Simple, Transparent Pricing
@@ -1405,7 +1410,7 @@ const LandingPage = () => {
 
       {/* Testimonials Section with Slide animations */}
       <Box py={10} bgcolor="background.paper">
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ px: { xs: 6, sm: 8 } }}>
           <Slide direction="up" in={checked} mountOnEnter unmountOnExit>
             <Box textAlign="center" mb={6}>
               <Typography
@@ -1484,7 +1489,10 @@ const LandingPage = () => {
       {/* CTA Section with Zoom animation */}
       <Zoom in={checked} style={{ transitionDelay: checked ? "500ms" : "0ms" }}>
         <Box py={12} bgcolor="primary.main" color="white">
-          <Container maxWidth="lg" sx={{ textAlign: "center" }}>
+          <Container
+            maxWidth="lg"
+            sx={{ textAlign: "center", px: { xs: 3, sm: 4 } }}
+          >
             <Rocket sx={{ fontSize: 64, mb: 2 }} />
             <Typography variant="h3" fontWeight="bold" gutterBottom>
               Ready to Transform Your Lead Business?
@@ -1548,7 +1556,7 @@ const LandingPage = () => {
         py={10}
         bgcolor="background.paper"
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="lg" sx={{ px: { xs: 3, sm: 4 } }}>
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
               <Chip
@@ -1643,7 +1651,7 @@ const LandingPage = () => {
           background: `linear-gradient(135deg, ${theme.palette.grey[100]} 0%, ${theme.palette.grey[50]} 100%)`,
         }}
       >
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" sx={{ px: { xs: 3, sm: 4 } }}>
           <Grid
             container
             spacing={4}

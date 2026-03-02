@@ -13,13 +13,19 @@ export async function POST(req: NextRequest) {
   const to = (formData.get("To") as string) || "";
   const body = (formData.get("Body") as string) || "";
 
-  // Find the seller by 'to' number
-  const seller = await User.findOne({ "apiSettings.twilioPhoneNumber": to });
+  // Find the seller by Twilio default number or assigned tracking number
+  const seller = await User.findOne({
+    $or: [
+      { "apiSettings.twilioPhoneNumber": to },
+      { "trackingNumbers.phoneNumber": to },
+    ],
+  });
   const userId = seller?._id?.toString() || "";
 
   const { reply } = await smsMarketingEngine.handleInboundMessage(
     userId,
     from,
+    to,
     body,
   );
 

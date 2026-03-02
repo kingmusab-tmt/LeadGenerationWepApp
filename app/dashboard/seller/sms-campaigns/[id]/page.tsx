@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -19,7 +19,7 @@ import {
   PlayArrow as ResumeIcon,
   Save as SaveIcon,
 } from "@mui/icons-material";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import SmsRecipientPicker from "@/app/components/SmsRecipientPicker";
 import { useConfirm } from "@/app/hooks/useConfirm";
@@ -44,13 +44,24 @@ interface CampaignData {
   updatedAt?: string;
 }
 
+interface SmsReply {
+  _id: string;
+  phone: string;
+  body: string;
+  createdAt?: string;
+}
+
 export default function SmsCampaignEditorPage() {
   const fetchWithCSRF = useCSRFFetch();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const campaignId = params?.id as string;
+  const repliesSectionRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [campaign, setCampaign] = useState<CampaignData | null>(null);
+  const [replies, setReplies] = useState<SmsReply[]>([]);
+  const [repliesLoading, setRepliesLoading] = useState(false);
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const [formData, setFormData] = useState({
     name: "",
@@ -58,8 +69,35 @@ export default function SmsCampaignEditorPage() {
     recipientList: "",
   });
   const [testPhone, setTestPhone] = useState("");
+  const shouldFocusReplies = searchParams.get("view") === "replies";
 
   useEffect(() => {
+    if (!shouldFocusReplies || loading) return;
+    requestAnimationFrame(() => {
+      repliesSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [shouldFocusReplies, loading]);
+
+  useEffect(() => {
+    const fetchReplies = async () => {
+      try {
+        setRepliesLoading(true);
+        const res = await fetch(
+          `/api/marketing/sms/campaigns/${campaignId}/replies`,
+        );
+        if (!res.ok) throw new Error("Failed to load replies");
+        const data = await res.json();
+        setReplies(data.items || []);
+      } catch {
+        setReplies([]);
+      } finally {
+        setRepliesLoading(false);
+      }
+    };
+
     const fetchCampaign = async () => {
       try {
         const res = await fetch(`/api/marketing/sms/campaigns/${campaignId}`);
@@ -80,7 +118,10 @@ export default function SmsCampaignEditorPage() {
         setLoading(false);
       }
     };
-    if (campaignId) void fetchCampaign();
+    if (campaignId) {
+      void fetchCampaign();
+      void fetchReplies();
+    }
   }, [campaignId]);
 
   const handleSave = async () => {
@@ -473,6 +514,78 @@ export default function SmsCampaignEditorPage() {
                 <Typography variant="body2" color="text.secondary">
                   Updated: {new Date(campaign.updatedAt).toLocaleDateString()}
                 </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12 }} ref={repliesSectionRef}>
+          <Card>
+            <CardContent>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
+                <Typography variant="h6">Received Replies</Typography>
+                <Button
+                  size="small"
+                  onClick={async () => {
+                    try {
+                      setRepliesLoading(true);
+                      const res = await fetch(
+                        `/api/marketing/sms/campaigns/${campaignId}/replies`,
+                      );
+                      if (!res.ok) throw new Error("Failed to load replies");
+                      const data = await res.json();
+                      setReplies(data.items || []);
+                    } catch {
+                      toast.error("Failed to refresh replies");
+                    } finally {
+                      setRepliesLoading(false);
+                    }
+                  }}
+                  disabled={repliesLoading}
+                >
+                  {repliesLoading ? "Refreshing..." : "Refresh"}
+                </Button>
+              </Box>
+
+              {repliesLoading ? (
+                <CircularProgress size={20} />
+              ) : replies.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No replies received for this campaign yet.
+                </Typography>
+              ) : (
+                <Box
+                  sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
+                >
+                  {replies.map((reply) => (
+                    <Box
+                      key={reply._id}
+                      sx={{
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        p: 1.5,
+                      }}
+                    >
+                      <Typography variant="subtitle2">{reply.phone}</Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        {reply.body || "(No message body)"}
+                      </Typography>
+                      {reply.createdAt && (
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(reply.createdAt).toLocaleString()}
+                        </Typography>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
               )}
             </CardContent>
           </Card>

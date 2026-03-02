@@ -155,6 +155,20 @@ class SmsQueueManager {
 // These classes are kept for extensibility and will be utilized in upcoming versions
 
 class SmsMarketingEngine {
+  private async resolveCampaignForInboundMessage(
+    userId: string,
+    to: string,
+    from: string,
+  ) {
+    if (!userId || !to || !from) return null;
+
+    return SmsCampaign.findOne({
+      userId,
+      fromPhoneNumber: to,
+      "recipients.phone": from,
+    }).sort({ updatedAt: -1 });
+  }
+
   async createCampaign(
     userId: string,
     payload: Partial<ISmsRecipient> & {
@@ -225,25 +239,47 @@ class SmsMarketingEngine {
     return { success: true, message: "Test SMS sent" };
   }
 
-  async handleInboundMessage(userId: string, from: string, body: string) {
+  async handleInboundMessage(
+    userId: string,
+    from: string,
+    to: string,
+    body: string,
+  ) {
     await dbConnect();
+    if (!userId) {
+      return { reply: "Thanks for your message." };
+    }
+
     const normalized = body.trim().toUpperCase();
+    const campaign = await this.resolveCampaignForInboundMessage(
+      userId,
+      to,
+      from,
+    );
+    const campaignId = campaign?._id || new mongoose.Types.ObjectId();
 
     if (["STOP", "UNSUBSCRIBE", "CANCEL"].includes(normalized)) {
       await SmsEvent.create({
         userId,
-        campaignId: new mongoose.Types.ObjectId(),
+        campaignId,
         type: "optout",
         phone: from,
+        meta: { body, to },
       });
+      if (campaign?._id) {
+        await SmsCampaign.findByIdAndUpdate(campaign._id, {
+          $inc: { "stats.optOuts": 1 },
+        });
+      }
       return { reply: "You have been unsubscribed. Reply START to opt-in." };
     }
     if (["START", "UNSTOP", "SUBSCRIBE"].includes(normalized)) {
       await SmsEvent.create({
         userId,
-        campaignId: new mongoose.Types.ObjectId(),
+        campaignId,
         type: "optin",
         phone: from,
+        meta: { body, to },
       });
       return { reply: "You have opted in. Thank you!" };
     }
@@ -253,11 +289,16 @@ class SmsMarketingEngine {
 
     await SmsEvent.create({
       userId,
-      campaignId: new mongoose.Types.ObjectId(),
+      campaignId,
       type: "replied",
       phone: from,
-      meta: { body },
+      meta: { body, to },
     });
+    if (campaign?._id) {
+      await SmsCampaign.findByIdAndUpdate(campaign._id, {
+        $inc: { "stats.replies": 1 },
+      });
+    }
     return { reply: "Thanks for your message." };
   }
 

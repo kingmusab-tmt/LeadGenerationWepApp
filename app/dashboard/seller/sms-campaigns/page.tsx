@@ -381,10 +381,15 @@ export default function SmsCampaignsPage() {
     return colors[status] || "default";
   };
 
-  const filteredCampaigns =
+  const filteredCampaigns = (
     filterStatus === "all"
       ? campaigns
-      : campaigns.filter((c) => c.status === filterStatus);
+      : campaigns.filter((c) => c.status === filterStatus)
+  ).sort((a, b) => {
+    const replyDiff = (b.stats?.replies || 0) - (a.stats?.replies || 0);
+    if (replyDiff !== 0) return replyDiff;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   const charCount = formData.textContent.length;
   const smsSegments = Math.ceil(charCount / 160) || 0;
@@ -542,6 +547,7 @@ export default function SmsCampaignsPage() {
                 <TableCell>Sent</TableCell>
                 <TableCell>Delivered</TableCell>
                 <TableCell>Failed</TableCell>
+                <TableCell>Replies</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -561,10 +567,35 @@ export default function SmsCampaignsPage() {
                   <TableCell>{campaign.stats?.sent || 0}</TableCell>
                   <TableCell>{campaign.stats?.delivered || 0}</TableCell>
                   <TableCell>{campaign.stats?.failed || 0}</TableCell>
+                  <TableCell>{campaign.stats?.replies || 0}</TableCell>
                   <TableCell>
                     {new Date(campaign.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
+                    <Box
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        mr: 1,
+                      }}
+                    >
+                      <Button
+                        size="small"
+                        href={`/dashboard/seller/sms-campaigns/${campaign._id}?view=replies`}
+                      >
+                        View Replies
+                      </Button>
+                      <Chip
+                        size="small"
+                        label={campaign.stats?.replies || 0}
+                        color={
+                          (campaign.stats?.replies || 0) > 0
+                            ? "success"
+                            : "default"
+                        }
+                        sx={{ ml: 0.5, height: 20 }}
+                      />
+                    </Box>
                     {campaign.status === "draft" && (
                       <Button
                         size="small"

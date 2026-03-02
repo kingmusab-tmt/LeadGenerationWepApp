@@ -247,78 +247,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
         bgcolor: "background.paper",
       }}
     >
-      {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          p: 2,
-          minHeight: APPBAR_HEIGHT,
-          borderBottom: 1,
-          borderColor: "divider",
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 1.5,
-              bgcolor: "primary.main",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontWeight: 700,
-              fontSize: 20,
-            }}
-          >
-            L
-          </Box>
-          <Typography variant="h6" fontWeight={700}>
-            Brixcot
-          </Typography>
-        </Box>
-        {isMobile && (
+      {/* Mobile close control */}
+      {isMobile && (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            p: 1,
+            borderBottom: 1,
+            borderColor: "divider",
+          }}
+        >
           <IconButton onClick={handleDrawerToggle} edge="end">
             <Close />
           </IconButton>
-        )}
-      </Box>
-
-      {/* User Info */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1.5,
-          p: 2,
-          mx: 1.5,
-          my: 1,
-          borderRadius: 2,
-          bgcolor: "action.hover",
-        }}
-      >
-        <Avatar
-          src={avatarSrc}
-          alt={displayName}
-          sx={{ width: 40, height: 40 }}
-        />
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600} noWrap>
-            {displayName}
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            noWrap
-            display="block"
-          >
-            {userEmail}
-          </Typography>
         </Box>
-      </Box>
+      )}
 
       {/* Main Navigation */}
       <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
@@ -497,9 +441,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
         position="fixed"
         elevation={0}
         sx={{
-          bgcolor: "background.paper",
-          borderBottom: 1,
-          borderColor: "divider",
+          background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.dark} 100%)`,
           zIndex: theme.zIndex.drawer + 1,
         }}
       >
@@ -513,43 +455,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
             <MenuIcon />
           </IconButton>
 
-          {/* Logo for mobile */}
-          <Box
-            sx={{
-              display: { xs: "flex", md: "none" },
-              alignItems: "center",
-              gap: 1,
-              flexGrow: 1,
-            }}
-          >
-            <Box
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: 1,
-                bgcolor: "primary.main",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "white",
-                fontWeight: 700,
-                fontSize: 16,
-              }}
-            >
-              L
-            </Box>
-            <Typography variant="h6" fontWeight={700} color="text.primary">
-              Brixcot
-            </Typography>
-          </Box>
-
           {/* Title for desktop */}
           <Typography
             variant="h6"
             noWrap
-            color="text.primary"
+            color="common.white"
             fontWeight={600}
-            sx={{ flexGrow: 1, display: { xs: "none", md: "block" } }}
+            sx={{ flexGrow: 1, display: "block" }}
           >
             Seller Dashboard
           </Typography>
@@ -558,13 +470,19 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <IconButton
               onClick={() => handleNavigation("help")}
-              sx={{ display: { xs: "none", sm: "flex" } }}
+              sx={{
+                display: { xs: "none", sm: "flex" },
+                color: "common.white",
+              }}
             >
               <HelpOutline />
             </IconButton>
             <IconButton
               onClick={() => handleNavigation("settings")}
-              sx={{ display: { xs: "none", sm: "flex" } }}
+              sx={{
+                display: { xs: "none", sm: "flex" },
+                color: "common.white",
+              }}
             >
               <Settings />
             </IconButton>
@@ -577,7 +495,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
                 height: 36,
                 cursor: "pointer",
                 border: 2,
-                borderColor: "primary.light",
+                borderColor: "rgba(255,255,255,0.5)",
               }}
             />
           </Box>
