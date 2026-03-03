@@ -1,9 +1,5 @@
-"use client";
 import StripePayout from "@/app/components/sellerComponent/payout/StripePayout";
-import React from "react";
 
-const StripePayOut = () => {
+export default function StripePayOutPage() {
   return <StripePayout />;
-};
-
-export default StripePayOut;
+}

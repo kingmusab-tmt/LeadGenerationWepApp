@@ -25,7 +25,11 @@ export interface ITransaction extends Document {
     leadId?: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref
     unitsPurchased?: number; // For units_purchase
     sellerId?: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref (ID of the seller earning income)
+    sellerName?: string; // Seller's full name at time of transaction
+    sellerEmail?: string; // Seller's email at time of transaction
     buyerId: mongoose.Types.ObjectId; // PHASE 1: Changed from String to ObjectId ref
+    buyerName?: string; // Buyer's full name at time of transaction
+    buyerEmail?: string; // Buyer's email at time of transaction
     refund: boolean;
     tierId: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref
     stripeTransferId: string; // For seller_payout (ID from Stripe transfer)
@@ -42,6 +46,13 @@ export interface ITransaction extends Document {
     subscriptionDuration?: string; // For subscription_payment or renewal (e.g., "monthly", "yearly")
     transferVerified: boolean;
     transferAmount: number;
+    checkoutSessionId?: string;
+    sellerAccountId?: string;
+    creditsApplied?: boolean;
+    refunded?: boolean;
+    refundedAt?: Date;
+    refundAmount?: number;
+    isPartialRefund?: boolean;
   };
   paymentGateway: "stripe" | "square" | "manual";
   gatewayTransactionId?: string; // Transaction ID from the payment gateway
@@ -124,13 +135,31 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
       unitsPurchased: {
         type: Number,
       },
+      checkoutSessionId: {
+        type: String,
+      },
       sellerId: {
         type: Schema.Types.ObjectId, // PHASE 1: Changed from String to ObjectId ref
         ref: "User", // Reference to User model
       },
+      sellerName: {
+        type: String, // Seller's full name at time of transaction
+      },
+      sellerEmail: {
+        type: String, // Seller's email at time of transaction
+      },
+      sellerAccountId: {
+        type: String,
+      },
       buyerId: {
         type: Schema.Types.ObjectId, // PHASE 1: Changed from String to ObjectId ref
         ref: "Buyer", // Reference to Buyer model
+      },
+      buyerName: {
+        type: String, // Buyer's full name at time of transaction
+      },
+      buyerEmail: {
+        type: String, // Buyer's email at time of transaction
       },
       refund: {
         type: Boolean,
@@ -150,6 +179,21 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
       },
       subscriptionDuration: {
         type: String,
+      },
+      creditsApplied: {
+        type: Boolean,
+      },
+      refunded: {
+        type: Boolean,
+      },
+      refundedAt: {
+        type: Date,
+      },
+      refundAmount: {
+        type: Number,
+      },
+      isPartialRefund: {
+        type: Boolean,
       },
     },
     paymentGateway: {
@@ -181,6 +225,16 @@ TransactionSchema.index({ "metadata.buyerId": 1 }); // PHASE 1: Index on buyerId
 TransactionSchema.index({ "metadata.leadId": 1 }); // PHASE 1: Index on leadId for faster queries
 TransactionSchema.index({ "metadata.tierId": 1 }); // PHASE 1: Index on tierId for faster queries
 TransactionSchema.index({ relatedInvoices: 1 }); // PHASE 3: Index on relatedInvoices for faster queries
+TransactionSchema.index(
+  { type: 1, "metadata.checkoutSessionId": 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      type: "units_purchase",
+      "metadata.checkoutSessionId": { $exists: true },
+    },
+  },
+);
 
 // Create and export the Mongoose model
 export const Transaction: Model<ITransaction> =

@@ -38,15 +38,50 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Static image assets – long cache with immutable hint
+      {
+        source: "/:all*(svg|jpg|jpeg|png|gif|ico|webp|avif)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      // Font files
+      {
+        source: "/:all*(woff|woff2|ttf|otf|eot)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      // JS/CSS chunks already fingerprinted by Next.js
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
     ];
   },
+  poweredByHeader: false,
   experimental: {
     serverActions: {
-      // You can specify body size limit if needed
       bodySizeLimit: "2mb",
-      // Add allowed origins if required
-      // allowedOrigins: ['your-domain.com']
     },
+    optimizePackageImports: [
+      "@mui/icons-material",
+      "@mui/material",
+      "recharts",
+      "react-icons",
+      "react-icons/fa",
+    ],
   },
   images: {
     remotePatterns: [
@@ -55,7 +90,7 @@ const nextConfig: NextConfig = {
         hostname: "api.twilio.com",
       },
     ],
-    qualities: [100, 75, 80],
+    qualities: [75, 80],
   },
 };
 

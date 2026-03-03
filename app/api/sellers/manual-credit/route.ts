@@ -84,7 +84,11 @@ export async function POST(req: NextRequest) {
       metadata: {
         unitsPurchased: numberOfCredits,
         sellerId: seller._id,
+        sellerName: seller.name || "Unknown",
+        sellerEmail: seller.email || "N/A",
         buyerId: buyer._id,
+        buyerName: buyer.name || "Unknown",
+        buyerEmail: buyer.email || "N/A",
         refund: false,
         adminNote: `Manual credit by seller: ${description}`,
         transferVerified: true,
@@ -107,6 +111,11 @@ export async function POST(req: NextRequest) {
       metadata: {
         unitsPurchased: numberOfCredits,
         buyerId: buyer._id,
+        buyerName: buyer.name || "Unknown",
+        buyerEmail: buyer.email || "N/A",
+        sellerId: seller._id,
+        sellerName: seller.name || "Unknown",
+        sellerEmail: seller.email || "N/A",
         refund: false,
         adminNote: `Manual credit to buyer ${buyer.name}: ${description}`,
         transferVerified: true,

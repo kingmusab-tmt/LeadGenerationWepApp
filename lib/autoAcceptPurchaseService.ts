@@ -302,6 +302,11 @@ async function autoPurchaseLead(
           metadata: {
             leadId: lead._id,
             sellerId: seller._id,
+            sellerName: seller.name || "Unknown",
+            sellerEmail: seller.email || "N/A",
+            buyerId: buyer._id,
+            buyerName: buyer.name || "Unknown",
+            buyerEmail: buyer.email || "N/A",
             unitsPurchased: lead.unit || 0,
             autoPurchased: true,
           },
@@ -324,6 +329,11 @@ async function autoPurchaseLead(
           metadata: {
             leadId: lead._id,
             buyerId: buyer._id,
+            buyerName: buyer.name || "Unknown",
+            buyerEmail: buyer.email || "N/A",
+            sellerId: seller._id,
+            sellerName: seller.name || "Unknown",
+            sellerEmail: seller.email || "N/A",
             autoAccepted: true,
           },
           paymentGateway: "internal",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { Lead } from "@/models/leads"; // Import Lead model
 import { Buyer } from "@/models/leadbuyers"; // Import Buyer model
+import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Transaction } from "@/models/transactions";
@@ -118,6 +119,9 @@ export async function POST(req: NextRequest) {
 
       await buyer.save();
 
+      // Fetch seller details for transaction record
+      const seller = await User.findById(buyer.registeredWith);
+
       // Create a transaction record
       const transaction = new Transaction({
         type: "lead_purchase",
@@ -128,6 +132,11 @@ export async function POST(req: NextRequest) {
         metadata: {
           leadId: lead._id,
           sellerId: buyer.registeredWith,
+          sellerName: seller?.name || "Unknown",
+          sellerEmail: seller?.email || "N/A",
+          buyerId: buyer._id,
+          buyerName: buyer.name || "Unknown",
+          buyerEmail: buyer.email || "N/A",
           unitsPurchased: lead.unit,
         },
         status: "completed",

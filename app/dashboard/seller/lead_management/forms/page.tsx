@@ -12,13 +12,13 @@ import {
   Box,
   Snackbar,
   Alert,
+  CircularProgress,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import FileCopyIcon from "@mui/icons-material/FileCopy";
 import { useRouter } from "next/navigation";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useConfirm } from "@/app/hooks/useConfirm";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
@@ -225,7 +225,7 @@ export default function SellerForms() {
             height: "50vh",
           }}
         >
-          <LoadingComponent />
+          <CircularProgress />
         </Box>
       ) : forms.length === 0 ? (
         <Box sx={{ textAlign: "center", mt: 4 }}>

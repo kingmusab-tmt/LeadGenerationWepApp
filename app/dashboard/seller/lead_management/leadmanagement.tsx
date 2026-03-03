@@ -37,6 +37,7 @@ import {
   Grid,
   Alert,
   Snackbar,
+  CircularProgress,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -56,7 +57,6 @@ import {
   ContentCopy as CopyIcon,
 } from "@mui/icons-material";
 import LeadForm from "@/app/components/leadmanagement/leadform";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import { useConfirm } from "@/app/hooks/useConfirm";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
@@ -428,7 +428,7 @@ const LeadManagement: React.FC = () => {
           height: "50vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }

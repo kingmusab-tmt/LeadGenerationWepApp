@@ -91,6 +91,9 @@ const pricingFAQs = [
   },
 ];
 
+const leftPricingFAQs = pricingFAQs.filter((_, index) => index % 2 === 0);
+const rightPricingFAQs = pricingFAQs.filter((_, index) => index % 2 !== 0);
+
 const PricingPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -553,6 +556,7 @@ const PricingPage = () => {
                 fontWeight="bold"
                 textAlign="center"
                 mb={2}
+                color="primary.main"
               >
                 Frequently Asked Questions
               </Typography>
@@ -565,27 +569,42 @@ const PricingPage = () => {
                 Have questions? We&apos;ve got answers.
               </Typography>
 
-              <Box maxWidth={800} mx="auto">
-                {pricingFAQs.map((faq, index) => (
-                  <Accordion
-                    key={index}
-                    elevation={0}
-                    sx={{
-                      bgcolor: "transparent",
-                      "&:before": { display: "none" },
-                      borderBottom: `1px solid ${theme.palette.divider}`,
-                    }}
-                  >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography fontWeight={600}>{faq.question}</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Typography color="text.secondary">
-                        {faq.answer}
-                      </Typography>
-                    </AccordionDetails>
-                  </Accordion>
-                ))}
+              <Box maxWidth={1100} mx="auto">
+                <Grid container spacing={3}>
+                  {[leftPricingFAQs, rightPricingFAQs].map(
+                    (faqColumn, columnIndex) => (
+                      <Grid
+                        size={{ xs: 12, md: 6 }}
+                        key={`pricing-faq-column-${columnIndex}`}
+                      >
+                        {faqColumn.map((faq) => {
+                          return (
+                            <Accordion
+                              key={faq.question}
+                              elevation={0}
+                              sx={{
+                                bgcolor: "transparent",
+                                "&:before": { display: "none" },
+                                borderBottom: `1px solid ${theme.palette.divider}`,
+                              }}
+                            >
+                              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                <Typography fontWeight={600}>
+                                  {faq.question}
+                                </Typography>
+                              </AccordionSummary>
+                              <AccordionDetails>
+                                <Typography color="text.secondary">
+                                  {faq.answer}
+                                </Typography>
+                              </AccordionDetails>
+                            </Accordion>
+                          );
+                        })}
+                      </Grid>
+                    ),
+                  )}
+                </Grid>
               </Box>
             </Box>
           </Fade>

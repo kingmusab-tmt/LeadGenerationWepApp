@@ -2,9 +2,8 @@
 
 import { useInitializeUser } from "@/lib/hooks";
 import { useCSRFFetch } from "@/app/hooks";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { SignInPage } from "./signin";
-import { Box } from "@mui/material";
+import { Box, CircularProgress } from "@mui/material";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -142,7 +141,7 @@ const SignInContent: React.FC = () => {
           minHeight: "100vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }

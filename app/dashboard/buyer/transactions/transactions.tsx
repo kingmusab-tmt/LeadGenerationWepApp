@@ -19,8 +19,6 @@ import {
   MenuItem,
   Snackbar,
   Alert,
-  Modal,
-  Box,
   Select,
   FormControl,
   InputLabel,
@@ -28,6 +26,7 @@ import {
 } from "@mui/material";
 import { Download, MoreVert, Visibility } from "@mui/icons-material";
 import { Container } from "@mui/material";
+import TransactionDetailsModal from "./transactiondetails";
 
 interface Transaction {
   _id: string;
@@ -41,7 +40,11 @@ interface Transaction {
     leadId?: string;
     unitsPurchased?: number;
     sellerId?: string;
+    sellerName?: string;
+    sellerEmail?: string;
     buyerId?: string;
+    buyerName?: string;
+    buyerEmail?: string;
     refund?: boolean;
     payoutId?: string;
     refundReason?: string;
@@ -69,7 +72,7 @@ const TransactionHistory: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm")
+    theme.breakpoints.down("sm"),
   );
 
   useEffect(() => {
@@ -88,7 +91,7 @@ const TransactionHistory: React.FC = () => {
           console.error("Unexpected API response structure:", response.data);
           showSnackbar(
             "Failed to fetch transactions: Invalid data format",
-            "error"
+            "error",
           );
         }
       } catch (error) {
@@ -108,14 +111,14 @@ const TransactionHistory: React.FC = () => {
       setFilteredTransactions(transactions);
     } else {
       setFilteredTransactions(
-        transactions.filter((transaction) => transaction.type === filterType)
+        transactions.filter((transaction) => transaction.type === filterType),
       );
     }
   }, [filterType, transactions]);
 
   const showSnackbar = (
     message: string,
-    severity: "success" | "error" | "info"
+    severity: "success" | "error" | "info",
   ) => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
@@ -128,7 +131,7 @@ const TransactionHistory: React.FC = () => {
 
   const handleMenuClick = (
     event: React.MouseEvent<HTMLElement>,
-    transaction: Transaction
+    transaction: Transaction,
   ) => {
     setAnchorEl(event.currentTarget);
     setSelectedTransaction(transaction);
@@ -136,45 +139,240 @@ const TransactionHistory: React.FC = () => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedTransaction(null);
   };
 
   const handleViewDetails = () => {
     if (selectedTransaction) {
       setModalOpen(true);
     }
-    handleMenuClose();
+    setAnchorEl(null);
   };
 
-  const handleDownload = () => {
-    if (selectedTransaction) {
-      // Create a string with all transaction details
-      const transactionDetails = `
-        Transaction ID: ${selectedTransaction._id}
-        Type: ${selectedTransaction.type}
-        Amount: ${selectedTransaction.amount}
-        Previous Balance: ${selectedTransaction.previousBalance}
-        Current Balance: ${selectedTransaction.currentBalance}
-        Status: ${selectedTransaction.status}
-        Date: ${new Date(selectedTransaction.createdAt).toLocaleString()}
-        Metadata:
-          Lead ID: ${selectedTransaction.metadata.leadId || "N/A"}
-          Units Purchased: ${
-            selectedTransaction.metadata.unitsPurchased || "N/A"
-          }
-  
-          Refund Reason: ${selectedTransaction.metadata.refundReason || "N/A"}
-          Admin Note: ${selectedTransaction.metadata.adminNote || "N/A"}
-      `;
-      const blob = new Blob([transactionDetails], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `transaction-${selectedTransaction._id}.txt`;
-      link.click();
-      URL.revokeObjectURL(url);
-      showSnackbar("Transaction details downloaded", "success");
+  const handleDownload = async () => {
+    if (!selectedTransaction) return;
+
+    // Get user details from stored metadata (captured at transaction time)
+    const getSellerDisplay = () => ({
+      name: selectedTransaction.metadata.sellerName || "N/A",
+      email: selectedTransaction.metadata.sellerEmail || "N/A",
+    });
+
+    const getBuyerDisplay = () => ({
+      name: selectedTransaction.metadata.buyerName || "N/A",
+      email: selectedTransaction.metadata.buyerEmail || "N/A",
+    });
+
+    // Create canvas
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Canvas dimensions
+    const canvasWidth = isMobile ? 450 : 700;
+    const canvasHeight = isMobile ? 650 : 750;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    // Background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Header background
+    ctx.fillStyle = "#1976d2";
+    ctx.fillRect(0, 0, canvas.width, isMobile ? 100 : 120);
+
+    // Load and draw logo
+    const logo = new Image();
+    logo.crossOrigin = "anonymous";
+    logo.src = "/BRIXCOT.png";
+
+    await new Promise<void>((resolve) => {
+      logo.onload = () => resolve();
+      logo.onerror = () => resolve();
+      setTimeout(() => resolve(), 2000);
+    });
+
+    const logoSize = isMobile ? 60 : 80;
+    const logoX = (canvasWidth - logoSize) / 2;
+    const logoY = isMobile ? 10 : 10;
+
+    if (logo.complete && logo.naturalWidth > 0) {
+      ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
     }
+
+    // Receipt title
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${isMobile ? "16px" : "20px"} Arial`;
+    ctx.textAlign = "center";
+    ctx.fillText("TRANSACTION RECEIPT", canvasWidth / 2, isMobile ? 85 : 105);
+
+    // Content area
+    const startY = isMobile ? 120 : 140;
+    const padding = isMobile ? 20 : 40;
+    const labelX = padding;
+    const valueX = isMobile ? 160 : 220;
+    const lineHeight = isMobile ? 24 : 30;
+    let currentY = startY;
+
+    const drawRow = (label: string, value: string, isHeader = false) => {
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#666666";
+      ctx.font = `${isMobile ? "12px" : "14px"} Arial`;
+      ctx.fillText(label, labelX, currentY);
+
+      ctx.fillStyle = isHeader ? "#1976d2" : "#333333";
+      ctx.font = `${isHeader ? "bold " : ""}${isMobile ? "12px" : "14px"} Arial`;
+      ctx.fillText(value, valueX, currentY);
+      currentY += lineHeight;
+    };
+
+    const drawSectionHeader = (title: string) => {
+      currentY += 10;
+      ctx.fillStyle = "#1976d2";
+      ctx.font = `bold ${isMobile ? "13px" : "15px"} Arial`;
+      ctx.textAlign = "left";
+      ctx.fillText(title, labelX, currentY);
+      currentY += 8;
+      ctx.strokeStyle = "#e0e0e0";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(labelX, currentY);
+      ctx.lineTo(canvasWidth - padding, currentY);
+      ctx.stroke();
+      currentY += 15;
+    };
+
+    // Transaction Info Section
+    drawSectionHeader("Transaction Details");
+    drawRow(
+      "Transaction ID:",
+      selectedTransaction._id.slice(-12).toUpperCase(),
+      true,
+    );
+    drawRow("Type:", selectedTransaction.type.replace(/_/g, " ").toUpperCase());
+    drawRow("Status:", selectedTransaction.status.toUpperCase());
+    drawRow("Date:", new Date(selectedTransaction.createdAt).toLocaleString());
+
+    // Amount Section
+    drawSectionHeader("Amount");
+    drawRow("Amount:", `$${selectedTransaction.amount.toFixed(2)}`, true);
+    drawRow("Previous Balance:", `${selectedTransaction.previousBalance}`);
+    drawRow("Current Balance:", `${selectedTransaction.currentBalance}`);
+
+    // Metadata Section based on transaction type
+    drawSectionHeader("Additional Information");
+
+    switch (selectedTransaction.type) {
+      case "lead_purchase": {
+        drawRow("Lead ID:", selectedTransaction.metadata.leadId || "N/A");
+        if (
+          selectedTransaction.metadata.sellerName ||
+          selectedTransaction.metadata.sellerEmail
+        ) {
+          const seller = getSellerDisplay();
+          drawRow("Seller Name:", seller.name);
+          drawRow("Seller Email:", seller.email);
+        }
+        break;
+      }
+      case "units_purchase": {
+        drawRow(
+          "Units Purchased:",
+          String(selectedTransaction.metadata.unitsPurchased || "N/A"),
+        );
+        if (
+          selectedTransaction.metadata.sellerName ||
+          selectedTransaction.metadata.sellerEmail
+        ) {
+          const seller = getSellerDisplay();
+          drawRow("Seller Name:", seller.name);
+          drawRow("Seller Email:", seller.email);
+        }
+        break;
+      }
+      case "refund": {
+        drawRow(
+          "Refund Reason:",
+          selectedTransaction.metadata.refundReason || "N/A",
+        );
+        if (
+          selectedTransaction.metadata.sellerName ||
+          selectedTransaction.metadata.sellerEmail
+        ) {
+          const seller = getSellerDisplay();
+          drawRow("Seller Name:", seller.name);
+          drawRow("Seller Email:", seller.email);
+        }
+        break;
+      }
+      case "subscription_payment":
+      case "subscription_renewal": {
+        drawRow(
+          "Subscription Plan:",
+          selectedTransaction.metadata.subscriptionPlan || "N/A",
+        );
+        drawRow(
+          "Duration:",
+          selectedTransaction.metadata.subscriptionDuration || "N/A",
+        );
+        break;
+      }
+      case "admin_adjustment": {
+        drawRow("Admin Note:", selectedTransaction.metadata.adminNote || "N/A");
+        break;
+      }
+      default: {
+        if (selectedTransaction.metadata.leadId) {
+          drawRow("Lead ID:", selectedTransaction.metadata.leadId);
+        }
+        if (selectedTransaction.metadata.unitsPurchased) {
+          drawRow(
+            "Units:",
+            String(selectedTransaction.metadata.unitsPurchased),
+          );
+        }
+      }
+    }
+
+    // Footer
+    currentY = canvasHeight - 50;
+    ctx.fillStyle = "#f5f5f5";
+    ctx.fillRect(0, currentY - 10, canvasWidth, 60);
+
+    ctx.fillStyle = "#888888";
+    ctx.font = `${isMobile ? "10px" : "12px"} Arial`;
+    ctx.textAlign = "center";
+    ctx.fillText(
+      "Thank you for your business!",
+      canvasWidth / 2,
+      currentY + 10,
+    );
+    ctx.fillText(
+      `Generated on ${new Date().toLocaleDateString()}`,
+      canvasWidth / 2,
+      currentY + 28,
+    );
+
+    // Border
+    ctx.strokeStyle = "#e0e0e0";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, canvasWidth - 2, canvasHeight - 2);
+
+    // Convert to PNG and download
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `receipt-${selectedTransaction._id.slice(-8)}.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      "image/png",
+      1.0,
+    );
+    showSnackbar("Receipt downloaded successfully", "success");
     handleMenuClose();
   };
 
@@ -311,67 +509,12 @@ const TransactionHistory: React.FC = () => {
         </MenuItem>
       </Menu>
 
-      {/* Modal for Viewing Details */}
-      <Modal open={modalOpen} onClose={handleCloseModal}>
-        <Box
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: isMobile ? "90%" : 400,
-            bgcolor: "background.paper",
-            boxShadow: 24,
-            p: 4,
-          }}
-        >
-          <Typography variant="h6" gutterBottom>
-            Transaction Details
-          </Typography>
-          {selectedTransaction && (
-            <div>
-              <Typography>
-                <strong>ID:</strong> {selectedTransaction._id}
-              </Typography>
-              <Typography>
-                <strong>Type:</strong> {selectedTransaction.type}
-              </Typography>
-              <Typography>
-                <strong>Amount:</strong> ${selectedTransaction.amount}
-              </Typography>
-              <Typography>
-                <strong>Previous Balance:</strong> $
-                {selectedTransaction.previousBalance}
-              </Typography>
-              <Typography>
-                <strong>Current Balance:</strong> $
-                {selectedTransaction.currentBalance}
-              </Typography>
-              <Typography>
-                <strong>Status:</strong> {selectedTransaction.status}
-              </Typography>
-              <Typography>
-                <strong>Date:</strong>{" "}
-                {new Date(selectedTransaction.createdAt).toLocaleString()}
-              </Typography>
-              <Typography>
-                <strong>Metadata:</strong>
-                <pre>
-                  {JSON.stringify(selectedTransaction.metadata, null, 2)}
-                </pre>
-              </Typography>
-            </div>
-          )}
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleCloseModal}
-            sx={{ mt: 2 }}
-          >
-            Close
-          </Button>
-        </Box>
-      </Modal>
+      {/* Transaction Details Modal */}
+      <TransactionDetailsModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        transaction={selectedTransaction}
+      />
 
       {/* Snackbar for Notifications */}
       <Snackbar

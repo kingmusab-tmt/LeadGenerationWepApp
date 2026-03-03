@@ -13,13 +13,13 @@ import {
   Avatar,
   Chip,
   Stack,
+  CircularProgress,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import BuyerProfile from "@/app/components/leadbuyers/buyerprofile";
 import LeadPurchaseHistory from "@/app/components/leadbuyers/leadpurchasehistory";
 import { Buyer } from "@/types/buyer";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -108,7 +108,7 @@ const BuyerDetailsPage: React.FC = () => {
           height: "50vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }

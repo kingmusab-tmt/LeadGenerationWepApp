@@ -119,14 +119,27 @@ const BuyerTable: React.FC<BuyerTableProps> = ({
             open={Boolean(anchorEl[params.row._id])}
             onClose={() => handleMenuClose(params.row._id)}
           >
-            <MenuItem onClick={() => handleView(params.row._id)}>
+            <MenuItem
+              onClick={() => {
+                handleMenuClose(params.row._id);
+                handleView(params.row._id);
+              }}
+            >
               <VisibilityIcon fontSize="small" sx={{ mr: 1 }} /> View
             </MenuItem>
-            <MenuItem onClick={() => handleEdit(params.row)}>
+            <MenuItem
+              onClick={() => {
+                handleMenuClose(params.row._id);
+                handleEdit(params.row);
+              }}
+            >
               <EditIcon fontSize="small" sx={{ mr: 1 }} /> Edit
             </MenuItem>
             <MenuItem
-              onClick={() => handleDelete(params.row._id)}
+              onClick={() => {
+                handleMenuClose(params.row._id);
+                handleDelete(params.row._id);
+              }}
               sx={{ color: "red" }}
             >
               <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> Delete

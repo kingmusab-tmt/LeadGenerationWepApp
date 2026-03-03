@@ -5,6 +5,7 @@ import { Buyer } from "@/models/leadbuyers";
 import { User } from "@/models";
 import { Transaction } from "@/models/transactions";
 import { Tier } from "@/models/tier";
+import { StripeEvent } from "@/models/stripeEvent";
 import {
   forceRefreshUserSession,
   invalidateSessionWithConfirmation,
@@ -15,6 +16,90 @@ import {
   handleInvoicePaid,
   handlePaymentFailed,
 } from "@/lib/stripeSubscriptionService";
+
+/**
+ * Check if a Stripe event has already been processed.
+ * Returns true if event was already handled (skip processing).
+ */
+async function isEventAlreadyProcessed(eventId: string): Promise<boolean> {
+  const existing = await StripeEvent.findOne({ eventId }).lean();
+  return !!existing;
+}
+
+/**
+ * Atomically claim a Stripe event for processing.
+ * Returns true if successfully claimed, false if already claimed by another process.
+ * This prevents race conditions where two webhooks arrive simultaneously.
+ */
+async function claimEventForProcessing(
+  eventId: string,
+  eventType: string,
+): Promise<boolean> {
+  try {
+    const result = await StripeEvent.updateOne(
+      { eventId },
+      {
+        $setOnInsert: {
+          eventId,
+          eventType,
+          processedAt: new Date(),
+          metadata: { status: "processing" },
+        },
+      },
+      { upsert: true },
+    );
+    // If upsertedCount is 1, we successfully claimed it (new document created)
+    // If upsertedCount is 0, it already existed (another process claimed it)
+    return result.upsertedCount === 1;
+  } catch (error: any) {
+    // Duplicate key error means another process claimed it first
+    if (error.code === 11000) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Mark a Stripe event as processed with metadata.
+ * Uses upsert to handle race conditions gracefully.
+ */
+async function markEventProcessed(
+  eventId: string,
+  eventType: string,
+  metadata?: {
+    sessionId?: string;
+    paymentIntentId?: string;
+    userId?: string;
+    buyerId?: string;
+    sellerId?: string;
+    units?: number;
+    amount?: number;
+    creditsApplied?: boolean;
+    error?: string;
+  },
+): Promise<void> {
+  await StripeEvent.updateOne(
+    { eventId },
+    {
+      $set: {
+        eventType,
+        sessionId: metadata?.sessionId,
+        paymentIntentId: metadata?.paymentIntentId,
+        metadata: {
+          status: "completed",
+          userId: metadata?.userId,
+          buyerId: metadata?.buyerId,
+          sellerId: metadata?.sellerId,
+          units: metadata?.units,
+          amount: metadata?.amount,
+          creditsApplied: metadata?.creditsApplied,
+          error: metadata?.error,
+        },
+      },
+    },
+  );
+}
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
@@ -85,6 +170,45 @@ export async function POST(req: NextRequest) {
     );
     console.log("[StripeWebhook] Livemode:", event.livemode);
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // IDEMPOTENCY CHECK: Atomically claim event BEFORE processing
+    // This prevents race conditions where two webhooks arrive simultaneously
+    // Only one process can successfully claim (insert) the event document
+    // ═══════════════════════════════════════════════════════════════════════
+    const alreadyProcessed = await isEventAlreadyProcessed(event.id);
+    if (alreadyProcessed) {
+      console.log(
+        `[StripeWebhook] ↺ Event ${event.id} already processed, returning 200 to acknowledge`,
+      );
+      return NextResponse.json({
+        success: true,
+        message: "Event already processed",
+        eventId: event.id,
+      });
+    }
+
+    // For credit-related events, atomically claim before processing
+    const creditRelatedEvents = [
+      "checkout.session.completed",
+      "charge.succeeded",
+      "payment_intent.succeeded",
+    ];
+
+    if (creditRelatedEvents.includes(event.type)) {
+      const claimed = await claimEventForProcessing(event.id, event.type);
+      if (!claimed) {
+        console.log(
+          `[StripeWebhook] ↺ Event ${event.id} already claimed by another process, returning 200`,
+        );
+        return NextResponse.json({
+          success: true,
+          message: "Event already being processed",
+          eventId: event.id,
+        });
+      }
+      console.log(`[StripeWebhook] ✓ Event ${event.id} claimed for processing`);
+    }
+
     switch (event.type as string) {
       case "account.updated":
         console.log("[StripeWebhook] → Handling account.updated");
@@ -112,7 +236,7 @@ export async function POST(req: NextRequest) {
           "[StripeWebhook] Metadata:",
           JSON.stringify(session.metadata, null, 2),
         );
-        return await handleCheckoutSessionCompleted(session);
+        return await handleCheckoutSessionCompleted(session, event.id);
 
       // Subscription lifecycle events
       case "customer.subscription.created":
@@ -369,8 +493,10 @@ async function handleAccountUpdated(account: Stripe.Account) {
 
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
+  eventId: string,
 ) {
   console.log("[handleCheckoutSessionCompleted] Session ID:", session.id);
+  console.log("[handleCheckoutSessionCompleted] Event ID:", eventId);
   console.log(
     "[handleCheckoutSessionCompleted] Payment status:",
     session.payment_status,
@@ -389,6 +515,11 @@ async function handleCheckoutSessionCompleted(
     console.error(
       "[handleCheckoutSessionCompleted] ✗ Missing required metadata",
     );
+    // Mark event as processed even on error to prevent retries
+    await markEventProcessed(eventId, "checkout.session.completed", {
+      sessionId: session.id,
+      error: "Missing required metadata",
+    });
     return NextResponse.json(
       { success: false, message: "Missing required metadata" },
       { status: 400 },
@@ -405,7 +536,7 @@ async function handleCheckoutSessionCompleted(
     console.log(
       "[handleCheckoutSessionCompleted] → Processing credits purchase",
     );
-    return await handleCreditsPurchase(session, metadata);
+    return await handleCreditsPurchase(session, metadata, eventId);
   } else if (metadata.purchaseType === "subscription") {
     console.log(
       "[handleCheckoutSessionCompleted] → Processing subscription purchase",
@@ -417,6 +548,10 @@ async function handleCheckoutSessionCompleted(
     "[handleCheckoutSessionCompleted] ✗ Unknown purchase type:",
     metadata.purchaseType,
   );
+  await markEventProcessed(eventId, "checkout.session.completed", {
+    sessionId: session.id,
+    error: `Unknown purchase type: ${metadata.purchaseType}`,
+  });
   return NextResponse.json(
     { success: false, message: "Unknown purchase type" },
     { status: 400 },
@@ -519,10 +654,13 @@ async function handleTransferEvent(
 async function handleCreditsPurchase(
   session: Stripe.Checkout.Session,
   metadata: Metadata,
+  eventId: string,
 ) {
   console.log("[handleCreditsPurchase] Processing credits purchase");
+  console.log("[handleCreditsPurchase] Event ID:", eventId);
   const units = parseInt(metadata.units || "0");
   const amount = session.amount_total ? session.amount_total / 100 : 0;
+  const gatewayTransactionId = session.payment_intent?.toString() || session.id;
   const userId = metadata.userId;
   const sellerId = metadata.sellerId;
   const email = session.customer_details?.email;
@@ -533,19 +671,27 @@ async function handleCreditsPurchase(
   console.log("[handleCreditsPurchase] Seller ID:", sellerId);
   console.log("[handleCreditsPurchase] Email:", email);
 
+  // Helper to mark event and return error response
+  const markEventAndReturnError = async (errorMsg: string, status: number) => {
+    await markEventProcessed(eventId, "checkout.session.completed", {
+      sessionId: session.id,
+      userId: userId,
+      sellerId: sellerId,
+      error: errorMsg,
+    });
+    return NextResponse.json({ success: false, message: errorMsg }, { status });
+  };
+
   if (!email) {
     console.error("[handleCreditsPurchase] ✗ Customer email not found");
-    return NextResponse.json(
-      { success: false, message: "Customer email not found" },
-      { status: 400 },
-    );
+    return markEventAndReturnError("Customer email not found", 400);
   }
 
   if (!units || !amount || !userId || !sellerId) {
     console.error("[handleCreditsPurchase] ✗ Missing required data");
-    return NextResponse.json(
-      { success: false, message: "Missing required data for credits purchase" },
-      { status: 400 },
+    return markEventAndReturnError(
+      "Missing required data for credits purchase",
+      400,
     );
   }
 
@@ -561,18 +707,12 @@ async function handleCreditsPurchase(
       "[handleCreditsPurchase] ✗ Buyer not found for email:",
       email,
     );
-    return NextResponse.json(
-      { success: false, message: "Buyer not found" },
-      { status: 404 },
-    );
+    return markEventAndReturnError("Buyer not found", 404);
   }
 
   if (!seller) {
     console.error("[handleCreditsPurchase] ✗ Seller not found:", sellerId);
-    return NextResponse.json(
-      { success: false, message: "Seller not found" },
-      { status: 404 },
-    );
+    return markEventAndReturnError("Seller not found", 404);
   }
 
   console.log("[handleCreditsPurchase] ✓ Buyer found:", buyer.email);
@@ -582,43 +722,117 @@ async function handleCreditsPurchase(
     buyer.walletUnit,
   );
 
-  // Update buyer's wallet
+  // ═══════════════════════════════════════════════════════════════════════
+  // CRITICAL: Atomic wallet update with session marker
+  // This is the ONLY place where buyer credits are incremented
+  // The processedCreditSessionIds check ensures exactly-once crediting
+  // ═══════════════════════════════════════════════════════════════════════
   console.log(
-    "[handleCreditsPurchase] Updating buyer wallet, adding units:",
-    units,
+    "[handleCreditsPurchase] Attempting atomic wallet update + processed marker",
   );
-  await Buyer.findByIdAndUpdate(
-    buyer._id,
-    { $inc: { walletUnit: units } },
+  const updatedBuyer = await Buyer.findOneAndUpdate(
+    {
+      _id: buyer._id,
+      processedCreditSessionIds: { $ne: session.id },
+    },
+    {
+      $inc: { walletUnit: units },
+      $push: { processedCreditSessionIds: session.id },
+    },
     { new: true },
   );
-  console.log("[handleCreditsPurchase] ✓ Buyer wallet updated");
 
-  // Create transaction record (initially unverified)
-  console.log("[handleCreditsPurchase] Creating transaction record...");
-  const transaction = new Transaction({
-    type: "units_purchase",
-    userId: buyer._id,
-    amount,
-    currency: session.currency || "usd",
-    previousBalance: buyer.walletUnit,
-    currentBalance: buyer.walletUnit + units,
-    paymentGateway: "stripe",
-    gatewayTransactionId: session.payment_intent?.toString() || session.id,
-    status: "completed",
-    metadata: {
-      sellerId,
-      sellerAccountId: seller.stripeAccountId,
-      unitsPurchased: units,
-      checkoutSessionId: session.id,
-      transferVerified: false,
-    },
+  let creditsApplied = false;
+  let buyerWalletAfterCredit = updatedBuyer?.walletUnit;
+
+  if (!updatedBuyer) {
+    console.log(
+      "[handleCreditsPurchase] ↺ Buyer session marker already present, skipping duplicate wallet credit but continuing idempotent writes",
+      {
+        sessionId: session.id,
+        buyerId: buyer._id,
+      },
+    );
+
+    const existingBuyer = await Buyer.findById(buyer._id).select("walletUnit");
+    buyerWalletAfterCredit = existingBuyer?.walletUnit;
+  } else {
+    creditsApplied = true;
+    console.log("[handleCreditsPurchase] ✓ Buyer wallet updated atomically", {
+      previousBalance: updatedBuyer.walletUnit - units,
+      currentBalance: updatedBuyer.walletUnit,
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Mark event as processed IMMEDIATELY after credits are applied
+  // This ensures that even if subsequent processing fails, Stripe won't
+  // retry and the credits won't be double-applied
+  // ═══════════════════════════════════════════════════════════════════════
+  await markEventProcessed(eventId, "checkout.session.completed", {
+    sessionId: session.id,
+    userId: userId,
+    buyerId: buyer._id.toString(),
+    sellerId: sellerId,
+    units: units,
+    amount: amount,
+    creditsApplied: creditsApplied,
   });
-  await transaction.save();
-  console.log(
-    "[handleCreditsPurchase] ✓ Transaction created:",
-    transaction._id,
+  console.log("[handleCreditsPurchase] ✓ Event marked as processed");
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // If credits were NOT applied (duplicate session), return early
+  // Do NOT create transactions or update seller - this was already done
+  // ═══════════════════════════════════════════════════════════════════════
+  if (!creditsApplied) {
+    console.log(
+      "[handleCreditsPurchase] ↺ Duplicate session detected - skipping transaction creation and seller update",
+    );
+    return NextResponse.json({
+      success: true,
+      message: "Credits already processed for this session",
+      duplicate: true,
+    });
+  }
+
+  const currentBalance = Number(buyerWalletAfterCredit || 0);
+  const previousBalance = currentBalance - units;
+
+  console.log("[handleCreditsPurchase] Upserting buyer units transaction...");
+  await Transaction.updateOne(
+    {
+      type: "units_purchase",
+      "metadata.checkoutSessionId": session.id,
+    },
+    {
+      $setOnInsert: {
+        type: "units_purchase",
+        userId: buyer._id,
+        amount,
+        currency: session.currency || "usd",
+        paymentGateway: "stripe",
+        status: "completed",
+        "metadata.sellerId": sellerId,
+        "metadata.sellerName": seller.name || "Unknown",
+        "metadata.sellerEmail": seller.email || "N/A",
+        "metadata.sellerAccountId": seller.stripeAccountId,
+        "metadata.buyerId": buyer._id,
+        "metadata.buyerName": buyer.name || "Unknown",
+        "metadata.buyerEmail": buyer.email || "N/A",
+        "metadata.unitsPurchased": units,
+        "metadata.checkoutSessionId": session.id,
+        "metadata.transferVerified": false,
+      },
+      $set: {
+        previousBalance,
+        currentBalance,
+        gatewayTransactionId,
+        "metadata.creditsApplied": true,
+      },
+    },
+    { upsert: true },
   );
+  console.log("[handleCreditsPurchase] ✓ Buyer units transaction upserted");
 
   // Update lead seller's balance if applicable
   if (buyer.registeredWith) {
@@ -626,36 +840,74 @@ async function handleCreditsPurchase(
       "[handleCreditsPurchase] Updating seller balance for:",
       buyer.registeredWith,
     );
-    const leadSeller = await User.findByIdAndUpdate(
-      buyer.registeredWith,
-      { $inc: { walletBalance: amount } },
-      { new: true },
-    );
 
-    if (leadSeller) {
-      console.log(
-        "[handleCreditsPurchase] Seller balance updated:",
-        leadSeller.walletBalance,
-      );
-      const sellerTransaction = new Transaction({
+    // Fetch the registered seller's details for transaction record
+    const registeredSeller = await User.findById(buyer.registeredWith);
+
+    const sellerIncomeSeed = await Transaction.updateOne(
+      {
         type: "seller_income",
         userId: buyer.registeredWith,
-        amount,
-        currency: session.currency || "usd",
-        previousBalance: leadSeller.walletBalance - amount,
-        currentBalance: leadSeller.walletBalance,
-        paymentGateway: "stripe",
-        gatewayTransactionId: session.id,
-        status: "completed",
-        metadata: {
-          buyerId: buyer._id,
-          unitsPurchased: units,
+        "metadata.checkoutSessionId": session.id,
+      },
+      {
+        $setOnInsert: {
+          type: "seller_income",
+          userId: buyer.registeredWith,
+          amount,
+          currency: session.currency || "usd",
+          paymentGateway: "stripe",
+          gatewayTransactionId: session.id,
+          status: "completed",
+          "metadata.buyerId": buyer._id,
+          "metadata.buyerName": buyer.name || "Unknown",
+          "metadata.buyerEmail": buyer.email || "N/A",
+          "metadata.sellerId": buyer.registeredWith,
+          "metadata.sellerName": registeredSeller?.name || "Unknown",
+          "metadata.sellerEmail": registeredSeller?.email || "N/A",
+          "metadata.unitsPurchased": units,
+          "metadata.checkoutSessionId": session.id,
         },
-      });
-      await sellerTransaction.save();
+      },
+      { upsert: true },
+    );
+
+    if (sellerIncomeSeed.upsertedCount > 0) {
+      const leadSeller = await User.findByIdAndUpdate(
+        buyer.registeredWith,
+        { $inc: { walletBalance: amount } },
+        { new: true },
+      );
+
+      if (leadSeller) {
+        console.log(
+          "[handleCreditsPurchase] Seller balance updated:",
+          leadSeller.walletBalance,
+        );
+
+        await Transaction.updateOne(
+          {
+            type: "seller_income",
+            userId: buyer.registeredWith,
+            "metadata.checkoutSessionId": session.id,
+          },
+          {
+            $set: {
+              previousBalance: leadSeller.walletBalance - amount,
+              currentBalance: leadSeller.walletBalance,
+              gatewayTransactionId: session.id,
+            },
+          },
+        );
+
+        console.log(
+          "[handleCreditsPurchase] ✓ Seller transaction upserted and balances updated",
+        );
+      }
+    } else {
       console.log(
-        "[handleCreditsPurchase] ✓ Seller transaction created:",
-        sellerTransaction._id,
+        "[handleCreditsPurchase] ↺ Seller income already processed for checkout session",
+        session.id,
       );
     }
   }
@@ -1555,6 +1807,8 @@ async function handleChargeFailed(charge: Stripe.Charge) {
 
 /**
  * Handle charge.refunded event
+ * IMPORTANT: This handler is idempotent - it checks if refund was already
+ * processed before deducting credits from buyer wallet.
  */
 async function handleChargeRefunded(charge: Stripe.Charge) {
   console.log(
@@ -1586,42 +1840,66 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
       originalTransaction.type,
     );
 
-    // Create a refund transaction
-    const refundTransaction = new Transaction({
-      type: "refund",
-      userId: originalTransaction.userId,
-      amount: -refundAmount, // Negative amount for refund
-      currency: charge.currency || "usd",
-      paymentGateway: "stripe",
-      gatewayTransactionId: charge.id,
-      status: "completed",
-      metadata: {
-        originalTransactionId: originalTransaction._id,
-        chargeId: charge.id,
-        isPartialRefund,
-        refundAmount,
-        originalAmount: charge.amount / 100,
-        refundReason: charge.metadata?.refund_reason || "Not specified",
+    // Check if already refunded - prevent duplicate processing
+    if (originalTransaction.metadata?.refunded) {
+      console.log(
+        "[handleChargeRefunded] ↺ Transaction already marked as refunded, skipping duplicate processing",
+      );
+      return;
+    }
+
+    // Atomically mark as refunded and get the result
+    const updatedTransaction = await Transaction.findOneAndUpdate(
+      {
+        _id: originalTransaction._id,
+        "metadata.refunded": { $ne: true },
       },
-    });
-    await refundTransaction.save();
-    console.log(
-      "[handleChargeRefunded] ✓ Refund transaction created:",
-      refundTransaction._id,
+      {
+        $set: {
+          "metadata.refunded": true,
+          "metadata.refundedAt": new Date(),
+          "metadata.refundAmount": refundAmount,
+          "metadata.isPartialRefund": isPartialRefund,
+        },
+      },
+      { new: true },
     );
 
-    // Update original transaction
-    await Transaction.findByIdAndUpdate(originalTransaction._id, {
-      $set: {
-        "metadata.refunded": true,
-        "metadata.refundedAt": new Date(),
-        "metadata.refundAmount": refundAmount,
-        "metadata.isPartialRefund": isPartialRefund,
+    if (!updatedTransaction) {
+      console.log(
+        "[handleChargeRefunded] ↺ Could not update transaction (already refunded or concurrent update)",
+      );
+      return;
+    }
+
+    // Create a refund transaction (upsert to be idempotent)
+    await Transaction.updateOne(
+      {
+        type: "refund",
+        gatewayTransactionId: charge.id,
       },
-    });
-    console.log(
-      "[handleChargeRefunded] ✓ Original transaction updated with refund info",
+      {
+        $setOnInsert: {
+          type: "refund",
+          userId: originalTransaction.userId,
+          amount: -refundAmount,
+          currency: charge.currency || "usd",
+          paymentGateway: "stripe",
+          gatewayTransactionId: charge.id,
+          status: "completed",
+          metadata: {
+            originalTransactionId: originalTransaction._id,
+            chargeId: charge.id,
+            isPartialRefund,
+            refundAmount,
+            originalAmount: charge.amount / 100,
+            refundReason: charge.metadata?.refund_reason || "Not specified",
+          },
+        },
+      },
+      { upsert: true },
     );
+    console.log("[handleChargeRefunded] ✓ Refund transaction upserted");
 
     console.log(
       `[handleChargeRefunded] Refund processed: ${isPartialRefund ? "Partial" : "Full"} refund of $${refundAmount}`,
@@ -1629,9 +1907,13 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
 
     // TODO: Send notification to user about refund
     // If this was a credit purchase, deduct from buyer's wallet
+    // IMPORTANT: Only deduct if creditsApplied is true (credits were actually given)
     if (originalTransaction.type === "units_purchase") {
       const unitsToDeduct = originalTransaction.metadata?.unitsPurchased || 0;
-      if (unitsToDeduct > 0) {
+      const creditsWereApplied =
+        originalTransaction.metadata?.creditsApplied === true;
+
+      if (unitsToDeduct > 0 && creditsWereApplied) {
         console.log(
           "[handleChargeRefunded] Deducting units from buyer wallet:",
           unitsToDeduct,
@@ -1641,6 +1923,10 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
         });
         console.log(
           `[handleChargeRefunded] ✓ Deducted ${unitsToDeduct} units from buyer wallet due to refund`,
+        );
+      } else if (unitsToDeduct > 0 && !creditsWereApplied) {
+        console.log(
+          "[handleChargeRefunded] ℹ Credits were never applied for this transaction, skipping wallet deduction",
         );
       }
     }

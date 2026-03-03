@@ -30,15 +30,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (!buyer.registeredWith) {
-      return NextResponse.json(
-        { success: false, message: "Buyer is not registered with any seller" },
-        { status: 400 },
-      );
-    }
-
     const buyerId = buyer._id.toString();
-    const sellerId = buyer.registeredWith.toString();
+    const sellerId = buyer.registeredWith?.toString();
 
     // Extract query parameters
     const { searchParams } = new URL(req.url);
@@ -46,6 +39,19 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const sort = searchParams.get("sort") || "newest";
     const status = searchParams.get("status") || "available";
+
+    if (status === "available" && !sellerId) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
+      });
+    }
 
     // Calculate skip value for pagination
     const skip = (page - 1) * limit;
@@ -73,8 +79,11 @@ export async function GET(req: NextRequest) {
     const baseQuery: { [key: string]: any } = {
       distributionMethod: "marketplace",
       exclusive: false,
-      userId: sellerId, // Only fetch leads belonging to the seller the buyer is registered with
     };
+
+    if (sellerId) {
+      baseQuery.userId = sellerId; // Only fetch leads belonging to the seller the buyer is registered with
+    }
 
     // Add status-specific conditions
     if (status === "available") {

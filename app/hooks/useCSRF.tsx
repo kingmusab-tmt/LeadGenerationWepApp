@@ -5,14 +5,18 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
+  useRef,
   ReactNode,
 } from "react";
+import { useSession } from "next-auth/react";
 
 /**
  * CSRF Token Context
  *
- * Provides CSRF token to all components in the app
- * Automatically fetches and refreshes tokens
+ * Provides CSRF token to all components in the app.
+ * Only fetches a token when the user is authenticated,
+ * avoiding unnecessary API calls on public pages.
  */
 
 interface CSRFContextType {
@@ -24,22 +28,25 @@ interface CSRFContextType {
 
 const CSRFContext = createContext<CSRFContextType>({
   csrfToken: null,
-  loading: true,
+  loading: false,
   refreshToken: async () => null,
   ensureToken: async () => null,
 });
 
 export function CSRFProvider({ children }: { children: ReactNode }) {
+  const { status } = useSession();
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const fetchingRef = useRef(false);
 
-  const fetchToken = async (): Promise<string | null> => {
+  const fetchToken = useCallback(async (): Promise<string | null> => {
+    if (fetchingRef.current) return csrfToken;
+    fetchingRef.current = true;
     try {
       const response = await fetch("/api/csrf-token", {
         credentials: "include",
       });
 
-      // 401 means user is not authenticated - this is expected, not an error
       if (response.status === 401) {
         setLoading(false);
         return null;
@@ -58,19 +65,18 @@ export function CSRFProvider({ children }: { children: ReactNode }) {
       return null;
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
-  };
+  }, [csrfToken]);
 
-  const refreshToken = async (): Promise<string | null> => {
+  const refreshToken = useCallback(async (): Promise<string | null> => {
     setLoading(true);
     try {
-      // POST to /api/csrf-token to refresh token
       const response = await fetch("/api/csrf-token", {
         method: "POST",
         credentials: "include",
       });
 
-      // 401 means user is not authenticated - silently return null
       if (response.status === 401) {
         setLoading(false);
         setCsrfToken(null);
@@ -86,22 +92,27 @@ export function CSRFProvider({ children }: { children: ReactNode }) {
       return data.csrfToken as string;
     } catch (error) {
       console.error("[CSRF] Failed to refresh token:", error);
-      // Fallback to fetching new token
       return await fetchToken();
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchToken]);
 
-  const ensureToken = async (): Promise<string | null> => {
+  const ensureToken = useCallback(async (): Promise<string | null> => {
     if (csrfToken) return csrfToken;
     return await fetchToken();
-  };
+  }, [csrfToken, fetchToken]);
 
-  // Fetch token on mount
+  // Only fetch token when the user is authenticated
   useEffect(() => {
-    fetchToken();
-  }, []);
+    if (status === "authenticated") {
+      setLoading(true);
+      fetchToken();
+    } else if (status === "unauthenticated") {
+      setCsrfToken(null);
+      setLoading(false);
+    }
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh token every 50 minutes (before 1 hour expiry)
   useEffect(() => {
@@ -112,10 +123,10 @@ export function CSRFProvider({ children }: { children: ReactNode }) {
         refreshToken();
       },
       50 * 60 * 1000,
-    ); // 50 minutes
+    );
 
     return () => clearInterval(interval);
-  }, [csrfToken]);
+  }, [csrfToken, refreshToken]);
 
   return (
     <CSRFContext.Provider

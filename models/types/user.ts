@@ -6,10 +6,22 @@ import { ISubscription } from "./subscription";
  * Core user document type for MongoDB
  */
 export interface IUser extends Document {
-  username: string;
   name: string;
   email: string;
   businessName: string;
+  businessEmail?: string;
+  businessPhone?: string;
+  businessWebsite?: string;
+  companyDescription?: string;
+  industryNiche?: string;
+  businessAddress?: {
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postCode?: string;
+  };
   loginlink: string;
   role: "admin" | "seller" | "buyer" | "user" | "business-admin" | "staff";
   image?: string;

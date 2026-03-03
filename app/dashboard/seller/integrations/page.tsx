@@ -135,7 +135,13 @@ export default function IntegrationsPage() {
     <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
+        <Typography
+          variant="h4"
+          component="h1"
+          gutterBottom
+          fontWeight="bold"
+          color="primary.main"
+        >
           Integrations
         </Typography>
         <Typography variant="body1" color="text.secondary">

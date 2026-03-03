@@ -18,6 +18,7 @@ import {
   Snackbar,
   Alert,
   Button,
+  CircularProgress,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import {
@@ -40,7 +41,6 @@ import {
 import { redirect, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useInitializeUser } from "@/lib/hooks";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import {
   ArrowUpward,
   ArrowDownward,
@@ -517,7 +517,7 @@ const Overview: React.FC = () => {
           height: "50vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }

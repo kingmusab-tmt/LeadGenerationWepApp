@@ -6,6 +6,7 @@ import Call from "@/models/call";
 import { Transaction } from "@/models/transactions";
 import { sendNotification } from "@/lib/notificationService";
 import { Buyer } from "@/models/leadbuyers";
+import { User } from "@/models";
 import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
 
 export async function POST(req: NextRequest) {
@@ -118,15 +119,23 @@ async function processRefund(call: any) {
     await buyer.save();
   }
 
-  // 2. Create refund transaction record
+  // 2. Fetch seller details for transaction record
+  const seller = await User.findById(call.sellerId);
+
+  // 3. Create refund transaction record
   const refundTransaction = new Transaction({
     type: "refund",
     userId: call.buyerId,
     callId: call._id,
     amount: call.unitsCharged,
-    meta: {
+    metadata: {
       callId: call._id,
       sellerId: call.sellerId,
+      sellerName: seller?.name || "Unknown",
+      sellerEmail: seller?.email || "N/A",
+      buyerId: call.buyerId,
+      buyerName: buyer?.name || "Unknown",
+      buyerEmail: buyer?.email || "N/A",
       refund: true,
       refundReason: call.feedback.sellerComment,
     },

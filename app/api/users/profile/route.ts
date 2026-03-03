@@ -30,26 +30,56 @@ const updateUserProfileSchema = z.object({
       "Name can only contain letters, spaces, hyphens, and apostrophes",
     )
     .optional(),
-  username: z
-    .string()
-    .min(3, "Username must be at least 3 characters")
-    .max(30, "Username cannot exceed 30 characters")
-    .regex(
-      /^[a-zA-Z0-9_]+$/,
-      "Username can only contain letters, numbers, and underscores",
-    )
-    .optional(),
   mobileNumber: z
     .string()
     .regex(/^[\+]?[0-9\s\-\(\)]+$/, "Please enter a valid phone number")
     .min(10, "Phone number must be at least 10 digits")
     .max(15, "Phone number cannot exceed 15 digits")
     .optional(),
+  businessName: z
+    .string()
+    .max(150, "Business name cannot exceed 150 characters")
+    .optional(),
+  businessEmail: z
+    .string()
+    .email("Please enter a valid business email")
+    .optional(),
+  businessPhone: z
+    .string()
+    .regex(
+      /^[\+]?[0-9\s\-\(\)]+$/,
+      "Please enter a valid business phone number",
+    )
+    .min(10, "Business phone number must be at least 10 digits")
+    .max(15, "Business phone number cannot exceed 15 digits")
+    .optional(),
+  businessWebsite: z
+    .string()
+    .url("Please enter a valid business website URL")
+    .optional(),
+  companyDescription: z
+    .string()
+    .max(1000, "Company description cannot exceed 1000 characters")
+    .optional(),
+  industryNiche: z
+    .string()
+    .max(120, "Industry/Niche cannot exceed 120 characters")
+    .optional(),
+  businessAddress: z
+    .object({
+      addressLine1: z.string().max(150).optional(),
+      addressLine2: z.string().max(150).optional(),
+      city: z.string().max(80).optional(),
+      state: z.string().max(80).optional(),
+      country: z.string().max(80).optional(),
+      postCode: z.string().max(20).optional(),
+    })
+    .optional(),
 });
 
 /**
  * PUT /api/users/profile
- * Update user profile information (name, username, mobile number)
+ * Update user profile information
  */
 export async function PUT(req: NextRequest) {
   try {
@@ -84,8 +114,14 @@ export async function PUT(req: NextRequest) {
     // Check if at least one field is being updated
     const hasFieldsToUpdate =
       validatedData.name ||
-      validatedData.username ||
-      validatedData.mobileNumber;
+      validatedData.mobileNumber ||
+      validatedData.businessName ||
+      validatedData.businessEmail ||
+      validatedData.businessPhone ||
+      validatedData.businessWebsite ||
+      validatedData.companyDescription ||
+      validatedData.industryNiche ||
+      validatedData.businessAddress;
     if (!hasFieldsToUpdate) {
       return badRequest("At least one field must be provided for update");
     }
@@ -101,21 +137,9 @@ export async function PUT(req: NextRequest) {
     }
 
     // Find the user first
-    const user = await User.findOne(filter).select("_id username");
+    const user = await User.findOne(filter).select("_id");
     if (!user) {
       return notFound("User not found");
-    }
-
-    // If username is being updated, check availability
-    if (validatedData.username) {
-      const existingUser = await User.findOne({
-        username: validatedData.username,
-        _id: { $ne: user._id },
-      });
-
-      if (existingUser) {
-        return conflict("Username is already taken");
-      }
     }
 
     // Prepare update object
@@ -128,15 +152,36 @@ export async function PUT(req: NextRequest) {
           txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase(),
       );
     }
-    if (validatedData.username) {
-      updateData.username = validatedData.username.toLowerCase();
-    }
     if (validatedData.mobileNumber) {
       // Clean phone number: remove all non-digits except leading +
       updateData.mobileNumber = validatedData.mobileNumber.replace(
         /[^\d+]/g,
         "",
       );
+    }
+    if (validatedData.businessName) {
+      updateData.businessName = validatedData.businessName;
+    }
+    if (validatedData.businessEmail) {
+      updateData.businessEmail = validatedData.businessEmail.toLowerCase();
+    }
+    if (validatedData.businessPhone) {
+      updateData.businessPhone = validatedData.businessPhone.replace(
+        /[^\d+]/g,
+        "",
+      );
+    }
+    if (validatedData.businessWebsite) {
+      updateData.businessWebsite = validatedData.businessWebsite;
+    }
+    if (validatedData.companyDescription) {
+      updateData.companyDescription = validatedData.companyDescription;
+    }
+    if (validatedData.industryNiche) {
+      updateData.industryNiche = validatedData.industryNiche;
+    }
+    if (validatedData.businessAddress) {
+      updateData.businessAddress = validatedData.businessAddress;
     }
 
     // Update the user
@@ -193,8 +238,14 @@ export async function PATCH(req: NextRequest) {
     // Check if at least one field is being updated
     const hasFieldsToUpdate =
       validatedData.name ||
-      validatedData.username ||
-      validatedData.mobileNumber;
+      validatedData.mobileNumber ||
+      validatedData.businessName ||
+      validatedData.businessEmail ||
+      validatedData.businessPhone ||
+      validatedData.businessWebsite ||
+      validatedData.companyDescription ||
+      validatedData.industryNiche ||
+      validatedData.businessAddress;
     if (!hasFieldsToUpdate) {
       return badRequest("At least one field must be provided for update");
     }
@@ -210,21 +261,9 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Find the user first
-    const user = await User.findOne(filter).select("_id username");
+    const user = await User.findOne(filter).select("_id");
     if (!user) {
       return notFound("User not found");
-    }
-
-    // Check username availability if being updated
-    if (validatedData.username) {
-      const existingUser = await User.findOne({
-        username: validatedData.username,
-        _id: { $ne: user._id },
-      });
-
-      if (existingUser) {
-        return conflict("Username is already taken");
-      }
     }
 
     // Prepare update object
@@ -236,14 +275,35 @@ export async function PATCH(req: NextRequest) {
           txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase(),
       );
     }
-    if (validatedData.username) {
-      updateData.username = validatedData.username.toLowerCase();
-    }
     if (validatedData.mobileNumber) {
       updateData.mobileNumber = validatedData.mobileNumber.replace(
         /[^\d+]/g,
         "",
       );
+    }
+    if (validatedData.businessName) {
+      updateData.businessName = validatedData.businessName;
+    }
+    if (validatedData.businessEmail) {
+      updateData.businessEmail = validatedData.businessEmail.toLowerCase();
+    }
+    if (validatedData.businessPhone) {
+      updateData.businessPhone = validatedData.businessPhone.replace(
+        /[^\d+]/g,
+        "",
+      );
+    }
+    if (validatedData.businessWebsite) {
+      updateData.businessWebsite = validatedData.businessWebsite;
+    }
+    if (validatedData.companyDescription) {
+      updateData.companyDescription = validatedData.companyDescription;
+    }
+    if (validatedData.industryNiche) {
+      updateData.industryNiche = validatedData.industryNiche;
+    }
+    if (validatedData.businessAddress) {
+      updateData.businessAddress = validatedData.businessAddress;
     }
 
     // Update the user

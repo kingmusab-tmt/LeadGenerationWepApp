@@ -9,6 +9,33 @@ import {
 } from "@/lib/cachedSession";
 import { Buyer } from "@/models/leadbuyers";
 
+type SellerContact = {
+  id: string;
+  name: string;
+  businessName?: string;
+  email: string;
+};
+
+const getLeadSellerContacts = async (): Promise<SellerContact[]> => {
+  const sellers = await User.find({
+    role: { $in: ["seller", "business-admin"] },
+    status: "active",
+  })
+    .select("_id name businessName email")
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .lean();
+
+  return sellers
+    .filter((seller) => Boolean(seller.email))
+    .map((seller) => ({
+      id: seller._id.toString(),
+      name: seller.name || "Lead Seller",
+      businessName: seller.businessName || "",
+      email: seller.email,
+    }));
+};
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -62,26 +89,27 @@ export async function POST(req: NextRequest) {
         result.role,
       );
 
-      // If role is "buyer", create a Buyer profile if it doesn't exist
+      // If role is "buyer", require pre-registration in Buyer schema by email
       if (result.role === "buyer") {
         const existingBuyer = await Buyer.findOne({
           email: session.user.email,
-        });
+        }).select("_id");
+
         if (!existingBuyer) {
-          console.log(
-            "[UserType API] Creating Buyer profile for:",
-            session.user.email,
+          // Revert role back to base role if buyer pre-registration is missing
+          await User.updateOne({ _id: result._id }, { $set: { role: "user" } });
+
+          const sellers = await getLeadSellerContacts();
+
+          return NextResponse.json(
+            {
+              message:
+                "You must be registered first by a lead seller before using the platform as a buyer.",
+              code: "BUYER_PRE_REG_REQUIRED",
+              sellers,
+            },
+            { status: 403 },
           );
-          const newBuyer = new Buyer({
-            name: result.name || "New Buyer",
-            email: session.user.email,
-            // registeredWith is optional - null for independent buyers
-            registeredWith: null,
-            isIndependentBuyer: true, // Independent registration
-            // All other fields will use schema defaults
-          });
-          await newBuyer.save();
-          console.log("[UserType API] Buyer profile created successfully");
         }
       }
 
@@ -108,6 +136,47 @@ export async function POST(req: NextRequest) {
     }
   } catch (error) {
     console.error("Error updating role:", error);
+    return NextResponse.json(
+      { message: "Internal server error", error: String(error) },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    await dbConnect();
+
+    let deletedUser = null;
+    if (session.user.id) {
+      deletedUser = await User.findByIdAndDelete(session.user.id);
+    }
+
+    if (!deletedUser && session.user.email) {
+      deletedUser = await User.findOneAndDelete({ email: session.user.email });
+    }
+
+    if (!deletedUser) {
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
+    }
+
+    if (session.user.email) {
+      await invalidateSessionCache(session.user.email);
+    }
+    if (session.user.id) {
+      await invalidateAllUserSessions(session.user.id);
+    }
+
+    return NextResponse.json({
+      message: "Registration cancelled successfully",
+    });
+  } catch (error) {
+    console.error("Error cancelling registration:", error);
     return NextResponse.json(
       { message: "Internal server error", error: String(error) },
       { status: 500 },

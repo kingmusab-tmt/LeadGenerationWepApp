@@ -29,7 +29,6 @@ import {
   CreditCard as SubscriptionIcon,
 } from "@mui/icons-material";
 import UnitPricingComponent from "./unitsetting/page";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useRouter } from "next/navigation";
 import StripeOnboardingPage from "./stripeonboarding/page";
 import LeadDistributionSettings from "./leadsellersetting/page";
@@ -37,8 +36,13 @@ import EmailSettingsPage from "./emailsetting/page";
 import APISettingsPage from "./apisetting/page";
 import SubscriptionManagement from "./subscription/SubscriptionManagement";
 import ChangePlanModal from "./subscription/ChangePlanModal";
-import PaymentMethodsManager from "./subscription/PaymentMethodsManager";
+import dynamic from "next/dynamic";
 import { useInitializeUser, useAppDispatch } from "@/lib/hooks";
+
+const PaymentMethodsManager = dynamic(
+  () => import("./subscription/PaymentMethodsManager"),
+  { ssr: false },
+);
 import { updateUser } from "@/lib/userSlice";
 import { useNotification } from "@/lib/useNotification";
 
@@ -46,9 +50,22 @@ import { useNotification } from "@/lib/useNotification";
 interface BasicUserInfo {
   _id?: string;
   name?: string;
-  username?: string;
   email?: string;
   mobileNumber?: string;
+  businessName?: string;
+  businessEmail?: string;
+  businessPhone?: string;
+  businessWebsite?: string;
+  companyDescription?: string;
+  industryNiche?: string;
+  businessAddress?: {
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postCode?: string;
+  };
   image?: string;
 }
 
@@ -62,8 +79,21 @@ interface ApiError {
 // Interface for update payload - only allowed fields
 interface UpdateUserPayload {
   name?: string;
-  username?: string;
   mobileNumber?: string;
+  businessName?: string;
+  businessEmail?: string;
+  businessPhone?: string;
+  businessWebsite?: string;
+  companyDescription?: string;
+  industryNiche?: string;
+  businessAddress?: {
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postCode?: string;
+  };
 }
 
 const AccountSettings = () => {
@@ -80,8 +110,14 @@ const AccountSettings = () => {
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     name?: string;
-    username?: string;
     mobileNumber?: string;
+    businessName?: string;
+    businessEmail?: string;
+    businessPhone?: string;
+    businessWebsite?: string;
+    companyDescription?: string;
+    industryNiche?: string;
+    businessAddress?: string;
   }>({});
   const [changePlanModalOpen, setChangePlanModalOpen] = useState(false);
 
@@ -91,7 +127,7 @@ const AccountSettings = () => {
     "lead-distribution",
     "units-settings",
     "email-settings",
-    "api-settings",
+    // "api-settings",
     "stripe-onboarding",
     "subscription",
   ];
@@ -132,9 +168,22 @@ const AccountSettings = () => {
       const basicUserInfo: BasicUserInfo = {
         _id: currentUser.id || "",
         name: currentUser.name || "",
-        username: currentUser.username || "",
         email: currentUser.email || "",
         mobileNumber: currentUser.mobileNumber || currentUser.mobile || "",
+        businessName: currentUser.businessName || "",
+        businessEmail: currentUser.businessEmail || "",
+        businessPhone: currentUser.businessPhone || "",
+        businessWebsite: currentUser.businessWebsite || "",
+        companyDescription: currentUser.companyDescription || "",
+        industryNiche: currentUser.industryNiche || "",
+        businessAddress: {
+          addressLine1: currentUser.businessAddress?.addressLine1 || "",
+          addressLine2: currentUser.businessAddress?.addressLine2 || "",
+          city: currentUser.businessAddress?.city || "",
+          state: currentUser.businessAddress?.state || "",
+          country: currentUser.businessAddress?.country || "",
+          postCode: currentUser.businessAddress?.postCode || "",
+        },
         image: currentUser.image || "",
       };
       setEditableUser(basicUserInfo);
@@ -172,9 +221,28 @@ const AccountSettings = () => {
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setEditableUser((prevUser) =>
-      prevUser ? ({ ...prevUser, [name]: value } as BasicUserInfo) : null,
-    );
+
+    if (name.startsWith("businessAddress.")) {
+      const addressKey = name.split(".")[1] as keyof NonNullable<
+        BasicUserInfo["businessAddress"]
+      >;
+
+      setEditableUser((prevUser) =>
+        prevUser
+          ? ({
+              ...prevUser,
+              businessAddress: {
+                ...(prevUser.businessAddress || {}),
+                [addressKey]: value,
+              },
+            } as BasicUserInfo)
+          : null,
+      );
+    } else {
+      setEditableUser((prevUser) =>
+        prevUser ? ({ ...prevUser, [name]: value } as BasicUserInfo) : null,
+      );
+    }
 
     // Clear field-specific errors when user starts typing
     if (fieldErrors[name as keyof typeof fieldErrors]) {
@@ -191,13 +259,19 @@ const AccountSettings = () => {
     apiErrors.forEach((error) => {
       if (error.toLowerCase().includes("name")) {
         errors.name = error;
-      } else if (error.toLowerCase().includes("username")) {
-        errors.username = error;
       } else if (
         error.toLowerCase().includes("phone") ||
         error.toLowerCase().includes("mobile")
       ) {
         errors.mobileNumber = error;
+      } else if (error.toLowerCase().includes("business email")) {
+        errors.businessEmail = error;
+      } else if (error.toLowerCase().includes("website")) {
+        errors.businessWebsite = error;
+      } else if (error.toLowerCase().includes("industry")) {
+        errors.industryNiche = error;
+      } else if (error.toLowerCase().includes("address")) {
+        errors.businessAddress = error;
       }
     });
 
@@ -214,8 +288,14 @@ const AccountSettings = () => {
       // Create payload with only the allowed fields
       const updatePayload: UpdateUserPayload = {
         name: editableUser.name,
-        username: editableUser.username,
         mobileNumber: editableUser.mobileNumber,
+        businessName: editableUser.businessName,
+        businessEmail: editableUser.businessEmail,
+        businessPhone: editableUser.businessPhone,
+        businessWebsite: editableUser.businessWebsite,
+        companyDescription: editableUser.companyDescription,
+        industryNiche: editableUser.industryNiche,
+        businessAddress: editableUser.businessAddress,
       };
 
       // Remove undefined fields
@@ -243,9 +323,15 @@ const AccountSettings = () => {
         dispatch(
           updateUser({
             name: editableUser.name,
-            username: editableUser.username,
             mobile: editableUser.mobileNumber,
             mobileNumber: editableUser.mobileNumber,
+            businessName: editableUser.businessName,
+            businessEmail: editableUser.businessEmail,
+            businessPhone: editableUser.businessPhone,
+            businessWebsite: editableUser.businessWebsite,
+            companyDescription: editableUser.companyDescription,
+            industryNiche: editableUser.industryNiche,
+            businessAddress: editableUser.businessAddress,
           }),
         );
 
@@ -348,7 +434,7 @@ const AccountSettings = () => {
             label="Units Settings"
           />
           <Tab icon={<EmailIcon />} iconPosition="start" label="Email" />
-          <Tab icon={<CodeIcon />} iconPosition="start" label="API Keys" />
+          {/* <Tab icon={<CodeIcon />} iconPosition="start" label="API Keys" /> */}
           <Tab icon={<StripeIcon />} iconPosition="start" label="Stripe" />
           <Tab
             icon={<SubscriptionIcon />}
@@ -365,7 +451,7 @@ const AccountSettings = () => {
             minHeight={400}
             sx={{ p: 4 }}
           >
-            <LoadingComponent />
+            <CircularProgress />
           </Box>
         ) : (
           <Box sx={{ p: 4 }}>
@@ -432,21 +518,6 @@ const AccountSettings = () => {
                           <Grid size={{ xs: 12, sm: 6 }}>
                             <TextField
                               fullWidth
-                              label="Username"
-                              name="username"
-                              value={editableUser?.username || ""}
-                              onChange={handleInputChange}
-                              error={!!fieldErrors.username}
-                              helperText={
-                                fieldErrors.username || "Your unique username"
-                              }
-                              disabled={saving}
-                              placeholder="Choose a username"
-                            />
-                          </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
-                            <TextField
-                              fullWidth
                               label="Phone Number"
                               name="mobileNumber"
                               value={editableUser?.mobileNumber || ""}
@@ -458,6 +529,172 @@ const AccountSettings = () => {
                               }
                               disabled={saving}
                               placeholder="+1234567890"
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12 }}>
+                            <TextField
+                              fullWidth
+                              label="Company Name"
+                              name="businessName"
+                              value={editableUser?.businessName || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.businessName}
+                              helperText={
+                                fieldErrors.businessName ||
+                                "Your business or company name"
+                              }
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Business Email"
+                              name="businessEmail"
+                              value={editableUser?.businessEmail || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.businessEmail}
+                              helperText={
+                                fieldErrors.businessEmail ||
+                                "Public-facing business email"
+                              }
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Business Phone"
+                              name="businessPhone"
+                              value={editableUser?.businessPhone || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.businessPhone}
+                              helperText={
+                                fieldErrors.businessPhone ||
+                                "Public-facing business phone"
+                              }
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12 }}>
+                            <TextField
+                              fullWidth
+                              label="Business Website"
+                              name="businessWebsite"
+                              value={editableUser?.businessWebsite || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.businessWebsite}
+                              helperText={
+                                fieldErrors.businessWebsite ||
+                                "Include https://"
+                              }
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Industry / Niche"
+                              name="industryNiche"
+                              value={editableUser?.industryNiche || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.industryNiche}
+                              helperText={
+                                fieldErrors.industryNiche ||
+                                "Your primary market focus"
+                              }
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Address Line 1"
+                              name="businessAddress.addressLine1"
+                              value={
+                                editableUser?.businessAddress?.addressLine1 ||
+                                ""
+                              }
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.businessAddress}
+                              helperText={
+                                fieldErrors.businessAddress || "Street address"
+                              }
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Address Line 2"
+                              name="businessAddress.addressLine2"
+                              value={
+                                editableUser?.businessAddress?.addressLine2 ||
+                                ""
+                              }
+                              onChange={handleInputChange}
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="City"
+                              name="businessAddress.city"
+                              value={editableUser?.businessAddress?.city || ""}
+                              onChange={handleInputChange}
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="State"
+                              name="businessAddress.state"
+                              value={editableUser?.businessAddress?.state || ""}
+                              onChange={handleInputChange}
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Country"
+                              name="businessAddress.country"
+                              value={
+                                editableUser?.businessAddress?.country || ""
+                              }
+                              onChange={handleInputChange}
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              label="Postal Code"
+                              name="businessAddress.postCode"
+                              value={
+                                editableUser?.businessAddress?.postCode || ""
+                              }
+                              onChange={handleInputChange}
+                              disabled={saving}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12 }}>
+                            <TextField
+                              fullWidth
+                              multiline
+                              minRows={3}
+                              label="Company Description"
+                              name="companyDescription"
+                              value={editableUser?.companyDescription || ""}
+                              onChange={handleInputChange}
+                              error={!!fieldErrors.companyDescription}
+                              helperText={
+                                fieldErrors.companyDescription ||
+                                "Short overview of your company"
+                              }
+                              disabled={saving}
                             />
                           </Grid>
                           <Grid size={{ xs: 12 }}>
@@ -494,10 +731,27 @@ const AccountSettings = () => {
                             setEditableUser({
                               _id: latest.id || "",
                               name: latest.name || "",
-                              username: latest.username || "",
                               email: latest.email || "",
                               mobileNumber:
                                 latest.mobileNumber || latest.mobile || "",
+                              businessName: latest.businessName || "",
+                              businessEmail: latest.businessEmail || "",
+                              businessPhone: latest.businessPhone || "",
+                              businessWebsite: latest.businessWebsite || "",
+                              companyDescription:
+                                latest.companyDescription || "",
+                              industryNiche: latest.industryNiche || "",
+                              businessAddress: {
+                                addressLine1:
+                                  latest.businessAddress?.addressLine1 || "",
+                                addressLine2:
+                                  latest.businessAddress?.addressLine2 || "",
+                                city: latest.businessAddress?.city || "",
+                                state: latest.businessAddress?.state || "",
+                                country: latest.businessAddress?.country || "",
+                                postCode:
+                                  latest.businessAddress?.postCode || "",
+                              },
                               image: latest.image || "",
                             });
                             clearFieldErrors();
@@ -529,9 +783,9 @@ const AccountSettings = () => {
             {tabValue === 1 && <LeadDistributionSettings />}
             {tabValue === 2 && <UnitPricingComponent />}
             {tabValue === 3 && <EmailSettingsPage />}
-            {tabValue === 4 && <APISettingsPage />}
-            {tabValue === 5 && <StripeOnboardingPage />}
-            {tabValue === 6 && (
+            {/* {tabValue === 4 && <APISettingsPage />} */}
+            {tabValue === 4 && <StripeOnboardingPage />}
+            {tabValue === 5 && (
               <Box>
                 <SubscriptionManagement
                   onOpenChangePlanModal={() => setChangePlanModalOpen(true)}

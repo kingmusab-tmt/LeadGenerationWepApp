@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Typography,
   TextField,
@@ -30,7 +30,15 @@ import {
 import axios from "@/lib/axiosInstance";
 import { toast } from "react-toastify";
 
-const LeadSettings = () => {
+type LeadSettingsProps = {
+  hideSaveButton?: boolean;
+  onSaveHandlerReady?: ((saveHandler: () => Promise<boolean>) => void) | null;
+};
+
+const LeadSettings: React.FC<LeadSettingsProps> = ({
+  hideSaveButton = false,
+  onSaveHandlerReady,
+}) => {
   // Lead distribution configuration state
   const [autoAssignLeads, setAutoAssignLeads] = useState<boolean>(false);
   const [distributionMode, setDistributionMode] = useState<
@@ -85,7 +93,9 @@ const LeadSettings = () => {
     }
   }, [distributionMode]);
 
-  const handleSaveSettings = async () => {
+  const saveHandlerRef = useRef<() => Promise<boolean>>(async () => false);
+
+  saveHandlerRef.current = async () => {
     setSaving(true);
     try {
       await axios.post("/api/settings", {
@@ -99,14 +109,24 @@ const LeadSettings = () => {
       toast.success("Settings updated successfully");
       const now = new Date().toLocaleTimeString();
       setLastSaved(now);
-      if (typeof window !== "undefined") {
+      if (!hideSaveButton && typeof window !== "undefined") {
         window.location.reload();
       }
+      return true;
     } catch (error) {
       toast.error("Failed to update settings");
+      return false;
+    } finally {
       setSaving(false);
     }
   };
+
+  const handleSaveSettings = () => saveHandlerRef.current();
+
+  useEffect(() => {
+    if (!onSaveHandlerReady) return;
+    onSaveHandlerReady(() => saveHandlerRef.current());
+  }, [onSaveHandlerReady]);
 
   return (
     <Box sx={{ mt: -2 }}>
@@ -377,19 +397,21 @@ const LeadSettings = () => {
               variant="outlined"
             />
           )}
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleSaveSettings}
-            disabled={saving}
-            startIcon={
-              saving ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : undefined
-            }
-          >
-            {saving ? "Saving..." : "Save All Settings"}
-          </Button>
+          {!hideSaveButton && (
+            <Button
+              variant="contained"
+              size="large"
+              onClick={handleSaveSettings}
+              disabled={saving}
+              startIcon={
+                saving ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : undefined
+              }
+            >
+              {saving ? "Saving..." : "Save All Settings"}
+            </Button>
+          )}
         </Box>
       </Card>
     </Box>

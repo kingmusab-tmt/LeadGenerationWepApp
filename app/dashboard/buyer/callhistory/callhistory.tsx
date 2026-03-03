@@ -28,6 +28,7 @@ import {
   TextField,
   Switch,
   DialogActions,
+  CircularProgress,
 } from "@mui/material";
 import {
   PlayCircle,
@@ -42,7 +43,6 @@ import {
 } from "@mui/icons-material";
 import { Container } from "@mui/material";
 import { formatDate, formatDuration } from "@/lib/formatUtils";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Call {
@@ -237,7 +237,10 @@ const CallHistory: React.FC = () => {
           gap: 2,
         }}
       >
-        <Typography variant="h5" sx={{ fontWeight: "bold", mt: 6 }}>
+        <Typography
+          variant="h5"
+          sx={{ fontWeight: "bold", mt: 6, color: "primary.main" }}
+        >
           Call History
         </Typography>
 
@@ -670,7 +673,7 @@ const AudioPlayerModal = ({
     >
       {audioLoading ? (
         <>
-          <LoadingComponent />
+          <CircularProgress />
         </>
       ) : currentAudio ? (
         <>

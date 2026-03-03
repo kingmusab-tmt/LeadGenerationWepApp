@@ -25,7 +25,10 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
-import FormPreview from "./FormPreview";
+import dynamic from "next/dynamic";
+
+const FormPreview = dynamic(() => import("./FormPreview"), { ssr: false });
+
 import { industryNiches } from "@/utils/industryNiches";
 import { LEAD_SOURCES } from "@/utils/leadSources";
 import { useRouter } from "next/navigation";

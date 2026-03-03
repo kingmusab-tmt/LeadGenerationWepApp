@@ -32,6 +32,7 @@ import {
   Divider,
   Select,
   MenuItem,
+  CircularProgress,
 } from "@mui/material";
 import {
   Search,
@@ -50,7 +51,6 @@ import {
   Business,
   FlagOutlined,
 } from "@mui/icons-material";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useNotification } from "@/lib/useNotification";
 
@@ -283,7 +283,7 @@ const ContentVerification = () => {
           height: "50vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }

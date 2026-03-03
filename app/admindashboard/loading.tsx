@@ -1,8 +1,7 @@
 "use client";
-import React from "react";
 import { Box, CircularProgress, keyframes } from "@mui/material";
 import Image from "next/image";
-import CompanyLogo from "../../../public/images/5ae9cfb6c909a_thumb900.png"; // Adjust the path as necessary
+import CompanyLogo from "../../public/BRIXCOT.png";
 
 const pulse = keyframes`
   0% { transform: scale(1); opacity: 1; }
@@ -10,7 +9,7 @@ const pulse = keyframes`
   100% { transform: scale(1); opacity: 1; }
 `;
 
-const LoadingComponent = () => {
+export default function AdminDashboardLoading() {
   return (
     <Box
       sx={{
@@ -22,9 +21,9 @@ const LoadingComponent = () => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "rgba(255, 255, 255, 0.8)", // Semi-transparent white
-        backdropFilter: "blur(8px)", // Blur effect
-        WebkitBackdropFilter: "blur(8px)", // For Safari
+        backgroundColor: "rgba(255, 255, 255, 0.8)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
         zIndex: 9999,
       }}
     >
@@ -44,7 +43,7 @@ const LoadingComponent = () => {
           sx={{
             color: "primary.main",
             position: "absolute",
-            animationDuration: "1.5s", // Slightly slower rotation
+            animationDuration: "1.5s",
           }}
         />
         <Box
@@ -53,15 +52,14 @@ const LoadingComponent = () => {
             width: 120,
             height: 120,
             position: "relative",
-            filter: "drop-shadow(0 0 8px rgba(0, 0, 0, 0.1))", // Subtle shadow
+            filter: "drop-shadow(0 0 8px rgba(0, 0, 0, 0.1))",
           }}
         >
           <Image
             src={CompanyLogo}
-            alt="Company Logo"
+            alt="BRIXCOT"
             fill
-            priority // Important for loading screen
-            quality={100} // Highest quality
+            priority
             style={{
               objectFit: "contain",
               objectPosition: "center",
@@ -71,6 +69,4 @@ const LoadingComponent = () => {
       </Box>
     </Box>
   );
-};
-
-export default LoadingComponent;
+}

@@ -17,10 +17,10 @@ import {
   Tooltip,
   Grid,
   Typography,
+  CircularProgress,
 } from "@mui/material";
 import { IBuyer } from "@/models/leadbuyers";
 import { industryNiches } from "@/utils/industryNiches";
-import LoadingComponent from "../generalComponent/loadingcomponent";
 import GooglePlacesAutocomplete from "../GooglePlacesAutocomplete";
 import GoogleTimezoneAutocomplete from "../GoogleTimezoneAutocomplete";
 
@@ -220,7 +220,7 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
     <>
       <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
         <DialogTitle>
-          {initialValues ? "Edit Buyer" : "Register Buyer"}
+          {initialValues ? "Edit Buyer" : "Buyer Registration"}
         </DialogTitle>
         <DialogContent>
           <Box
@@ -424,13 +424,14 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
                   <Tooltip
                     title={
                       <>
-                        <strong>Automatic:</strong> Be assigned leads using
-                        round-robin for fairness.
+                        <strong>Automatic:</strong> Leads are automatically
+                        assigned to you based on your preference.
                         <br />
                         <strong>Manual:</strong> Purchase leads directly on your
-                        dashboard.
+                        dashboard marketplace.
                         <br />
-                        <strong>Direct:</strong> Be assigned exclusive leads.
+                        <strong>Both:</strong> Be assigned leads using both
+                        automatic and manual methods.
                       </>
                     }
                     placement="top"
@@ -486,7 +487,7 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <LoadingComponent />
+              <CircularProgress size={24} color="inherit" />
             ) : initialValues ? (
               "Save Changes"
             ) : (

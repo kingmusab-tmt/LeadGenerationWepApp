@@ -55,7 +55,6 @@ import SellerRefundReview from "./sellerRefundReview";
 import BuyerPerformanceDashboard from "./buyerPerformanceDashboard";
 import ScheduledCallbacksPanel from "./scheduledCallbacksPanel";
 import { TrackingNumber } from "@/types/trackingNumbers";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import NextLink from "next/link";
 import { formatDuration } from "@/lib/formatUtils";
 
@@ -458,7 +457,19 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       ? (subscriptionLimits.currentCount / subscriptionLimits.maxAllowed) * 100
       : 0;
 
-  if (loading) return <LoadingComponent />;
+  if (loading)
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "50vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -1264,7 +1275,12 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
           <TabPanel value={activeTab} index={3}>
             <Card variant="outlined" sx={{ borderRadius: 2 }}>
               <CardContent sx={{ "&:last-child": { pb: 2 } }}>
-                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                <Typography
+                  variant="subtitle1"
+                  fontWeight={700}
+                  gutterBottom
+                  color="primary.main"
+                >
                   Call History
                 </Typography>
                 <Typography

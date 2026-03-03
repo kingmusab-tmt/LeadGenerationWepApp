@@ -26,6 +26,7 @@ import {
   FormControlLabel,
   Checkbox,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import {
   Phone as PhoneIcon,
@@ -36,7 +37,6 @@ import {
   CheckCircle as CheckCircleIcon,
   Send as SendIcon,
 } from "@mui/icons-material";
-import Head from "next/head";
 import Header from "../components/generalComponent/Header";
 import Footer from "../components/generalComponent/Footer";
 
@@ -54,6 +54,7 @@ const ContactPage = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -67,13 +68,30 @@ const ContactPage = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    // Simulate form submission
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          subject: formData.subject,
+          message: formData.message,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Something went wrong.");
+      }
+
       setSubmitSuccess(true);
       setFormData({
         name: "",
@@ -83,12 +101,13 @@ const ContactPage = () => {
         message: "",
         agreeTerms: false,
       });
-
-      // Reset success message after 3 seconds
-      setTimeout(() => {
-        setSubmitSuccess(false);
-      }, 3000);
-    }, 1500);
+    } catch (err: unknown) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to send message.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const contactMethods = [
@@ -106,20 +125,20 @@ const ContactPage = () => {
       action: "Call us now",
       details: "+1 (800) 123-4567",
     },
-    {
-      icon: <ChatIcon color="primary" />,
-      title: "Live Chat",
-      description: "Instant help from our online agents",
-      action: "Start chat",
-      details: "Available 9AM-5PM EST",
-    },
-    {
-      icon: <TicketIcon color="primary" />,
-      title: "Ticket System",
-      description: "Track your support requests",
-      action: "Create ticket",
-      details: "24/7 ticket submission",
-    },
+    // {
+    //   icon: <ChatIcon color="primary" />,
+    //   title: "Live Chat",
+    //   description: "Instant help from our online agents",
+    //   action: "Start chat",
+    //   details: "Available 9AM-5PM EST",
+    // },
+    // {
+    //   icon: <TicketIcon color="primary" />,
+    //   title: "Ticket System",
+    //   description: "Track your support requests",
+    //   action: "Create ticket",
+    //   details: "24/7 ticket submission",
+    // },
   ];
 
   const faqs = [
@@ -145,14 +164,6 @@ const ContactPage = () => {
 
   return (
     <>
-      <Head>
-        <title>Contact Us | Lead Management Platform</title>
-        <meta
-          name="description"
-          content="Get in touch with our lead management experts for support, sales, and partnerships"
-        />
-      </Head>
-
       <Header />
 
       {/* Hero Section */}
@@ -244,7 +255,7 @@ const ContactPage = () => {
             </Grid>
 
             {/* Office Location */}
-            <Box mt={6}>
+            {/* <Box mt={6}>
               <Typography variant="h5" gutterBottom>
                 Our Office
               </Typography>
@@ -268,7 +279,7 @@ const ContactPage = () => {
                   </Button>
                 </Box>
               </Paper>
-            </Box>
+            </Box> */}
           </Grid>
 
           {/* Contact Form */}
@@ -285,16 +296,16 @@ const ContactPage = () => {
               >
                 <Tab label="Email" icon={<EmailIcon />} iconPosition="start" />
                 <Tab label="Phone" icon={<PhoneIcon />} iconPosition="start" />
-                <Tab
+                {/* <Tab
                   label="Live Chat"
                   icon={<ChatIcon />}
                   iconPosition="start"
-                />
-                <Tab
+                /> */}
+                {/* <Tab
                   label="Support Ticket"
                   icon={<TicketIcon />}
                   iconPosition="start"
-                />
+                /> */}
               </Tabs>
 
               <CardContent>
@@ -322,6 +333,16 @@ const ContactPage = () => {
                 ) : (
                   <form onSubmit={handleSubmit}>
                     <Grid container spacing={3}>
+                      {submitError && (
+                        <Grid size={{ xs: 12 }}>
+                          <Alert
+                            severity="error"
+                            onClose={() => setSubmitError(null)}
+                          >
+                            {submitError}
+                          </Alert>
+                        </Grid>
+                      )}
                       <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField
                           fullWidth
@@ -359,7 +380,7 @@ const ContactPage = () => {
                           }}
                         />
                       </Grid>
-                      {activeTab === 3 && (
+                      {activeTab === 1 && (
                         <Grid size={{ xs: 12 }}>
                           <TextField
                             fullWidth
@@ -424,8 +445,8 @@ const ContactPage = () => {
             </Card>
 
             {/* FAQ Section */}
-            <Box mt={6}>
-              <Typography variant="h4" gutterBottom>
+            {/* <Box mt={6}>
+              <Typography variant="h4" gutterBottom color="primary.main">
                 Frequently Asked Questions
               </Typography>
               <List>
@@ -448,13 +469,13 @@ const ContactPage = () => {
                   </React.Fragment>
                 ))}
               </List>
-            </Box>
+            </Box> */}
           </Grid>
         </Grid>
       </Container>
 
       {/* Team Section */}
-      <Box bgcolor="background.default" py={8}>
+      {/* <Box bgcolor="background.default" py={8}>
         <Container maxWidth="lg">
           <Typography variant="h3" align="center" gutterBottom>
             Meet Our Support Team
@@ -516,10 +537,10 @@ const ContactPage = () => {
             ))}
           </Grid>
         </Container>
-      </Box>
+      </Box> */}
 
       {/* CTA Section */}
-      <Box bgcolor="primary.main" color="white" py={10} textAlign="center">
+      {/* <Box bgcolor="primary.main" color="white" py={10} textAlign="center">
         <Container maxWidth="md">
           <Typography variant="h3" gutterBottom>
             Ready to Transform Your Lead Management?
@@ -537,7 +558,7 @@ const ContactPage = () => {
             Request a Demo
           </Button>
         </Container>
-      </Box>
+      </Box> */}
 
       <Footer />
     </>

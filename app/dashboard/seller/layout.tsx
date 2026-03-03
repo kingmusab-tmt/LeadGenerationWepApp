@@ -51,6 +51,7 @@ import InactivityLogout from "@/app/components/generalComponent/InactivityLogout
 import { useInitializeUser } from "@/lib/hooks";
 import { useSession } from "next-auth/react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
+import { isSellerOnboardingFlowComplete } from "@/lib/sellerOnboarding";
 
 interface UserDashboardProps {
   children: React.ReactNode;
@@ -172,6 +173,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       router.replace("/auth/sign-in");
     }
   }, [userLoading, currentUser, status, router]);
+
+  useEffect(() => {
+    if (status === "loading" || userLoading || !currentUser) return;
+
+    const isSellerRole =
+      currentUser.role === "seller" || currentUser.role === "business-admin";
+    if (!isSellerRole) return;
+
+    const onboardingFlowComplete = isSellerOnboardingFlowComplete(
+      currentUser.email,
+    );
+
+    if (!onboardingFlowComplete) {
+      router.replace("/seller-onboarding");
+    }
+  }, [status, userLoading, currentUser, pathname, router]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);

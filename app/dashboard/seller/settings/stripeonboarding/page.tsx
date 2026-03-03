@@ -3,10 +3,24 @@ import StripeOnboarding from "@/app/components/sellerComponent/payout/stripeonbo
 import React from "react";
 import { useInitializeUser } from "@/lib/hooks";
 
-const StripeOnboardingPage = () => {
+type StripeOnboardingPageProps = {
+  onSaveHandlerReady?: ((saveHandler: () => Promise<boolean>) => void) | null;
+  onConnectionStatusChange?: ((isFullyConnected: boolean) => void) | null;
+};
+
+const StripeOnboardingPage: React.FC<StripeOnboardingPageProps> = ({
+  onSaveHandlerReady,
+  onConnectionStatusChange,
+}) => {
   const { currentUser } = useInitializeUser();
   const userEmail = currentUser?.email || "";
-  return <StripeOnboarding userEmail={userEmail} />;
+  return (
+    <StripeOnboarding
+      userEmail={userEmail}
+      onSaveHandlerReady={onSaveHandlerReady}
+      onConnectionStatusChange={onConnectionStatusChange}
+    />
+  );
 };
 
 export default StripeOnboardingPage;

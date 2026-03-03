@@ -31,6 +31,7 @@ import {
   MenuItem,
   Collapse,
   Paper,
+  CircularProgress,
 } from "@mui/material";
 import {
   ContentCopy,
@@ -51,12 +52,16 @@ import {
   FileDownload as FileDownloadIcon,
   FileUpload as FileUploadIcon,
 } from "@mui/icons-material";
-import BuyerTable from "@/app/components/leadbuyers/buyertable";
+import dynamic from "next/dynamic";
 import BuyerFormEnhanced from "@/app/components/leadbuyers/BuyerFormEnhanced";
+
+const BuyerTable = dynamic(
+  () => import("@/app/components/leadbuyers/buyertable"),
+  { ssr: false },
+);
 import { IBuyer } from "@/models/leadbuyers";
 import { useInitializeUser } from "@/lib/hooks";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import Papa from "papaparse";
 import axios from "@/lib/axiosInstance";
@@ -132,6 +137,10 @@ const BuyersPage: React.FC = () => {
     buyerName?: string;
     buyerEmail?: string;
     emailSent?: boolean;
+  }>({ open: false });
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    open: boolean;
+    buyerId?: string;
   }>({ open: false });
   const [subscriptionLimits, setSubscriptionLimits] = useState({
     currentCount: 0,
@@ -298,14 +307,28 @@ const BuyersPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (buyerId: string) => {
+  const handleDelete = (buyerId: string) => {
+    setDeleteConfirmModal({
+      open: true,
+      buyerId,
+    });
+  };
+
+  const confirmDeleteBuyer = async () => {
+    if (!deleteConfirmModal.buyerId) {
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/buyers?id=${buyerId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/api/buyers?id=${deleteConfirmModal.buyerId}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (!response.ok) throw new Error("Failed to delete buyer");
 
-      fetchData();
+      await fetchData();
       setSnackbar({
         open: true,
         message: "Buyer deleted!",
@@ -317,6 +340,8 @@ const BuyersPage: React.FC = () => {
         message: "Failed to delete buyer.",
         severity: "error",
       });
+    } finally {
+      setDeleteConfirmModal({ open: false });
     }
   };
 
@@ -705,7 +730,7 @@ const BuyersPage: React.FC = () => {
 
       {/* Buyer Table */}
       {loading ? (
-        <LoadingComponent />
+        <CircularProgress />
       ) : error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -885,6 +910,44 @@ const BuyersPage: React.FC = () => {
             onClick={() => setSuccessModal({ open: false })}
           >
             Got It
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={deleteConfirmModal.open}
+        onClose={() => setDeleteConfirmModal({ open: false })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <WarningIcon sx={{ color: "warning.main", fontSize: 28 }} />
+            <Typography variant="h6">Delete Buyer?</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 1.5 }}>
+            If you delete this buyer, they will lose access to your platform.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setDeleteConfirmModal({ open: false })}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmDeleteBuyer}
+          >
+            Delete Buyer
           </Button>
         </DialogActions>
       </Dialog>

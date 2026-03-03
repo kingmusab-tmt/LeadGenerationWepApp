@@ -5,6 +5,13 @@ import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin, escapeRegex } from "@/lib/api/adminAuth";
 
+const toIsoDateOrNull = (value: unknown): string | null => {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value as string);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+};
+
 export async function GET(req: NextRequest) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -56,22 +63,74 @@ export async function GET(req: NextRequest) {
       }
 
       buyers = await Buyer.find(buyerConditions)
-        .select("name email status createdAt lastLogin")
+        .select("name email status")
         .sort({ createdAt: -1 })
         .lean();
     }
 
+    const normalizedUserDateByEmail = new Map<
+      string,
+      { createdAt: string | null; lastLogin: string | null }
+    >();
+
+    users.forEach((userDoc) => {
+      const email = userDoc.email?.toLowerCase?.();
+      if (!email) return;
+      normalizedUserDateByEmail.set(email, {
+        createdAt: toIsoDateOrNull(userDoc.createdAt),
+        lastLogin: toIsoDateOrNull(userDoc.lastLogin),
+      });
+    });
+
+    const buyerEmailsMissingDates = buyers
+      .map((buyerDoc) => buyerDoc.email?.toLowerCase?.())
+      .filter(
+        (email): email is string =>
+          Boolean(email) && !normalizedUserDateByEmail.has(email),
+      );
+
+    if (buyerEmailsMissingDates.length > 0) {
+      const userDateRecords = await User.find({
+        email: { $in: buyerEmailsMissingDates },
+      })
+        .select("email createdAt lastLogin")
+        .lean();
+
+      userDateRecords.forEach((userDoc) => {
+        const email = userDoc.email?.toLowerCase?.();
+        if (!email) return;
+        normalizedUserDateByEmail.set(email, {
+          createdAt: toIsoDateOrNull(userDoc.createdAt),
+          lastLogin: toIsoDateOrNull(userDoc.lastLogin),
+        });
+      });
+    }
+
     // Combine results
     const combinedUsers = [
-      ...users.map((u) => ({ ...u, id: u._id.toString(), _id: undefined })),
-      ...buyers.map((b) => ({
-        ...b,
-        id: b._id.toString(),
+      ...users.map((u) => ({
+        ...u,
+        id: u._id.toString(),
         _id: undefined,
-        role: "buyer",
-        verified: undefined,
-        image: undefined,
+        createdAt: toIsoDateOrNull(u.createdAt),
+        lastLogin: toIsoDateOrNull(u.lastLogin),
       })),
+      ...buyers.map((b) => {
+        const userDates = normalizedUserDateByEmail.get(
+          b.email?.toLowerCase?.() || "",
+        );
+
+        return {
+          ...b,
+          id: b._id.toString(),
+          _id: undefined,
+          role: "buyer",
+          verified: undefined,
+          image: undefined,
+          createdAt: userDates?.createdAt ?? null,
+          lastLogin: userDates?.lastLogin ?? null,
+        };
+      }),
     ];
 
     return NextResponse.json({ users: combinedUsers });

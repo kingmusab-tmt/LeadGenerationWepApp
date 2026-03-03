@@ -18,7 +18,13 @@ import {
   CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import FormPreview from "@/app/components/leadcapture/FormPreview";
+import dynamic from "next/dynamic";
+
+const FormPreview = dynamic(
+  () => import("@/app/components/leadcapture/FormPreview"),
+  { ssr: false },
+);
+
 import { industryNiches } from "@/utils/industryNiches";
 import { usCities } from "@/utils/citiesInUsUk";
 import { LEAD_SOURCES } from "@/utils/leadSources";

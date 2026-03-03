@@ -33,6 +33,7 @@ import {
   Skeleton,
   DialogActions,
   TextareaAutosize,
+  CircularProgress,
 } from "@mui/material";
 import {
   PlayCircle,
@@ -45,7 +46,6 @@ import {
   ThumbDown,
 } from "@mui/icons-material";
 import { formatDate, formatDuration } from "@/lib/formatUtils";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
 interface Call {
   _id: string;
@@ -515,7 +515,7 @@ export default function LeadTracking() {
         >
           {audioLoading ? (
             <>
-              <LoadingComponent />
+              <CircularProgress />
             </>
           ) : currentAudio ? (
             <>

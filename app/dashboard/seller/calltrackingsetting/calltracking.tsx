@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from "react";
 import CallPage from "./selltertwiliosetup";
 import { useInitializeUser } from "@/lib/hooks";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
-import { Box } from "@mui/material";
+import { Box, CircularProgress } from "@mui/material";
 
 const CallTrackingSetting = () => {
   const { currentUser } = useInitializeUser();
@@ -29,7 +28,7 @@ const CallTrackingSetting = () => {
           minHeight: "300px",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }

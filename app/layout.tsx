@@ -3,8 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/authprovider";
 import { NavigationProvider } from "../context/handlenavigation";
-import { ThemeProvider } from "@/context/themeprovider";
 import NotificationManager from "@/app/components/NotificationManager";
+import CookieConsentManager from "@/app/components/generalComponent/CookieConsentManager";
 import MuiThemeProvider from "@/lib/theme/MuiThemeProvider";
 import { Providers } from "@/app/reduxprovider";
 import { CSRFProvider } from "@/app/hooks/useCSRF";
@@ -194,18 +194,17 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <MuiThemeProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <NavigationProvider>
-                <Providers>
-                  <CSRFProvider>
-                    {children}
-                    <NotificationManager />
-                  </CSRFProvider>
-                </Providers>
-              </NavigationProvider>
-            </AuthProvider>
-          </ThemeProvider>
+          <AuthProvider>
+            <NavigationProvider>
+              <Providers>
+                <CSRFProvider>
+                  {children}
+                  <CookieConsentManager />
+                  <NotificationManager />
+                </CSRFProvider>
+              </Providers>
+            </NavigationProvider>
+          </AuthProvider>
         </MuiThemeProvider>
       </body>
     </html>

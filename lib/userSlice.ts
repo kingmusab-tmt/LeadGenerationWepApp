@@ -14,9 +14,22 @@ export interface User {
     | "user"
     | "guest"
     | string;
-  username?: string;
   mobile?: string;
   mobileNumber?: string;
+  businessName?: string;
+  businessEmail?: string;
+  businessPhone?: string;
+  businessWebsite?: string;
+  companyDescription?: string;
+  industryNiche?: string;
+  businessAddress?: {
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postCode?: string;
+  };
   isSubActive?: boolean;
   preferredDistribution?: "Automatic" | "Manual" | "Both" | string;
   tierUserType?: "seller" | "business";

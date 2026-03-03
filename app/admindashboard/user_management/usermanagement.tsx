@@ -28,6 +28,8 @@ import {
   Button,
   FormControl,
   InputLabel,
+  Menu,
+  CircularProgress,
 } from "@mui/material";
 import {
   Edit,
@@ -39,8 +41,9 @@ import {
   Refresh,
   Close,
   Save,
+  MoreVert,
+  Visibility,
 } from "@mui/icons-material";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useNotification } from "@/lib/useNotification";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
@@ -76,6 +79,14 @@ const UserManagement = () => {
     userId: string;
     userName: string;
   }>({ open: false, userId: "", userName: "" });
+  const [detailsModal, setDetailsModal] = useState<{
+    open: boolean;
+    user: User | null;
+  }>({ open: false, user: null });
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(
+    null,
+  );
+  const [actionMenuUser, setActionMenuUser] = useState<User | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -211,6 +222,60 @@ const UserManagement = () => {
     }
   };
 
+  const handleOpenActionMenu = (
+    event: React.MouseEvent<HTMLElement>,
+    user: User,
+  ) => {
+    setActionMenuAnchor(event.currentTarget);
+    setActionMenuUser(user);
+  };
+
+  const handleCloseActionMenu = () => {
+    setActionMenuAnchor(null);
+    setActionMenuUser(null);
+  };
+
+  const handleViewUserDetails = (user: User) => {
+    setDetailsModal({ open: true, user });
+    handleCloseActionMenu();
+  };
+
+  const handleOpenEditFromMenu = (user: User) => {
+    handleEditUser(user);
+    handleCloseActionMenu();
+  };
+
+  const handleToggleStatusFromMenu = (user: User) => {
+    handleToggleStatus(user.id, user.status);
+    handleCloseActionMenu();
+  };
+
+  const handleOpenDeleteFromMenu = (user: User) => {
+    setDeleteConfirm({
+      open: true,
+      userId: user.id,
+      userName: user.name,
+    });
+    handleCloseActionMenu();
+  };
+
+  const handleCloseDetailsModal = () => {
+    setDetailsModal({ open: false, user: null });
+  };
+
+  const formatDateValue = (
+    value?: string,
+    options?: Intl.DateTimeFormatOptions,
+    fallback = "—",
+  ) => {
+    if (!value) return fallback;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return fallback;
+    return options
+      ? parsed.toLocaleString(undefined, options)
+      : parsed.toLocaleString();
+  };
+
   // Server already filters — only paginate client-side
   const paginatedUsers = users.slice(
     page * rowsPerPage,
@@ -227,7 +292,7 @@ const UserManagement = () => {
           height: "50vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }
@@ -301,8 +366,8 @@ const UserManagement = () => {
               <TableCell>Email</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Joined</TableCell>
-              <TableCell>Last Login</TableCell>
+              {/* <TableCell>Joined</TableCell>
+              <TableCell>Last Login</TableCell> */}
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -348,46 +413,26 @@ const UserManagement = () => {
                       color={user.status === "active" ? "success" : "error"}
                     />
                   </TableCell>
+                  {/* <TableCell>
+                    {formatDateValue(
+                      user.createdAt,
+                      {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                      },
+                      "—",
+                    )}
+                  </TableCell> */}
+                  {/* <TableCell>
+                    {formatDateValue(user.lastLogin, undefined, "Never")}
+                  </TableCell> */}
                   <TableCell>
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    {user.lastLogin
-                      ? new Date(user.lastLogin).toLocaleString()
-                      : "Never"}
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title="Edit">
-                      <IconButton onClick={() => handleEditUser(user)}>
-                        <Edit fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip
-                      title={user.status === "active" ? "Suspend" : "Activate"}
+                    <IconButton
+                      onClick={(event) => handleOpenActionMenu(event, user)}
                     >
-                      <IconButton
-                        onClick={() => handleToggleStatus(user.id, user.status)}
-                      >
-                        {user.status === "active" ? (
-                          <Block color="error" fontSize="small" />
-                        ) : (
-                          <VerifiedUser color="success" fontSize="small" />
-                        )}
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton
-                        onClick={() =>
-                          setDeleteConfirm({
-                            open: true,
-                            userId: user.id,
-                            userName: user.name,
-                          })
-                        }
-                      >
-                        <Delete color="error" fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                      <MoreVert fontSize="small" />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))
@@ -410,6 +455,160 @@ const UserManagement = () => {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </TableContainer>
+
+      <Menu
+        anchorEl={actionMenuAnchor}
+        open={Boolean(actionMenuAnchor && actionMenuUser)}
+        onClose={handleCloseActionMenu}
+      >
+        <MenuItem
+          onClick={() =>
+            actionMenuUser && handleViewUserDetails(actionMenuUser)
+          }
+        >
+          <Visibility fontSize="small" sx={{ mr: 1 }} /> View
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            actionMenuUser && handleOpenEditFromMenu(actionMenuUser)
+          }
+        >
+          <Edit fontSize="small" sx={{ mr: 1 }} /> Edit
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            actionMenuUser && handleToggleStatusFromMenu(actionMenuUser)
+          }
+        >
+          {actionMenuUser?.status === "active" ? (
+            <Block color="error" fontSize="small" sx={{ mr: 1 }} />
+          ) : (
+            <VerifiedUser color="success" fontSize="small" sx={{ mr: 1 }} />
+          )}
+          {actionMenuUser?.status === "active" ? "Suspend" : "Activate"}
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            actionMenuUser && handleOpenDeleteFromMenu(actionMenuUser)
+          }
+          sx={{ color: "error.main" }}
+        >
+          <Delete fontSize="small" sx={{ mr: 1 }} /> Delete
+        </MenuItem>
+      </Menu>
+
+      <Dialog
+        open={detailsModal.open}
+        onClose={handleCloseDetailsModal}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          User Details
+          <IconButton
+            aria-label="close"
+            onClick={handleCloseDetailsModal}
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {detailsModal.user && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  pb: 0.5,
+                }}
+              >
+                <Avatar
+                  src={detailsModal.user.image}
+                  alt={detailsModal.user.name}
+                  sx={{ width: 44, height: 44 }}
+                />
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {detailsModal.user.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {detailsModal.user.email}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "140px 1fr",
+                  rowGap: 1.25,
+                  columnGap: 1.5,
+                  alignItems: "center",
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Role
+                </Typography>
+                <Typography variant="body1">
+                  {detailsModal.user.role}
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary">
+                  Status
+                </Typography>
+                <Box>
+                  <Chip
+                    label={detailsModal.user.status}
+                    size="small"
+                    color={
+                      detailsModal.user.status === "active"
+                        ? "success"
+                        : "error"
+                    }
+                  />
+                </Box>
+
+                <Typography variant="body2" color="text.secondary">
+                  Verified
+                </Typography>
+                <Typography variant="body1">
+                  {detailsModal.user.verified ? "Yes" : "No"}
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary">
+                  Joined
+                </Typography>
+                <Typography variant="body1">
+                  {formatDateValue(detailsModal.user.createdAt, undefined, "—")}
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary">
+                  Last Login
+                </Typography>
+                <Typography variant="body1">
+                  {formatDateValue(
+                    detailsModal.user.lastLogin,
+                    undefined,
+                    "Never",
+                  )}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDetailsModal} variant="contained">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog

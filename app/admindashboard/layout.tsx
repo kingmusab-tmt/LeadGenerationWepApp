@@ -36,7 +36,6 @@ import { useMediaQuery } from "@mui/material";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
 const navItems = [
   { label: "Overview", path: "overview", icon: <Dashboard /> },
@@ -123,7 +122,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
   };
 
   if (status === "loading") {
-    return <LoadingComponent />;
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
@@ -258,7 +268,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
       >
-        <LoadingComponent />
+        <CircularProgress color="inherit" />
       </Backdrop>
     </Box>
   );

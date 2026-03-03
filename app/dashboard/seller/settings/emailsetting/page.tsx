@@ -24,7 +24,15 @@ import {
 import axios from "@/lib/axiosInstance";
 import { useNotification } from "@/app/hooks/useNotification";
 
-const EmailSettingsPage = () => {
+type EmailSettingsPageProps = {
+  hideSaveButton?: boolean;
+  onSaveHandlerReady?: ((saveHandler: () => Promise<boolean>) => void) | null;
+};
+
+const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
+  hideSaveButton = false,
+  onSaveHandlerReady,
+}) => {
   const notify = useNotification();
   const [emailSettings, setEmailSettings] = useState({
     smtpServer: "",
@@ -72,7 +80,7 @@ const EmailSettingsPage = () => {
     setIsSaved(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<boolean> => {
     try {
       setSaving(true);
       await axios.post("/api/settings", {
@@ -88,15 +96,22 @@ const EmailSettingsPage = () => {
       setIsSaved(true);
       const now = new Date().toLocaleTimeString();
       setLastSaved(now);
+      return true;
     } catch (e: any) {
       notify(
         e?.response?.data?.message || "Failed to update email settings",
         "error",
       );
+      return false;
     } finally {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!onSaveHandlerReady) return;
+    onSaveHandlerReady(handleSave);
+  }, [onSaveHandlerReady, emailSettings]);
 
   const handleTestConnection = async () => {
     try {
@@ -267,15 +282,17 @@ const EmailSettingsPage = () => {
               {testing ? "Testing..." : "Test Connection"}
             </Button>
           )}
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleSave}
-            disabled={saving || testing}
-            startIcon={saving ? <CircularProgress size={20} /> : null}
-          >
-            {saving ? "Saving..." : "Save Settings"}
-          </Button>
+          {!hideSaveButton && (
+            <Button
+              variant="contained"
+              size="large"
+              onClick={handleSave}
+              disabled={saving || testing}
+              startIcon={saving ? <CircularProgress size={20} /> : null}
+            >
+              {saving ? "Saving..." : "Save Settings"}
+            </Button>
+          )}
         </Box>
       </Card>
     </Box>

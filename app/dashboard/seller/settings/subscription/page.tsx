@@ -2,9 +2,13 @@
 
 import React, { useState } from "react";
 import { Box, Container, Paper, Tabs, Tab } from "@mui/material";
+import dynamic from "next/dynamic";
 import SubscriptionManagement from "./SubscriptionManagement";
-import PaymentMethodsManager from "./PaymentMethodsManager";
 import ChangePlanModal from "./ChangePlanModal";
+
+const PaymentMethodsManager = dynamic(() => import("./PaymentMethodsManager"), {
+  ssr: false,
+});
 
 interface TabPanelProps {
   children?: React.ReactNode;

@@ -13,6 +13,7 @@ import {
   Chip,
   Stack,
   Divider,
+  CircularProgress,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import {
@@ -32,7 +33,6 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import {
   ArrowUpward,
   ArrowDownward,
@@ -183,7 +183,7 @@ const AdminOverview: React.FC = () => {
           height: "50vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }

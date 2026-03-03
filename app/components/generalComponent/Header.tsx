@@ -35,8 +35,18 @@ import {
   FeaturedPlayList,
   HowToReg,
   PriceCheckRounded,
+  Phone,
+  Email,
+  Rocket,
 } from "@mui/icons-material";
 import { FcAbout } from "react-icons/fc";
+import {
+  FaFacebook,
+  FaTwitter,
+  FaLinkedin,
+  FaInstagram,
+  FaYoutube,
+} from "react-icons/fa";
 import { useInitializeUser, useAppDispatch } from "@/lib/hooks";
 import { clearUser } from "@/lib/userSlice";
 
@@ -85,11 +95,11 @@ const Header = () => {
 
   // Lead management specific navigation items
   const navItems = [
-    {
-      name: "Dashboard",
-      href: "/dashboard/seller/overview",
-      icon: <DashboardIcon fontSize="small" />,
-    },
+    // {
+    //   name: "Dashboard",
+    //   href: "/dashboard/seller/overview",
+    //   icon: <DashboardIcon fontSize="small" />,
+    // },
     {
       name: "Leads",
       href: "/dashboard/seller/lead_management",
@@ -103,11 +113,11 @@ const Header = () => {
   ];
 
   const publicNavItems = [
-    {
-      name: "About Us",
-      href: "/about",
-      icon: <FcAbout fontSize="small" />,
-    },
+    // {
+    //   name: "About Us",
+    //   href: "/about",
+    //   icon: <FcAbout fontSize="small" />,
+    // },
     {
       name: "Features",
       href: "/#features",
@@ -124,7 +134,7 @@ const Header = () => {
       icon: <PriceCheckRounded fontSize="small" />,
     },
     {
-      name: "Contact",
+      name: "Contact Us",
       href: "/contact",
       icon: <ContactPage fontSize="small" />,
     },
@@ -133,402 +143,545 @@ const Header = () => {
   const displayItems = isAuthenticated ? navItems : publicNavItems;
 
   return (
-    <AppBar
-      position="sticky"
-      color="default"
-      elevation={2}
-      sx={{
-        backgroundColor: "background.paper",
-        backdropFilter: "blur(10px)",
-        borderBottom: `2px solid ${theme.palette.primary.main}20`,
-      }}
-    >
-      <Container maxWidth="xl">
-        <Toolbar disableGutters sx={{ py: 1 }}>
-          {/* Logo */}
-          <MuiLink
-            component={Link}
-            href="/"
+    <>
+      {/* Top Utility Bar */}
+      <Box
+        sx={{
+          backgroundColor: theme.palette.primary.main,
+          color: "white",
+          py: 0.75,
+          display: { xs: "none", sm: "block" },
+        }}
+      >
+        <Container maxWidth="xl">
+          <Box
             sx={{
               display: "flex",
+              justifyContent: "space-between",
               alignItems: "center",
-              flexGrow: { xs: 1, md: 0 },
-              mr: 4,
-              "&:hover": {
-                animation: `${zoomIn} 0.2s forwards`,
-              },
-              "&:not(:hover)": {
-                animation: `${zoomOut} 0.2s forwards`,
-              },
-              textDecoration: "none",
             }}
           >
-            <Image
-              src={logo}
-              alt="Brixcot Lead Management"
-              width={45}
-              height={45}
-              style={{ marginRight: 12 }}
-            />
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 800,
-                  background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                  backgroundClip: "text",
-                  WebkitBackgroundClip: "text",
-                  color: "transparent",
-                }}
-              >
-                BRIXCOT
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  color: theme.palette.text.secondary,
-                  fontWeight: 500,
-                  display: { xs: "none", sm: "block" },
-                }}
-              >
-                Lead Management
-              </Typography>
+            {/* Contact Info - Left */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Phone sx={{ fontSize: 16 }} />
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  +2348162552901
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Email sx={{ fontSize: 16 }} />
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  support@brixcot.com
+                </Typography>
+              </Box>
             </Box>
-          </MuiLink>
 
-          {/* Desktop Navigation */}
-          {!isMobile && (
-            <Stack direction="row" spacing={1} sx={{ flexGrow: 1 }}>
-              {displayItems.map((item) => (
-                <Box
-                  key={item.name}
-                  onMouseEnter={() => setHoveredItem(item.name)}
-                  onMouseLeave={() => setHoveredItem(null)}
+            {/* Social Media Icons - Right */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <IconButton
+                component="a"
+                href="https://facebook.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                size="small"
+                sx={{
+                  color: "white",
+                  "&:hover": { color: "rgba(255,255,255,0.8)" },
+                }}
+              >
+                <FaFacebook size={16} />
+              </IconButton>
+              <IconButton
+                component="a"
+                href="https://twitter.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                size="small"
+                sx={{
+                  color: "white",
+                  "&:hover": { color: "rgba(255,255,255,0.8)" },
+                }}
+              >
+                <FaTwitter size={16} />
+              </IconButton>
+              <IconButton
+                component="a"
+                href="https://linkedin.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                size="small"
+                sx={{
+                  color: "white",
+                  "&:hover": { color: "rgba(255,255,255,0.8)" },
+                }}
+              >
+                <FaLinkedin size={16} />
+              </IconButton>
+              <IconButton
+                component="a"
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                size="small"
+                sx={{
+                  color: "white",
+                  "&:hover": { color: "rgba(255,255,255,0.8)" },
+                }}
+              >
+                <FaInstagram size={16} />
+              </IconButton>
+              <IconButton
+                component="a"
+                href="https://youtube.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                size="small"
+                sx={{
+                  color: "white",
+                  "&:hover": { color: "rgba(255,255,255,0.8)" },
+                }}
+              >
+                <FaYoutube size={16} />
+              </IconButton>
+            </Box>
+          </Box>
+        </Container>
+      </Box>
+
+      <AppBar
+        position="sticky"
+        color="default"
+        elevation={2}
+        sx={{
+          backgroundColor: "background.paper",
+          backdropFilter: "blur(10px)",
+          borderBottom: `2px solid ${theme.palette.primary.main}20`,
+        }}
+      >
+        <Container maxWidth="xl">
+          <Toolbar disableGutters sx={{ py: 1 }}>
+            {/* Logo */}
+            <MuiLink
+              component={Link}
+              href="/"
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                flexGrow: { xs: 1, md: 0 },
+                mr: 4,
+                "&:hover": {
+                  animation: `${zoomIn} 0.2s forwards`,
+                },
+                "&:not(:hover)": {
+                  animation: `${zoomOut} 0.2s forwards`,
+                },
+                textDecoration: "none",
+              }}
+            >
+              <Image
+                src={logo}
+                alt="Brixcot Lead Management"
+                width={45}
+                height={45}
+                style={{ marginRight: 12 }}
+              />
+              <Box>
+                <Typography
+                  variant="h6"
                   sx={{
-                    position: "relative",
-                    "&:after": {
-                      content: '""',
-                      position: "absolute",
-                      bottom: -4,
-                      left: 0,
-                      width: hoveredItem === item.name ? "100%" : "0%",
-                      height: 3,
-                      backgroundColor: theme.palette.primary.main,
-                      transition: "width 0.3s ease",
-                      borderRadius: 2,
-                    },
+                    fontWeight: 800,
+                    background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    color: "transparent",
                   }}
                 >
-                  <Button
-                    component={Link}
-                    href={item.href}
-                    startIcon={item.icon}
+                  BRIXCOT
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: theme.palette.text.secondary,
+                    fontWeight: 500,
+                    display: { xs: "none", sm: "block" },
+                  }}
+                >
+                  Lead Management
+                </Typography>
+              </Box>
+            </MuiLink>
+
+            {/* Desktop Navigation */}
+            {!isMobile && (
+              <Stack direction="row" spacing={1} sx={{ flexGrow: 1 }}>
+                {displayItems.map((item) => (
+                  <Box
+                    key={item.name}
+                    onMouseEnter={() => setHoveredItem(item.name)}
+                    onMouseLeave={() => setHoveredItem(null)}
                     sx={{
-                      px: 2,
-                      py: 1,
-                      color: "text.primary.main",
-                      fontWeight: 600,
-                      textTransform: "none",
-                      fontSize: "0.9rem",
-                      "&:hover": {
-                        color: theme.palette.primary.main,
-                        backgroundColor: theme.palette.action.hover,
-                        transform: "translateY(-1px)",
+                      position: "relative",
+                      "&:after": {
+                        content: '""',
+                        position: "absolute",
+                        bottom: -4,
+                        left: 0,
+                        width: hoveredItem === item.name ? "100%" : "0%",
+                        height: 3,
+                        backgroundColor: theme.palette.primary.main,
+                        transition: "width 0.3s ease",
+                        borderRadius: 2,
                       },
-                      transform:
-                        hoveredItem === item.name ? "translateY(-1px)" : "none",
-                      transition: "all 0.2s ease",
                     }}
                   >
-                    {item.name}
-                  </Button>
-                </Box>
-              ))}
-            </Stack>
-          )}
-
-          {/* User Actions Section */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {userLoading ? (
-              // Loading state
-              <Button variant="outlined" disabled>
-                Loading...
-              </Button>
-            ) : isAuthenticated ? (
-              // Authenticated user
-              <>
-                {!isMobile && (
-                  <>
-                    <IconButton
-                      color="inherit"
-                      sx={{ color: theme.palette.text.primary }}
-                    >
-                      <Badge badgeContent={4} color="error">
-                        <NotificationsIcon />
-                      </Badge>
-                    </IconButton>
                     <Button
-                      variant="contained"
-                      startIcon={<DashboardIcon />}
                       component={Link}
-                      href="/dashboard/seller/overview"
+                      href={item.href}
+                      startIcon={item.icon}
                       sx={{
-                        textTransform: "none",
+                        px: 2,
+                        py: 1,
+                        color: "text.primary.main",
                         fontWeight: 600,
-                        borderRadius: 2,
-                        px: 3,
+                        textTransform: "none",
+                        fontSize: "0.9rem",
+                        "&:hover": {
+                          color: theme.palette.primary.main,
+                          backgroundColor: theme.palette.action.hover,
+                          transform: "translateY(-1px)",
+                        },
+                        transform:
+                          hoveredItem === item.name
+                            ? "translateY(-1px)"
+                            : "none",
+                        transition: "all 0.2s ease",
                       }}
                     >
-                      Dashboard
+                      {item.name}
                     </Button>
-                  </>
-                )}
-
-                {/* User Avatar Menu */}
-                <IconButton
-                  onClick={handleUserMenuOpen}
-                  sx={{
-                    border: `2px solid ${theme.palette.primary.main}30`,
-                    "&:hover": {
-                      border: `2px solid ${theme.palette.primary.main}`,
-                      transform: "scale(1.05)",
-                    },
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  <Avatar
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      bgcolor: theme.palette.primary.main,
-                      fontSize: "0.8rem",
-                    }}
-                    src={currentUser?.image || undefined}
-                  >
-                    {currentUser?.name?.charAt(0) || "U"}
-                  </Avatar>
-                </IconButton>
-
-                <Menu
-                  anchorEl={userMenuAnchor}
-                  open={Boolean(userMenuAnchor)}
-                  onClose={handleMenuClose}
-                  PaperProps={{
-                    sx: {
-                      mt: 1.5,
-                      minWidth: 200,
-                      boxShadow: theme.shadows[8],
-                      borderRadius: 2,
-                      "& .MuiMenuItem-root": {
-                        px: 2,
-                        py: 1.5,
-                        "&:hover": {
-                          backgroundColor: theme.palette.primary.light,
-                          color: theme.palette.primary.contrastText,
-                        },
-                      },
-                    },
-                  }}
-                >
-                  <MenuItem onClick={handleMenuClose}>
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {currentUser?.name || "User"}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {currentUser?.email}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem
-                    onClick={handleMenuClose}
-                    component={Link}
-                    href="/profile"
-                  >
-                    Profile
-                  </MenuItem>
-                  <MenuItem
-                    onClick={handleMenuClose}
-                    component={Link}
-                    href="/settings"
-                  >
-                    Settings
-                  </MenuItem>
-                  <MenuItem
-                    onClick={handleSignOut}
-                    sx={{ color: theme.palette.error.main }}
-                  >
-                    <LogoutIcon fontSize="small" sx={{ mr: 1 }} />
-                    Sign Out
-                  </MenuItem>
-                </Menu>
-              </>
-            ) : (
-              // Unauthenticated user
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Button
-                  variant="outlined"
-                  component={Link}
-                  href="/auth/sign-in"
-                  startIcon={<LoginIcon />}
-                  sx={{
-                    textTransform: "none",
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    px: 3,
-                  }}
-                >
-                  Login
-                </Button>
-                {/* <Button
-                  variant="contained"
-                  component={Link}
-                  href="/auth/sign-up"
-                  sx={{
-                    textTransform: "none",
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    px: 3,
-                    display: { xs: "none", sm: "flex" },
-                  }}
-                >
-                  Sign Up
-                </Button> */}
+                  </Box>
+                ))}
               </Stack>
             )}
 
-            {/* Mobile Menu Button */}
-            {isMobile && (
-              <IconButton
-                edge="end"
-                color="inherit"
-                aria-label="menu"
-                onClick={handleMenuOpen}
-                sx={{
-                  color: theme.palette.text.primary,
-                  "&:hover": {
-                    backgroundColor: theme.palette.action.hover,
-                    transform: "scale(1.1)",
-                  },
-                  transition: "transform 0.2s",
-                }}
-              >
-                <MenuIcon />
-              </IconButton>
-            )}
-          </Box>
+            {/* User Actions Section */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              {userLoading ? (
+                // Loading state
+                <Button variant="outlined" disabled>
+                  Loading...
+                </Button>
+              ) : isAuthenticated ? (
+                // Authenticated user
+                <>
+                  {!isMobile && (
+                    <>
+                      {/* <IconButton
+                        color="inherit"
+                        sx={{ color: theme.palette.text.primary }}
+                      >
+                        <Badge badgeContent={4} color="error">
+                          <NotificationsIcon />
+                        </Badge>
+                      </IconButton> */}
+                      <Button
+                        variant="contained"
+                        startIcon={<DashboardIcon />}
+                        component={Link}
+                        href="/dashboard/seller/overview"
+                        sx={{
+                          textTransform: "none",
+                          fontWeight: 600,
+                          borderRadius: 2,
+                          px: 3,
+                        }}
+                      >
+                        Dashboard
+                      </Button>
+                    </>
+                  )}
 
-          {/* Mobile Menu */}
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
-            PaperProps={{
-              sx: {
-                mt: 1.5,
-                minWidth: 280,
-                boxShadow: theme.shadows[8],
-                borderRadius: 2,
-                "& .MuiMenuItem-root": {
-                  px: 3,
-                  py: 1.5,
-                  "&:hover": {
-                    backgroundColor: theme.palette.primary.light,
-                    color: theme.palette.primary.contrastText,
+                  {/* User Avatar Menu */}
+                  <IconButton
+                    onClick={handleUserMenuOpen}
+                    sx={{
+                      border: `2px solid ${theme.palette.primary.main}30`,
+                      "&:hover": {
+                        border: `2px solid ${theme.palette.primary.main}`,
+                        transform: "scale(1.05)",
+                      },
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <Avatar
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        bgcolor: theme.palette.primary.main,
+                        fontSize: "0.8rem",
+                      }}
+                      src={currentUser?.image || undefined}
+                    >
+                      {currentUser?.name?.charAt(0) || "U"}
+                    </Avatar>
+                  </IconButton>
+
+                  <Menu
+                    anchorEl={userMenuAnchor}
+                    open={Boolean(userMenuAnchor)}
+                    onClose={handleMenuClose}
+                    PaperProps={{
+                      sx: {
+                        mt: 1.5,
+                        minWidth: 200,
+                        boxShadow: theme.shadows[8],
+                        borderRadius: 2,
+                        "& .MuiMenuItem-root": {
+                          px: 2,
+                          py: 1.5,
+                          "&:hover": {
+                            backgroundColor: theme.palette.primary.light,
+                            color: theme.palette.primary.contrastText,
+                          },
+                        },
+                      },
+                    }}
+                  >
+                    <MenuItem onClick={handleMenuClose}>
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight={600}>
+                          {currentUser?.name || "User"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {currentUser?.email}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                    <MenuItem
+                      onClick={handleMenuClose}
+                      component={Link}
+                      href="/dashboard/seller/settings?tab=general"
+                    >
+                      Profile
+                    </MenuItem>
+                    <MenuItem
+                      onClick={handleMenuClose}
+                      component={Link}
+                      href="/dashboard/seller/settings"
+                    >
+                      Settings
+                    </MenuItem>
+                    <MenuItem
+                      onClick={handleSignOut}
+                      sx={{ color: theme.palette.error.main }}
+                    >
+                      <LogoutIcon fontSize="small" sx={{ mr: 1 }} />
+                      Sign Out
+                    </MenuItem>
+                  </Menu>
+                </>
+              ) : (
+                // Unauthenticated user
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    variant="outlined"
+                    component={Link}
+                    href="/auth/sign-in"
+                    startIcon={<LoginIcon />}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      borderRadius: 2,
+                      px: 3,
+                    }}
+                  >
+                    Login
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    component={Link}
+                    href="/auth/sign-in?trial=true"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        sessionStorage.setItem("trialIntent", "true");
+                      }
+                    }}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      px: 3,
+                      display: { xs: "none", sm: "flex" },
+                    }}
+                  >
+                    Try it for Free
+                  </Button>
+                </Stack>
+              )}
+
+              {/* Mobile Menu Button */}
+              {isMobile && (
+                <IconButton
+                  edge="end"
+                  color="inherit"
+                  aria-label="menu"
+                  onClick={handleMenuOpen}
+                  sx={{
+                    color: theme.palette.text.primary,
+                    "&:hover": {
+                      backgroundColor: theme.palette.action.hover,
+                      transform: "scale(1.1)",
+                    },
+                    transition: "transform 0.2s",
+                  }}
+                >
+                  <MenuIcon />
+                </IconButton>
+              )}
+            </Box>
+
+            {/* Mobile Menu */}
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={handleMenuClose}
+              PaperProps={{
+                sx: {
+                  mt: 1.5,
+                  minWidth: 280,
+                  boxShadow: theme.shadows[8],
+                  borderRadius: 2,
+                  "& .MuiMenuItem-root": {
+                    px: 3,
+                    py: 1.5,
+                    "&:hover": {
+                      backgroundColor: theme.palette.primary.light,
+                      color: theme.palette.primary.contrastText,
+                    },
                   },
                 },
-              },
-            }}
-          >
-            {displayItems.map((item) => (
-              <MenuItem
-                key={item.name}
-                onClick={handleMenuClose}
-                component={Link}
-                href={item.href}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    width: "100%",
-                  }}
+              }}
+            >
+              {displayItems.map((item) => (
+                <MenuItem
+                  key={item.name}
+                  onClick={handleMenuClose}
+                  component={Link}
+                  href={item.href}
                 >
-                  {item.icon}
-                  <Typography variant="body2" fontWeight={500}>
-                    {item.name}
-                  </Typography>
-                </Box>
-              </MenuItem>
-            ))}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      width: "100%",
+                    }}
+                  >
+                    {item.icon}
+                    <Typography variant="body2" fontWeight={500}>
+                      {item.name}
+                    </Typography>
+                  </Box>
+                </MenuItem>
+              ))}
 
-            {isAuthenticated && (
-              <MenuItem
-                onClick={handleMenuClose}
-                component={Link}
-                href="/dashboard/seller/overview"
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    width: "100%",
-                  }}
+              {isAuthenticated && (
+                <MenuItem
+                  onClick={handleMenuClose}
+                  component={Link}
+                  href="/dashboard/seller/overview"
                 >
-                  <DashboardIcon fontSize="small" />
-                  <Typography variant="body2" fontWeight={500}>
-                    Dashboard
-                  </Typography>
-                </Box>
-              </MenuItem>
-            )}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      width: "100%",
+                    }}
+                  >
+                    <DashboardIcon fontSize="small" />
+                    <Typography variant="body2" fontWeight={500}>
+                      Dashboard
+                    </Typography>
+                  </Box>
+                </MenuItem>
+              )}
 
-            {isAuthenticated ? (
-              <MenuItem
-                onClick={handleSignOut}
-                sx={{ color: theme.palette.error.main }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    width: "100%",
-                  }}
+              {isAuthenticated ? (
+                <MenuItem
+                  onClick={handleSignOut}
+                  sx={{ color: theme.palette.error.main }}
                 >
-                  <LogoutIcon fontSize="small" />
-                  <Typography variant="body2" fontWeight={500}>
-                    Sign Out
-                  </Typography>
-                </Box>
-              </MenuItem>
-            ) : (
-              <MenuItem
-                component={Link}
-                href="/auth/sign-in"
-                onClick={handleMenuClose}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    width: "100%",
-                  }}
-                >
-                  <LoginIcon fontSize="small" />
-                  <Typography variant="body2" fontWeight={500}>
-                    Login
-                  </Typography>
-                </Box>
-              </MenuItem>
-            )}
-          </Menu>
-        </Toolbar>
-      </Container>
-    </AppBar>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      width: "100%",
+                    }}
+                  >
+                    <LogoutIcon fontSize="small" />
+                    <Typography variant="body2" fontWeight={500}>
+                      Sign Out
+                    </Typography>
+                  </Box>
+                </MenuItem>
+              ) : (
+                [
+                  <MenuItem
+                    key="menu-login"
+                    component={Link}
+                    href="/auth/sign-in"
+                    onClick={handleMenuClose}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        width: "100%",
+                      }}
+                    >
+                      <LoginIcon fontSize="small" />
+                      <Typography variant="body2" fontWeight={500}>
+                        Login
+                      </Typography>
+                    </Box>
+                  </MenuItem>,
+                  <MenuItem
+                    key="menu-try-free"
+                    component={Link}
+                    href="/auth/sign-in?trial=true"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        sessionStorage.setItem("trialIntent", "true");
+                      }
+                      handleMenuClose();
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        width: "100%",
+                      }}
+                    >
+                      <Rocket fontSize="small" />
+                      <Typography variant="body2" fontWeight={700}>
+                        Try it for Free
+                      </Typography>
+                    </Box>
+                  </MenuItem>,
+                ]
+              )}
+            </Menu>
+          </Toolbar>
+        </Container>
+      </AppBar>
+    </>
   );
 };
 

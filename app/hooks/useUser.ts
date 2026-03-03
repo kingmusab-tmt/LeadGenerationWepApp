@@ -28,13 +28,19 @@ export const normalizeUser = (data: any): User => {
 
   return {
     id: raw.id ?? raw._id ?? raw.userId ?? raw.uid ?? undefined,
-    name: raw.name ?? raw.fullName ?? raw.username ?? undefined,
+    name: raw.name ?? raw.fullName ?? undefined,
     email: raw.email ?? raw.mail ?? undefined,
     image: raw.image ?? raw.avatar ?? undefined,
     role: raw.role ?? raw.userRole ?? "user",
-    username: raw.username ?? raw.userName ?? undefined,
     mobile: raw.mobile ?? raw.phone ?? raw.mobileNumber ?? undefined,
     mobileNumber: raw.mobileNumber ?? raw.phone ?? raw.mobile ?? undefined,
+    businessName: raw.businessName ?? undefined,
+    businessEmail: raw.businessEmail ?? undefined,
+    businessPhone: raw.businessPhone ?? undefined,
+    businessWebsite: raw.businessWebsite ?? undefined,
+    companyDescription: raw.companyDescription ?? undefined,
+    industryNiche: raw.industryNiche ?? undefined,
+    businessAddress: raw.businessAddress ?? undefined,
     isSubActive: raw.isSubActive ?? raw.isSubscriptionActive ?? undefined,
   };
 };

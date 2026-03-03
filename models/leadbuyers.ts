@@ -157,6 +157,7 @@ export interface IBuyer extends Document {
     unitPaid: number;
     purchaseType: "assigned" | "marketplace";
   }[];
+  processedCreditSessionIds: string[];
 }
 
 export interface IBuyerCriteriaSet {
@@ -473,6 +474,11 @@ const BuyerSchema: Schema = new Schema({
       },
     },
   ],
+  processedCreditSessionIds: [
+    {
+      type: String,
+    },
+  ],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -480,6 +486,7 @@ const BuyerSchema: Schema = new Schema({
 BuyerSchema.index({ registeredWith: 1 }); // Index on registeredWith field
 BuyerSchema.index({ assignedLeads: 1 }); // PHASE 1: Index on assignedLeads for fast queries
 BuyerSchema.index({ purchasedLeads: 1 }); // PHASE 1: Index on purchasedLeads for fast queries
+BuyerSchema.index({ processedCreditSessionIds: 1 });
 
 // Create and export the Mongoose model
 

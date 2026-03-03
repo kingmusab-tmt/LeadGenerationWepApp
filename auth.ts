@@ -39,7 +39,6 @@ export const authOptions = {
       async profile(profile) {
         return {
           id: profile.sub,
-          username: profile.sub,
           email: profile.email,
           emailVerified: profile.email_verified,
           name: profile.name,
@@ -77,6 +76,58 @@ export const authOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      try {
+        if (!user?.email) return true;
+
+        await dbConnect();
+
+        const now = new Date();
+        const provider = account?.provider || "google";
+
+        const setData: Record<string, unknown> = {
+          lastLogin: now,
+          updatedAt: now,
+        };
+
+        if (user.name) setData.name = user.name;
+        if (user.image) setData.image = user.image;
+
+        await User.updateOne(
+          { email: user.email },
+          {
+            $set: setData,
+            $setOnInsert: {
+              email: user.email,
+              provider,
+              role: "user",
+              status: "active",
+              createdAt: now,
+            },
+          },
+          { upsert: true },
+        );
+
+        await User.updateOne(
+          { email: user.email, createdAt: { $exists: false } },
+          { $set: { createdAt: now } },
+        );
+
+        await User.updateOne(
+          { email: user.email, provider: { $exists: false } },
+          { $set: { provider } },
+        );
+
+        return true;
+      } catch (error) {
+        console.error(
+          "[auth.signIn] Failed to sync user login metadata",
+          error,
+        );
+        return false;
+      }
+    },
+
     async redirect({ url, baseUrl }) {
       return url.startsWith(baseUrl) ? url : baseUrl;
     },

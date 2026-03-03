@@ -1,6 +1,5 @@
 import { Suspense } from "react";
-import { Box } from "@mui/material";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
+import { Box, CircularProgress } from "@mui/material";
 import SignInContent from "./signin-content";
 
 export default function SignInPage() {
@@ -15,7 +14,7 @@ export default function SignInPage() {
             minHeight: "100vh",
           }}
         >
-          <LoadingComponent />
+          <CircularProgress />
         </Box>
       }
     >

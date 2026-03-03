@@ -75,7 +75,7 @@ import {
   Timer,
   TrendingDown,
 } from "@mui/icons-material";
-import Head from "next/head";
+// Head removed — use Next.js App Router metadata export instead
 
 const LandingPage = () => {
   const theme = useTheme();
@@ -355,6 +355,9 @@ const LandingPage = () => {
     },
   ];
 
+  const leftFaqs = faqs.filter((_, index) => index % 2 === 0);
+  const rightFaqs = faqs.filter((_, index) => index % 2 !== 0);
+
   // Social proof numbers
   const socialProof = [
     { number: "10,000+", label: "Leads Processed Daily", growth: "+127%" },
@@ -394,25 +397,7 @@ const LandingPage = () => {
 
   return (
     <>
-      <Head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "FAQPage",
-              mainEntity: faqs.map((faq) => ({
-                "@type": "Question",
-                name: faq.question,
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: faq.answer,
-                },
-              })),
-            }),
-          }}
-        />
-      </Head>
+      {/* FAQ structured data — move to a metadata export or layout-level <script> for SSR */}
       <Header />
 
       {/* Hero Section with Enhanced Gradient */}
@@ -1022,7 +1007,12 @@ const LandingPage = () => {
                     color="primary"
                     sx={{ mb: 2 }}
                   /> */}
-                  <Typography variant="h3" fontWeight="bold" gutterBottom>
+                  <Typography
+                    variant="h3"
+                    fontWeight="bold"
+                    gutterBottom
+                    color="primary.main"
+                  >
                     The Most Advanced Call Tracking in the Industry
                   </Typography>
                   <Typography variant="body1" color="text.secondary" paragraph>
@@ -1530,7 +1520,7 @@ const LandingPage = () => {
               >
                 Start Your Free 14-Day Trial
               </Button>
-              <Button
+              {/* <Button
                 variant="outlined"
                 color="inherit"
                 size="large"
@@ -1538,7 +1528,7 @@ const LandingPage = () => {
                 href="/contact"
               >
                 Talk to Sales
-              </Button>
+              </Button> */}
             </Stack>
             <Typography variant="body2" sx={{ mt: 3, opacity: 0.8 }}>
               No credit card required • Full access to all features • Cancel
@@ -1559,17 +1549,18 @@ const LandingPage = () => {
         <Container maxWidth="lg" sx={{ px: { xs: 3, sm: 4 } }}>
           <Fade in={checked}>
             <Box textAlign="center" mb={6}>
-              <Chip
+              {/* <Chip
                 label="Got Questions?"
                 color="primary"
                 variant="outlined"
                 sx={{ mb: 2 }}
-              />
+              /> */}
               <Typography
                 variant="h3"
                 component="h2"
                 fontWeight="bold"
                 gutterBottom
+                color="primary.main"
               >
                 Frequently Asked Questions
               </Typography>
@@ -1580,52 +1571,62 @@ const LandingPage = () => {
             </Box>
           </Fade>
 
-          <Box sx={{ mt: 4 }}>
-            {faqs.map((faq, index) => (
-              <Grow
-                key={index}
-                in={checked}
-                style={{ transformOrigin: "0 0 0" }}
-                {...(checked ? { timeout: 300 + index * 100 } : {})}
-              >
-                <Accordion
-                  elevation={0}
-                  sx={{
-                    mb: 2,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: "12px !important",
-                    "&:before": { display: "none" },
-                    "&.Mui-expanded": {
-                      borderColor: "primary.main",
-                      boxShadow: 2,
-                    },
-                  }}
-                >
-                  <AccordionSummary
-                    expandIcon={<ExpandMore />}
-                    sx={{
-                      py: 1,
-                      "& .MuiAccordionSummary-content": { my: 2 },
-                    }}
-                  >
-                    <Typography variant="h6" fontWeight="600">
-                      {faq.question}
-                    </Typography>
-                  </AccordionSummary>
-                  <AccordionDetails sx={{ pt: 0, pb: 3 }}>
-                    <Typography
-                      variant="body1"
-                      color="text.secondary"
-                      sx={{ lineHeight: 1.8 }}
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            {[leftFaqs, rightFaqs].map((faqColumn, columnIndex) => (
+              <Grid size={{ xs: 12, md: 6 }} key={`faq-column-${columnIndex}`}>
+                {faqColumn.map((faq, index) => {
+                  const originalIndex =
+                    columnIndex === 0 ? index * 2 : index * 2 + 1;
+                  return (
+                    <Grow
+                      key={faq.question}
+                      in={checked}
+                      style={{ transformOrigin: "0 0 0" }}
+                      {...(checked
+                        ? { timeout: 300 + originalIndex * 100 }
+                        : {})}
                     >
-                      {faq.answer}
-                    </Typography>
-                  </AccordionDetails>
-                </Accordion>
-              </Grow>
+                      <Accordion
+                        elevation={0}
+                        sx={{
+                          mb: 2,
+                          border: "1px solid",
+                          borderColor: "divider",
+                          borderRadius: "12px !important",
+                          "&:before": { display: "none" },
+                          "&.Mui-expanded": {
+                            borderColor: "primary.main",
+                            boxShadow: 2,
+                          },
+                        }}
+                      >
+                        <AccordionSummary
+                          expandIcon={<ExpandMore />}
+                          sx={{
+                            py: 1,
+                            "& .MuiAccordionSummary-content": { my: 2 },
+                          }}
+                        >
+                          <Typography variant="h6" fontWeight="600">
+                            {faq.question}
+                          </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ pt: 0, pb: 3 }}>
+                          <Typography
+                            variant="body1"
+                            color="text.secondary"
+                            sx={{ lineHeight: 1.8 }}
+                          >
+                            {faq.answer}
+                          </Typography>
+                        </AccordionDetails>
+                      </Accordion>
+                    </Grow>
+                  );
+                })}
+              </Grid>
             ))}
-          </Box>
+          </Grid>
 
           <Box textAlign="center" mt={6}>
             <Typography variant="body1" color="text.secondary" gutterBottom>

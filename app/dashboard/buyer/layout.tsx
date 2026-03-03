@@ -36,11 +36,11 @@ import {
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useInitializeUser } from "@/lib/hooks";
+import { isBuyerOnboardingFlowComplete } from "@/lib/buyerOnboarding";
 
 interface UserDashboardProps {
   children: React.ReactNode;
@@ -57,6 +57,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
   const [subMenuVisible, setSubMenuVisible] = useState(false);
   let subMenuTimeout: NodeJS.Timeout;
@@ -67,6 +68,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       router.replace("/auth/sign-in");
     }
   }, [status, userLoading, currentUser, router]);
+
+  useEffect(() => {
+    if (status === "loading" || userLoading || !currentUser) return;
+
+    if (currentUser.role !== "buyer") return;
+
+    const onboardingFlowComplete = isBuyerOnboardingFlowComplete(
+      currentUser.email,
+    );
+
+    if (!onboardingFlowComplete) {
+      router.replace("/buyer-onboarding");
+    }
+  }, [status, userLoading, currentUser, pathname, router]);
 
   const avatarSrc = currentUser?.image || "";
   const displayName = currentUser?.name || "User";
@@ -119,7 +134,18 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   // const subMenuOpen = Boolean(subMenuAnchorEl);
 
   if (status === "loading" || userLoading) {
-    return <LoadingComponent />;
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
@@ -379,7 +405,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
       >
-        <LoadingComponent />
+        <CircularProgress color="inherit" />
       </Backdrop>
     </Box>
   );

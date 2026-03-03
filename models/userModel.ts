@@ -16,16 +16,6 @@ import {
  */
 const UserSchema: Schema = new Schema<IUser>(
   {
-    username: {
-      type: String,
-      unique: true,
-      sparse: true,
-      validate: {
-        validator: (v: string) => !v || /^[a-zA-Z0-9_]{3,30}$/.test(v),
-        message:
-          "Username must be 3-30 characters and contain only letters, numbers, and underscores",
-      },
-    },
     name: {
       type: String,
       required: [true, "Name is required"],
@@ -46,6 +36,44 @@ const UserSchema: Schema = new Schema<IUser>(
     businessName: {
       type: String,
       maxlength: [150, "Business name cannot exceed 150 characters"],
+    },
+    businessEmail: {
+      type: String,
+      lowercase: true,
+      validate: {
+        validator: (v: string) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        message: "Invalid business email format",
+      },
+    },
+    businessPhone: {
+      type: String,
+      validate: {
+        validator: (v: string) => !v || /^\+?[1-9]\d{1,14}$/.test(v),
+        message: "Invalid business phone format",
+      },
+    },
+    businessWebsite: {
+      type: String,
+      validate: {
+        validator: (v: string) => !v || /^https?:\/\/.+/.test(v),
+        message: "Invalid business website URL",
+      },
+    },
+    companyDescription: {
+      type: String,
+      maxlength: [1000, "Company description cannot exceed 1000 characters"],
+    },
+    industryNiche: {
+      type: String,
+      maxlength: [120, "Industry/Niche cannot exceed 120 characters"],
+    },
+    businessAddress: {
+      addressLine1: { type: String, maxlength: 150 },
+      addressLine2: { type: String, maxlength: 150 },
+      city: { type: String, maxlength: 80 },
+      state: { type: String, maxlength: 80 },
+      country: { type: String, maxlength: 80 },
+      postCode: { type: String, maxlength: 20 },
     },
     loginlink: {
       type: String,
@@ -192,7 +220,7 @@ const UserSchema: Schema = new Schema<IUser>(
 /**
  * Database Indexes
  * Optimizes queries on frequently accessed fields
- * Note: email and username already have unique indexes defined at field level
+ * Note: email already has a unique index defined at field level
  */
 
 // Role-based queries

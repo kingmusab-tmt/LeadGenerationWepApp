@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Lead } from "@/models/leads";
 import { Buyer } from "@/models/leadbuyers";
 import { Transaction } from "@/models/transactions";
+import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Types } from "mongoose";
@@ -131,6 +132,9 @@ export async function POST(req: NextRequest) {
 
     await buyer.save();
 
+    // Fetch seller details for transaction record
+    const seller = await User.findById(buyer.registeredWith);
+
     // Create a transaction record
     const transaction = new Transaction({
       type: "lead_purchase",
@@ -141,6 +145,11 @@ export async function POST(req: NextRequest) {
       metadata: {
         leadId: lead._id,
         sellerId: buyer.registeredWith,
+        sellerName: seller?.name || "Unknown",
+        sellerEmail: seller?.email || "N/A",
+        buyerId: buyer._id,
+        buyerName: buyer.name || "Unknown",
+        buyerEmail: buyer.email || "N/A",
         unitsPurchased: unitCost,
       },
       status: "completed",

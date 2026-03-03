@@ -109,6 +109,9 @@ export async function POST(req: Request) {
       stripeAccountId: seller.stripeAccountId,
       metadata: {
         stripeTransferId: transfer.id,
+        sellerId: session.user.id,
+        sellerName: seller.name || "Unknown",
+        sellerEmail: seller.email || "N/A",
       },
     });
 

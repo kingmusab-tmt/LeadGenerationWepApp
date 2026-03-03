@@ -11,10 +11,18 @@ import {
   Divider,
   useTheme,
   Link as MuiLink,
+  IconButton,
 } from "@mui/material";
 import Link from "next/link";
 import Image from "next/image";
 import logo from "../../../public/BRIXCOT.png";
+import {
+  FaFacebook,
+  FaTwitter,
+  FaLinkedin,
+  FaInstagram,
+  FaYoutube,
+} from "react-icons/fa";
 
 // Footer Component
 const Footer = () => {
@@ -47,7 +55,7 @@ const Footer = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               The complete solution for modern lead management and distribution.
             </Typography>
-            <Button
+            {/* <Button
               variant="contained"
               color="primary"
               component={Link}
@@ -55,14 +63,14 @@ const Footer = () => {
               sx={{ mt: 1 }}
             >
               Request Demo
-            </Button>
+            </Button> */}
           </Grid>
           <Grid size={{ xs: 6, md: 2 }}>
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>
               Product
             </Typography>
             <List dense>
-              {["Features", "Pricing", "Integrations"].map((text) => (
+              {["Features", "Pricing"].map((text) => (
                 <ListItem key={text} disableGutters>
                   <MuiLink
                     component={Link}
@@ -85,7 +93,7 @@ const Footer = () => {
               Resources
             </Typography>
             <List dense>
-              {["Documentation", "Blog", "Support"].map((text) => (
+              {["Blog", "Contact"].map((text) => (
                 <ListItem key={text} disableGutters>
                   <MuiLink
                     component={Link}
@@ -126,7 +134,119 @@ const Footer = () => {
             </Box>
           </Grid>
         </Grid>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 1,
+            mt: 3,
+          }}
+        >
+          {[
+            {
+              href: "https://facebook.com",
+              icon: <FaFacebook size={18} />,
+              label: "Facebook",
+            },
+            {
+              href: "https://twitter.com",
+              icon: <FaTwitter size={18} />,
+              label: "Twitter",
+            },
+            {
+              href: "https://linkedin.com",
+              icon: <FaLinkedin size={18} />,
+              label: "LinkedIn",
+            },
+            {
+              href: "https://instagram.com",
+              icon: <FaInstagram size={18} />,
+              label: "Instagram",
+            },
+            {
+              href: "https://youtube.com",
+              icon: <FaYoutube size={18} />,
+              label: "YouTube",
+            },
+          ].map((social) => (
+            <IconButton
+              key={social.label}
+              component="a"
+              href={social.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={social.label}
+              sx={{
+                color: "text.secondary",
+                "&:hover": {
+                  color: "primary.main",
+                  backgroundColor: "action.hover",
+                },
+              }}
+            >
+              {social.icon}
+            </IconButton>
+          ))}
+        </Box>
         <Divider sx={{ my: 4 }} />
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: { xs: 1.5, md: 2.5 },
+            mb: 3,
+          }}
+        >
+          {[
+            { label: "Legal", href: "/legal" },
+            { label: "Terms of Service", href: "/terms-of-service" },
+            { label: "Privacy Information", href: "/privacy-information" },
+            {
+              label: "Responsible Disclosure",
+              href: "/responsible-disclosure",
+            },
+            { label: "Trust", href: "/trust" },
+            { label: "Cookie Preferences", href: "/cookie-preferences" },
+            { label: "Your Privacy Choices", href: "/your-privacy-choices" },
+          ].map((linkItem) => (
+            <MuiLink
+              key={linkItem.href}
+              component={Link}
+              href={linkItem.href}
+              color="text.secondary"
+              underline="hover"
+              sx={{
+                fontSize: "0.85rem",
+                transition: "color 0.2s",
+                "&:hover": { color: "primary.main" },
+              }}
+            >
+              {linkItem.label}
+            </MuiLink>
+          ))}
+          <MuiLink
+            component="button"
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(new Event("open-cookie-preferences"))
+            }
+            color="text.secondary"
+            underline="hover"
+            sx={{
+              fontSize: "0.85rem",
+              transition: "color 0.2s",
+              border: "none",
+              background: "none",
+              padding: 0,
+              cursor: "pointer",
+              "&:hover": { color: "primary.main" },
+            }}
+          >
+            Cookie Settings
+          </MuiLink>
+        </Box>
         <Box
           sx={{
             display: "flex",
@@ -135,20 +255,23 @@ const Footer = () => {
             alignItems: "center",
             gap: 1,
             textAlign: { xs: "center", md: "left" },
+            px: { xs: 2, md: 3 },
+            py: 2,
+            borderRadius: 2,
+            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.dark} 100%)`,
           }}
         >
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: "common.white" }}>
             © {new Date().getFullYear()} BRIXCOT. All rights reserved.
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: "common.white" }}>
             Developed by{" "}
             <MuiLink
               href="https://triplemultipurposetechnology.com.ng"
               target="_blank"
               rel="noopener noreferrer"
-              color="primary.main"
+              sx={{ color: "common.white", fontWeight: 700 }}
               underline="hover"
-              fontWeight={600}
             >
               Triple Multipurpose Technology
             </MuiLink>

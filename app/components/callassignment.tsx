@@ -8,8 +8,9 @@ import {
   Button,
   Snackbar,
   Alert,
+  Box,
+  CircularProgress,
 } from "@mui/material";
-import LoadingComponent from "./generalComponent/loadingcomponent";
 
 interface LeadBuyer {
   _id: string;
@@ -57,7 +58,19 @@ export default function SellerDashboard() {
       });
   };
 
-  if (loading) return <LoadingComponent />;
+  if (loading)
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "50vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
 
   return (
     <>

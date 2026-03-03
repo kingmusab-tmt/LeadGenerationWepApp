@@ -43,7 +43,13 @@ interface SettingsData {
   callChargeOptions: CallChargeOption[];
 }
 
-const UnitPricingComponent: React.FC = () => {
+type UnitPricingComponentProps = {
+  onSaveHandlerReady?: ((saveHandler: () => Promise<boolean>) => void) | null;
+};
+
+const UnitPricingComponent: React.FC<UnitPricingComponentProps> = ({
+  onSaveHandlerReady,
+}) => {
   const fetchWithCSRF = useCSRFFetch();
   const [settings, setSettings] = useState<SettingsData>({
     unitPricingOptions: [],
@@ -289,6 +295,34 @@ const UnitPricingComponent: React.FC = () => {
     }
     setOpenDialog(true);
   };
+
+  const handleNextValidation = async (): Promise<boolean> => {
+    if (isSaving) {
+      setSnackbar({
+        open: true,
+        message: "Please wait for the current save to finish.",
+        severity: "warning",
+      });
+      return false;
+    }
+
+    if (openDialog) {
+      setSnackbar({
+        open: true,
+        message:
+          "Please finish or cancel the open pricing edit before continuing.",
+        severity: "warning",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  useEffect(() => {
+    if (!onSaveHandlerReady) return;
+    onSaveHandlerReady(handleNextValidation);
+  }, [onSaveHandlerReady, openDialog, isSaving]);
 
   return (
     <Paper sx={{ p: 2 }}>

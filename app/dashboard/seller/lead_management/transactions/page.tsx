@@ -167,148 +167,238 @@ const TransactionHistory = () => {
   const handleDownload = async () => {
     if (!selectedTransaction) return;
 
+    // Get user details from stored metadata (captured at transaction time)
+    const getSellerDisplay = () => ({
+      name: selectedTransaction.metadata.sellerName || "N/A",
+      email: selectedTransaction.metadata.sellerEmail || "N/A",
+    });
+
+    const getBuyerDisplay = () => ({
+      name: selectedTransaction.metadata.buyerName || "N/A",
+      email: selectedTransaction.metadata.buyerEmail || "N/A",
+    });
+
     // Create canvas
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Responsive canvas sizing
-    const canvasWidth = isMobile ? 400 : 800;
-    const canvasHeight = isMobile ? 500 : 600;
+    // Canvas dimensions
+    const canvasWidth = isMobile ? 450 : 700;
+    const canvasHeight = isMobile ? 650 : 750;
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
 
-    // Canvas styling
+    // Background
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#000000";
-    ctx.font = isMobile ? "14px Arial" : "20px Arial";
-    ctx.textAlign = "left";
 
-    // Base transaction details
-    let transactionDetails = `
-    Transaction ID: ${selectedTransaction._id}
-    Type: ${selectedTransaction.type}
-    Amount: ${selectedTransaction.amount} ${selectedTransaction.currency}
-    Status: ${selectedTransaction.status}
-    Date: ${new Date(selectedTransaction.createdAt).toLocaleString()}
-    Payment Gateway: ${selectedTransaction.paymentGateway || "N/A"}
-  `;
+    // Header background
+    ctx.fillStyle = "#1976d2";
+    ctx.fillRect(0, 0, canvas.width, isMobile ? 100 : 120);
 
-    // Add metadata based on transaction type
-    switch (selectedTransaction.type) {
-      case "lead_purchase":
-        transactionDetails += `
-        Lead ID: ${selectedTransaction.metadata.leadId || "N/A"}
-        Buyer ID: ${selectedTransaction.metadata.buyerId || "N/A"}
-      `;
-        break;
+    // Load and draw logo
+    const logo = new Image();
+    logo.crossOrigin = "anonymous";
+    logo.src = "/BRIXCOT.png";
 
-      case "units_purchase":
-        transactionDetails += `
-        Units Purchased: ${selectedTransaction.metadata.unitsPurchased || "N/A"}
-        Buyer ID: ${selectedTransaction.metadata.buyerId || "N/A"}
-      `;
-        break;
-
-      case "seller_income":
-        transactionDetails += `
-        Seller ID: ${selectedTransaction.metadata.sellerId || "N/A"}
-        Payout ID: ${selectedTransaction.metadata.payoutId || "N/A"}
-      `;
-        break;
-
-      case "seller_payout":
-        transactionDetails += `
-        Seller ID: ${selectedTransaction.metadata.sellerId || "N/A"}
-        Payout ID: ${selectedTransaction.metadata.payoutId || "N/A"}
-      `;
-        break;
-
-      case "refund":
-        transactionDetails += `
-        Refund Reason: ${selectedTransaction.metadata.refundReason || "N/A"}
-        ${
-          selectedTransaction.metadata.buyerId
-            ? `Buyer ID: ${selectedTransaction.metadata.buyerId}`
-            : ""
-        }
-        ${
-          selectedTransaction.metadata.sellerId
-            ? `Seller ID: ${selectedTransaction.metadata.sellerId}`
-            : ""
-        }
-      `;
-        break;
-
-      case "subscription_payment":
-      case "subscription_renewal":
-        transactionDetails += `
-        Subscription Plan: ${
-          selectedTransaction.metadata.subscriptionPlan || "N/A"
-        }
-        Duration: ${selectedTransaction.metadata.subscriptionDuration || "N/A"}
-        Tier: ${selectedTransaction.metadata.tierName || "N/A"}
-        User Email: ${selectedTransaction.metadata.userEmail || "N/A"}
-      `;
-        break;
-
-      case "admin_adjustment":
-        transactionDetails += `
-        Admin Note: ${selectedTransaction.metadata.adminNote || "N/A"}
-        User: ${selectedTransaction.metadata.userEmail || "N/A"}
-      `;
-        break;
-    }
-
-    // Add balance information
-    transactionDetails += `
-    Previous Balance: ${selectedTransaction.previousBalance}
-    Current Balance: ${selectedTransaction.currentBalance}
-  `;
-
-    // Draw text on canvas with responsive positioning
-    const lines = transactionDetails.split("\n");
-    const lineHeight = isMobile ? 20 : 30;
-    let y = isMobile ? 30 : 50;
-    const x = isMobile ? 20 : 50;
-
-    lines.forEach((line) => {
-      if (line.trim()) {
-        // Handle text wrapping for mobile
-        if (isMobile && line.length > 40) {
-          const chunks = line.match(/.{1,40}/g) || [];
-          chunks.forEach((chunk) => {
-            ctx.fillText(chunk.trim(), x, y);
-            y += lineHeight;
-          });
-        } else {
-          ctx.fillText(line.trim(), x, y);
-          y += lineHeight;
-        }
-      }
+    await new Promise<void>((resolve) => {
+      logo.onload = () => resolve();
+      logo.onerror = () => resolve();
+      setTimeout(() => resolve(), 2000);
     });
 
-    // Add border
-    ctx.strokeStyle = "#dddddd";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+    const logoSize = isMobile ? 60 : 80;
+    const logoX = (canvasWidth - logoSize) / 2;
+    const logoY = isMobile ? 10 : 10;
 
-    // Convert to JPG and download
+    if (logo.complete && logo.naturalWidth > 0) {
+      ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+    }
+
+    // Receipt title
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${isMobile ? "16px" : "20px"} Arial`;
+    ctx.textAlign = "center";
+    ctx.fillText("TRANSACTION RECEIPT", canvasWidth / 2, isMobile ? 85 : 105);
+
+    // Content area
+    const startY = isMobile ? 120 : 140;
+    const padding = isMobile ? 20 : 40;
+    const labelX = padding;
+    const valueX = isMobile ? 160 : 220;
+    const lineHeight = isMobile ? 24 : 30;
+    let currentY = startY;
+
+    const drawRow = (label: string, value: string, isHeader = false) => {
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#666666";
+      ctx.font = `${isMobile ? "12px" : "14px"} Arial`;
+      ctx.fillText(label, labelX, currentY);
+
+      ctx.fillStyle = isHeader ? "#1976d2" : "#333333";
+      ctx.font = `${isHeader ? "bold " : ""}${isMobile ? "12px" : "14px"} Arial`;
+      ctx.fillText(value, valueX, currentY);
+      currentY += lineHeight;
+    };
+
+    const drawSectionHeader = (title: string) => {
+      currentY += 10;
+      ctx.fillStyle = "#1976d2";
+      ctx.font = `bold ${isMobile ? "13px" : "15px"} Arial`;
+      ctx.textAlign = "left";
+      ctx.fillText(title, labelX, currentY);
+      currentY += 8;
+      ctx.strokeStyle = "#e0e0e0";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(labelX, currentY);
+      ctx.lineTo(canvasWidth - padding, currentY);
+      ctx.stroke();
+      currentY += 15;
+    };
+
+    // Transaction Info Section
+    drawSectionHeader("Transaction Details");
+    drawRow(
+      "Transaction ID:",
+      selectedTransaction._id.slice(-12).toUpperCase(),
+      true,
+    );
+    drawRow("Type:", selectedTransaction.type.replace(/_/g, " ").toUpperCase());
+    drawRow("Status:", selectedTransaction.status.toUpperCase());
+    drawRow("Date:", new Date(selectedTransaction.createdAt).toLocaleString());
+    drawRow("Payment Gateway:", selectedTransaction.paymentGateway || "N/A");
+
+    // Amount Section
+    drawSectionHeader("Amount");
+    const currencySymbol =
+      selectedTransaction.currency === "usd"
+        ? "$"
+        : selectedTransaction.currency?.toUpperCase() || "";
+    drawRow(
+      "Amount:",
+      `${currencySymbol}${selectedTransaction.amount.toFixed(2)}`,
+      true,
+    );
+    drawRow("Previous Balance:", `${selectedTransaction.previousBalance}`);
+    drawRow("Current Balance:", `${selectedTransaction.currentBalance}`);
+
+    // Metadata Section based on transaction type
+    drawSectionHeader("Additional Information");
+
+    switch (selectedTransaction.type) {
+      case "lead_purchase": {
+        drawRow(
+          "Lead ID:",
+          String(selectedTransaction.metadata.leadId || "N/A"),
+        );
+        const buyer = getBuyerDisplay();
+        drawRow("Buyer Name:", buyer.name);
+        drawRow("Buyer Email:", buyer.email);
+        break;
+      }
+      case "units_purchase": {
+        drawRow(
+          "Units Purchased:",
+          String(selectedTransaction.metadata.unitsPurchased || "N/A"),
+        );
+        const buyer = getBuyerDisplay();
+        drawRow("Buyer Name:", buyer.name);
+        drawRow("Buyer Email:", buyer.email);
+        break;
+      }
+      case "seller_income":
+      case "seller_payout": {
+        const seller = getSellerDisplay();
+        drawRow("Seller Name:", seller.name);
+        drawRow("Seller Email:", seller.email);
+        drawRow("Payout ID:", selectedTransaction.metadata.payoutId || "N/A");
+        break;
+      }
+      case "refund": {
+        drawRow(
+          "Refund Reason:",
+          selectedTransaction.metadata.refundReason || "N/A",
+        );
+        if (
+          selectedTransaction.metadata.buyerName ||
+          selectedTransaction.metadata.buyerEmail
+        ) {
+          const buyer = getBuyerDisplay();
+          drawRow("Buyer Name:", buyer.name);
+          drawRow("Buyer Email:", buyer.email);
+        }
+        if (
+          selectedTransaction.metadata.sellerName ||
+          selectedTransaction.metadata.sellerEmail
+        ) {
+          const seller = getSellerDisplay();
+          drawRow("Seller Name:", seller.name);
+          drawRow("Seller Email:", seller.email);
+        }
+        break;
+      }
+      case "subscription_payment":
+      case "subscription_renewal": {
+        drawRow(
+          "Subscription Plan:",
+          selectedTransaction.metadata.subscriptionPlan || "N/A",
+        );
+        drawRow(
+          "Duration:",
+          selectedTransaction.metadata.subscriptionDuration || "N/A",
+        );
+        drawRow("Tier:", selectedTransaction.metadata.tierName || "N/A");
+        drawRow("User Email:", selectedTransaction.metadata.userEmail || "N/A");
+        break;
+      }
+      case "admin_adjustment": {
+        drawRow("Admin Note:", selectedTransaction.metadata.adminNote || "N/A");
+        drawRow("User Email:", selectedTransaction.metadata.userEmail || "N/A");
+        break;
+      }
+    }
+
+    // Footer
+    currentY = canvasHeight - 50;
+    ctx.fillStyle = "#f5f5f5";
+    ctx.fillRect(0, currentY - 10, canvasWidth, 60);
+
+    ctx.fillStyle = "#888888";
+    ctx.font = `${isMobile ? "10px" : "12px"} Arial`;
+    ctx.textAlign = "center";
+    ctx.fillText(
+      "Thank you for your business!",
+      canvasWidth / 2,
+      currentY + 10,
+    );
+    ctx.fillText(
+      `Generated on ${new Date().toLocaleDateString()}`,
+      canvasWidth / 2,
+      currentY + 28,
+    );
+
+    // Border
+    ctx.strokeStyle = "#e0e0e0";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, canvasWidth - 2, canvasHeight - 2);
+
+    // Convert to PNG and download
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
-
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `transaction-${selectedTransaction._id}.jpg`;
+        link.download = `receipt-${selectedTransaction._id.slice(-8)}.png`;
         link.click();
         URL.revokeObjectURL(url);
       },
-      "image/jpeg",
-      0.9,
+      "image/png",
+      1.0,
     );
+    handleMenuClose();
   };
 
   const getTypeIcon = (type: string) => {

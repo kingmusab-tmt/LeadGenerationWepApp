@@ -28,6 +28,7 @@ import {
   ListItemText,
   ListItemAvatar,
   Grid,
+  CircularProgress,
 } from "@mui/material";
 import { Container } from "@mui/material";
 import {
@@ -37,7 +38,6 @@ import {
   ShoppingCart,
   Person,
 } from "@mui/icons-material";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 
 interface Lead {
   _id: string;
@@ -298,14 +298,18 @@ const BuyerLeads: React.FC = () => {
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }
 
   return (
     <Container sx={{ mt: 8, mb: 4 }}>
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold", mb: 3 }}>
+      <Typography
+        variant="h5"
+        gutterBottom
+        sx={{ fontWeight: "bold", mb: 3, color: "primary.main" }}
+      >
         Lead Marketplace
       </Typography>
 
@@ -450,7 +454,7 @@ const BuyerLeads: React.FC = () => {
                             disabled={purchaseLoading}
                           >
                             {purchaseLoading ? (
-                              <LoadingComponent />
+                              <CircularProgress size={24} color="inherit" />
                             ) : (
                               "Purchase"
                             )}

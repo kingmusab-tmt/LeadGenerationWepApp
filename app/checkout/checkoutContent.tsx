@@ -32,7 +32,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { useInitializeUser } from "@/lib/hooks";
 import { useSession } from "next-auth/react";
-import Head from "next/head";
 import axios from "axios";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
@@ -382,10 +381,6 @@ const CheckoutContent = () => {
 
   return (
     <>
-      <Head>
-        <title>Checkout | {tier.name} Plan</title>
-      </Head>
-
       <Container maxWidth="md" sx={{ py: 6 }}>
         <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 6 }}>
           <Step>

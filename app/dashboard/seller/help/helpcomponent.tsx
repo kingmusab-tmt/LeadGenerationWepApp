@@ -24,17 +24,8 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
-import {
-  PlayCircle,
-  Search,
-  ContactSupport,
-  SupportAgent,
-  Chat,
-  CheckCircle,
-} from "@mui/icons-material";
+import { PlayCircle, Search, Chat } from "@mui/icons-material";
 import axios from "axios";
-import TicketForm from "@/app/components/generalComponent/ticketForm";
-import TicketStatusForm from "@/app/components/generalComponent/TicketStatusForm";
 import TawkChatWidget from "@/app/components/generalComponent/livechat";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 
@@ -143,20 +134,6 @@ const HelpSection = () => {
 
   const handleQuickHelpClick = (action: string) => {
     switch (action) {
-      case "submit":
-        setModalContent({
-          title: "Submit Support Ticket",
-          component: <TicketForm />,
-        });
-        setOpenModal(true);
-        break;
-      case "status":
-        setModalContent({
-          title: "Check Ticket Status",
-          component: <TicketStatusForm />,
-        });
-        setOpenModal(true);
-        break;
       case "chat":
         setShowChatWidget(true);
         break;
@@ -351,26 +328,6 @@ const HelpSection = () => {
                 <CardHeader title="Quick Help" />
                 <CardContent>
                   <List>
-                    <ListItem>
-                      <Button
-                        startIcon={<ContactSupport />}
-                        fullWidth
-                        sx={{ justifyContent: "flex-start" }}
-                        onClick={() => handleQuickHelpClick("submit")}
-                      >
-                        Submit Ticket
-                      </Button>
-                    </ListItem>
-                    <ListItem>
-                      <Button
-                        startIcon={<CheckCircle />}
-                        fullWidth
-                        sx={{ justifyContent: "flex-start" }}
-                        onClick={() => handleQuickHelpClick("status")}
-                      >
-                        Follow-Up Ticket Status
-                      </Button>
-                    </ListItem>
                     {limits?.liveSupport && (
                       <ListItem>
                         <Button

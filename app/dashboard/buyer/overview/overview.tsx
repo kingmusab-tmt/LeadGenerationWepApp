@@ -15,11 +15,11 @@ import {
   Skeleton,
   Card,
   CardContent,
+  CircularProgress,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import UserDashboard from "../layout";
 import { useRouter } from "next/navigation";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import {
   AccountCircle,
   Email,
@@ -152,7 +152,7 @@ const Overview: React.FC = () => {
           height: "50vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }

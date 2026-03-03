@@ -32,7 +32,17 @@ interface StripeAccountStatus {
   };
 }
 
-export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
+interface StripeOnboardingProps {
+  userEmail: string;
+  onSaveHandlerReady?: ((saveHandler: () => Promise<boolean>) => void) | null;
+  onConnectionStatusChange?: ((isFullyConnected: boolean) => void) | null;
+}
+
+export default function StripeOnboarding({
+  userEmail,
+  onSaveHandlerReady,
+  onConnectionStatusChange,
+}: StripeOnboardingProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountStatus, setAccountStatus] =
@@ -170,6 +180,49 @@ export default function StripeOnboarding({ userEmail }: { userEmail: string }) {
       setDashboardLoading(false);
     }
   };
+
+  const handleNextValidation = async (): Promise<boolean> => {
+    if (loading || dashboardLoading) {
+      setError("Please wait for Stripe status checks to complete.");
+      return false;
+    }
+
+    const isFullyEnabled = Boolean(
+      accountStatus?.chargesEnabled && accountStatus?.payoutsEnabled,
+    );
+
+    if (!isFullyEnabled) {
+      setError(
+        "Please complete Stripe onboarding and ensure payouts are enabled before continuing.",
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  useEffect(() => {
+    if (!onSaveHandlerReady) return;
+    onSaveHandlerReady(handleNextValidation);
+  }, [
+    onSaveHandlerReady,
+    loading,
+    dashboardLoading,
+    accountStatus?.chargesEnabled,
+    accountStatus?.payoutsEnabled,
+  ]);
+
+  useEffect(() => {
+    if (!onConnectionStatusChange) return;
+    const isFullyConnected = Boolean(
+      accountStatus?.chargesEnabled && accountStatus?.payoutsEnabled,
+    );
+    onConnectionStatusChange(isFullyConnected);
+  }, [
+    onConnectionStatusChange,
+    accountStatus?.chargesEnabled,
+    accountStatus?.payoutsEnabled,
+  ]);
 
   const renderRequirements = () => {
     if (!accountStatus) return null;

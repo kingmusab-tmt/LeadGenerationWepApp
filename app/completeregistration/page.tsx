@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import {
   Box,
   Button,
@@ -15,8 +15,15 @@ import {
   Grid,
   Avatar,
   useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
+  CircularProgress,
 } from "@mui/material";
-import LoadingComponent from "../components/generalComponent/loadingcomponent";
 import Image from "next/image";
 import CompanyLogo from "../../public/images/5ae9cfb6c909a_thumb900.png";
 import {
@@ -29,11 +36,30 @@ import { useCSRF, useCSRFFetch } from "@/app/hooks/useCSRF";
 
 type UserRole = "user" | "seller" | "buyer" | "business-admin" | "staff";
 
+type LeadSellerContact = {
+  id: string;
+  name: string;
+  businessName?: string;
+  email: string;
+};
+
 const RoleSelectionPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [trialIntent, setTrialIntent] = useState(false);
+  const [showSellerContacts, setShowSellerContacts] = useState(false);
+  const [cancelRegistrationLoading, setCancelRegistrationLoading] =
+    useState(false);
+  const [buyerPreRegBlocked, setBuyerPreRegBlocked] = useState<{
+    open: boolean;
+    message: string;
+    sellers: LeadSellerContact[];
+  }>({
+    open: false,
+    message: "",
+    sellers: [],
+  });
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -82,11 +108,11 @@ const RoleSelectionPage: React.FC = () => {
         (role === "seller" || role === "business-admin") &&
         isSubActive
       ) {
-        router.replace("/dashboard/seller/overview");
+        router.replace("/seller-onboarding");
       } else if (role === "seller" || role === "business-admin") {
         router.replace("/plan");
       } else if (role === "buyer" || role === "staff") {
-        router.replace("/dashboard/buyer/overview");
+        router.replace("/buyer-onboarding");
       }
     }
   }, [session, status, router, isRedirecting]);
@@ -129,8 +155,8 @@ const RoleSelectionPage: React.FC = () => {
             // Small delay so user sees the success message
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
-            // Redirect to dashboard since trial is now active
-            router.push("/dashboard/seller/overview");
+            // Redirect to onboarding page before dashboard access
+            router.push("/seller-onboarding");
             return;
           } else {
             // Trial failed (possibly already used), redirect to plan page
@@ -154,7 +180,7 @@ const RoleSelectionPage: React.FC = () => {
 
     // Redirect other roles to their dashboards
     const dashboardPaths: Record<string, string> = {
-      buyer: "/dashboard/buyer/overview",
+      buyer: "/buyer-onboarding",
       staff: "/dashboard/staff/overview",
     };
 
@@ -205,6 +231,19 @@ const RoleSelectionPage: React.FC = () => {
         await redirectBasedOnRole(role);
       } else {
         const errorData = await response.json();
+
+        if (errorData?.code === "BUYER_PRE_REG_REQUIRED" && role === "buyer") {
+          setBuyerPreRegBlocked({
+            open: true,
+            message:
+              errorData.message ||
+              "You must be registered first by a lead seller before you can use the platform as a buyer.",
+            sellers: Array.isArray(errorData.sellers) ? errorData.sellers : [],
+          });
+          setShowSellerContacts(false);
+          return;
+        }
+
         setSnackbar({
           open: true,
           message:
@@ -221,6 +260,33 @@ const RoleSelectionPage: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelRegistration = async () => {
+    setCancelRegistrationLoading(true);
+    try {
+      const response = await fetchWithCSRF("/api/users/type", {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || "Failed to cancel registration.");
+      }
+
+      await signOut({ callbackUrl: "/auth/sign-in" });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to cancel registration.",
+        severity: "error",
+      });
+    } finally {
+      setCancelRegistrationLoading(false);
     }
   };
 
@@ -253,7 +319,7 @@ const RoleSelectionPage: React.FC = () => {
           minHeight: "100vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }
@@ -464,7 +530,7 @@ const RoleSelectionPage: React.FC = () => {
         open={loading}
       >
         <Box textAlign="center">
-          <LoadingComponent />
+          <CircularProgress color="inherit" />
           <Typography variant="h6" sx={{ mt: 2 }}>
             {selectedRole
               ? `Setting up your ${selectedRole} access...`
@@ -472,6 +538,89 @@ const RoleSelectionPage: React.FC = () => {
           </Typography>
         </Box>
       </Backdrop>
+
+      <Dialog
+        open={buyerPreRegBlocked.open}
+        onClose={() =>
+          !cancelRegistrationLoading &&
+          setBuyerPreRegBlocked({ open: false, message: "", sellers: [] })
+        }
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Buyer Registration Requirement</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {buyerPreRegBlocked.message}
+          </Typography>
+
+          <Box
+            sx={{
+              mb: 2,
+              p: 1.5,
+              borderRadius: 1,
+              bgcolor: "warning.lighter",
+              border: "1px solid",
+              borderColor: "warning.light",
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              Why am I seeing this?
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Buyer access is only available to users who were first added by a
+              lead seller. Contact a lead seller to pre-register your email,
+              then return and select Buyer again.
+            </Typography>
+          </Box>
+
+          {showSellerContacts && (
+            <List sx={{ maxHeight: 280, overflow: "auto" }}>
+              {buyerPreRegBlocked.sellers.length > 0 ? (
+                buyerPreRegBlocked.sellers.map((seller) => (
+                  <ListItem key={seller.id} sx={{ px: 0 }}>
+                    <ListItemText
+                      primary={seller.businessName || seller.name}
+                      secondary={seller.email}
+                    />
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      component="a"
+                      href={`mailto:${seller.email}`}
+                    >
+                      Contact
+                    </Button>
+                  </ListItem>
+                ))
+              ) : (
+                <ListItem sx={{ px: 0 }}>
+                  <ListItemText primary="No lead sellers available right now." />
+                </ListItem>
+              )}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setShowSellerContacts((prev) => !prev)}
+            disabled={cancelRegistrationLoading}
+          >
+            View Existing Lead Sellers and Contact Them
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleCancelRegistration}
+            disabled={cancelRegistrationLoading}
+          >
+            {cancelRegistrationLoading
+              ? "Cancelling..."
+              : "Cancel Registration"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

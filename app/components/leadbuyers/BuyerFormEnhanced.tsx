@@ -26,11 +26,11 @@ import {
   AccordionDetails,
   Chip,
   Switch,
+  CircularProgress,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { IBuyer } from "@/models/leadbuyers";
 import { industryNiches } from "@/utils/industryNiches";
-import LoadingComponent from "../generalComponent/loadingcomponent";
 import GooglePlacesAutocomplete from "../GooglePlacesAutocomplete";
 import GoogleTimezoneAutocomplete from "../GoogleTimezoneAutocomplete";
 
@@ -1146,7 +1146,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <LoadingComponent />
+              <CircularProgress size={24} color="inherit" />
             ) : initialValues ? (
               "Save Changes"
             ) : (

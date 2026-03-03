@@ -88,22 +88,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await User.findOne({ email: session.user.email });
+    const updateQuery =
+      type === "unit"
+        ? {
+            $push: {
+              unitPricingOptions: { units: data.units, cost: data.cost! },
+            },
+          }
+        : {
+            $push: {
+              callChargeOptions: {
+                units: data.units,
+                seconds: data.seconds!,
+              },
+            },
+          };
+
+    const user = await User.findOneAndUpdate(
+      { email: session.user.email },
+      updateQuery,
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
+
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-
-    // Add the new option
-    if (type === "unit") {
-      user.unitPricingOptions.push({ units: data.units, cost: data.cost! });
-    } else {
-      user.callChargeOptions.push({
-        units: data.units,
-        seconds: data.seconds!,
-      });
-    }
-
-    await user.save();
 
     return NextResponse.json(
       {
@@ -141,7 +153,9 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const user = await User.findOne({ email: session.user.email });
+    const user = await User.findOne({ email: session.user.email }).select(
+      "unitPricingOptions callChargeOptions",
+    );
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -165,7 +179,18 @@ export async function PUT(req: NextRequest) {
           { status: 400 },
         );
       }
-      user.unitPricingOptions[index] = { units: data.units, cost: data.cost! };
+      await User.updateOne(
+        { email: session.user.email },
+        {
+          $set: {
+            [`unitPricingOptions.${index}`]: {
+              units: data.units,
+              cost: data.cost!,
+            },
+          },
+        },
+        { runValidators: true },
+      );
     } else if (type === "call") {
       if (index >= user.callChargeOptions.length) {
         return NextResponse.json(
@@ -184,24 +209,37 @@ export async function PUT(req: NextRequest) {
           { status: 400 },
         );
       }
-      user.callChargeOptions[index] = {
-        units: data.units,
-        seconds: data.seconds!,
-      };
+      await User.updateOne(
+        { email: session.user.email },
+        {
+          $set: {
+            [`callChargeOptions.${index}`]: {
+              units: data.units,
+              seconds: data.seconds!,
+            },
+          },
+        },
+        { runValidators: true },
+      );
     } else {
       return NextResponse.json(
         { error: "Invalid settings type." },
         { status: 400 },
       );
     }
+    const updatedUser = await User.findOne({
+      email: session.user.email,
+    }).select("unitPricingOptions callChargeOptions");
 
-    await user.save();
+    if (!updatedUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
     return NextResponse.json(
       {
         message: "Settings updated successfully",
-        unitPricingOptions: user.unitPricingOptions,
-        callChargeOptions: user.callChargeOptions,
+        unitPricingOptions: updatedUser.unitPricingOptions,
+        callChargeOptions: updatedUser.callChargeOptions,
       },
       { status: 200 },
     );
@@ -228,7 +266,9 @@ export async function DELETE(req: NextRequest) {
       index: number;
     };
 
-    const user = await User.findOne({ email: session.user.email });
+    const user = await User.findOne({ email: session.user.email }).select(
+      "unitPricingOptions callChargeOptions",
+    );
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -241,7 +281,15 @@ export async function DELETE(req: NextRequest) {
           { status: 400 },
         );
       }
-      user.unitPricingOptions.splice(index, 1);
+
+      const nextUnitPricingOptions = [...user.unitPricingOptions];
+      nextUnitPricingOptions.splice(index, 1);
+
+      await User.updateOne(
+        { email: session.user.email },
+        { $set: { unitPricingOptions: nextUnitPricingOptions } },
+        { runValidators: true },
+      );
     } else if (type === "call") {
       if (index < 0 || index >= user.callChargeOptions.length) {
         return NextResponse.json(
@@ -249,7 +297,15 @@ export async function DELETE(req: NextRequest) {
           { status: 400 },
         );
       }
-      user.callChargeOptions.splice(index, 1);
+
+      const nextCallChargeOptions = [...user.callChargeOptions];
+      nextCallChargeOptions.splice(index, 1);
+
+      await User.updateOne(
+        { email: session.user.email },
+        { $set: { callChargeOptions: nextCallChargeOptions } },
+        { runValidators: true },
+      );
     } else {
       return NextResponse.json(
         { error: "Invalid settings type." },
@@ -257,13 +313,19 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    await user.save();
+    const updatedUser = await User.findOne({
+      email: session.user.email,
+    }).select("unitPricingOptions callChargeOptions");
+
+    if (!updatedUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
     return NextResponse.json(
       {
         message: "Settings deleted successfully",
-        unitPricingOptions: user.unitPricingOptions,
-        callChargeOptions: user.callChargeOptions,
+        unitPricingOptions: updatedUser.unitPricingOptions,
+        callChargeOptions: updatedUser.callChargeOptions,
       },
       { status: 200 },
     );

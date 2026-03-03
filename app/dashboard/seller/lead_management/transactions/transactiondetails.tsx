@@ -47,7 +47,29 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
           Additional Details
         </Typography>
         <Grid container spacing={2}>
-          {/* Common Fields */}
+          {/* Buyer Name */}
+          {metadata.buyerName && (
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Typography variant="subtitle2" color="textSecondary">
+                Buyer Name
+              </Typography>
+              <Typography variant="body2" fontWeight="bold">
+                {metadata.buyerName}
+              </Typography>
+            </Grid>
+          )}
+          {/* Buyer Email */}
+          {metadata.buyerEmail && (
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Typography variant="subtitle2" color="textSecondary">
+                Buyer Email
+              </Typography>
+              <Typography variant="body2" noWrap>
+                {metadata.buyerEmail}
+              </Typography>
+            </Grid>
+          )}
+          {/* Buyer ID (for reference) */}
           {metadata.buyerId && (
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">

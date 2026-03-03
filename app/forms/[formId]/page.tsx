@@ -17,7 +17,13 @@ import {
   Fade,
   Skeleton,
 } from "@mui/material";
-import FormPreview from "@/app/components/leadcapture/FormPreview";
+import dynamic from "next/dynamic";
+
+const FormPreview = dynamic(
+  () => import("@/app/components/leadcapture/FormPreview"),
+  { ssr: false },
+);
+
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 
 interface Field {

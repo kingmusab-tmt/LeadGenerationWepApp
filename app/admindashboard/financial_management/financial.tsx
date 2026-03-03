@@ -33,6 +33,7 @@ import {
   Select,
   MenuItem,
   Alert,
+  CircularProgress,
 } from "@mui/material";
 import {
   Search,
@@ -48,7 +49,6 @@ import {
   Download,
   Visibility,
 } from "@mui/icons-material";
-import LoadingComponent from "@/app/components/generalComponent/loadingcomponent";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useNotification } from "@/lib/useNotification";
 
@@ -367,7 +367,7 @@ const FinancialManagement = () => {
           height: "50vh",
         }}
       >
-        <LoadingComponent />
+        <CircularProgress />
       </Box>
     );
   }
