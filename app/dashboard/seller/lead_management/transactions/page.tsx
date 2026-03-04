@@ -571,12 +571,13 @@ const TransactionHistory = () => {
           flexDirection={isMobile ? "column" : "row"}
           justifyContent="space-between"
           alignItems={isMobile ? "flex-start" : "center"}
-          gap={isMobile ? 2 : 0}
+          gap={isMobile ? 2 : 2}
+          flexWrap="wrap"
         >
           <Typography
-            variant={isMobile ? "h5" : "h5"}
+            variant="h5"
             component="h1"
-            sx={{ mt: 4, mb: 1, fontWeight: "bold", color: "primary.main" }}
+            sx={{ fontWeight: "bold", color: "primary.main" }}
           >
             Transaction History
           </Typography>

@@ -60,57 +60,7 @@ import LeadForm from "@/app/components/leadmanagement/leadform";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import { useConfirm } from "@/app/hooks/useConfirm";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-
-// ---------- Types ----------
-
-interface LeadField {
-  id: string;
-  label: string;
-  value: any;
-}
-
-interface Lead {
-  _id: string;
-  userId: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  company?: string;
-  industry?: string;
-  leadSource?: string;
-  aiQualityScore?: number;
-  qualityLevel?: "High" | "Medium" | "Low";
-  location?: {
-    city?: string;
-    state?: string;
-    country?: string;
-    zipCode?: string;
-  };
-  fields: LeadField[];
-  createdAt: string;
-  updatedAt?: string;
-  status:
-    | "new"
-    | "available"
-    | "sold"
-    | "assigned"
-    | "qualified"
-    | "unqualified"
-    | "transferred";
-  distributionMethod: "manual" | "round_robin" | "marketplace";
-  exclusive: boolean;
-  shared: boolean;
-  shareNumber: number;
-  unit: number;
-  isManual: boolean;
-  soldCount?: number;
-  assignedTo?: Array<{
-    buyerId: string;
-    accepted: boolean;
-    rejected: boolean;
-    assignedAt: string;
-  }>;
-}
+import { Lead, LeadField } from "@/types/lead";
 
 interface TabPanelProps {
   children?: React.ReactNode;

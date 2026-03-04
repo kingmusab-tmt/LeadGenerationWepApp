@@ -53,29 +53,7 @@ import {
 } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useNotification } from "@/lib/useNotification";
-
-interface Lead {
-  id: string;
-  status: "new" | "available" | "sold" | "assigned" | "flagged";
-  qualityScore: number;
-  qualityLevel: "High" | "Medium" | "Low";
-  source: string;
-  createdAt: string;
-  seller: {
-    id: string;
-    name: string;
-    email?: string;
-  };
-  buyer?: {
-    id: string;
-    name: string;
-    email?: string;
-  };
-  fields: {
-    label: string;
-    value: string;
-  }[];
-}
+import { AdminLead } from "@/types/lead";
 
 interface CallRecord {
   id: string;
@@ -104,7 +82,7 @@ const ContentVerification = () => {
   const csrfFetch = useCSRFFetch();
   const notify = useNotification();
   const [activeTab, setActiveTab] = useState(0);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [leads, setLeads] = useState<AdminLead[]>([]);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [leadPage, setLeadPage] = useState(0);
@@ -113,7 +91,7 @@ const ContentVerification = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [leadStatusFilter, setLeadStatusFilter] = useState<string>("all");
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedLead, setSelectedLead] = useState<AdminLead | null>(null);
   const [openCallDialog, setOpenCallDialog] = useState(false);
   const [openLeadDialog, setOpenLeadDialog] = useState(false);
 
@@ -171,7 +149,7 @@ const ContentVerification = () => {
     setOpenCallDialog(false);
   };
 
-  const handleOpenLeadDialog = (lead: Lead) => {
+  const handleOpenLeadDialog = (lead: AdminLead) => {
     setSelectedLead(lead);
     setOpenLeadDialog(true);
   };
@@ -210,14 +188,14 @@ const ContentVerification = () => {
         setLeads(
           leads.map((lead) =>
             lead.id === id
-              ? { ...lead, status: newStatus as Lead["status"] }
+              ? { ...lead, status: newStatus as AdminLead["status"] }
               : lead,
           ),
         );
         if (selectedLead?.id === id) {
           setSelectedLead({
             ...selectedLead,
-            status: newStatus as Lead["status"],
+            status: newStatus as AdminLead["status"],
           });
         }
       } else {

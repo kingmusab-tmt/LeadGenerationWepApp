@@ -283,6 +283,7 @@ export default function LeadTracking() {
           gap: 1.5,
           alignItems: "center",
           mb: 2,
+          pt: 1,
         }}
       >
         <TextField
@@ -374,8 +375,8 @@ export default function LeadTracking() {
       </Box>
 
       {/* Table */}
-      <TableContainer sx={{ maxHeight: 600 }}>
-        <Table size="small" stickyHeader>
+      <TableContainer sx={{ maxHeight: 600, overflowX: "auto" }}>
+        <Table size="small" stickyHeader sx={{ minWidth: 1100 }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>

@@ -40,21 +40,7 @@ import {
   ArrowDownward,
   FilterList,
 } from "@mui/icons-material";
-
-interface Lead {
-  _id: string;
-  userId: string;
-  fields: Array<{ id: string; label: string; value: string | string[] | any }>;
-  createdAt: string;
-  status: "new" | "available" | "sold" | "assigned";
-  distributionMethod: "manual" | "round_robin" | "marketplace";
-  quality?: "High" | "Medium" | "Low";
-  exclusive: boolean;
-  shared: boolean;
-  shareNumber: number;
-  unit: number;
-  isManual: boolean;
-}
+import { Lead } from "@/types/lead";
 
 interface LeadListProps {
   leads: Lead[];
@@ -67,12 +53,18 @@ interface LeadListProps {
   fieldLabels: string[];
 }
 
-const statusColors = {
+const statusColors: Record<
+  string,
+  "primary" | "success" | "warning" | "info" | "default" | "error" | "secondary"
+> = {
   new: "primary",
   available: "success",
   sold: "warning",
   assigned: "info",
-} as const;
+  qualified: "success",
+  unqualified: "default",
+  transferred: "secondary",
+};
 
 const LeadList: React.FC<LeadListProps> = ({
   leads,
@@ -320,7 +312,7 @@ const LeadList: React.FC<LeadListProps> = ({
                   </TableCell>
                   <TableCell>
                     <Typography variant="caption" color="text.secondary">
-                      {lead.quality || "—"}
+                      {lead.qualityLevel || "—"}
                     </Typography>
                   </TableCell>
                   <TableCell>

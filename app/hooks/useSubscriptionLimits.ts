@@ -66,15 +66,21 @@ export function useSubscriptionLimits(): UseSubscriptionLimitsReturn {
       const response = await axios.get("/api/users");
       const userData = response.data?.user;
 
-      if (userData?.subscription?.subscriptionLimits) {
-        setLimits(userData.subscription.subscriptionLimits);
+      // subscriptionLimits can be nested under subscription or at top level
+      const limits =
+        userData?.subscription?.subscriptionLimits ??
+        userData?.subscriptionLimits;
+
+      if (limits) {
+        setLimits(limits);
       } else {
-        // Default limits if not found
+        // Default limits if not found — keep features visible until real limits load
         setLimits({
           exports: false,
           imports: false,
-          emailCampaignsEnabled: false,
-          smsCampaignsEnabled: false,
+          emailCampaignsEnabled: true,
+          smsCampaignsEnabled: true,
+          zapierIntegration: false,
           aiGenerativeEnabled: false,
         });
       }

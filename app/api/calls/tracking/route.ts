@@ -13,14 +13,9 @@ import {
   badRequest,
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
-import { checkCallRateLimit } from "@/lib/security/callSecurity";
 
 export async function GET(req: NextRequest) {
   try {
-    // Rate limit check
-    const rateLimitResponse = await checkCallRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
-
     await dbConnect();
 
     // Get the seller ID from the session
@@ -43,23 +38,33 @@ export async function GET(req: NextRequest) {
       return badRequest("Invalid query parameters");
     }
 
-    const calls = await Call.find({ userId: sellerId });
+    // Fetch calls as plain objects (lean) for faster serialization
+    const calls = await Call.find({ userId: sellerId }).lean();
 
-    const callsWithBuyerInfo = await Promise.all(
-      calls.map(async (call) => {
-        if (call.buyerId) {
-          const buyer = await Buyer.findById(call.buyerId);
-          if (buyer) {
-            return {
-              ...call.toObject(),
-              buyerName: buyer.name,
-              industry: buyer.leadPreferences.industries?.[0] || "N/A",
-            };
-          }
-        }
-        return { ...call.toObject(), buyerName: "N/A", industry: "N/A" };
-      }),
-    );
+    // Batch-fetch all referenced buyers in a single query (avoids N+1)
+    const buyerIds = [
+      ...new Set(
+        calls.filter((c) => c.buyerId).map((c) => c.buyerId!.toString()),
+      ),
+    ];
+
+    const buyers =
+      buyerIds.length > 0
+        ? await Buyer.find({ _id: { $in: buyerIds } })
+            .select("name leadPreferences.industries")
+            .lean()
+        : [];
+
+    const buyerMap = new Map(buyers.map((b) => [b._id.toString(), b]));
+
+    const callsWithBuyerInfo = calls.map((call) => {
+      const buyer = call.buyerId ? buyerMap.get(call.buyerId.toString()) : null;
+      return {
+        ...call,
+        buyerName: buyer?.name || "N/A",
+        industry: buyer?.leadPreferences?.industries?.[0] || "N/A",
+      };
+    });
 
     return successResponse(callsWithBuyerInfo);
   } catch (error) {

@@ -207,11 +207,7 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
     </>
   );
 
-  return (
-    <Box sx={{ mb: 2 }}>
-      {isMobile ? renderMobileFilters() : renderDesktopFilters()}
-    </Box>
-  );
+  return <Box>{isMobile ? renderMobileFilters() : renderDesktopFilters()}</Box>;
 };
 
 export default TransactionFilters;

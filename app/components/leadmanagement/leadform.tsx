@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { Lead } from "@/types/lead";
 
 interface FormField {
   id: string;
@@ -24,27 +25,6 @@ interface FormField {
   label: string;
   required?: boolean;
   options?: string[];
-}
-
-interface Lead {
-  _id: string;
-  userId: string;
-  fields: Array<{ id: string; label: string; value: string; _id?: string }>;
-  createdAt: string;
-  status:
-    | "new"
-    | "available"
-    | "assigned"
-    | "sold"
-    | "qualified"
-    | "unqualified"
-    | "transferred";
-  distributionMethod: "manual" | "round_robin" | "marketplace";
-  exclusive: boolean;
-  unit: number;
-  shared: boolean;
-  shareNumber: number;
-  isManual: boolean;
 }
 
 interface UserForm {

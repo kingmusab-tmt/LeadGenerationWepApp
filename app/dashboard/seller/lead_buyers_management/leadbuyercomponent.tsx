@@ -201,20 +201,26 @@ const BuyersPage: React.FC = () => {
     try {
       setLoading(true);
 
-      // Update buyer statuses from "new" to "active" if they have purchased leads
-      await csrfFetch("/api/sellers/update-buyer-status", { method: "POST" });
-
-      const buyersResponse = await fetch("/api/buyers");
-      if (!buyersResponse.ok) throw new Error("Failed to fetch buyers");
-      const buyersData: IBuyer[] = await buyersResponse.json();
-      setBuyers(buyersData);
-
-      const limitsResponse = await fetch(
-        `/api/subscriptions/limits?sellerId=${sellerId}`,
+      // Fire status update in background (non-blocking) and fetch buyers + limits in parallel
+      csrfFetch("/api/sellers/update-buyer-status", { method: "POST" }).catch(
+        () => {},
       );
+
+      const [buyersResponse, limitsResponse] = await Promise.all([
+        fetch("/api/buyers"),
+        fetch(`/api/subscriptions/limits?sellerId=${sellerId}`),
+      ]);
+
+      if (!buyersResponse.ok) throw new Error("Failed to fetch buyers");
       if (!limitsResponse.ok)
         throw new Error("Failed to fetch subscription limits");
-      const limitsData = await limitsResponse.json();
+
+      const [buyersData, limitsData] = await Promise.all([
+        buyersResponse.json() as Promise<IBuyer[]>,
+        limitsResponse.json(),
+      ]);
+
+      setBuyers(buyersData);
       setSubscriptionLimits({
         currentCount: buyersData.length,
         maxAllowed: limitsData.data?.subscriptionLimits?.buyers || 0,

@@ -286,7 +286,7 @@ const Header = React.memo(function Header() {
                 height={45}
                 style={{ marginRight: 12 }}
               />
-              <Box>
+              {/* <Box>
                 <Typography
                   variant="h6"
                   sx={{
@@ -309,7 +309,7 @@ const Header = React.memo(function Header() {
                 >
                   Lead Management
                 </Typography>
-              </Box>
+              </Box> */}
             </MuiLink>
 
             {/* Desktop Navigation */}

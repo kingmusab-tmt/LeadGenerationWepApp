@@ -9,6 +9,12 @@ import twilio from "twilio";
 
 let callRateLimiter: Ratelimit | null = null;
 
+// Circuit breaker: skip rate limiting for 5 minutes after a failure
+let circuitOpen = false;
+let circuitOpenUntil = 0;
+const CIRCUIT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_TIMEOUT_MS = 1500; // 1.5s max for rate limit check
+
 function getCallRateLimiter(): Ratelimit | null {
   if (callRateLimiter) return callRateLimiter;
 
@@ -35,10 +41,19 @@ function getCallRateLimiter(): Ratelimit | null {
 /**
  * Rate limit check for call API endpoints.
  * Returns null if allowed, or a NextResponse if rate limited.
+ * Includes a circuit breaker (skips for 5 min after failure) and
+ * a 1.5s timeout so a DNS/network failure doesn't stall the request.
  */
 export async function checkCallRateLimit(
   req: NextRequest,
 ): Promise<NextResponse | null> {
+  // Circuit breaker: skip if Upstash was recently unreachable
+  if (circuitOpen) {
+    if (Date.now() < circuitOpenUntil) return null;
+    // Cooldown expired — allow one probe attempt
+    circuitOpen = false;
+  }
+
   const limiter = getCallRateLimiter();
   if (!limiter) return null; // No rate limiter configured - allow
 
@@ -48,7 +63,19 @@ export async function checkCallRateLimit(
     "unknown";
 
   try {
-    const { success, limit, remaining, reset } = await limiter.limit(ip);
+    // Race the rate-limit call against a timeout so a DNS/network
+    // failure cannot stall the entire request for seconds.
+    const result = await Promise.race([
+      limiter.limit(ip),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Rate limit check timed out")),
+          RATE_LIMIT_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+
+    const { success, limit, reset } = result;
 
     if (!success) {
       return NextResponse.json(
@@ -71,7 +98,13 @@ export async function checkCallRateLimit(
 
     return null; // Allowed
   } catch (error) {
-    console.error("[CallSecurity] Rate limit check failed:", error);
+    // Open the circuit so subsequent requests skip the broken limiter
+    circuitOpen = true;
+    circuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+    console.warn(
+      "[CallSecurity] Rate limit check failed — circuit open for 5 min:",
+      error instanceof Error ? error.message : error,
+    );
     return null; // Fail open - don't block on rate limit errors
   }
 }

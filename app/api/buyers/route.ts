@@ -127,8 +127,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(buyer, { status: 200 });
     }
 
-    // Fetch all buyers with all fields
-    const buyers = await Buyer.find({ registeredWith: session.user.id });
+    // Fetch all buyers with lean() for faster serialization
+    const buyers = await Buyer.find({ registeredWith: session.user.id }).lean();
     return NextResponse.json(buyers, { status: 200 });
   } catch (error) {
     return NextResponse.json(

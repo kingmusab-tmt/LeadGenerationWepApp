@@ -260,8 +260,9 @@ const Footer = React.memo(() => {
             textAlign: { xs: "center", md: "left" },
             px: { xs: 2, md: 3 },
             py: 2,
-            borderRadius: 2,
-            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.dark} 100%)`,
+            borderRadius: 0,
+            mx: { xs: -2, sm: -4, md: -6 },
+            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.primary.dark} 100%)`,
           }}
         >
           <Typography variant="body2" sx={{ color: "common.white" }}>

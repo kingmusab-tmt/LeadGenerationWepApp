@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
-  Container,
   Paper,
   Typography,
   useMediaQuery,
@@ -35,10 +34,8 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
-  AreaChart,
-  Area,
 } from "recharts";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useInitializeUser } from "@/lib/hooks";
 import {
@@ -156,6 +153,8 @@ const initialOverviewData = {
   },
 };
 
+const COLORS = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"];
+
 const Overview: React.FC = () => {
   const [overviewData, setOverviewData] = useState(initialOverviewData);
   const { currentUser, loading: userLoading } = useInitializeUser();
@@ -186,34 +185,16 @@ const Overview: React.FC = () => {
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
       try {
-        console.log("[Dashboard] Starting subscription check...");
-        console.log("[Dashboard] Session data:", {
-          role: session?.user?.role,
-          isSubActive: session?.user?.isSubActive,
-        });
-
         const subscriptionCheck = await fetch("/api/subscriptions/check");
         if (subscriptionCheck.ok) {
-          const { isActive, expiryDate, isTrial, daysRemaining, planName } =
+          const { isActive, expiryDate, isTrial, daysRemaining } =
             await subscriptionCheck.json();
-
-          console.log("[Dashboard] API subscription check result:", {
-            isActive,
-            expiryDate,
-            isTrial,
-            daysRemaining,
-          });
 
           // If subscription is active, don't do any redirects
           if (isActive) {
-            console.log(
-              "[Dashboard] Subscription is ACTIVE - staying on dashboard",
-            );
-
             // Show trial or subscription expiry notifications
             if (expiryDate && daysRemaining !== undefined) {
               if (isTrial) {
-                // Trial notification - always show for trials
                 if (daysRemaining <= 14 && daysRemaining > 0) {
                   setSubscriptionAlert({
                     open: true,
@@ -227,7 +208,6 @@ const Overview: React.FC = () => {
                   });
                 }
               } else {
-                // Paid subscription - only show warning if expiring soon
                 if (daysRemaining <= 10 && daysRemaining > 0) {
                   setSubscriptionAlert({
                     open: true,
@@ -241,29 +221,17 @@ const Overview: React.FC = () => {
                 }
               }
             }
-            return; // Exit early - subscription is active
+            return;
           }
 
-          // If user has no subscription at all, redirect to plan page to select one
           if (!expiryDate) {
-            // If session indicates active subscription, skip redirect to plan
             if (session?.user?.isSubActive === true) {
-              console.log(
-                "[Dashboard] No expiryDate but session shows active; staying on dashboard",
-              );
               return;
             }
-            console.log(
-              "[Dashboard] No subscription found, redirecting to /plan",
-            );
             router.push("/plan");
             return;
           }
 
-          // Subscription exists but is inactive (expired)
-          console.log(
-            "[Dashboard] Subscription is expired, redirecting to /subscription-expired",
-          );
           router.push("/subscription-expired");
         }
       } catch (error) {
@@ -274,13 +242,14 @@ const Overview: React.FC = () => {
     const fetchOverviewData = async () => {
       try {
         if (currentUser && currentUser.role === "seller") {
-          // First check subscription status
-          await checkSubscriptionStatus();
+          // Run subscription check and overview data fetch in PARALLEL
+          const [, overviewResponse] = await Promise.all([
+            checkSubscriptionStatus(),
+            fetch("/api/overview"),
+          ]);
 
-          // Then fetch overview data
-          const response = await fetch("/api/overview");
-          if (response.ok) {
-            const data = await response.json();
+          if (overviewResponse.ok) {
+            const data = await overviewResponse.json();
             setOverviewData({
               ...initialOverviewData,
               ...data,
@@ -301,163 +270,8 @@ const Overview: React.FC = () => {
                 ...(data.campaignPerformance || {}),
               },
             });
-          } else {
-            // Set dummy data for demonstration
-            setOverviewData({
-              ...initialOverviewData,
-              totalLeads: 1245,
-              totalUsers: 42,
-              activeCampaigns: 8,
-              totalRevenue: 58250,
-              conversionRate: 32,
-              leadStatus: {
-                new: 845,
-                verified: 275,
-                closed: 125,
-              },
-              campaignPerformance: {
-                budgetUsage: 65,
-                roi: 215,
-              },
-              kpiTrends: {
-                conversionRateTrend: 5,
-                revenueTrend: 12,
-                leadVolumeTrend: 8,
-              },
-              topLeadBuyers: [
-                {
-                  id: "1",
-                  name: "Acme Corp",
-                  leadsPurchased: 245,
-                  totalSpend: 12250,
-                },
-                {
-                  id: "2",
-                  name: "Globex Inc",
-                  leadsPurchased: 189,
-                  totalSpend: 9450,
-                },
-                {
-                  id: "3",
-                  name: "Soylent Corp",
-                  leadsPurchased: 156,
-                  totalSpend: 7800,
-                },
-                {
-                  id: "4",
-                  name: "Initech",
-                  leadsPurchased: 132,
-                  totalSpend: 6600,
-                },
-                {
-                  id: "5",
-                  name: "Umbrella Corp",
-                  leadsPurchased: 98,
-                  totalSpend: 4900,
-                },
-              ],
-              salesPerformance: {
-                daily: Array(30)
-                  .fill(0)
-                  .map((_, i) => ({
-                    day: `Day ${i + 1}`,
-                    sales: Math.floor(Math.random() * 1000) + 500,
-                  })),
-                weekly: Array(12)
-                  .fill(0)
-                  .map((_, i) => ({
-                    week: `Week ${i + 1}`,
-                    sales: Math.floor(Math.random() * 5000) + 3000,
-                  })),
-                monthly: Array(12)
-                  .fill(0)
-                  .map((_, i) => ({
-                    month: new Date(0, i).toLocaleString("default", {
-                      month: "short",
-                    }),
-                    sales: Math.floor(Math.random() * 20000) + 15000,
-                  })),
-              },
-              recentActivities: [
-                {
-                  id: "1",
-                  type: "Lead Sold",
-                  description: "Lead #12345 sold to Acme Corp for $50",
-                  timestamp: new Date(Date.now() - 3600000).toISOString(),
-                },
-                {
-                  id: "2",
-                  type: "New Lead",
-                  description: "New lead generated from Facebook campaign",
-                  timestamp: new Date(Date.now() - 7200000).toISOString(),
-                },
-                {
-                  id: "3",
-                  type: "Payment Received",
-                  description: "Payment of $1,250 received from Globex Inc",
-                  timestamp: new Date(Date.now() - 86400000).toISOString(),
-                },
-                {
-                  id: "4",
-                  type: "Campaign Update",
-                  description:
-                    "Summer Promotion campaign reached 80% of budget",
-                  timestamp: new Date(Date.now() - 172800000).toISOString(),
-                },
-              ],
-              leadTrends: {
-                monthlyLeads: [120, 190, 140, 210, 180, 220, 240],
-                monthlyConversions: [40, 65, 45, 70, 60, 75, 80],
-              },
-              leadStatusDistribution: [
-                { status: "New", count: 845 },
-                { status: "Contacted", count: 275 },
-                { status: "Converted", count: 125 },
-              ],
-              topPerformingCampaigns: [
-                {
-                  id: "1",
-                  name: "Summer Sale",
-                  conversionRate: 42,
-                  revenue: 18500,
-                },
-                {
-                  id: "2",
-                  name: "New Product Launch",
-                  conversionRate: 38,
-                  revenue: 15200,
-                },
-                {
-                  id: "3",
-                  name: "Holiday Special",
-                  conversionRate: 35,
-                  revenue: 12400,
-                },
-              ],
-              leadQualityMetrics: {
-                averageLeadScore: 7.2,
-                contactRate: 68,
-                followUpRate: 72,
-              },
-              revenueTrend: [
-                { month: "Jan", revenue: 4000 },
-                { month: "Feb", revenue: 6500 },
-                { month: "Mar", revenue: 5800 },
-                { month: "Apr", revenue: 7200 },
-                { month: "May", revenue: 8900 },
-                { month: "Jun", revenue: 10500 },
-              ],
-              leadSources: [
-                { source: "Facebook", count: 420, conversionRate: 28 },
-                { source: "Google", count: 380, conversionRate: 32 },
-                { source: "Email", count: 210, conversionRate: 35 },
-                { source: "Referral", count: 150, conversionRate: 40 },
-                { source: "Other", count: 85, conversionRate: 25 },
-              ],
-            });
           }
         }
-        // Auth/role redirects are handled by the layout, not here
       } catch (error) {
         console.error("Failed to fetch overview data", error);
       } finally {
@@ -485,26 +299,30 @@ const Overview: React.FC = () => {
     router.push("/plan");
   };
 
-  // Chart data for Recharts
-  const barChartData =
-    overviewData.leadTrends?.monthlyLeads?.map((leads, index) => ({
-      month: `Month ${index + 1}`,
-      leads,
-      conversions: overviewData.leadTrends?.monthlyConversions?.[index] || 0,
-    })) || [];
+  // Memoized chart data for Recharts
+  const barChartData = useMemo(
+    () =>
+      overviewData.leadTrends?.monthlyLeads?.map((leads, index) => ({
+        month: `Month ${index + 1}`,
+        leads,
+        conversions: overviewData.leadTrends?.monthlyConversions?.[index] || 0,
+      })) || [],
+    [overviewData.leadTrends],
+  );
 
-  const pieChartData =
-    overviewData.leadStatusDistribution?.map((item) => ({
-      name: item.status,
-      value: item.count,
-    })) || [];
+  const pieChartData = useMemo(
+    () =>
+      overviewData.leadStatusDistribution?.map((item) => ({
+        name: item.status,
+        value: item.count,
+      })) || [],
+    [overviewData.leadStatusDistribution],
+  );
 
   const revenueTrendData = overviewData.revenueTrend || [];
   const leadSourcesData = overviewData.leadSources || [];
   const salesPerformanceData = overviewData.salesPerformance?.[timeframe] || [];
   const topLeadBuyersData = overviewData.topLeadBuyers || [];
-
-  const COLORS = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"];
 
   // Show loading while auth is loading or data is loading
   if (loading || status === "loading" || userLoading) {

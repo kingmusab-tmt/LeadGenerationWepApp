@@ -384,7 +384,7 @@ const LandingPage = () => {
         component="section"
         aria-label="Hero"
         sx={{
-          background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.dark} 100%)`,
+          background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%,${theme.palette.primary.dark} 100%)`,
           color: "white",
           pt: { xs: 1, md: 3 },
           pb: { xs: 6, md: 10 },
@@ -453,10 +453,10 @@ const LandingPage = () => {
                         label={badge.label}
                         size="small"
                         sx={{
-                          bgcolor: "rgba(255,255,255,0.15)",
+                          bgcolor: "rgba(255, 255, 255, 0.15)",
                           color: "white",
                           backdropFilter: "blur(10px)",
-                          border: "1px solid rgba(255,255,255,0.2)",
+                          border: "1px solid rgba(255, 255, 255, 0.2)",
                           "& .MuiChip-icon": { color: "white" },
                         }}
                       />
@@ -572,11 +572,11 @@ const LandingPage = () => {
                       fontWeight: "bold",
                       fontSize: "1.1rem",
                       borderRadius: 2,
-                      boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
+                      boxShadow: "0 8px 20px rgba(0, 0, 0, 0.3)",
                       transition: "all 0.3s",
                       "&:hover": {
                         transform: "translateY(-3px)",
-                        boxShadow: "0 12px 30px rgba(0,0,0,0.4)",
+                        boxShadow: "0 12px 30px rgba(0, 0, 0, 0.4)",
                       },
                     }}
                   >

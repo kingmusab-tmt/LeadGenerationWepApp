@@ -38,23 +38,7 @@ import {
   ShoppingCart,
   Person,
 } from "@mui/icons-material";
-
-interface Lead {
-  _id: string;
-  fields: Array<{
-    id: string;
-    label: string;
-    value: string | Record<string, string>;
-    _id?: string;
-  }>;
-  status: string;
-  unit: number;
-  shareNumber: number;
-  soldCount: number;
-  createdAt: string;
-  soldTo?: Array<{ buyerId: string; createdAt: string; unit: number }>;
-  cost?: number;
-}
+import { MarketplaceLead as Lead } from "@/types/lead";
 
 const BuyerLeads: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([]);

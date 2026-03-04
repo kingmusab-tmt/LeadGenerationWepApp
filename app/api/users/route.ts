@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await User.findOne(filterUser)
       .select(
-        "name email image role mobile mobileNumber businessName isSubActive stripeCustomerId currentPlan",
+        "name email image role mobile mobileNumber businessName isSubActive stripeCustomerId currentPlan subscription.subscriptionLimits",
       )
       .lean();
 

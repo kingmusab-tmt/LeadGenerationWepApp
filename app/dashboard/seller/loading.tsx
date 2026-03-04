@@ -1,5 +1,4 @@
 "use client";
-import React from "react";
 import { Box, CircularProgress, keyframes } from "@mui/material";
 import Image from "next/image";
 import CompanyLogo from "../../../public/BRIXCOT.webp";

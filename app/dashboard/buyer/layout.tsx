@@ -165,7 +165,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Dashboard
+            {currentUser?.role === "staff" ? "Sales Team" : "Buyer"} Dashboard
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <Avatar

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/connectdb";
 import { Buyer } from "@/models/leadbuyers";
-import { User } from "@/models/userModel";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 
@@ -26,9 +25,10 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
-    const seller = await User.findOne({ email: session.user.email });
+    const sellerId = session.user.id;
+    const sellerRole = session.user.role;
 
-    if (!seller || seller.role !== "seller") {
+    if (!sellerId || sellerRole !== "seller") {
       return NextResponse.json(
         { success: false, message: "Only sellers can perform this action" },
         { status: 403 },
@@ -39,10 +39,11 @@ export async function POST(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const specificBuyerId = searchParams.get("buyerId");
 
-    // Build query to find "new" buyers registered with this seller
+    // Build query to find "new" buyers with purchases, registered with this seller
     const buyerQuery: Record<string, unknown> = {
-      registeredWith: seller._id,
+      registeredWith: sellerId,
       status: "new",
+      "purchaseHistory.0": { $exists: true },
     };
 
     // If a specific buyer ID is provided, add it to the query
@@ -50,49 +51,16 @@ export async function POST(req: NextRequest) {
       buyerQuery._id = specificBuyerId;
     }
 
-    // Find all buyers with status "new" registered with this seller
-    const newBuyers = await Buyer.find(buyerQuery);
-
-    if (newBuyers.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: specificBuyerId
-          ? "No buyer found with status 'new' for the given ID"
-          : "No buyers with status 'new' found",
-        updatedCount: 0,
-        updatedBuyers: [],
-      });
-    }
-
-    // Filter buyers who have at least one entry in their purchaseHistory
-    const buyersToUpdate = newBuyers.filter(
-      (buyer) => buyer.purchaseHistory && buyer.purchaseHistory.length > 0,
-    );
-
-    const updatedBuyers: {
-      id: string;
-      name: string;
-      email: string;
-      purchaseCount: number;
-    }[] = [];
-
-    for (const buyer of buyersToUpdate) {
-      buyer.status = "active";
-      await buyer.save();
-      updatedBuyers.push({
-        id: buyer._id.toString(),
-        name: buyer.name,
-        email: buyer.email,
-        purchaseCount: buyer.purchaseHistory.length,
-      });
-    }
+    // Use updateMany for a single DB round-trip instead of find + loop + save
+    const result = await Buyer.updateMany(buyerQuery, {
+      $set: { status: "active" },
+    });
 
     return NextResponse.json({
       success: true,
-      message: `Successfully updated ${updatedBuyers.length} buyer(s) from 'new' to 'active'`,
-      updatedCount: updatedBuyers.length,
-      updatedBuyers,
-      checkedCount: newBuyers.length,
+      message: `Successfully updated ${result.modifiedCount} buyer(s) from 'new' to 'active'`,
+      updatedCount: result.modifiedCount,
+      checkedCount: result.matchedCount,
     });
   } catch (error) {
     console.error("Error updating buyer status:", error);
@@ -126,9 +94,10 @@ export async function GET(req: NextRequest) {
 
     await connectDB();
 
-    const seller = await User.findOne({ email: session.user.email });
+    const sellerId = session.user.id;
+    const sellerRole = session.user.role;
 
-    if (!seller || seller.role !== "seller") {
+    if (!sellerId || sellerRole !== "seller") {
       return NextResponse.json(
         { success: false, message: "Only sellers can perform this action" },
         { status: 403 },
@@ -137,9 +106,11 @@ export async function GET(req: NextRequest) {
 
     // Find all buyers with status "new" registered with this seller
     const newBuyers = await Buyer.find({
-      registeredWith: seller._id,
+      registeredWith: sellerId,
       status: "new",
-    }).select("_id name email company purchaseHistory");
+    })
+      .select("_id name email company purchaseHistory")
+      .lean();
 
     if (newBuyers.length === 0) {
       return NextResponse.json({

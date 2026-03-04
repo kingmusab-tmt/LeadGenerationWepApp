@@ -4,8 +4,8 @@ import { z } from "zod";
 const envSchema = z.object({
   TWILIO_ACCOUNT_SID: z.string(),
   TWILIO_AUTH_TOKEN: z.string(),
-  UPSTASH_REDIS_REST_URL: z.string().url(),
-  UPSTASH_REDIS_REST_TOKEN: z.string(),
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   NEXTAUTH_URL: z.string().url(),
   AUTH_SECRET: z.string(),
   AUTH_GOOGLE_ID: z.string(),

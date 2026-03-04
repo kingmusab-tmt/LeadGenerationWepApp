@@ -33,15 +33,6 @@ export async function GET(req: Request) {
     const currentDate = new Date();
     const subscription = user.subscription;
 
-    console.log("[Subscriptions/Check] User subscription data:", {
-      userId: session.user.id,
-      email: session.user.email,
-      isSubscriptionActive: subscription?.isSubscriptionActive,
-      subscriptionExpiryDate: subscription?.subscriptionExpiryDate,
-      isTrial: subscription?.isTrial,
-      currentDate: currentDate.toISOString(),
-    });
-
     // Determine if subscription is active based on multiple factors
     let isSubscriptionActive = false;
     let daysRemaining = 0;
@@ -57,14 +48,9 @@ export async function GET(req: Request) {
         // Calculate days remaining
         const timeDiff = expiryDate.getTime() - currentDate.getTime();
         daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        console.log(
-          "[Subscriptions/Check] Subscription is ACTIVE, days remaining:",
-          daysRemaining,
-        );
       } else {
         // Subscription has expired, update the user's subscription status
         isSubscriptionActive = false;
-        console.log("[Subscriptions/Check] Subscription has EXPIRED");
 
         // Update subscription status in the database
         await User.findByIdAndUpdate(session.user.id, {
@@ -76,14 +62,6 @@ export async function GET(req: Request) {
     const isTrial = subscription?.isTrial === true;
     const isTrialExpired =
       isTrial && !isSubscriptionActive && subscription?.usedTrial === true;
-
-    console.log("[Subscriptions/Check] Final response:", {
-      isActive: isSubscriptionActive,
-      expiryDate: subscription?.subscriptionExpiryDate || null,
-      isTrial,
-      isTrialExpired,
-      daysRemaining,
-    });
 
     return successResponse({
       isActive: isSubscriptionActive,

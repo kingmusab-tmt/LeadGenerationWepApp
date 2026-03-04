@@ -100,19 +100,11 @@ export default function LeadTracking() {
   );
 
   useEffect(() => {
-    async function fetchSellerId() {
+    async function init() {
       const session = await getSession();
-      if (session && session.user) {
-        setSellerId(session.user.id);
-      }
-    }
-    fetchSellerId();
-  }, []);
+      if (!session?.user) return;
+      setSellerId(session.user.id);
 
-  useEffect(() => {
-    if (!sellerId) return;
-
-    const fetchCalls = async () => {
       setLoading(true);
       try {
         const response = await fetch(`/api/calls/tracking`);
@@ -124,10 +116,9 @@ export default function LeadTracking() {
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchCalls();
-  }, [sellerId]);
+    }
+    init();
+  }, []);
 
   const handleSort = (field: keyof Call) => {
     const isAsc = sortField === field && sortOrder === "asc";
@@ -296,14 +287,14 @@ export default function LeadTracking() {
       >
         <Typography
           variant="h5"
-          sx={{ fontWeight: "bold", mt: 4, mb: 1 }}
+          sx={{ fontWeight: "bold" }}
           component="h1"
           color="primary"
         >
           Call Tracking
         </Typography>
 
-        <Box sx={{ display: "flex", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <TextField
             size="small"
             placeholder="Search leads..."

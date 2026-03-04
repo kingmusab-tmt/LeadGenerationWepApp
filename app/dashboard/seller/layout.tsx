@@ -242,15 +242,19 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     return isActive(item.path);
   };
 
-  // Filter nav items based on subscription limits
+  // Filter nav items based on subscription limits (show all while loading)
   const filteredNavItems = navItems.filter((item) => {
-    if (item.path === "email-campaigns" && !limits?.emailCampaignsEnabled) {
+    if (!limits) return true;
+    if (
+      item.path === "email-campaigns" &&
+      limits.emailCampaignsEnabled === false
+    ) {
       return false;
     }
-    if (item.path === "sms-campaigns" && !limits?.smsCampaignsEnabled) {
+    if (item.path === "sms-campaigns" && limits.smsCampaignsEnabled === false) {
       return false;
     }
-    if (item.path === "integrations" && !limits?.zapierIntegration) {
+    if (item.path === "integrations" && limits.zapierIntegration === false) {
       return false;
     }
     return true;
@@ -460,7 +464,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
         position="fixed"
         elevation={0}
         sx={{
-          background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.dark} 100%)`,
+          background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.primary.dark} 100%)`,
           zIndex: theme.zIndex.drawer + 1,
         }}
       >
@@ -482,7 +486,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
             fontWeight={600}
             sx={{ flexGrow: 1, display: "block" }}
           >
-            Seller Dashboard
+            {currentUser?.role === "business-admin" ? "Business" : "Seller"}{" "}
+            Dashboard
           </Typography>
 
           {/* Right side icons */}
