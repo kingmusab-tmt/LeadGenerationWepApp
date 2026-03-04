@@ -11,7 +11,6 @@ import {
 } from "@mui/material";
 import { useJsApiLoader } from "@react-google-maps/api";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
-import cityAreaCodes from "@/utils/cityareacodes";
 
 // Define libraries as a constant to prevent useJsApiLoader re-renders
 const libraries: "places"[] = ["places"];
@@ -86,7 +85,6 @@ interface GooglePlacesAutocompleteProps {
   onChange: (values: string[]) => void;
   onSelectWithState?: (states: string[]) => void; // Callback to auto-populate states from cities
   onSelectWithZipCodes?: (zipCodes: string[]) => void; // Callback to auto-populate zip codes from cities
-  onSelectWithAreaCodes?: (areaCodes: string[]) => void; // Callback to auto-populate area codes from cities
   placeholder?: string;
   helperText?: string;
   type: "city" | "state";
@@ -101,7 +99,6 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
   onChange,
   onSelectWithState,
   onSelectWithZipCodes,
-  onSelectWithAreaCodes,
   placeholder,
   helperText,
   type,
@@ -356,28 +353,12 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
         }
       }
 
-      // Extract area codes from city selections if callback provided
-      if (type === "city" && onSelectWithAreaCodes) {
-        const extractedAreaCodes = new Set<string>();
-        selectedValues.forEach((cityName) => {
-          // Look up area code from the cityAreaCodes mapping
-          const areaCode = cityAreaCodes[cityName];
-          if (areaCode) {
-            extractedAreaCodes.add(areaCode);
-          }
-        });
-        if (extractedAreaCodes.size > 0) {
-          onSelectWithAreaCodes(Array.from(extractedAreaCodes));
-        }
-      }
-
       onChange(selectedValues);
     },
     [
       onChange,
       onSelectWithState,
       onSelectWithZipCodes,
-      onSelectWithAreaCodes,
       type,
       fetchZipCodesForPlace,
     ],

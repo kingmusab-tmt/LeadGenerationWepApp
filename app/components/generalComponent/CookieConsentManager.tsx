@@ -5,11 +5,9 @@ import {
   Box,
   Button,
   Collapse,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControlLabel,
+  Paper,
+  Slide,
   Stack,
   Switch,
   Typography,
@@ -34,12 +32,14 @@ const PREFS_COOKIE = "brix_cookie_preferences";
 const VISIT_COOKIE = "brix_first_visit";
 const SESSION_COOKIE = "brix_session_id";
 
-const defaultPrefs: CookiePrefs = {
+const allAcceptedPrefs: CookiePrefs = {
   essential: true,
-  analytics: false,
-  functional: false,
-  advertising: false,
+  analytics: true,
+  functional: true,
+  advertising: true,
 };
+
+const defaultPrefs = allAcceptedPrefs;
 
 const cookieCategoryDetails: {
   key: CookieCategoryKey;
@@ -96,6 +96,25 @@ const getCookie = (name: string): string | null => {
   return match ? decodeURIComponent(match[1]) : null;
 };
 
+const getStorage = (key: string): string | null => {
+  try {
+    return typeof window !== "undefined" ? localStorage.getItem(key) : null;
+  } catch {
+    return null;
+  }
+};
+
+const setStorage = (key: string, value: string) => {
+  try {
+    if (typeof window !== "undefined") localStorage.setItem(key, value);
+  } catch {
+    /* localStorage unavailable — cookie is still set */
+  }
+};
+
+const getConsent = (name: string): string | null =>
+  getCookie(name) || getStorage(name);
+
 const safeParsePrefs = (value: string | null): CookiePrefs => {
   if (!value) return defaultPrefs;
 
@@ -114,6 +133,7 @@ const safeParsePrefs = (value: string | null): CookiePrefs => {
 
 const CookieConsentManager = () => {
   const [open, setOpen] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [prefs, setPrefs] = useState<CookiePrefs>(defaultPrefs);
   const [expandedDetails, setExpandedDetails] = useState<
     Record<CookieCategoryKey, boolean>
@@ -129,6 +149,7 @@ const CookieConsentManager = () => {
     [],
   );
 
+  /* ---- visit / session cookies (independent of consent) ---- */
   useEffect(() => {
     if (typeof document === "undefined") return;
 
@@ -139,20 +160,36 @@ const CookieConsentManager = () => {
     if (!getCookie(SESSION_COOKIE)) {
       setCookie(SESSION_COOKIE, sessionId, 1);
     }
+  }, [sessionId]);
 
-    const existingConsent = getCookie(CONSENT_COOKIE);
-    const existingPrefs = safeParsePrefs(getCookie(PREFS_COOKIE));
+  /* ---- consent check (runs once on mount) ---- */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const existingConsent = getConsent(CONSENT_COOKIE);
+    const rawPrefs = getConsent(PREFS_COOKIE);
+    const existingPrefs = safeParsePrefs(rawPrefs);
     setPrefs(existingPrefs);
 
-    if (!existingConsent) {
+    if (existingConsent) {
+      /* Re-sync cookie if it was cleared but localStorage survived */
+      if (!getCookie(CONSENT_COOKIE)) {
+        setCookie(CONSENT_COOKIE, existingConsent, 365);
+      }
+      if (rawPrefs && !getCookie(PREFS_COOKIE)) {
+        setCookie(PREFS_COOKIE, rawPrefs, 365);
+      }
+      setOpen(false);
+    } else {
       setOpen(true);
     }
-  }, [sessionId]);
+  }, []);
 
   useEffect(() => {
     const handleOpenPreferences = () => {
       const existingPrefs = safeParsePrefs(getCookie(PREFS_COOKIE));
       setPrefs(existingPrefs);
+      setShowDetails(true);
       setOpen(true);
     };
 
@@ -166,24 +203,32 @@ const CookieConsentManager = () => {
     };
   }, []);
 
-  const handleAcceptAll = () => {
-    const allPrefs: CookiePrefs = {
-      essential: true,
-      analytics: true,
-      functional: true,
-      advertising: true,
-    };
+  const persistConsent = (mode: string, cookiePrefs: CookiePrefs) => {
+    const prefsJson = JSON.stringify(cookiePrefs);
+    setCookie(CONSENT_COOKIE, mode, 365);
+    setCookie(PREFS_COOKIE, prefsJson, 365);
+    setStorage(CONSENT_COOKIE, mode);
+    setStorage(PREFS_COOKIE, prefsJson);
+  };
 
-    setPrefs(allPrefs);
-    setCookie(CONSENT_COOKIE, "accepted_all", 365);
-    setCookie(PREFS_COOKIE, JSON.stringify(allPrefs), 365);
+  const handleAcceptAll = () => {
+    setPrefs(allAcceptedPrefs);
+    persistConsent("accepted_all", allAcceptedPrefs);
+    setShowDetails(false);
     setOpen(false);
   };
 
+  const essentialOnlyPrefs: CookiePrefs = {
+    essential: true,
+    analytics: false,
+    functional: false,
+    advertising: false,
+  };
+
   const handleEssentialOnly = () => {
-    setPrefs(defaultPrefs);
-    setCookie(CONSENT_COOKIE, "essential_only", 365);
-    setCookie(PREFS_COOKIE, JSON.stringify(defaultPrefs), 365);
+    setPrefs(essentialOnlyPrefs);
+    persistConsent("essential_only", essentialOnlyPrefs);
+    setShowDetails(false);
     setOpen(false);
   };
 
@@ -195,8 +240,8 @@ const CookieConsentManager = () => {
       advertising: prefs.advertising,
     };
 
-    setCookie(CONSENT_COOKIE, "custom", 365);
-    setCookie(PREFS_COOKIE, JSON.stringify(customPrefs), 365);
+    persistConsent("custom", customPrefs);
+    setShowDetails(false);
     setOpen(false);
   };
 
@@ -214,84 +259,142 @@ const CookieConsentManager = () => {
   };
 
   return (
-    <Dialog open={open} maxWidth="sm" fullWidth>
-      <DialogTitle>Manage Cookie Preferences</DialogTitle>
-      <DialogContent>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          We use cookies to keep the site secure and improve your experience.
-          You can choose which optional cookie categories to enable.
-        </Typography>
+    <Slide direction="up" in={open} mountOnEnter unmountOnExit>
+      <Paper
+        elevation={6}
+        sx={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1400,
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+          maxHeight: "80vh",
+          overflowY: "auto",
+        }}
+      >
+        <Box sx={{ px: 3, pt: 2.5, pb: 2 }}>
+          {/* ---- Compact view (always visible) ---- */}
+          <Typography variant="body2" color="text.secondary">
+            By continuing to use our website, you acknowledge the use of cookies
+          </Typography>
 
-        <Stack spacing={1.5}>
-          {cookieCategoryDetails.map((category) => (
-            <Box
-              key={category.key}
-              sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1.5,
-                p: 1.2,
-              }}
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            sx={{ mt: 2 }}
+          >
+            <Button
+              size="small"
+              onClick={() => setShowDetails((prev) => !prev)}
+              endIcon={showDetails ? <ExpandLess /> : <ExpandMore />}
+              sx={{ textTransform: "none" }}
             >
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={prefs[category.key]}
-                    disabled={category.key === "essential"}
-                    onChange={(e) =>
-                      handleCookieToggle(category.key, e.target.checked)
+              {showDetails ? "View Less" : "View More"}
+            </Button>
+
+            <Box sx={{ flex: 1 }} />
+
+            <Button onClick={handleAcceptAll} variant="contained" size="small">
+              Accept All
+            </Button>
+          </Stack>
+
+          {/* ---- Expanded details ---- */}
+          <Collapse in={showDetails}>
+            <Stack spacing={1.5} sx={{ mt: 2 }}>
+              {cookieCategoryDetails.map((category) => (
+                <Box
+                  key={category.key}
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 1.5,
+                    p: 1.2,
+                  }}
+                >
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={prefs[category.key]}
+                        disabled={category.key === "essential"}
+                        onChange={(e) =>
+                          handleCookieToggle(category.key, e.target.checked)
+                        }
+                      />
                     }
+                    label={category.label}
                   />
-                }
-                label={category.label}
-              />
-              <Button
-                size="small"
-                onClick={() => toggleDetailVisibility(category.key)}
-                endIcon={
-                  expandedDetails[category.key] ? (
-                    <ExpandLess />
-                  ) : (
-                    <ExpandMore />
-                  )
-                }
-                sx={{ ml: 1, textTransform: "none" }}
-              >
-                {expandedDetails[category.key]
-                  ? "Hide details"
-                  : "Show details"}
-              </Button>
-              <Collapse in={expandedDetails[category.key]}>
-                <Box sx={{ mt: 1, pl: 1.5 }}>
-                  {category.details.map((detail) => (
-                    <Typography
-                      key={detail}
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 0.5 }}
-                    >
-                      • {detail}
-                    </Typography>
-                  ))}
+                  <Button
+                    size="small"
+                    onClick={() => toggleDetailVisibility(category.key)}
+                    endIcon={
+                      expandedDetails[category.key] ? (
+                        <ExpandLess />
+                      ) : (
+                        <ExpandMore />
+                      )
+                    }
+                    sx={{ ml: 1, textTransform: "none" }}
+                  >
+                    {expandedDetails[category.key]
+                      ? "Hide details"
+                      : "Show details"}
+                  </Button>
+                  <Collapse in={expandedDetails[category.key]}>
+                    <Box sx={{ mt: 1, pl: 1.5 }}>
+                      {category.details.map((detail) => (
+                        <Typography
+                          key={detail}
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mb: 0.5 }}
+                        >
+                          • {detail}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Collapse>
                 </Box>
-              </Collapse>
-            </Box>
-          ))}
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={handleEssentialOnly} variant="outlined">
-          Essential Only
-        </Button>
-        <Box sx={{ flex: 1 }} />
-        <Button onClick={handleSaveCustom} variant="outlined">
-          Save Preferences
-        </Button>
-        <Button onClick={handleAcceptAll} variant="contained">
-          Accept All
-        </Button>
-      </DialogActions>
-    </Dialog>
+              ))}
+            </Stack>
+
+            <Stack
+              direction="row"
+              spacing={1.5}
+              justifyContent="flex-end"
+              sx={{ mt: 2 }}
+            >
+              <Button
+                onClick={handleEssentialOnly}
+                variant="outlined"
+                size="small"
+              >
+                Essential Only
+              </Button>
+              <Button
+                onClick={handleSaveCustom}
+                variant="outlined"
+                size="small"
+              >
+                Save Preferences
+              </Button>
+              <Button
+                onClick={handleAcceptAll}
+                variant="contained"
+                size="small"
+              >
+                Accept All
+              </Button>
+            </Stack>
+          </Collapse>
+        </Box>
+      </Paper>
+    </Slide>
   );
 };
 

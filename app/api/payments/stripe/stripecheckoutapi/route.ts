@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         message: "Internal server error",
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     );

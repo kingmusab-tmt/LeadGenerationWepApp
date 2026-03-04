@@ -1,4 +1,10 @@
 "use client";
+/**
+ * @deprecated — DO NOT USE.
+ * This file is superseded by lib/theme/MuiThemeProvider.tsx
+ * which is the single source of truth for MUI theming.
+ * Kept only to avoid breaking any stale imports; will be deleted.
+ */
 import { createContext, useState, useContext, ReactNode } from "react";
 import {
   ThemeProvider as MuiThemeProvider,

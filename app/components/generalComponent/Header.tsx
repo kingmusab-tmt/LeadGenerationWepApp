@@ -29,7 +29,7 @@ import Image from "next/image";
 import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { signOut } from "next-auth/react";
-import logo from "../../../public/BRIXCOT.png";
+import logo from "../../../public/BRIXCOT.webp";
 import {
   ContactPage,
   FeaturedPlayList,
@@ -61,7 +61,7 @@ const zoomOut = keyframes`
   to { transform: scale(1); }
 `;
 
-const Header = () => {
+const Header = React.memo(function Header() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -683,6 +683,7 @@ const Header = () => {
       </AppBar>
     </>
   );
-};
+});
 
+Header.displayName = "Header";
 export default Header;

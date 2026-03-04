@@ -39,7 +39,12 @@ export async function GET(req: Request) {
       session,
       transactionStatus: transaction?.status,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 },
+    );
   }
 }

@@ -64,9 +64,12 @@ export async function GET(req: NextRequest) {
         { status: 200 },
       );
     }
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { success: false, error: error.message || "Internal Server Error" },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Internal Server Error",
+      },
       { status: 500 },
     );
   }
@@ -111,9 +114,12 @@ export async function POST(req: NextRequest) {
       },
       { status: 200 },
     );
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { success: false, error: error.message || "Internal Server Error" },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Internal Server Error",
+      },
       { status: 500 },
     );
   }

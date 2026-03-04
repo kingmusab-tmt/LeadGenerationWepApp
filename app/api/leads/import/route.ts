@@ -161,7 +161,7 @@ export async function POST(request: Request) {
       {
         success: false,
         message: "Failed to import leads.",
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     );

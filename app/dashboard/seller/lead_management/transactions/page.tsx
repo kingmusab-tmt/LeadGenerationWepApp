@@ -200,7 +200,7 @@ const TransactionHistory = () => {
     // Load and draw logo
     const logo = new Image();
     logo.crossOrigin = "anonymous";
-    logo.src = "/BRIXCOT.png";
+    logo.src = "/BRIXCOT.webp";
 
     await new Promise<void>((resolve) => {
       logo.onload = () => resolve();

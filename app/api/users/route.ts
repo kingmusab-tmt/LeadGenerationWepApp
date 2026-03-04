@@ -35,8 +35,16 @@ export async function GET(req: NextRequest) {
   }
   filterUser = { email };
 
+  const cacheHeaders = {
+    "Cache-Control": "private, max-age=10, stale-while-revalidate=30",
+  };
+
   try {
-    const user = await User.findOne(filterUser).lean();
+    const user = await User.findOne(filterUser)
+      .select(
+        "name email image role mobile mobileNumber businessName isSubActive stripeCustomerId currentPlan",
+      )
+      .lean();
 
     if (!user) {
       // Clear stale session cache so the client can re-authenticate cleanly
@@ -49,13 +57,22 @@ export async function GET(req: NextRequest) {
     if (user.role === "buyer") {
       const leadbuyerDetail = await Buyer.findOne({
         email: user.email,
-      } as any).lean();
-      return NextResponse.json({ user, leadbuyerDetail }, { status: 200 });
+      } as any)
+        .select("name email walletBalance autoAccept preferences")
+        .lean();
+      return NextResponse.json(
+        { user, leadbuyerDetail },
+        { status: 200, headers: cacheHeaders },
+      );
     }
 
     // Return user for any other role (seller, admin, staff, etc.)
-    return NextResponse.json({ user }, { status: 200 });
+    return NextResponse.json({ user }, { status: 200, headers: cacheHeaders });
   } catch (error) {
-    return NextResponse.json({ success: false, error: error }, { status: 500 });
+    console.error("[/api/users] Error:", error);
+    return NextResponse.json(
+      { success: false, message: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

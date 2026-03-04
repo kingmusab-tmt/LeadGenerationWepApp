@@ -529,8 +529,8 @@ export async function POST(request: Request) {
       {
         success: false,
         message: "Failed to capture lead.",
-        error: error.message || "Unknown error occurred.",
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+        error:
+          error instanceof Error ? error.message : "Unknown error occurred.",
       },
       { status: 500 },
     );

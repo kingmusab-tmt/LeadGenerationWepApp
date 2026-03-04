@@ -41,12 +41,14 @@ import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import { useInitializeUser } from "@/lib/hooks";
 import { isBuyerOnboardingFlowComplete } from "@/lib/buyerOnboarding";
+import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
 
 interface UserDashboardProps {
   children: React.ReactNode;
 }
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
+  useDashboardReducers();
   const { currentUser, loading: userLoading } = useInitializeUser();
   const { status } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);

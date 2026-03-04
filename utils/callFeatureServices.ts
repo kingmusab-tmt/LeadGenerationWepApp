@@ -16,7 +16,6 @@ import { getRedisClient } from "@/lib/redis";
 import Call from "@/models/call";
 import ScheduledCallback from "@/models/scheduledCallback";
 import cityAreaCodes from "@/utils/cityareacodes";
-import { CALL_DEFAULTS } from "@/lib/security/callSecurity";
 
 // ─── STIR/SHAKEN Spam Detection ───────────────────────────────
 

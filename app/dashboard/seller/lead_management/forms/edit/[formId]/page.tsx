@@ -26,7 +26,6 @@ const FormPreview = dynamic(
 );
 
 import { industryNiches } from "@/utils/industryNiches";
-import { usCities } from "@/utils/citiesInUsUk";
 import { LEAD_SOURCES } from "@/utils/leadSources";
 import { useRouter, useParams } from "next/navigation";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
@@ -161,10 +160,9 @@ export default function EditForm() {
       },
       {
         id: Math.random().toString(),
-        type: "dropdown",
+        type: "city_autocomplete",
         label: "City",
         required: false,
-        options: usCities,
       },
     ];
     setFields([...fields, ...contactFields]);

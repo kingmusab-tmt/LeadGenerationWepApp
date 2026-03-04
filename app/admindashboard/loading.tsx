@@ -1,7 +1,7 @@
 "use client";
 import { Box, CircularProgress, keyframes } from "@mui/material";
 import Image from "next/image";
-import CompanyLogo from "../../public/BRIXCOT.png";
+import CompanyLogo from "../../public/BRIXCOT.webp";
 
 const pulse = keyframes`
   0% { transform: scale(1); opacity: 1; }

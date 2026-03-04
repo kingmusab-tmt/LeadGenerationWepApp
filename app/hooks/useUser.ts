@@ -4,6 +4,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { useAppDispatch, useAppSelector } from "./useRedux";
 import axios from "axios";
 import {
@@ -70,6 +71,7 @@ export const normalizeUser = (data: any): User => {
 export const useInitializeUser = () => {
   const dispatch = useAppDispatch();
   const userState = useAppSelector((state) => state.user);
+  const { status: sessionStatus } = useSession();
   const hasAttemptedRef = useRef(false);
 
   const fetchUser = useCallback(
@@ -101,15 +103,32 @@ export const useInitializeUser = () => {
     [dispatch, userState.loading, userState.currentUser],
   );
 
+  // Only fetch user data when session is authenticated
   useEffect(() => {
+    if (sessionStatus === "unauthenticated") {
+      // Clear stale user data for logged-out visitors — skip network call
+      if (userState.currentUser) {
+        dispatch(clearUser());
+      }
+      hasAttemptedRef.current = false;
+      return;
+    }
+
     if (
+      sessionStatus === "authenticated" &&
       !userState.currentUser &&
       !userState.loading &&
       !hasAttemptedRef.current
     ) {
       fetchUser();
     }
-  }, [userState.currentUser, userState.loading, fetchUser]);
+  }, [
+    sessionStatus,
+    userState.currentUser,
+    userState.loading,
+    fetchUser,
+    dispatch,
+  ]);
 
   return { ...userState, refreshUser: fetchUser };
 };

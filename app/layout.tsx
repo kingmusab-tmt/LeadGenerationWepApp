@@ -3,11 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/authprovider";
 import { NavigationProvider } from "../context/handlenavigation";
-import NotificationManager from "@/app/components/NotificationManager";
-import CookieConsentManager from "@/app/components/generalComponent/CookieConsentManager";
 import MuiThemeProvider from "@/lib/theme/MuiThemeProvider";
 import { Providers } from "@/app/reduxprovider";
 import { CSRFProvider } from "@/app/hooks/useCSRF";
+import ClientOverlays from "@/app/components/ClientOverlays";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -199,8 +198,7 @@ export default function RootLayout({
               <Providers>
                 <CSRFProvider>
                   {children}
-                  <CookieConsentManager />
-                  <NotificationManager />
+                  <ClientOverlays />
                 </CSRFProvider>
               </Providers>
             </NavigationProvider>

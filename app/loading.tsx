@@ -2,7 +2,7 @@
 import React from "react";
 import { Box, CircularProgress, keyframes } from "@mui/material";
 import Image from "next/image";
-import CompanyLogo from "../public/images/5ae9cfb6c909a_thumb900.png";
+import CompanyLogo from "../public/images/5ae9cfb6c909a_thumb900.webp";
 
 const pulse = keyframes`
   0% { transform: scale(1); opacity: 1; }

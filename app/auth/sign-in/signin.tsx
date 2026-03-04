@@ -18,7 +18,7 @@ import {
 import { FcGoogle } from "react-icons/fc";
 import Image from "next/image";
 import backgroundImage from "@/public/images/bg2 (1).jpg";
-import Logo from "@/public/images/5ae9cfb6c909a_thumb900.png"; // Replace with your actual logo import
+import Logo from "@/public/images/5ae9cfb6c909a_thumb900.webp";
 import TermsOfServiceDialog from "@/app/components/legal/TermsOfServiceDialog";
 import PrivacyPolicyDialog from "@/app/components/legal/PrivacyPolicyDialog";
 

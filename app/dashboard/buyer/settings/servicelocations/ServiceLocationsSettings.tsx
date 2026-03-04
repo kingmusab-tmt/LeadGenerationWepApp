@@ -20,7 +20,6 @@ import {
   Typography,
   Alert,
   Snackbar,
-  Autocomplete,
   Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -28,7 +27,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import EditIcon from "@mui/icons-material/Edit";
 import InfoIcon from "@mui/icons-material/Info";
-import { usCities } from "@/utils/citiesInUsUk";
+import GoogleCityAutocomplete from "@/app/components/GoogleCityAutocomplete";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useConfirm } from "@/app/hooks/useConfirm";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
@@ -259,62 +258,6 @@ export default function ServiceLocationsSettings() {
     }
   };
 
-  // Extract unique cities from the utility
-  // Note: usCities is an array of city names, we'll parse them to extract state info
-  const cityOptions = usCities.sort();
-  const stateOptions = [
-    "AL",
-    "AK",
-    "AZ",
-    "AR",
-    "CA",
-    "CO",
-    "CT",
-    "DE",
-    "FL",
-    "GA",
-    "HI",
-    "ID",
-    "IL",
-    "IN",
-    "IA",
-    "KS",
-    "KY",
-    "LA",
-    "ME",
-    "MD",
-    "MA",
-    "MI",
-    "MN",
-    "MS",
-    "MO",
-    "MT",
-    "NE",
-    "NV",
-    "NH",
-    "NJ",
-    "NM",
-    "NY",
-    "NC",
-    "ND",
-    "OH",
-    "OK",
-    "OR",
-    "PA",
-    "RI",
-    "SC",
-    "SD",
-    "TN",
-    "TX",
-    "UT",
-    "VT",
-    "VA",
-    "WA",
-    "WV",
-    "WI",
-    "WY",
-  ];
-
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
@@ -485,29 +428,32 @@ export default function ServiceLocationsSettings() {
           <Box sx={{ pt: 2 }}>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Autocomplete
-                  options={cityOptions}
+                <GoogleCityAutocomplete
+                  label="City"
                   value={newLocation.city}
-                  onChange={(_, value) =>
+                  onChange={(value) =>
                     setNewLocation({ ...newLocation, city: value || "" })
                   }
-                  renderInput={(params) => (
-                    <TextField {...params} label="City" required fullWidth />
-                  )}
-                  freeSolo
+                  onSelectWithState={(state) =>
+                    setNewLocation((prev) => ({
+                      ...prev,
+                      state: state || prev.state,
+                    }))
+                  }
+                  placeholder="Search city..."
+                  required
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Autocomplete
-                  options={stateOptions}
+                <TextField
+                  label="State"
                   value={newLocation.state}
-                  onChange={(_, value) =>
-                    setNewLocation({ ...newLocation, state: value || "" })
+                  onChange={(e) =>
+                    setNewLocation({ ...newLocation, state: e.target.value })
                   }
-                  renderInput={(params) => (
-                    <TextField {...params} label="State" required fullWidth />
-                  )}
-                  freeSolo
+                  fullWidth
+                  required
+                  helperText="Auto-populated from city selection"
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>

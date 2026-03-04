@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useCallback } from "react";
 import {
   Box,
   Button,
@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import Image from "next/image";
-import logo from "../../../public/BRIXCOT.png";
+import logo from "../../../public/BRIXCOT.webp";
 import {
   FaFacebook,
   FaTwitter,
@@ -25,8 +25,13 @@ import {
 } from "react-icons/fa";
 
 // Footer Component
-const Footer = () => {
+const Footer = React.memo(() => {
   const theme = useTheme();
+
+  const openCookiePreferences = useCallback(() => {
+    window.dispatchEvent(new Event("open-cookie-preferences"));
+  }, []);
+
   return (
     <Box
       component="footer"
@@ -229,9 +234,7 @@ const Footer = () => {
           <MuiLink
             component="button"
             type="button"
-            onClick={() =>
-              window.dispatchEvent(new Event("open-cookie-preferences"))
-            }
+            onClick={openCookiePreferences}
             color="text.secondary"
             underline="hover"
             sx={{
@@ -280,5 +283,8 @@ const Footer = () => {
       </Container>
     </Box>
   );
-};
+});
+
+Footer.displayName = "Footer";
+
 export default Footer;

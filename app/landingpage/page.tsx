@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, Key } from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   Button,
@@ -37,7 +37,7 @@ import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import BuildIcon from "@mui/icons-material/Build";
 import Header from "../components/generalComponent/Header";
 import Footer from "../components/generalComponent/Footer";
-import logo from "../../public/BRIXCOT.png";
+import logo from "../../public/BRIXCOT.webp";
 import Image from "next/image";
 import {
   Description,
@@ -77,323 +77,302 @@ import {
 } from "@mui/icons-material";
 // Head removed — use Next.js App Router metadata export instead
 
+// ── Static data arrays (hoisted to module scope to avoid re-creation) ──
+
+const callTrackingFeatures = [
+  "Round-Robin Buyer Assignment",
+  "Business Hours Routing",
+  "Vacation Mode Filtering",
+  "Voicemail Recording",
+  "Call Recording & Transcription",
+  "AI Call Analysis & Scoring",
+  "Geo-Routing by Area Code",
+  "Multi-Ring Simultaneous Dialing",
+  "Call Whisper & Screening",
+  "Spam/Robot Detection",
+  "Do-Not-Call (DNC) List",
+  "Scheduled Callbacks",
+];
+
+const platformStats = [
+  { value: "6,000+", label: "App Integrations via Zapier" },
+  { value: "99.9%", label: "Platform Uptime" },
+  { value: "< 1s", label: "Lead Distribution Speed" },
+  { value: "24/7", label: "Customer Support" },
+];
+
+const testimonials = [
+  {
+    name: "Sarah Johnson",
+    role: "Real Estate Agency Owner",
+    text: "The AI lead scoring alone increased our conversion by 40%. We no longer waste time on low-quality leads. The call tracking features are a game-changer!",
+  },
+  {
+    name: "Michael Chen",
+    role: "Insurance Broker",
+    text: "Automated lead distribution saves us 20+ hours weekly. The geo-routing ensures leads go to agents in the right territory. Best investment we made.",
+  },
+  {
+    name: "David Wilson",
+    role: "Solar Sales Director",
+    text: "From lead capture to sale, BRIXCOT handles everything. The marketplace feature opened new revenue streams we never knew existed.",
+  },
+  {
+    name: "Jennifer Martinez",
+    role: "Home Services Company",
+    text: "The email and SMS campaigns are incredibly easy to set up. Our re-engagement rate improved by 65% since switching to BRIXCOT.",
+  },
+  {
+    name: "Robert Taylor",
+    role: "Digital Marketing Agency",
+    text: "We manage leads for 50+ clients through BRIXCOT. The Zapier integration connects everything seamlessly. It's the backbone of our operation.",
+  },
+  {
+    name: "Amanda Lee",
+    role: "Mortgage Lead Buyer",
+    text: "As a buyer, I love the marketplace. Preview leads before purchasing, see quality scores, and the wallet system makes transactions instant.",
+  },
+];
+
+const howItWorks = [
+  {
+    step: 1,
+    title: "Capture Leads",
+    description:
+      "Use our form builder to create custom lead capture forms. Embed anywhere — your website, landing pages, or ads. Every submission is instantly processed.",
+  },
+  {
+    step: 2,
+    title: "AI Quality Scoring",
+    description:
+      "Our Gemini AI analyzes every lead in real-time, detecting spam and assigning quality scores. High-quality leads are prioritized automatically.",
+  },
+  {
+    step: 3,
+    title: "Smart Distribution",
+    description:
+      "Leads are auto-assigned to buyers based on your rules — by location, industry, budget, or round-robin. Or list them on the marketplace.",
+  },
+  {
+    step: 4,
+    title: "Engage & Convert",
+    description:
+      "Use call tracking, email campaigns, and SMS marketing to nurture leads. Track every interaction and optimize your conversion funnel.",
+  },
+];
+
+const sellerBenefits = [
+  "Create unlimited lead capture forms",
+  "AI-powered spam detection & lead scoring",
+  "Automated buyer assignment & round-robin",
+  "Built-in lead marketplace for monetization",
+  "Email & SMS marketing campaigns",
+  "Advanced call tracking with Twilio",
+  "Zapier integration with 12 trigger events",
+  "Comprehensive analytics dashboard",
+];
+
+const buyerBenefits = [
+  "Browse & purchase leads from marketplace",
+  "Preview lead details before buying",
+  "AI quality scores for informed decisions",
+  "Wallet-based instant transactions",
+  "Auto-accept leads matching your criteria",
+  "Call tracking with caller ID & routing",
+  "Dedicated buyer dashboard",
+  "Real-time lead notifications",
+];
+
+const industries = [
+  {
+    icon: <Home />,
+    name: "Real Estate",
+    description:
+      "Manage buyer and seller leads with automated follow-ups and property matching.",
+    keywords: "real estate lead management, realtor CRM, property leads",
+  },
+  {
+    icon: <AttachMoney />,
+    name: "Insurance",
+    description:
+      "Distribute insurance leads by type, location, and agent availability.",
+    keywords: "insurance lead software, agent lead distribution",
+  },
+  {
+    icon: <Lightbulb />,
+    name: "Solar & Energy",
+    description:
+      "Qualify solar leads with AI scoring and geo-route to local installers.",
+    keywords: "solar lead management, energy lead generation",
+  },
+  {
+    icon: <Business />,
+    name: "Home Services",
+    description:
+      "Route plumbing, HVAC, and roofing leads to available contractors instantly.",
+    keywords: "home services leads, contractor lead management",
+  },
+  {
+    icon: <LocalHospital />,
+    name: "Healthcare",
+    description:
+      "HIPAA-conscious lead handling for medical and dental practices.",
+    keywords: "healthcare lead generation, medical practice leads",
+  },
+  {
+    icon: <DirectionsCar />,
+    name: "Automotive",
+    description:
+      "Connect car buyers with dealers based on make, model, and location preferences.",
+    keywords: "auto dealer leads, car sales lead management",
+  },
+];
+
+const faqs = [
+  {
+    question: "What is BRIXCOT lead management software?",
+    answer:
+      "BRIXCOT is an enterprise-grade lead management platform that combines AI-powered lead scoring, advanced call tracking, email and SMS marketing automation, and a built-in lead marketplace. It helps businesses capture, distribute, and convert leads more efficiently with features like round-robin distribution, geo-routing, and real-time analytics.",
+  },
+  {
+    question: "How does AI lead scoring work?",
+    answer:
+      "Our AI lead scoring uses Google Gemini to analyze every incoming lead in real-time. It evaluates factors like contact validity, data completeness, and spam indicators to assign a quality score (High/Medium/Low). High-quality leads can be auto-distributed to premium buyers, while lower-quality leads go to the marketplace.",
+  },
+  {
+    question: "What call tracking features does BRIXCOT offer?",
+    answer:
+      "BRIXCOT offers 16+ enterprise call tracking features including round-robin buyer assignment, geo-routing by area code, call recording and transcription, AI call analysis with sentiment scoring, multi-ring simultaneous dialing, call whisper and screening, voicemail recording, scheduled callbacks, and Do-Not-Call list management.",
+  },
+  {
+    question: "Can I integrate BRIXCOT with my existing tools?",
+    answer:
+      "Yes! BRIXCOT integrates with 6,000+ apps through Zapier with 12 trigger events and 7 actions. You can connect to CRMs like HubSpot and Salesforce, ad platforms like Google Ads and Facebook Ads, and any other Zapier-supported tool. We also offer a REST API for custom integrations.",
+  },
+  {
+    question: "How does the lead marketplace work?",
+    answer:
+      "The lead marketplace allows sellers to list excess or unmatched leads for purchase by verified buyers. Buyers can browse available leads, preview details (with contact info hidden until purchase), see AI quality scores, and buy instantly using their wallet balance. Sellers set pricing and buyers get high-intent leads.",
+  },
+  {
+    question: "Is BRIXCOT suitable for my industry?",
+    answer:
+      "BRIXCOT is used across industries including real estate, insurance, solar/energy, home services, healthcare, automotive, mortgage, legal, and education. Our flexible form builder, customizable distribution rules, and industry-agnostic AI scoring make it adaptable to any lead-based business.",
+  },
+  {
+    question: "What security features does BRIXCOT have?",
+    answer:
+      "BRIXCOT uses enterprise-grade security including AES-256 encryption for stored credentials, HMAC-SHA256 webhook signatures, Twilio signature validation, CSRF protection, per-user credential isolation, and rate limiting. Your data is protected at every level.",
+  },
+  {
+    question: "Do you offer a free trial?",
+    answer:
+      "Yes! We offer a 14-day free trial with full access to all features. No credit card required to start. You can test lead capture forms, distribution rules, call tracking, marketing campaigns, and the marketplace before committing to a paid plan.",
+  },
+];
+
+const leftFaqs = faqs.filter((_, index) => index % 2 === 0);
+const rightFaqs = faqs.filter((_, index) => index % 2 !== 0);
+
+const socialProof = [
+  { number: "10,000+", label: "Leads Processed Daily", growth: "+127%" },
+  { number: "2,500+", label: "Active Businesses", growth: "+89%" },
+  { number: "98.7%", label: "Customer Satisfaction", growth: "+12%" },
+  { number: "$2.4M", label: "Leads Sold Monthly", growth: "+156%" },
+];
+
+const trustBadges = [
+  { icon: <Shield />, label: "SOC 2 Compliant" },
+  { icon: <Verified />, label: "GDPR Ready" },
+  { icon: <WorkspacePremium />, label: "Enterprise Grade" },
+  { icon: <ThumbUp />, label: "4.9/5 Rating" },
+];
+
+// ── Component ──
+
 const LandingPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const [checked, setChecked] = useState(false);
+  // Animations start immediately — no useEffect cycle needed
+  const checked = true;
 
-  useEffect(() => {
-    setChecked(true);
-  }, []);
-
-  const features = [
-    {
-      icon: <Psychology color="primary" />,
-      text: "AI-Powered Lead Scoring",
-      description:
-        "Google Gemini AI automatically evaluates every lead, detecting spam and assigning quality scores (High/Medium/Low) for smarter prioritization.",
-    },
-    {
-      icon: <PhoneInTalk color="primary" />,
-      text: "Advanced Call Tracking",
-      description:
-        "Full Twilio integration with round-robin routing, geo-routing, call recording, transcription, AI analysis, and real-time call monitoring.",
-    },
-    {
-      icon: <Email color="primary" />,
-      text: "Email Marketing Automation",
-      description:
-        "Create beautiful email campaigns with templates, A/B testing, scheduling, and comprehensive open/click/unsubscribe tracking.",
-    },
-    {
-      icon: <Sms color="primary" />,
-      text: "SMS Marketing Campaigns",
-      description:
-        "Engage leads with SMS campaigns featuring template support, delivery tracking, and automatic opt-out compliance (STOP/START/HELP).",
-    },
-    {
-      icon: <Storefront color="primary" />,
-      text: "Lead Marketplace",
-      description:
-        "Sell leads through our integrated marketplace. Buyers browse available leads, preview details, and purchase with wallet-based transactions.",
-    },
-    {
-      icon: <IntegrationInstructions color="primary" />,
-      text: "Zapier & API Integration",
-      description:
-        "Connect with 6,000+ apps via Zapier. 12 trigger events and 7 actions for complete automation. Plus native API for custom integrations.",
-    },
-    {
-      icon: <BuildIcon color="primary" />,
-      text: "Drag & Drop Form Builder",
-      description:
-        "Create custom lead capture forms with our intuitive builder. Embed anywhere, track submissions, and auto-score incoming leads.",
-    },
-    {
-      icon: <AutoAwesome color="primary" />,
-      text: "Smart Lead Distribution",
-      description:
-        "Auto-assign leads based on buyer preferences, location, industry, and budget. Round-robin, priority, or manual distribution options.",
-    },
-    {
-      icon: <Analytics color="primary" />,
-      text: "Comprehensive Analytics",
-      description:
-        "Real-time dashboards with lead performance, call analytics, buyer metrics, campaign ROI tracking, and exportable reports.",
-    },
-    {
-      icon: <Groups color="primary" />,
-      text: "Buyer Management",
-      description:
-        "Manage lead buyers with approval workflows, wallet accounts, purchase history, auto-accept settings, and performance tracking.",
-    },
-    {
-      icon: <Shield color="primary" />,
-      text: "Enterprise Security",
-      description:
-        "AES-256 encryption, HMAC webhook signatures, Twilio validation, CSRF protection, and per-user credential isolation.",
-    },
-    {
-      icon: <SupportAgent color="primary" />,
-      text: "24/7 Priority Support",
-      description:
-        "Dedicated support team with in-app help center, video tutorials, comprehensive documentation, and direct chat assistance.",
-    },
-  ];
-
-  const callTrackingFeatures = [
-    "Round-Robin Buyer Assignment",
-    "Business Hours Routing",
-    "Vacation Mode Filtering",
-    "Voicemail Recording",
-    "Call Recording & Transcription",
-    "AI Call Analysis & Scoring",
-    "Geo-Routing by Area Code",
-    "Multi-Ring Simultaneous Dialing",
-    "Call Whisper & Screening",
-    "Spam/Robot Detection",
-    "Do-Not-Call (DNC) List",
-    "Scheduled Callbacks",
-  ];
-
-  const platformStats = [
-    { value: "6,000+", label: "App Integrations via Zapier" },
-    { value: "99.9%", label: "Platform Uptime" },
-    { value: "< 1s", label: "Lead Distribution Speed" },
-    { value: "24/7", label: "Customer Support" },
-  ];
-
-  const testimonials = [
-    {
-      name: "Sarah Johnson",
-      role: "Real Estate Agency Owner",
-      text: "The AI lead scoring alone increased our conversion by 40%. We no longer waste time on low-quality leads. The call tracking features are a game-changer!",
-    },
-    {
-      name: "Michael Chen",
-      role: "Insurance Broker",
-      text: "Automated lead distribution saves us 20+ hours weekly. The geo-routing ensures leads go to agents in the right territory. Best investment we made.",
-    },
-    {
-      name: "David Wilson",
-      role: "Solar Sales Director",
-      text: "From lead capture to sale, BRIXCOT handles everything. The marketplace feature opened new revenue streams we never knew existed.",
-    },
-    {
-      name: "Jennifer Martinez",
-      role: "Home Services Company",
-      text: "The email and SMS campaigns are incredibly easy to set up. Our re-engagement rate improved by 65% since switching to BRIXCOT.",
-    },
-    {
-      name: "Robert Taylor",
-      role: "Digital Marketing Agency",
-      text: "We manage leads for 50+ clients through BRIXCOT. The Zapier integration connects everything seamlessly. It's the backbone of our operation.",
-    },
-    {
-      name: "Amanda Lee",
-      role: "Mortgage Lead Buyer",
-      text: "As a buyer, I love the marketplace. Preview leads before purchasing, see quality scores, and the wallet system makes transactions instant.",
-    },
-  ];
-
-  const howItWorks = [
-    {
-      step: 1,
-      title: "Capture Leads",
-      description:
-        "Use our form builder to create custom lead capture forms. Embed anywhere — your website, landing pages, or ads. Every submission is instantly processed.",
-    },
-    {
-      step: 2,
-      title: "AI Quality Scoring",
-      description:
-        "Our Gemini AI analyzes every lead in real-time, detecting spam and assigning quality scores. High-quality leads are prioritized automatically.",
-    },
-    {
-      step: 3,
-      title: "Smart Distribution",
-      description:
-        "Leads are auto-assigned to buyers based on your rules — by location, industry, budget, or round-robin. Or list them on the marketplace.",
-    },
-    {
-      step: 4,
-      title: "Engage & Convert",
-      description:
-        "Use call tracking, email campaigns, and SMS marketing to nurture leads. Track every interaction and optimize your conversion funnel.",
-    },
-  ];
-
-  const sellerBenefits = [
-    "Create unlimited lead capture forms",
-    "AI-powered spam detection & lead scoring",
-    "Automated buyer assignment & round-robin",
-    "Built-in lead marketplace for monetization",
-    "Email & SMS marketing campaigns",
-    "Advanced call tracking with Twilio",
-    "Zapier integration with 12 trigger events",
-    "Comprehensive analytics dashboard",
-  ];
-
-  const buyerBenefits = [
-    "Browse & purchase leads from marketplace",
-    "Preview lead details before buying",
-    "AI quality scores for informed decisions",
-    "Wallet-based instant transactions",
-    "Auto-accept leads matching your criteria",
-    "Call tracking with caller ID & routing",
-    "Dedicated buyer dashboard",
-    "Real-time lead notifications",
-  ];
-
-  // Industry use cases for SEO
-  const industries = [
-    {
-      icon: <Home />,
-      name: "Real Estate",
-      description:
-        "Manage buyer and seller leads with automated follow-ups and property matching.",
-      keywords: "real estate lead management, realtor CRM, property leads",
-    },
-    {
-      icon: <AttachMoney />,
-      name: "Insurance",
-      description:
-        "Distribute insurance leads by type, location, and agent availability.",
-      keywords: "insurance lead software, agent lead distribution",
-    },
-    {
-      icon: <Lightbulb />,
-      name: "Solar & Energy",
-      description:
-        "Qualify solar leads with AI scoring and geo-route to local installers.",
-      keywords: "solar lead management, energy lead generation",
-    },
-    {
-      icon: <Business />,
-      name: "Home Services",
-      description:
-        "Route plumbing, HVAC, and roofing leads to available contractors instantly.",
-      keywords: "home services leads, contractor lead management",
-    },
-    {
-      icon: <LocalHospital />,
-      name: "Healthcare",
-      description:
-        "HIPAA-conscious lead handling for medical and dental practices.",
-      keywords: "healthcare lead generation, medical practice leads",
-    },
-    {
-      icon: <DirectionsCar />,
-      name: "Automotive",
-      description:
-        "Connect car buyers with dealers based on make, model, and location preferences.",
-      keywords: "auto dealer leads, car sales lead management",
-    },
-  ];
-
-  // FAQ for SEO (FAQ schema)
-  const faqs = [
-    {
-      question: "What is BRIXCOT lead management software?",
-      answer:
-        "BRIXCOT is an enterprise-grade lead management platform that combines AI-powered lead scoring, advanced call tracking, email and SMS marketing automation, and a built-in lead marketplace. It helps businesses capture, distribute, and convert leads more efficiently with features like round-robin distribution, geo-routing, and real-time analytics.",
-    },
-    {
-      question: "How does AI lead scoring work?",
-      answer:
-        "Our AI lead scoring uses Google Gemini to analyze every incoming lead in real-time. It evaluates factors like contact validity, data completeness, and spam indicators to assign a quality score (High/Medium/Low). High-quality leads can be auto-distributed to premium buyers, while lower-quality leads go to the marketplace.",
-    },
-    {
-      question: "What call tracking features does BRIXCOT offer?",
-      answer:
-        "BRIXCOT offers 16+ enterprise call tracking features including round-robin buyer assignment, geo-routing by area code, call recording and transcription, AI call analysis with sentiment scoring, multi-ring simultaneous dialing, call whisper and screening, voicemail recording, scheduled callbacks, and Do-Not-Call list management.",
-    },
-    {
-      question: "Can I integrate BRIXCOT with my existing tools?",
-      answer:
-        "Yes! BRIXCOT integrates with 6,000+ apps through Zapier with 12 trigger events and 7 actions. You can connect to CRMs like HubSpot and Salesforce, ad platforms like Google Ads and Facebook Ads, and any other Zapier-supported tool. We also offer a REST API for custom integrations.",
-    },
-    {
-      question: "How does the lead marketplace work?",
-      answer:
-        "The lead marketplace allows sellers to list excess or unmatched leads for purchase by verified buyers. Buyers can browse available leads, preview details (with contact info hidden until purchase), see AI quality scores, and buy instantly using their wallet balance. Sellers set pricing and buyers get high-intent leads.",
-    },
-    {
-      question: "Is BRIXCOT suitable for my industry?",
-      answer:
-        "BRIXCOT is used across industries including real estate, insurance, solar/energy, home services, healthcare, automotive, mortgage, legal, and education. Our flexible form builder, customizable distribution rules, and industry-agnostic AI scoring make it adaptable to any lead-based business.",
-    },
-    {
-      question: "What security features does BRIXCOT have?",
-      answer:
-        "BRIXCOT uses enterprise-grade security including AES-256 encryption for stored credentials, HMAC-SHA256 webhook signatures, Twilio signature validation, CSRF protection, per-user credential isolation, and rate limiting. Your data is protected at every level.",
-    },
-    {
-      question: "Do you offer a free trial?",
-      answer:
-        "Yes! We offer a 14-day free trial with full access to all features. No credit card required to start. You can test lead capture forms, distribution rules, call tracking, marketing campaigns, and the marketplace before committing to a paid plan.",
-    },
-  ];
-
-  const leftFaqs = faqs.filter((_, index) => index % 2 === 0);
-  const rightFaqs = faqs.filter((_, index) => index % 2 !== 0);
-
-  // Social proof numbers
-  const socialProof = [
-    { number: "10,000+", label: "Leads Processed Daily", growth: "+127%" },
-    { number: "2,500+", label: "Active Businesses", growth: "+89%" },
-    { number: "98.7%", label: "Customer Satisfaction", growth: "+12%" },
-    { number: "$2.4M", label: "Leads Sold Monthly", growth: "+156%" },
-  ];
-
-  // Trust badges
-  const trustBadges = [
-    { icon: <Shield />, label: "SOC 2 Compliant" },
-    { icon: <Verified />, label: "GDPR Ready" },
-    { icon: <WorkspacePremium />, label: "Enterprise Grade" },
-    { icon: <ThumbUp />, label: "4.9/5 Rating" },
-  ];
-
-  // Animated counter hook
-  const useCounter = (end: number, duration: number = 2000) => {
-    const [count, setCount] = useState(0);
-    useEffect(() => {
-      if (!checked) return;
-      let start = 0;
-      const increment = end / (duration / 16);
-      const timer = setInterval(() => {
-        start += increment;
-        if (start >= end) {
-          setCount(end);
-          clearInterval(timer);
-        } else {
-          setCount(Math.floor(start));
-        }
-      }, 16);
-      return () => clearInterval(timer);
-    }, [end, duration, checked]);
-    return count;
-  };
+  const features = useMemo(
+    () => [
+      {
+        icon: <Psychology color="primary" />,
+        text: "AI-Powered Lead Scoring",
+        description:
+          "Google Gemini AI automatically evaluates every lead, detecting spam and assigning quality scores (High/Medium/Low) for smarter prioritization.",
+      },
+      {
+        icon: <PhoneInTalk color="primary" />,
+        text: "Advanced Call Tracking",
+        description:
+          "Full Twilio integration with round-robin routing, geo-routing, call recording, transcription, AI analysis, and real-time call monitoring.",
+      },
+      {
+        icon: <Email color="primary" />,
+        text: "Email Marketing Automation",
+        description:
+          "Create beautiful email campaigns with templates, A/B testing, scheduling, and comprehensive open/click/unsubscribe tracking.",
+      },
+      {
+        icon: <Sms color="primary" />,
+        text: "SMS Marketing Campaigns",
+        description:
+          "Engage leads with SMS campaigns featuring template support, delivery tracking, and automatic opt-out compliance (STOP/START/HELP).",
+      },
+      {
+        icon: <Storefront color="primary" />,
+        text: "Lead Marketplace",
+        description:
+          "Sell leads through our integrated marketplace. Buyers browse available leads, preview details, and purchase with wallet-based transactions.",
+      },
+      {
+        icon: <IntegrationInstructions color="primary" />,
+        text: "Zapier & API Integration",
+        description:
+          "Connect with 6,000+ apps via Zapier. 12 trigger events and 7 actions for complete automation. Plus native API for custom integrations.",
+      },
+      {
+        icon: <BuildIcon color="primary" />,
+        text: "Drag & Drop Form Builder",
+        description:
+          "Create custom lead capture forms with our intuitive builder. Embed anywhere, track submissions, and auto-score incoming leads.",
+      },
+      {
+        icon: <AutoAwesome color="primary" />,
+        text: "Smart Lead Distribution",
+        description:
+          "Auto-assign leads based on buyer preferences, location, industry, and budget. Round-robin, priority, or manual distribution options.",
+      },
+      {
+        icon: <Analytics color="primary" />,
+        text: "Comprehensive Analytics",
+        description:
+          "Real-time dashboards with lead performance, call analytics, buyer metrics, campaign ROI tracking, and exportable reports.",
+      },
+      {
+        icon: <Groups color="primary" />,
+        text: "Buyer Management",
+        description:
+          "Manage lead buyers with approval workflows, wallet accounts, purchase history, auto-accept settings, and performance tracking.",
+      },
+      {
+        icon: <Shield color="primary" />,
+        text: "Enterprise Security",
+        description:
+          "AES-256 encryption, HMAC webhook signatures, Twilio validation, CSRF protection, and per-user credential isolation.",
+      },
+      {
+        icon: <SupportAgent color="primary" />,
+        text: "24/7 Priority Support",
+        description:
+          "Dedicated support team with in-app help center, video tutorials, comprehensive documentation, and direct chat assistance.",
+      },
+    ],
+    [],
+  );
 
   return (
     <>

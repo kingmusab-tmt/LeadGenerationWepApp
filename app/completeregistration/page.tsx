@@ -25,7 +25,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import Image from "next/image";
-import CompanyLogo from "../../public/images/5ae9cfb6c909a_thumb900.png";
+import CompanyLogo from "../../public/images/5ae9cfb6c909a_thumb900.webp";
 import {
   CheckCircle,
   Shield,

@@ -52,6 +52,7 @@ import { useInitializeUser } from "@/lib/hooks";
 import { useSession } from "next-auth/react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import { isSellerOnboardingFlowComplete } from "@/lib/sellerOnboarding";
+import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
 
 interface UserDashboardProps {
   children: React.ReactNode;
@@ -147,6 +148,7 @@ const bottomNavItems: NavItem[] = [
 ];
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
+  useDashboardReducers();
   const { currentUser, loading: userLoading } = useInitializeUser();
   const { status } = useSession();
   const { limits } = useSubscriptionLimits();

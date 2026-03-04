@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { Snackbar, Alert, AlertColor } from "@mui/material";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { removeNotification } from "@/lib/uiSlice";
@@ -7,29 +7,28 @@ import { removeNotification } from "@/lib/uiSlice";
 const NotificationManager: React.FC = () => {
   const dispatch = useAppDispatch();
   const notifications = useAppSelector((state) => state.ui.notifications);
-  const [displayedNotifications, setDisplayedNotifications] = useState<
-    Map<string, boolean>
-  >(new Map());
+  const displayedRef = useRef<Set<string>>(new Set());
 
-  const handleClose = (notificationId: string) => {
-    dispatch(removeNotification(notificationId));
-  };
+  const handleClose = useCallback(
+    (notificationId: string) => {
+      displayedRef.current.delete(notificationId);
+      dispatch(removeNotification(notificationId));
+    },
+    [dispatch],
+  );
 
-  // Auto-remove notifications after 6 seconds
+  // Auto-remove notifications after 6 seconds — no state updates, no re-render loop
   useEffect(() => {
     notifications.forEach((notification) => {
-      if (!displayedNotifications.has(notification.id)) {
-        const newMap = new Map(displayedNotifications);
-        newMap.set(notification.id, true);
-        setDisplayedNotifications(newMap);
+      if (!displayedRef.current.has(notification.id)) {
+        displayedRef.current.add(notification.id);
 
-        // Auto-close after 6 seconds
         setTimeout(() => {
           handleClose(notification.id);
         }, 6000);
       }
     });
-  }, [notifications, displayedNotifications]);
+  }, [notifications, handleClose]);
 
   return (
     <>
