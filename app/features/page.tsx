@@ -45,12 +45,12 @@ const FeaturesPage = () => {
               justifyContent="center"
               pt={1}
             >
-              <Button variant="contained" color="secondary" href="/pricing">
+              <Button variant="contained" color="primary" href="/pricing">
                 View Pricing
               </Button>
               <Button
                 variant="outlined"
-                color="inherit"
+                color="primary"
                 href="/auth/sign-in?trial=true"
               >
                 Try it for Free
@@ -88,7 +88,11 @@ const FeaturesPage = () => {
               ))}
             </List>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mt={2}>
-              <Button variant="contained" href="/auth/sign-in?trial=true">
+              <Button
+                variant="contained"
+                color="primary"
+                href="/auth/sign-in?trial=true"
+              >
                 Start Free Trial
               </Button>
               <Button variant="outlined" href="/contact">

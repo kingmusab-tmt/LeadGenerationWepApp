@@ -1740,7 +1740,7 @@ const TierManagement = () => {
                         >
                           (
                           {currentTier.tierType === "free"
-                            ? "100% Free Trial just for 1 month"
+                            ? "100% Free Trial just for 14 days"
                             : "Monthly"}
                           )
                         </Typography>

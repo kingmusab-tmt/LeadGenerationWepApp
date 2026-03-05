@@ -124,7 +124,7 @@ const Footer = React.memo(() => {
               Email: support@brixcot.com
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Phone: +1 (555) 123-4567
+              Phone: +1 (702) 800-9182
             </Typography>
             <Box mt={2.5}>
               <MuiLink

@@ -166,7 +166,7 @@ const Header = React.memo(function Header() {
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <Phone sx={{ fontSize: 16 }} />
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  +2348162552901
+                  +1 (702) 800-9182
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -500,7 +500,7 @@ const Header = React.memo(function Header() {
                   </Button>
                   <Button
                     variant="contained"
-                    color="secondary"
+                    color="primary"
                     component={Link}
                     href="/auth/sign-in?trial=true"
                     onClick={() => {

@@ -557,7 +557,7 @@ const LandingPage = () => {
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <Button
                     variant="contained"
-                    color="secondary"
+                    color="info"
                     size="large"
                     href="/auth/sign-in?trial=true"
                     startIcon={<Rocket />}
@@ -581,25 +581,6 @@ const LandingPage = () => {
                     }}
                   >
                     Start Free 14-Day Trial
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    size="large"
-                    href="#demo"
-                    startIcon={<PlayArrow />}
-                    sx={{
-                      px: 4,
-                      py: 1.8,
-                      borderWidth: 2,
-                      borderRadius: 2,
-                      "&:hover": {
-                        borderWidth: 2,
-                        bgcolor: "rgba(255,255,255,0.1)",
-                      },
-                    }}
-                  >
-                    Watch Demo
                   </Button>
                 </Stack>
 
@@ -1478,7 +1459,7 @@ const LandingPage = () => {
             >
               <Button
                 variant="contained"
-                color="secondary"
+                color="info"
                 size="large"
                 sx={{
                   px: 6,

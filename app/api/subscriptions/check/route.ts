@@ -1,19 +1,14 @@
-import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
-import {
-  successResponse,
-  unauthorized,
-  internalError,
-} from "@/lib/api/error-handler";
+import { successResponse, internalError } from "@/lib/api/error-handler";
 
 /**
  * GET /api/subscriptions/check
  * Check if user's subscription is active
  */
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {

@@ -13,7 +13,10 @@ import {
   invalidateSessionCache,
   invalidateAllUserSessions,
 } from "@/lib/cachedSession";
-import { TIER_LIMIT_PRESETS } from "@/lib/subscriptionLimitsService";
+import {
+  TIER_LIMIT_PRESETS,
+  buildSubscriptionLimitsFromTier,
+} from "@/lib/subscriptionLimitsService";
 
 // Trial configuration
 const TRIAL_DURATION_DAYS = 14;
@@ -63,14 +66,10 @@ export async function POST(req: Request) {
     const expiryDate = new Date(startDate);
     expiryDate.setDate(expiryDate.getDate() + TRIAL_DURATION_DAYS);
 
-    // Use professional tier limits for trial (generous but not unlimited)
-    const trialLimits = {
-      ...TIER_LIMIT_PRESETS.professional,
-      // Slightly adjust for trial - give good access but not full professional
-      leads: 500, // Half of professional
-      callSeconds: 5000, // Half of professional
-      smsCampaignsPerMonth: 10, // Less than professional
-    };
+    // Use complete professional tier limits/features for trial
+    const trialLimits = buildSubscriptionLimitsFromTier(
+      TIER_LIMIT_PRESETS.professional,
+    );
 
     // Prepare trial subscription update
     const subscriptionUpdate = {

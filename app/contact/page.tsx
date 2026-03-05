@@ -116,14 +116,14 @@ const ContactPage = () => {
       title: "Email Support",
       description: "Get detailed responses within 24 hours",
       action: "Send us an email",
-      details: "support@leadmanager.com",
+      details: "support@brixcot.com",
     },
     {
       icon: <PhoneIcon color="primary" />,
       title: "Phone Support",
       description: "Speak directly with our support team",
       action: "Call us now",
-      details: "+1 (800) 123-4567",
+      details: "+1 (702) 800-9182",
     },
     // {
     //   icon: <ChatIcon color="primary" />,

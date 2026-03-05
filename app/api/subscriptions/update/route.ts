@@ -9,7 +9,6 @@ import {
   unauthorized,
   badRequest,
   notFound,
-  conflict,
   internalError,
   handleValidationError,
 } from "@/lib/api/error-handler";
@@ -23,8 +22,8 @@ const createSubscriptionSchema = z.object({
   tierId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid tier ID format"),
   planName: z.string().min(1, "Plan name is required"),
   price: z.number().min(0, "Price must be >= 0").optional(),
-  tierType: z.enum(["free", "paid"], {
-    message: "Tier type must be 'free' or 'paid'",
+  tierType: z.literal("paid", {
+    message: "This endpoint only supports paid tier subscriptions",
   }),
   subscriptionYears: z
     .number()
@@ -76,16 +75,6 @@ export async function POST(req: Request) {
       return notFound("User not found");
     }
 
-    // Check if user is trying to use free trial but has already used it
-    if (validatedData.tierType === "free") {
-      const hasUsedTrial = currentUser.subscription?.usedTrial === true;
-      if (hasUsedTrial) {
-        return conflict(
-          "You have already used your free trial. Please choose a paid subscription to continue.",
-        );
-      }
-    }
-
     // Get the tier details to access the limits
     const tier = await Tier.findById(validatedData.tierId).lean();
     if (!tier) {
@@ -96,13 +85,9 @@ export async function POST(req: Request) {
     const startDate = new Date();
     const expiryDate = new Date(startDate);
 
-    if (validatedData.tierType === "free") {
-      expiryDate.setMonth(expiryDate.getMonth() + 1);
-    } else {
-      expiryDate.setFullYear(
-        expiryDate.getFullYear() + validatedData.subscriptionYears,
-      );
-    }
+    expiryDate.setFullYear(
+      expiryDate.getFullYear() + validatedData.subscriptionYears,
+    );
 
     // Prepare subscription update data
     const subscriptionUpdate = {
@@ -110,13 +95,9 @@ export async function POST(req: Request) {
       "subscription.subscriptionStartDate": startDate,
       "subscription.subscriptionExpiryDate": expiryDate,
       "subscription.isSubscriptionActive": true,
-      "subscription.isTrial": validatedData.tierType === "free",
-      "subscription.usedTrial":
-        validatedData.tierType === "free"
-          ? true
-          : currentUser.subscription?.usedTrial || false,
-      "subscription.subscriptionPaymentMethod":
-        validatedData.tierType === "free" ? "free" : "paid",
+      "subscription.isTrial": false,
+      "subscription.usedTrial": currentUser.subscription?.usedTrial || false,
+      "subscription.subscriptionPaymentMethod": "paid",
       "subscription.subscriptionTierId": validatedData.tierId,
       "subscription.subscriptionTierType": validatedData.tierType,
       "subscription.subscriptionPrice": validatedData.price || 0,

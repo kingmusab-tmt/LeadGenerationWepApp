@@ -190,17 +190,13 @@ export default function PricingSection() {
 
     try {
       if (tier.tierType === "free") {
-        // Call API to update user's subscription to free tier
-        const response = await csrfFetch("/api/subscriptions/update", {
+        // Call dedicated API to start 14-day free trial
+        const response = await csrfFetch("/api/subscriptions/trial/start", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            tierId: tier._id,
-            planName: tier.name,
-            tierType: tier.tierType,
-          }),
+          body: JSON.stringify({}),
         });
 
         const responseData = await response.json();
@@ -392,7 +388,7 @@ export default function PricingSection() {
             ? `Your subscription expires in ${daysRemaining} day${
                 daysRemaining !== 1 ? "s" : ""
               }. Choose a plan to continue uninterrupted service.`
-            : "Choose the plan that fits your business needs. Start with our free tier and upgrade anytime."}
+            : "Choose the plan that fits your business needs. Start with our 14-day free trial and upgrade anytime."}
         </Typography>
 
         {/* User Type Toggle */}
