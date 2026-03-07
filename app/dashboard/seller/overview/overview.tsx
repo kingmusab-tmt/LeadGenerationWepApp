@@ -413,7 +413,9 @@ const Overview: React.FC = () => {
               justifyContent="space-between"
               alignItems="center"
             >
-              <Typography variant="h6">New Leads</Typography>
+              <Typography variant="h6" color="primary">
+                New Leads
+              </Typography>
               <People color="primary" />
             </Box>
             <Typography
@@ -435,7 +437,9 @@ const Overview: React.FC = () => {
               justifyContent="space-between"
               alignItems="center"
             >
-              <Typography variant="h6">Purchased Leads</Typography>
+              <Typography variant="h6" color="primary">
+                Purchased Leads
+              </Typography>
               <People color="primary" />
             </Box>
             <Typography
@@ -457,7 +461,9 @@ const Overview: React.FC = () => {
               justifyContent="space-between"
               alignItems="center"
             >
-              <Typography variant="h6">Total Leads</Typography>
+              <Typography variant="h6" color="primary">
+                Total Leads
+              </Typography>
               <People color="primary" />
             </Box>
             <Typography
@@ -479,7 +485,9 @@ const Overview: React.FC = () => {
               justifyContent="space-between"
               alignItems="center"
             >
-              <Typography variant="h6">Total Leads Buyers</Typography>
+              <Typography variant="h6" color="primary">
+                Total Leads Buyers
+              </Typography>
               <People color="primary" />
             </Box>
             <Typography
@@ -501,7 +509,9 @@ const Overview: React.FC = () => {
               justifyContent="space-between"
               alignItems="center"
             >
-              <Typography variant="h6">New Leads Buyers</Typography>
+              <Typography variant="h6" color="primary">
+                New Leads Buyers
+              </Typography>
               <People color="primary" />
             </Box>
             <Typography
@@ -524,12 +534,14 @@ const Overview: React.FC = () => {
               justifyContent="space-between"
               alignItems="center"
             >
-              <Typography variant="h6">Conversion Rate</Typography>
+              <Typography variant="h6" color="primary">
+                Conversion Rate
+              </Typography>
               <Timeline color="primary" />
             </Box>
             <Typography
               variant="h4"
-              sx={{ color: "success.main", fontWeight: "bold" }}
+              sx={{ color: "primary.main", fontWeight: "bold" }}
             >
               {overviewData.conversionRate}%
             </Typography>
@@ -547,12 +559,14 @@ const Overview: React.FC = () => {
               justifyContent="space-between"
               alignItems="center"
             >
-              <Typography variant="h6">Total Revenue</Typography>
+              <Typography variant="h6" color="primary">
+                Total Revenue
+              </Typography>
               <MonetizationOn color="primary" />
             </Box>
             <Typography
               variant="h4"
-              sx={{ color: "warning.main", fontWeight: "bold" }}
+              sx={{ color: "primary.main", fontWeight: "bold" }}
             >
               ${overviewData.totalRevenue.toLocaleString()}
             </Typography>
@@ -568,7 +582,9 @@ const Overview: React.FC = () => {
               justifyContent="space-between"
               alignItems="center"
             >
-              <Typography variant="h6">Campaign ROI</Typography>
+              <Typography variant="h6" color="primary">
+                Campaign ROI
+              </Typography>
               <LocalAtm color="primary" />
             </Box>
             <Typography

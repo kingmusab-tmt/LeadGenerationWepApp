@@ -9,6 +9,10 @@ const CookieConsentManager = dynamic(
   () => import("@/app/components/generalComponent/CookieConsentManager"),
   { ssr: false },
 );
+const ServiceWorkerRegistration = dynamic(
+  () => import("@/app/components/ServiceWorkerRegistration"),
+  { ssr: false },
+);
 
 /**
  * Client-side wrapper for components that need `ssr: false` dynamic imports.
@@ -17,6 +21,7 @@ const CookieConsentManager = dynamic(
 export default function ClientOverlays() {
   return (
     <>
+      <ServiceWorkerRegistration />
       <CookieConsentManager />
       <NotificationManager />
     </>

@@ -332,7 +332,7 @@ const AdminOverview: React.FC = () => {
             </Box>
             <Typography
               variant="h4"
-              sx={{ color: "success.main", fontWeight: "bold" }}
+              sx={{ color: "primary.main", fontWeight: "bold" }}
             >
               ${overviewData.totalRevenue.toLocaleString()}
             </Typography>

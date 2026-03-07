@@ -93,7 +93,7 @@ const FeaturesPage = () => {
                 color="primary"
                 href="/auth/sign-in?trial=true"
               >
-                Start Free Trial
+                Start 14 Days Free Trial
               </Button>
               <Button variant="outlined" href="/contact">
                 Contact Sales

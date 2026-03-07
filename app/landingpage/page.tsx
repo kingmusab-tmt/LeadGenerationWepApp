@@ -6,9 +6,6 @@ import {
   Container,
   Grid,
   Typography,
-  Card,
-  CardContent,
-  CardActions,
   List,
   ListItem,
   ListItemIcon,
@@ -27,57 +24,37 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Rating,
-  LinearProgress,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import PhoneIcon from "@mui/icons-material/Phone";
-import PeopleIcon from "@mui/icons-material/People";
-import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import BuildIcon from "@mui/icons-material/Build";
+import Psychology from "@mui/icons-material/Psychology";
+import Email from "@mui/icons-material/Email";
+import Sms from "@mui/icons-material/Sms";
+import TrendingUp from "@mui/icons-material/TrendingUp";
+import IntegrationInstructions from "@mui/icons-material/IntegrationInstructions";
+import Store from "@mui/icons-material/Store";
+import AutoAwesome from "@mui/icons-material/AutoAwesome";
+import Analytics from "@mui/icons-material/Analytics";
+import PhoneInTalk from "@mui/icons-material/PhoneInTalk";
+import Storefront from "@mui/icons-material/Storefront";
+import Groups from "@mui/icons-material/Groups";
+import Rocket from "@mui/icons-material/Rocket";
+import Shield from "@mui/icons-material/Shield";
+import SupportAgent from "@mui/icons-material/SupportAgent";
+import ExpandMore from "@mui/icons-material/ExpandMore";
+import Verified from "@mui/icons-material/Verified";
+import WorkspacePremium from "@mui/icons-material/WorkspacePremium";
+import ThumbUp from "@mui/icons-material/ThumbUp";
+import Business from "@mui/icons-material/Business";
+import Home from "@mui/icons-material/Home";
+import LocalHospital from "@mui/icons-material/LocalHospital";
+import DirectionsCar from "@mui/icons-material/DirectionsCar";
+import AttachMoney from "@mui/icons-material/AttachMoney";
+import Lightbulb from "@mui/icons-material/Lightbulb";
 import Header from "../components/generalComponent/Header";
 import Footer from "../components/generalComponent/Footer";
 import logo from "../../public/BRIXCOT.webp";
 import Image from "next/image";
-import {
-  Description,
-  Speed,
-  Psychology,
-  Email,
-  Sms,
-  TrendingUp,
-  Security,
-  IntegrationInstructions,
-  Store,
-  AutoAwesome,
-  Analytics,
-  PhoneInTalk,
-  Storefront,
-  Groups,
-  Rocket,
-  Shield,
-  SupportAgent,
-  CloudSync,
-  ExpandMore,
-  PlayArrow,
-  EmojiEvents,
-  Verified,
-  WorkspacePremium,
-  ThumbUp,
-  Business,
-  Home,
-  LocalHospital,
-  School,
-  DirectionsCar,
-  AttachMoney,
-  Lightbulb,
-  FlashOn,
-  Timer,
-  TrendingDown,
-} from "@mui/icons-material";
-// Head removed — use Next.js App Router metadata export instead
-
-// ── Static data arrays (hoisted to module scope to avoid re-creation) ──
 
 const callTrackingFeatures = [
   "Round-Robin Buyer Assignment",
@@ -580,7 +557,7 @@ const LandingPage = () => {
                       },
                     }}
                   >
-                    Start Free 14-Day Trial
+                    Start 14 Days Free Trial
                   </Button>
                 </Stack>
 
@@ -1347,7 +1324,7 @@ const LandingPage = () => {
                     },
                   }}
                 >
-                  Start Free Trial
+                  Start 14 Days Free Trial
                 </Button>
               </Stack>
               <Typography variant="body2" sx={{ mt: 3, opacity: 0.8 }}>
@@ -1359,7 +1336,7 @@ const LandingPage = () => {
       </Fade>
 
       {/* Testimonials Section with Slide animations */}
-      <Box py={10} bgcolor="background.paper">
+      {/* <Box py={10} bgcolor="background.paper">
         <Container maxWidth="xl" sx={{ px: { xs: 6, sm: 8 } }}>
           <Slide direction="up" in={checked} mountOnEnter unmountOnExit>
             <Box textAlign="center" mb={6}>
@@ -1434,69 +1411,7 @@ const LandingPage = () => {
             ))}
           </Grid>
         </Container>
-      </Box>
-
-      {/* CTA Section with Zoom animation */}
-      <Zoom in={checked} style={{ transitionDelay: checked ? "500ms" : "0ms" }}>
-        <Box py={12} bgcolor="primary.main" color="white">
-          <Container
-            maxWidth="lg"
-            sx={{ textAlign: "center", px: { xs: 3, sm: 4 } }}
-          >
-            <Rocket sx={{ fontSize: 64, mb: 2 }} />
-            <Typography variant="h3" fontWeight="bold" gutterBottom>
-              Ready to Transform Your Lead Business?
-            </Typography>
-            <Typography variant="h5" paragraph sx={{ opacity: 0.9 }}>
-              Join thousands of businesses already using BRIXCOT to capture,
-              manage, and convert more leads than ever before.
-            </Typography>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              justifyContent="center"
-              mt={4}
-            >
-              <Button
-                variant="contained"
-                color="info"
-                size="large"
-                sx={{
-                  px: 6,
-                  py: 2,
-                  fontWeight: "bold",
-                  transition: "all 0.3s ease",
-                  "&:hover": {
-                    transform: "scale(1.05)",
-                    boxShadow: theme.shadows[8],
-                  },
-                }}
-                href="/auth/sign-in?trial=true"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    sessionStorage.setItem("trialIntent", "true");
-                  }
-                }}
-              >
-                Start Your Free 14-Day Trial
-              </Button>
-              {/* <Button
-                variant="outlined"
-                color="inherit"
-                size="large"
-                sx={{ px: 6, py: 2 }}
-                href="/contact"
-              >
-                Talk to Sales
-              </Button> */}
-            </Stack>
-            <Typography variant="body2" sx={{ mt: 3, opacity: 0.8 }}>
-              No credit card required • Full access to all features • Cancel
-              anytime
-            </Typography>
-          </Container>
-        </Box>
-      </Zoom>
+      </Box> */}
 
       {/* FAQ Section for SEO */}
       <Box

@@ -647,7 +647,7 @@ const PricingPage = () => {
                     },
                   }}
                 >
-                  Start Free Trial
+                  Start 14 Days Free Trial
                 </Button>
                 <Button
                   variant="outlined"

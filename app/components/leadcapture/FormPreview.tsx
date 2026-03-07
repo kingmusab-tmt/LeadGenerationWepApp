@@ -154,6 +154,9 @@ interface StyleConfig {
   buttonText?: string;
   successMessage?: string;
   formBackgroundColor?: string;
+  // Backward-compatible aliases used by older saved forms.
+  backgroundColor?: string;
+  accentColor?: string;
 }
 
 interface FormPreviewProps {
@@ -557,17 +560,22 @@ const FormPreview = ({
     return maxLength ? `${value.length}/${maxLength}` : `${value.length}`;
   };
 
-  // Determine form background color based on theme and config
+  const resolvedBackgroundColor =
+    styleConfig?.formBackgroundColor || styleConfig?.backgroundColor;
+  const resolvedPrimaryColor =
+    styleConfig?.primaryColor || styleConfig?.accentColor;
+
+  // Determine form background color based on config/theme
   const getFormBackgroundColor = () => {
-    if (styleConfig?.formBackgroundColor && !isLoggedIn) {
-      return styleConfig.formBackgroundColor;
+    if (resolvedBackgroundColor) {
+      return resolvedBackgroundColor;
     }
     return isDarkMode ? theme.palette.background.paper : "#ffffff";
   };
 
   // Get primary color for buttons
   const getPrimaryColor = () => {
-    return styleConfig?.primaryColor || theme.palette.primary.main;
+    return resolvedPrimaryColor || theme.palette.primary.main;
   };
 
   const headingVariant = (level?: Field["headingLevel"]) => {
@@ -1162,16 +1170,18 @@ const FormPreview = ({
           </Box>
         )}
 
-        {!isLoggedIn && safeFields.length > 0 && (
+        {safeFields.length > 0 && (
           <Box
             sx={{
               mt: { xs: 3, sm: 4 },
               display: "flex",
               justifyContent: "center",
+              flexDirection: "column",
+              gap: 1,
             }}
           >
             <Button
-              type="submit"
+              type={isLoggedIn ? "button" : "submit"}
               variant="contained"
               disabled={isSubmitting}
               sx={{
@@ -1189,6 +1199,15 @@ const FormPreview = ({
                 ? "Submitting..."
                 : styleConfig?.buttonText || "Submit"}
             </Button>
+            {isLoggedIn && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ textAlign: "center" }}
+              >
+                Button preview only. Submissions are enabled after publishing.
+              </Typography>
+            )}
           </Box>
         )}
       </form>

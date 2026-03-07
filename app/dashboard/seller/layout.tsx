@@ -391,7 +391,12 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       <Divider sx={{ mx: 2 }} />
 
       {/* Bottom Navigation */}
-      <Box sx={{ py: 1 }}>
+      <Box
+        sx={{
+          py: 1,
+          background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.primary.dark} 100%)`,
+        }}
+      >
         <List disablePadding>
           {bottomNavItems.map((item) => {
             const active = isActive(item.path);
@@ -403,13 +408,15 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
                   mx: 1.5,
                   mb: 0.5,
                   borderRadius: 2,
-                  bgcolor: active ? "primary.main" : "transparent",
-                  color: active ? "primary.contrastText" : "text.primary",
+                  bgcolor: active ? "rgba(255,255,255,0.2)" : "transparent",
+                  color: "common.white",
                   "&:hover": {
-                    bgcolor: active ? "primary.dark" : "action.hover",
+                    bgcolor: active
+                      ? "rgba(255,255,255,0.28)"
+                      : "rgba(255,255,255,0.14)",
                   },
                   "& .MuiListItemIcon-root": {
-                    color: active ? "primary.contrastText" : "text.secondary",
+                    color: "common.white",
                   },
                 }}
               >
@@ -432,12 +439,12 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               mx: 1.5,
               mb: 0.5,
               borderRadius: 2,
-              color: "error.main",
+              color: "common.white",
               "&:hover": {
-                bgcolor: "error.lighter",
+                bgcolor: "rgba(255,255,255,0.14)",
               },
               "& .MuiListItemIcon-root": {
-                color: "error.main",
+                color: "common.white",
               },
             }}
           >

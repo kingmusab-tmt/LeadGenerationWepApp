@@ -36,11 +36,15 @@ export async function GET(req: NextRequest) {
     oneMonthAgo.setMonth(currentDate.getMonth() - 1);
     const twoMonthsAgo = new Date();
     twoMonthsAgo.setMonth(currentDate.getMonth() - 2);
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(currentDate.getMonth() - 12);
 
     // ──────────────────────────────────────────────────────
     // Run ALL independent MongoDB queries in parallel
     // ──────────────────────────────────────────────────────
     const userObjId = new mongoose.Types.ObjectId(userId);
+    const transactionUserMatch = { $in: [userObjId, userId] };
+    const sellerIncomeTypes = ["seller_income", "seller_income_auto_accept"];
 
     const [
       totalLeads,
@@ -83,8 +87,8 @@ export async function GET(req: NextRequest) {
       Transaction.aggregate([
         {
           $match: {
-            userId: userObjId,
-            type: "seller_income",
+            userId: transactionUserMatch,
+            type: { $in: sellerIncomeTypes },
             status: "completed",
           },
         },
@@ -186,19 +190,22 @@ export async function GET(req: NextRequest) {
       Transaction.aggregate([
         {
           $match: {
-            userId: userId || userObjId,
-            type: "seller_income",
+            userId: transactionUserMatch,
+            type: { $in: sellerIncomeTypes },
             status: "completed",
-            createdAt: { $gte: twoMonthsAgo },
+            createdAt: { $gte: twelveMonthsAgo },
           },
         },
         {
           $group: {
-            _id: { $month: "$createdAt" },
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+            },
             revenue: { $sum: "$amount" },
           },
         },
-        { $sort: { _id: 1 } },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
 
       // 9. LEAD SOURCES
@@ -228,8 +235,8 @@ export async function GET(req: NextRequest) {
       Transaction.aggregate([
         {
           $match: {
-            userId: userId || userObjId,
-            type: "seller_income",
+            userId: transactionUserMatch,
+            type: { $in: sellerIncomeTypes },
             status: "completed",
           },
         },
@@ -274,8 +281,8 @@ export async function GET(req: NextRequest) {
       Transaction.aggregate([
         {
           $match: {
-            userId: userId || userObjId,
-            type: "seller_income",
+            userId: transactionUserMatch,
+            type: { $in: sellerIncomeTypes },
             status: "completed",
             createdAt: { $gte: oneMonthAgo, $lte: currentDate },
           },
@@ -285,8 +292,8 @@ export async function GET(req: NextRequest) {
       Transaction.aggregate([
         {
           $match: {
-            userId: userId || userObjId,
-            type: "seller_income",
+            userId: transactionUserMatch,
+            type: { $in: sellerIncomeTypes },
             status: "completed",
             createdAt: { $gte: twoMonthsAgo, $lte: oneMonthAgo },
           },
@@ -364,7 +371,12 @@ export async function GET(req: NextRequest) {
             foreignField: "metadata.leadId",
             as: "transactions",
             pipeline: [
-              { $match: { type: "seller_income", status: "completed" } },
+              {
+                $match: {
+                  type: { $in: sellerIncomeTypes },
+                  status: "completed",
+                },
+              },
             ],
           },
         },
@@ -433,8 +445,8 @@ export async function GET(req: NextRequest) {
       Transaction.aggregate([
         {
           $match: {
-            userId: userId || userObjId,
-            type: "seller_income",
+            userId: transactionUserMatch,
+            type: { $in: sellerIncomeTypes },
             status: "completed",
             createdAt: {
               $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
@@ -455,8 +467,8 @@ export async function GET(req: NextRequest) {
       Transaction.aggregate([
         {
           $match: {
-            userId: userId || userObjId,
-            type: "seller_income",
+            userId: transactionUserMatch,
+            type: { $in: sellerIncomeTypes },
             status: "completed",
             createdAt: {
               $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
@@ -567,12 +579,17 @@ export async function GET(req: NextRequest) {
         // contactRate: followUpMetrics[0]?.contactRate || 0,
         // followUpRate: followUpMetrics[0]?.followUpRate || 0,
       },
-      revenueTrend: revenueTrend.map((rt: { _id: number; revenue: any }) => ({
-        month: new Date(0, rt._id - 1).toLocaleString("default", {
-          month: "short",
+      revenueTrend: revenueTrend.map(
+        (rt: { _id: { year: number; month: number }; revenue: number }) => ({
+          month: new Date(rt._id.year, rt._id.month - 1, 1).toLocaleString(
+            "default",
+            {
+              month: "short",
+            },
+          ),
+          revenue: rt.revenue,
         }),
-        revenue: rt.revenue,
-      })),
+      ),
       leadSources: leadSources.map((ls) => ({
         source: ls.source,
         count: ls.count,
@@ -606,12 +623,17 @@ export async function GET(req: NextRequest) {
           week: ws.weekLabel,
           sales: ws.sales,
         })),
-        monthly: revenueTrend.map((rt: { _id: number; revenue: any }) => ({
-          month: new Date(0, rt._id - 1).toLocaleString("default", {
-            month: "short",
+        monthly: revenueTrend.map(
+          (rt: { _id: { year: number; month: number }; revenue: number }) => ({
+            month: new Date(rt._id.year, rt._id.month - 1, 1).toLocaleString(
+              "default",
+              {
+                month: "short",
+              },
+            ),
+            sales: rt.revenue,
           }),
-          sales: rt.revenue,
-        })),
+        ),
       },
       callMetrics: {
         totalCalls: callMetrics[0]?.totalCalls || 0,

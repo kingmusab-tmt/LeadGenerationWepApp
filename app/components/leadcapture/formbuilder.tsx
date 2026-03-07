@@ -70,13 +70,10 @@ const FormBuilder = () => {
   }>({ open: false, message: "", severity: "info" });
 
   // Style Configuration State
-  const [primaryColor, setPrimaryColor] = useState<string>("#1976d2");
   const [buttonText, setButtonText] = useState<string>("Submit");
   const [successMessage, setSuccessMessage] = useState<string>(
     "Thank you! Your form has been submitted successfully.",
   );
-  const [formBackgroundColor, setFormBackgroundColor] =
-    useState<string>("#ffffff");
   const [recaptchaEnabled, setRecaptchaEnabled] = useState<boolean>(false);
 
   // AI Generation State
@@ -297,10 +294,8 @@ const FormBuilder = () => {
           fields: mappedFields,
           recaptchaEnabled,
           styleConfig: {
-            primaryColor,
             buttonText,
             successMessage,
-            formBackgroundColor,
           },
         }),
       });
@@ -319,12 +314,10 @@ const FormBuilder = () => {
         setLeadSource("");
         setIndustry("");
         setNewFieldLabel("");
-        setPrimaryColor("#1976d2");
         setButtonText("Submit");
         setSuccessMessage(
           "Thank you! Your form has been submitted successfully.",
         );
-        setFormBackgroundColor("#ffffff");
         setRecaptchaEnabled(false);
 
         // Redirect to forms page
@@ -488,69 +481,6 @@ const FormBuilder = () => {
                 </Select>
               </FormControl>
             </Tooltip>
-            <Typography
-              variant="caption"
-              gutterBottom
-              sx={{
-                fontWeight: 600,
-                mt: 1.5,
-                mb: 0.5,
-                display: "block",
-                fontSize: "0.75rem",
-              }}
-            >
-              Style
-            </Typography>
-            <Tooltip
-              title="Choose the primary color for buttons and accents"
-              placement="right"
-              arrow
-            >
-              <Box
-                sx={{ mb: 1, display: "flex", alignItems: "center", gap: 0.5 }}
-              >
-                <Typography variant="caption" sx={{ fontSize: "0.7rem" }}>
-                  Primary:
-                </Typography>
-                <input
-                  type="color"
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  style={{
-                    width: "28px",
-                    height: "22px",
-                    border: "1px solid #ccc",
-                    borderRadius: "3px",
-                    cursor: "pointer",
-                  }}
-                />
-              </Box>
-            </Tooltip>
-            <Tooltip
-              title="Customize the background color of the form"
-              placement="right"
-              arrow
-            >
-              <Box
-                sx={{ mb: 1, display: "flex", alignItems: "center", gap: 0.5 }}
-              >
-                <Typography variant="caption" sx={{ fontSize: "0.7rem" }}>
-                  BG:
-                </Typography>
-                <input
-                  type="color"
-                  value={formBackgroundColor}
-                  onChange={(e) => setFormBackgroundColor(e.target.value)}
-                  style={{
-                    width: "28px",
-                    height: "22px",
-                    border: "1px solid #ccc",
-                    borderRadius: "3px",
-                    cursor: "pointer",
-                  }}
-                />
-              </Box>
-            </Tooltip>
             <Tooltip
               title="Set the text label for the submit button"
               placement="right"
@@ -598,6 +528,31 @@ const FormBuilder = () => {
                 typography: { variant: "caption", sx: { fontSize: "0.7rem" } },
               }}
             />
+
+            {limits?.aiGenerativeEnabled && (
+              <Tooltip
+                title="Use AI to automatically generate form fields based on your requirements"
+                placement="right"
+                arrow
+              >
+                <Button
+                  variant="contained"
+                  fullWidth
+                  size="small"
+                  onClick={() => setAiDialogOpen(true)}
+                  startIcon={<AutoFixHighIcon sx={{ fontSize: "0.85rem" }} />}
+                  sx={{
+                    mt: 0.75,
+                    fontSize: "0.7rem",
+                    py: 0.5,
+                    backgroundColor: "#9c27b0",
+                    "&:hover": { backgroundColor: "#7b1fa2" },
+                  }}
+                >
+                  AI Generate
+                </Button>
+              </Tooltip>
+            )}
           </Paper>
         </Grid>
 
@@ -620,10 +575,8 @@ const FormBuilder = () => {
             errors={{}}
             loading={false}
             styleConfig={{
-              primaryColor,
               buttonText,
               successMessage,
-              formBackgroundColor,
             }}
             recaptchaEnabled={recaptchaEnabled}
           />
@@ -754,12 +707,10 @@ const FormBuilder = () => {
                   setLeadSource("");
                   setIndustry("");
                   setNewFieldLabel("");
-                  setPrimaryColor("#1976d2");
                   setButtonText("Submit");
                   setSuccessMessage(
                     "Thank you! Your form has been submitted successfully.",
                   );
-                  setFormBackgroundColor("#ffffff");
                   setRecaptchaEnabled(false);
                   setSnackbar({
                     open: true,
@@ -816,7 +767,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("header", "Section Header")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Header
               </Button>
@@ -832,7 +783,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("paragraph", "Paragraph text")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Paragraph
               </Button>
@@ -848,36 +799,11 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={addLeadContactFields}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Contact Fields
               </Button>
             </Tooltip>
-
-            {limits?.aiGenerativeEnabled && (
-              <Tooltip
-                title="Use AI to automatically generate form fields based on your requirements"
-                placement="left"
-                arrow
-              >
-                <Button
-                  variant="contained"
-                  fullWidth
-                  size="small"
-                  onClick={() => setAiDialogOpen(true)}
-                  startIcon={<AutoFixHighIcon sx={{ fontSize: "0.85rem" }} />}
-                  sx={{
-                    mb: 1,
-                    fontSize: "0.7rem",
-                    py: 0.5,
-                    backgroundColor: "#9c27b0",
-                    "&:hover": { backgroundColor: "#7b1fa2" },
-                  }}
-                >
-                  AI Generate
-                </Button>
-              </Tooltip>
-            )}
 
             <Tooltip
               title="Add a single-line text input field for short text responses"
@@ -889,7 +815,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("text", "Text Input")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Text
               </Button>
@@ -905,7 +831,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("textarea", "Long Text / Textarea")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Textarea
               </Button>
@@ -921,7 +847,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("select", "Dropdown")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Dropdown
               </Button>
@@ -937,7 +863,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("checkbox", "Checkbox")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Checkbox
               </Button>
@@ -953,7 +879,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("radio", "Radio Button")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Radio
               </Button>
@@ -969,7 +895,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("number", "Number Input")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Number
               </Button>
@@ -985,7 +911,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("date", "Date Picker")}
-                sx={{ mb: 0.5, fontSize: "0.7rem", py: 0.5 }}
+                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
               >
                 Date
               </Button>

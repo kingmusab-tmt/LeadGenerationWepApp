@@ -14,9 +14,9 @@ export const sendPushNotification = async (user: any, lead: any) => {
     }
 
     // Register the service worker
-    const registration = await navigator.serviceWorker.register(
-      "/service-worker.js"
-    );
+    const registration = await navigator.serviceWorker.register("/sw.js", {
+      scope: "/",
+    });
     //("Service Worker registered:", registration);
 
     // Request permission for push notifications

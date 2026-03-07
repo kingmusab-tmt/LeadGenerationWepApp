@@ -46,13 +46,9 @@ export class EmailTemplateEngine {
    * @param trackingToken Unique tracking token
    * @returns HTML with tracking pixel
    */
-  static addTrackingPixel(
-    html: string,
-    campaignId: string,
-    recipientEmail: string,
-  ): string {
+  static addTrackingPixel(html: string, trackingToken: string): string {
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const pixel = `<img src="${baseUrl}/api/marketing/email/track?action=open&campaignId=${campaignId}&email=${encodeURIComponent(recipientEmail)}" width="1" height="1" alt="" style="display:none" />`;
+    const pixel = `<img src="${baseUrl}/api/marketing/email/track/open/${encodeURIComponent(trackingToken)}" width="1" height="1" alt="" style="width:1px;height:1px;opacity:0;border:0;" />`;
     // Insert before closing body tag if exists, otherwise append
     if (html.includes("</body>")) {
       return html.replace("</body>", `${pixel}</body>`);
@@ -67,11 +63,7 @@ export class EmailTemplateEngine {
    * @param recipientEmail Recipient email
    * @returns HTML with tracked links
    */
-  static addLinkTracking(
-    html: string,
-    campaignId: string,
-    recipientEmail: string,
-  ): string {
+  static addLinkTracking(html: string, trackingToken: string): string {
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     const linkRegex = /href="([^"]*)"/g;
     return html.replace(linkRegex, (match, url) => {
@@ -84,7 +76,8 @@ export class EmailTemplateEngine {
         return match;
       }
       if (url.startsWith("http")) {
-        const trackingUrl = `${baseUrl}/api/marketing/email/track?action=click&campaignId=${campaignId}&email=${encodeURIComponent(recipientEmail)}&url=${encodeURIComponent(url)}`;
+        const encodedUrl = Buffer.from(url, "utf-8").toString("base64");
+        const trackingUrl = `${baseUrl}/api/marketing/email/track/click/${encodeURIComponent(trackingToken)}?url=${encodeURIComponent(encodedUrl)}`;
         return `href="${trackingUrl}"`;
       }
       return match;
@@ -259,16 +252,14 @@ export class EmailQueueManager {
         if (campaign.trackingPixel) {
           htmlContent = EmailTemplateEngine.addTrackingPixel(
             htmlContent,
-            campaignId,
-            queueItem.recipientEmail,
+            queueItem.trackingToken || "",
           );
         }
 
         if (campaign.trackLinks) {
           htmlContent = EmailTemplateEngine.addLinkTracking(
             htmlContent,
-            campaignId,
-            queueItem.recipientEmail,
+            queueItem.trackingToken || "",
           );
         }
 
