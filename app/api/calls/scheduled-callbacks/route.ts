@@ -3,6 +3,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import ScheduledCallback from "@/models/scheduledCallback";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 /**
  * Scheduled Callbacks API
@@ -14,7 +21,11 @@ export async function GET(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Seller or admin access required");
     }
 
     const searchParams = req.nextUrl.searchParams;
@@ -22,7 +33,11 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
 
-    const query: Record<string, any> = { sellerId: session.user.id };
+    if (Number.isNaN(page) || Number.isNaN(limit) || page < 1 || limit < 1) {
+      return badRequest("page and limit must be positive integers");
+    }
+
+    const query: Record<string, unknown> = { sellerId: session.user.id };
     if (status !== "all") {
       query.status = status;
     }
@@ -48,10 +63,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching scheduled callbacks:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch callbacks" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch callbacks");
   }
 }
 
@@ -60,16 +72,17 @@ export async function PATCH(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Seller or admin access required");
     }
 
     const { callbackId, action, notes } = await req.json();
 
     if (!callbackId || !action) {
-      return NextResponse.json(
-        { error: "callbackId and action are required" },
-        { status: 400 },
-      );
+      return badRequest("callbackId and action are required");
     }
 
     const callback = await ScheduledCallback.findOne({
@@ -78,10 +91,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!callback) {
-      return NextResponse.json(
-        { error: "Callback not found" },
-        { status: 404 },
-      );
+      return notFound("Callback");
     }
 
     if (action === "complete") {
@@ -93,10 +103,7 @@ export async function PATCH(req: NextRequest) {
       callback.status = "cancelled";
       if (notes) callback.notes = notes;
     } else {
-      return NextResponse.json(
-        { error: "Invalid action. Use 'complete' or 'cancel'" },
-        { status: 400 },
-      );
+      return badRequest("Invalid action. Use 'complete' or 'cancel'");
     }
 
     await callback.save();
@@ -107,9 +114,6 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error updating callback:", error);
-    return NextResponse.json(
-      { error: "Failed to update callback" },
-      { status: 500 },
-    );
+    return internalError("Failed to update callback");
   }
 }

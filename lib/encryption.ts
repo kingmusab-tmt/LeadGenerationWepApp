@@ -1,7 +1,8 @@
 import crypto from "crypto";
+import { env } from "@/lib/env";
 
 const algorithm = "aes-256-cbc";
-const key = Buffer.from(process.env.ENCRYPTION_KEY!, "hex");
+const key = Buffer.from(env.ENCRYPTION_KEY, "hex");
 
 /**
  * Encrypts data with a randomly generated IV per encryption
@@ -69,6 +70,10 @@ export function migrateEncryptedData(legacyEncryptedData: string): string {
     // Re-encrypt with new random IV
     return encryptData(decrypted);
   } catch (error) {
-    throw new Error(`Failed to migrate encrypted data: ${error}`);
+    throw new Error(
+      `Failed to migrate encrypted data: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 }

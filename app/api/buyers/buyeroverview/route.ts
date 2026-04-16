@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Buyer } from "@/models/leadbuyers";
@@ -6,22 +6,26 @@ import { User } from "@/models";
 import { Lead } from "@/models/leads";
 import Call from "@/models/call";
 import { Transaction } from "@/models/transactions";
+import dbConnect from "@/lib/connectdb";
+import { internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   // Get the session using getServerSession
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.role !== "buyer") {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return unauthorized("Authentication required");
   }
 
   const buyerEmail = session.user.email;
 
   try {
+    await dbConnect();
+
     // Fetch buyer information
     const buyer = await Buyer.findOne({ email: buyerEmail });
     if (!buyer) {
-      return NextResponse.json({ message: "Buyer not found" }, { status: 404 });
+      return notFound("Buyer");
     }
 
     // Fetch seller information
@@ -85,15 +89,6 @@ export async function GET(req: NextRequest) {
     const totalUnitPurchased =
       totalUnits.length > 0 ? totalUnits[0].totalUnits : 0;
 
-    // Fetch total unit used
-    const totalUnitUsed = await Lead.aggregate([
-      { $match: { "soldTo.buyerId": buyer._id } },
-      { $group: { _id: null, total: { $sum: "$soldTo.unit" } } },
-    ]);
-    const totalUnitUsedValue = totalUnitUsed.length
-      ? totalUnitUsed[0].total
-      : 0;
-
     // Fetch calls received and missed
     const callsReceived = await Call.countDocuments({
       "answeredBy.buyerId": buyer._id,
@@ -106,23 +101,23 @@ export async function GET(req: NextRequest) {
 
     // Return the overview data
     return NextResponse.json({
-      purchasedLeads,
-      availableLeads,
-      sellerInfo,
-      assignedLeads,
-      acceptedLeads,
-      rejectedLeads,
-      walletUnit,
-      totalUnitPurchased,
-      totalUnitUsed: totalUnitPurchased - walletUnit,
-      callsReceived,
-      callsMissed,
+      success: true,
+      data: {
+        purchasedLeads,
+        availableLeads,
+        sellerInfo,
+        assignedLeads,
+        acceptedLeads,
+        rejectedLeads,
+        walletUnit,
+        totalUnitPurchased,
+        totalUnitUsed: totalUnitPurchased - walletUnit,
+        callsReceived,
+        callsMissed,
+      },
     });
   } catch (error) {
     console.error("Failed to fetch overview data", error);
-    return NextResponse.json(
-      { message: "Internal Server Error" },
-      { status: 500 },
-    );
+    return internalError("Internal Server Error");
   }
 }

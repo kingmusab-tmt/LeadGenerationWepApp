@@ -83,6 +83,16 @@ const getOnboardingStateStorageKey = (email?: string): string => {
   return `${SELLER_ONBOARDING_STATE_PREFIX}:${normalizedEmail}`;
 };
 
+const sanitizeSellerSteps = (steps: unknown): SellerOnboardingStep[] => {
+  if (!Array.isArray(steps)) {
+    return [];
+  }
+
+  return steps.filter((step): step is SellerOnboardingStep =>
+    SELLER_ONBOARDING_STEPS.includes(step as SellerOnboardingStep),
+  );
+};
+
 const readOnboardingState = (
   email?: string,
 ): {
@@ -102,17 +112,13 @@ const readOnboardingState = (
     }
 
     const parsed = JSON.parse(raw) as {
-      completedSteps?: SellerOnboardingStep[];
-      skippedSteps?: SellerOnboardingStep[];
+      completedSteps?: unknown;
+      skippedSteps?: unknown;
     };
 
     return {
-      completedSteps: Array.isArray(parsed.completedSteps)
-        ? parsed.completedSteps
-        : [],
-      skippedSteps: Array.isArray(parsed.skippedSteps)
-        ? parsed.skippedSteps
-        : [],
+      completedSteps: sanitizeSellerSteps(parsed.completedSteps),
+      skippedSteps: sanitizeSellerSteps(parsed.skippedSteps),
     };
   } catch {
     return { completedSteps: [], skippedSteps: [] };

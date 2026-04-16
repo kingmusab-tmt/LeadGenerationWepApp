@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -132,9 +132,15 @@ const safeParsePrefs = (value: string | null): CookiePrefs => {
 };
 
 const CookieConsentManager = () => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => {
+    if (typeof document === "undefined") return false;
+    return !getConsent(CONSENT_COOKIE);
+  });
   const [showDetails, setShowDetails] = useState(false);
-  const [prefs, setPrefs] = useState<CookiePrefs>(defaultPrefs);
+  const [prefs, setPrefs] = useState<CookiePrefs>(() => {
+    if (typeof document === "undefined") return defaultPrefs;
+    return safeParsePrefs(getConsent(PREFS_COOKIE));
+  });
   const [expandedDetails, setExpandedDetails] = useState<
     Record<CookieCategoryKey, boolean>
   >({
@@ -144,14 +150,11 @@ const CookieConsentManager = () => {
     advertising: false,
   });
 
-  const sessionId = useMemo(
-    () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-    [],
-  );
-
   /* ---- visit / session cookies (independent of consent) ---- */
   useEffect(() => {
     if (typeof document === "undefined") return;
+
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
     if (!getCookie(VISIT_COOKIE)) {
       setCookie(VISIT_COOKIE, new Date().toISOString(), 365);
@@ -160,7 +163,7 @@ const CookieConsentManager = () => {
     if (!getCookie(SESSION_COOKIE)) {
       setCookie(SESSION_COOKIE, sessionId, 1);
     }
-  }, [sessionId]);
+  }, []);
 
   /* ---- consent check (runs once on mount) ---- */
   useEffect(() => {
@@ -168,8 +171,6 @@ const CookieConsentManager = () => {
 
     const existingConsent = getConsent(CONSENT_COOKIE);
     const rawPrefs = getConsent(PREFS_COOKIE);
-    const existingPrefs = safeParsePrefs(rawPrefs);
-    setPrefs(existingPrefs);
 
     if (existingConsent) {
       /* Re-sync cookie if it was cleared but localStorage survived */
@@ -179,9 +180,6 @@ const CookieConsentManager = () => {
       if (rawPrefs && !getCookie(PREFS_COOKIE)) {
         setCookie(PREFS_COOKIE, rawPrefs, 365);
       }
-      setOpen(false);
-    } else {
-      setOpen(true);
     }
   }, []);
 

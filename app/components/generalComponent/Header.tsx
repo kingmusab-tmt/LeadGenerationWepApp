@@ -47,7 +47,7 @@ import {
   FaInstagram,
   FaYoutube,
 } from "react-icons/fa";
-import { useInitializeUser, useAppDispatch } from "@/lib/hooks";
+import { useInitializeUser, useAppDispatch } from "@/app/hooks";
 import { clearUser } from "@/lib/userSlice";
 
 // Animation keyframes

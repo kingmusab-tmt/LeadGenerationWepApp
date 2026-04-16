@@ -4,12 +4,7 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
-import {
-  EmailCampaign,
-  EmailTemplate,
-  EmailSegment,
-} from "@/models/emailCampaign";
-import { emailMarketingEngine } from "@/lib/emailMarketingEngine";
+import { EmailCampaign } from "@/models/emailCampaign";
 import {
   createEmailCampaignSchema,
   getEmailCampaignsQuerySchema,
@@ -54,7 +49,7 @@ export async function GET(req: NextRequest) {
     await dbConnect();
 
     // Build query
-    const query: Record<string, any> = {
+    const query: Record<string, unknown> = {
       userId: session.user.id,
     };
     if (queryParams.status) {
@@ -129,14 +124,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate template if provided
-    if (validatedData.template) {
-      const template = await EmailTemplate.findById(validatedData.template);
-      if (!template) {
-        return badRequest("Template not found");
-      }
-    }
-
     // Create campaign
     const recipientEmails = validatedData.recipientList || [];
     const campaign = new EmailCampaign({
@@ -150,7 +137,6 @@ export async function POST(req: NextRequest) {
       status: "draft",
       schedule: validatedData.schedule || { type: "immediate" },
       tags: validatedData.tags || [],
-      templateId: validatedData.template,
       createdAt: new Date(),
     });
 
@@ -162,9 +148,14 @@ export async function POST(req: NextRequest) {
       },
       201,
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[POST /api/email-campaigns]", error);
-    if (error.code === 11000) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000
+    ) {
       return badRequest("Campaign with this name already exists");
     }
     return internalError("Failed to create campaign");

@@ -1,5 +1,3 @@
-"use server";
-
 import client from "./db";
 // import dynamic from 'next/dynamic';
 

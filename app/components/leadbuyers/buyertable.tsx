@@ -15,8 +15,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { IBuyer } from "@/models/leadbuyers";
-import { useRouter } from "next/navigation";
-import { useNavigation } from "@/context/handlenavigation";
+import { useNavigation } from "@/app/hooks";
 
 interface BuyerTableProps {
   buyers: IBuyer[];
@@ -32,7 +31,6 @@ const BuyerTable: React.FC<BuyerTableProps> = ({
   const [anchorEl, setAnchorEl] = useState<{
     [key: string]: null | HTMLElement;
   }>({});
-  const router = useRouter();
   const { navigateTo } = useNavigation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // Mobile-first breakpoint

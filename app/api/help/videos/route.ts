@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import HelpVideo from "@/models/helpVideo";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
+
+async function requireAdmin() {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user?.role !== "admin") {
+    return forbidden("Forbidden: Admin access required");
+  }
+  return null;
+}
 
 /**
  * GET /api/help/videos
@@ -28,10 +44,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(videos, { status: 200 });
   } catch (error) {
     console.error("Error fetching help videos:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch help videos" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch help videos");
   }
 }
 
@@ -41,6 +54,9 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const authResponse = await requireAdmin();
+    if (authResponse) return authResponse;
+
     await dbConnect();
 
     const body = await req.json();
@@ -48,10 +64,7 @@ export async function POST(req: NextRequest) {
       body;
 
     if (!title || !url) {
-      return NextResponse.json(
-        { error: "Title and URL are required" },
-        { status: 400 },
-      );
+      return badRequest("Title and URL are required");
     }
 
     const newVideo = await HelpVideo.create({
@@ -66,10 +79,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(newVideo, { status: 201 });
   } catch (error) {
     console.error("Error creating help video:", error);
-    return NextResponse.json(
-      { error: "Failed to create help video" },
-      { status: 500 },
-    );
+    return internalError("Failed to create help video");
   }
 }
 
@@ -79,16 +89,16 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
+    const authResponse = await requireAdmin();
+    if (authResponse) return authResponse;
+
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { error: "Video ID is required" },
-        { status: 400 },
-      );
+      return badRequest("Video ID is required");
     }
 
     const body = await req.json();
@@ -109,16 +119,13 @@ export async function PUT(req: NextRequest) {
     );
 
     if (!updatedVideo) {
-      return NextResponse.json({ error: "Video not found" }, { status: 404 });
+      return notFound("Video");
     }
 
     return NextResponse.json(updatedVideo, { status: 200 });
   } catch (error) {
     console.error("Error updating help video:", error);
-    return NextResponse.json(
-      { error: "Failed to update help video" },
-      { status: 500 },
-    );
+    return internalError("Failed to update help video");
   }
 }
 
@@ -128,22 +135,22 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
+    const authResponse = await requireAdmin();
+    if (authResponse) return authResponse;
+
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { error: "Video ID is required" },
-        { status: 400 },
-      );
+      return badRequest("Video ID is required");
     }
 
     const deletedVideo = await HelpVideo.findByIdAndDelete(id);
 
     if (!deletedVideo) {
-      return NextResponse.json({ error: "Video not found" }, { status: 404 });
+      return notFound("Video");
     }
 
     return NextResponse.json(
@@ -152,9 +159,6 @@ export async function DELETE(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error deleting help video:", error);
-    return NextResponse.json(
-      { error: "Failed to delete help video" },
-      { status: 500 },
-    );
+    return internalError("Failed to delete help video");
   }
 }

@@ -1604,74 +1604,76 @@ export async function activateSubscription(
       "subscription.cancelAtPeriodEnd": stripeSubscription.cancel_at_period_end,
       "subscription.subscriptionLimits": {
         // Core Limits
-        forms: tier.tierLimits?.forms || 1,
-        leads: tier.tierLimits?.leads || 100,
-        buyers: tier.tierLimits?.buyers || 5,
-        industries: tier.tierLimits?.industries || 1,
+        forms: tier.tierLimits?.forms ?? 1,
+        leads: tier.tierLimits?.leads ?? 100,
+        buyers: tier.tierLimits?.buyers ?? 5,
+        industries: tier.tierLimits?.industries ?? 1,
 
         // Call Tracking & Telephony
-        numbers: tier.tierLimits?.numbers || 1,
-        twilioNumbers: tier.tierLimits?.twilioNumbers || 0,
-        callSeconds: tier.tierLimits?.callSeconds || 1000,
-        callRecording: tier.tierLimits?.callRecording || false,
-        callTranscription: tier.tierLimits?.callTranscription || false,
-        callAIAnalysis: tier.tierLimits?.callAIAnalysis || false,
-        multiRingForwarding: tier.tierLimits?.multiRingForwarding || false,
-        geoRouting: tier.tierLimits?.geoRouting || false,
-        scheduledCallbacks: tier.tierLimits?.scheduledCallbacks || false,
-        concurrentCallLimit: tier.tierLimits?.concurrentCallLimit || 1,
+        numbers: tier.tierLimits?.numbers ?? 1,
+        twilioNumbers: tier.tierLimits?.twilioNumbers ?? 0,
+        callSeconds: tier.tierLimits?.callSeconds ?? 1000,
+        callRecording: tier.tierLimits?.callRecording ?? false,
+        callTranscription: tier.tierLimits?.callTranscription ?? false,
+        callAIAnalysis: tier.tierLimits?.callAIAnalysis ?? false,
+        multiRingForwarding: tier.tierLimits?.multiRingForwarding ?? false,
+        geoRouting: tier.tierLimits?.geoRouting ?? false,
+        scheduledCallbacks: tier.tierLimits?.scheduledCallbacks ?? false,
+        concurrentCallLimit: tier.tierLimits?.concurrentCallLimit ?? 1,
 
         // Marketing & Campaigns
-        emailCampaignsEnabled: tier.tierLimits?.emailCampaignsEnabled || false,
-        smsCampaignsPerMonth: tier.tierLimits?.smsCampaignsPerMonth || 0,
+        emailCampaignsEnabled: tier.tierLimits?.emailCampaignsEnabled ?? false,
+        smsCampaignsEnabled: tier.tierLimits?.smsCampaignsEnabled ?? false,
+        smsCampaignsPerMonth: tier.tierLimits?.smsCampaignsPerMonth ?? 0,
         smsRecipientsPerCampaign:
-          tier.tierLimits?.smsRecipientsPerCampaign || 50,
-        smsPhoneNumbers: tier.tierLimits?.smsPhoneNumbers || 0,
+          tier.tierLimits?.smsRecipientsPerCampaign ?? 50,
+        smsPhoneNumbers: tier.tierLimits?.smsPhoneNumbers ?? 0,
 
         // Automation & Workflows
-        automationWorkflows: tier.tierLimits?.automationWorkflows || 0,
+        automationWorkflows: tier.tierLimits?.automationWorkflows ?? 0,
         automationActionsPerWorkflow:
-          tier.tierLimits?.automationActionsPerWorkflow || 3,
+          tier.tierLimits?.automationActionsPerWorkflow ?? 3,
 
         // AI & Advanced Features
-        chatbotEnabled: tier.tierLimits?.chatbotEnabled || false,
-        leadScoringEnabled: tier.tierLimits?.leadScoringEnabled || false,
+        chatbotEnabled: tier.tierLimits?.chatbotEnabled ?? false,
+        leadScoringEnabled: tier.tierLimits?.leadScoringEnabled ?? false,
         sentimentAnalysisEnabled:
-          tier.tierLimits?.sentimentAnalysisEnabled || false,
-        aiSummariesEnabled: tier.tierLimits?.aiSummariesEnabled || false,
+          tier.tierLimits?.sentimentAnalysisEnabled ?? false,
+        aiSummariesEnabled: tier.tierLimits?.aiSummariesEnabled ?? false,
+        aiGenerativeEnabled: tier.tierLimits?.aiGenerativeEnabled ?? true,
 
         // Invoicing & Payments
-        invoicesPerMonth: tier.tierLimits?.invoicesPerMonth || 10,
-        customInvoiceBranding: tier.tierLimits?.customInvoiceBranding || false,
+        invoicesPerMonth: tier.tierLimits?.invoicesPerMonth ?? 10,
+        customInvoiceBranding: tier.tierLimits?.customInvoiceBranding ?? false,
 
         // Integrations
-        zapierIntegration: tier.tierLimits?.zapierIntegration || false,
-        webhookIntegration: tier.tierLimits?.webhookIntegration || false,
-        apiAccess: tier.tierLimits?.apiAccess || false,
-        maxWebhooks: tier.tierLimits?.maxWebhooks || 0,
+        zapierIntegration: tier.tierLimits?.zapierIntegration ?? false,
+        webhookIntegration: tier.tierLimits?.webhookIntegration ?? false,
+        apiAccess: tier.tierLimits?.apiAccess ?? false,
+        maxWebhooks: tier.tierLimits?.maxWebhooks ?? 0,
 
         // Marketplace & Distribution
-        marketplaceAccess: tier.tierLimits?.marketplaceAccess || false,
-        exclusiveLeads: tier.tierLimits?.exclusiveLeads || false,
-        leadDistributionRules: tier.tierLimits?.leadDistributionRules || false,
+        marketplaceAccess: tier.tierLimits?.marketplaceAccess ?? false,
+        exclusiveLeads: tier.tierLimits?.exclusiveLeads ?? false,
+        leadDistributionRules: tier.tierLimits?.leadDistributionRules ?? false,
 
         // Data & Reporting
-        exports: tier.tierLimits?.exports || false,
-        imports: tier.tierLimits?.imports || false,
-        advancedReports: tier.tierLimits?.advancedReports || false,
-        dataRetentionDays: tier.tierLimits?.dataRetentionDays || 90,
+        exports: tier.tierLimits?.exports ?? false,
+        imports: tier.tierLimits?.imports ?? false,
+        advancedReports: tier.tierLimits?.advancedReports ?? false,
+        dataRetentionDays: tier.tierLimits?.dataRetentionDays ?? 90,
 
         // Team & Access
-        teamMembers: tier.tierLimits?.teamMembers || 1,
-        maxConcurrentSessions: tier.tierLimits?.maxConcurrentSessions || 1,
+        teamMembers: tier.tierLimits?.teamMembers ?? 1,
+        maxConcurrentSessions: tier.tierLimits?.maxConcurrentSessions ?? 1,
 
         // Support
-        liveSupport: tier.tierLimits?.liveSupport || false,
-        prioritySupport: tier.tierLimits?.prioritySupport || false,
+        liveSupport: tier.tierLimits?.liveSupport ?? false,
+        prioritySupport: tier.tierLimits?.prioritySupport ?? false,
 
         // Customization
-        customBranding: tier.tierLimits?.customBranding || false,
-        customDomain: tier.tierLimits?.customDomain || false,
+        customBranding: tier.tierLimits?.customBranding ?? false,
+        customDomain: tier.tierLimits?.customDomain ?? false,
       },
       // Reset usage for new billing period
       "subscription.subscriptionUsage.leads": 0,

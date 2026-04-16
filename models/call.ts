@@ -13,6 +13,7 @@ interface ICall extends Document {
   status: string;
   callDuration?: number;
   recordingUrl?: string;
+  paymentIntentId?: string;
   unitsCharged: number; // Units deducted for this call
   paymentStatus: "paid" | "refunded" | "pending_refund";
   reassigned?: boolean;
@@ -70,6 +71,7 @@ const CallSchema = new Schema<ICall>(
     callRecorded: { type: Boolean, default: false },
     callDuration: { type: Number },
     recordingUrl: { type: String },
+    paymentIntentId: { type: String },
     unitsCharged: { type: Number, default: 0 }, // Units charged for this call
     paymentStatus: {
       type: String,

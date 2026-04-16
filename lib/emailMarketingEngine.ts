@@ -129,7 +129,10 @@ export class TransporterManager {
       secure: user.emailSettings.port === 465,
       auth: {
         user: user.emailSettings.smtpUser || process.env.EMAIL_FROM!,
-        pass: user.emailSettings.smtpPassword || process.env.EMAIL_PASSWORD!,
+        pass:
+          user.emailSettings.smtpPassword ||
+          process.env.EMAIL_SERVER_PASSWORD ||
+          process.env.EMAIL_PASSWORD!,
       },
     };
 

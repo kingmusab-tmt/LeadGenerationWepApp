@@ -27,6 +27,7 @@ import {
   CALL_DEFAULTS,
 } from "@/lib/security/callSecurity";
 import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
+import { env } from "@/lib/env";
 import {
   checkSpamStatus,
   isOnDncList,
@@ -449,7 +450,7 @@ async function handleNewCall(
       const cbDigit = scheduledCallbackDigit || "1";
       const gather = twiml.gather({
         numDigits: 1,
-        action: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/callback-request?sellerId=${sellerId}&callSid=${callSid}&from=${encodeURIComponent(from)}&trackingNumber=${encodeURIComponent(to)}&industry=${encodeURIComponent(industry)}`,
+        action: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/callback-request?sellerId=${sellerId}&callSid=${callSid}&from=${encodeURIComponent(from)}&trackingNumber=${encodeURIComponent(to)}&industry=${encodeURIComponent(industry)}`,
         method: "POST",
         timeout: 5,
       });
@@ -737,7 +738,7 @@ async function handleNoAnswer(
       });
       debugLog("No-answer fallback: overflow", { overflowNumber });
     } else if (scheduledCallbackEnabled) {
-      const baseUrl = process.env.NEXTAUTH_URL || "";
+      const baseUrl = env.NEXTAUTH_URL || "";
       twiml.say("All of our representatives are currently unavailable.");
       const gather = twiml.gather({
         numDigits: 1,

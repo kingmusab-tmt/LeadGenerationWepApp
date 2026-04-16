@@ -147,6 +147,26 @@ class SmsQueueManager {
         }
       }
     }
+
+    // Finalize campaign status when there are no pending queue items left.
+    const pendingCount = await SmsQueue.countDocuments({
+      campaignId,
+      status: "pending",
+    });
+
+    if (pendingCount === 0) {
+      const [sentCount, failedCount] = await Promise.all([
+        SmsQueue.countDocuments({ campaignId, status: "sent" }),
+        SmsQueue.countDocuments({ campaignId, status: "failed" }),
+      ]);
+
+      const terminalStatus = sentCount > 0 ? "completed" : "failed";
+      await SmsCampaign.findByIdAndUpdate(campaignId, {
+        status: terminalStatus,
+        "stats.sent": sentCount,
+        "stats.failed": failedCount,
+      });
+    }
   }
 }
 
@@ -176,7 +196,6 @@ class SmsMarketingEngine {
       textContent: string;
       recipients?: ISmsRecipient[];
       segmentId?: string;
-      templateId?: string;
       scheduleAt?: Date;
     },
   ) {
@@ -184,7 +203,6 @@ class SmsMarketingEngine {
     const campaign = await SmsCampaign.create({
       userId,
       name: payload.name,
-      templateId: payload.templateId,
       segmentId: payload.segmentId,
       recipients: payload.recipients || [],
       textContent: payload.textContent,

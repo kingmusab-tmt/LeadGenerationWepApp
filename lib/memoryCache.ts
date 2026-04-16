@@ -18,6 +18,16 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+const MAX_CACHE_ENTRIES = Math.max(
+  100,
+  Number(process.env.MEMORY_CACHE_MAX_ENTRIES || 5000),
+);
+
+function wildcardToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escaped.replace(/\*/g, ".*")}$`);
+}
+
 class MemoryCache {
   private cache = new Map<string, CacheEntry<any>>();
   private cleanupInterval: NodeJS.Timeout;
@@ -30,6 +40,9 @@ class MemoryCache {
       },
       5 * 60 * 1000,
     );
+
+    // Prevent interval from keeping the process alive during shutdown.
+    this.cleanupInterval.unref?.();
   }
 
   /**
@@ -37,6 +50,11 @@ class MemoryCache {
    */
   set<T>(key: string, value: T, ttlSeconds: number): void {
     const expiresAt = Date.now() + ttlSeconds * 1000;
+
+    if (!this.cache.has(key) && this.cache.size >= MAX_CACHE_ENTRIES) {
+      this.evictOne();
+    }
+
     this.cache.set(key, { data: value, expiresAt });
   }
 
@@ -70,7 +88,7 @@ class MemoryCache {
    * Delete all entries matching pattern
    */
   deletePattern(pattern: string): void {
-    const regex = new RegExp(pattern.replace(/\*/g, ".*"));
+    const regex = wildcardToRegExp(pattern);
     const keysToDelete: string[] = [];
 
     for (const key of this.cache.keys()) {
@@ -86,7 +104,7 @@ class MemoryCache {
    * Get all keys matching pattern
    */
   keys(pattern: string): string[] {
-    const regex = new RegExp(pattern.replace(/\*/g, ".*"));
+    const regex = wildcardToRegExp(pattern);
     const matchingKeys: string[] = [];
 
     for (const key of this.cache.keys()) {
@@ -138,6 +156,26 @@ class MemoryCache {
       console.log(
         `[MemoryCache] Cleaned up ${keysToDelete.length} expired entries`,
       );
+    }
+  }
+
+  /**
+   * Evict one entry when reaching configured max size.
+   * Prefer removing the soonest-expiring key.
+   */
+  private evictOne(): void {
+    let evictionKey: string | null = null;
+    let earliestExpiry = Number.POSITIVE_INFINITY;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.expiresAt < earliestExpiry) {
+        earliestExpiry = entry.expiresAt;
+        evictionKey = key;
+      }
+    }
+
+    if (evictionKey) {
+      this.cache.delete(evictionKey);
     }
   }
 
@@ -208,7 +246,7 @@ export async function checkCacheHealth(): Promise<boolean> {
     const result = memoryCache.get("health-check");
     memoryCache.delete("health-check");
     return result === true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

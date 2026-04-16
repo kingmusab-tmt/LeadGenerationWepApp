@@ -1,7 +1,5 @@
 // app/api/admin/overview/route.ts
 import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
-import mongoose from "mongoose";
 import { User } from "@/models";
 import { Transaction } from "@/models/transactions";
 import { Lead } from "@/models/leads";
@@ -10,8 +8,9 @@ import { Verifications } from "@/models/vertification";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { internalError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
 
@@ -239,9 +238,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(responseData);
   } catch (error) {
     console.error("Failed to fetch admin overview data:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch admin overview data" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch admin overview data");
   }
 }

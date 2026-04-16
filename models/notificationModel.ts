@@ -20,11 +20,19 @@ const NotificationSchema = new Schema<INotification>(
       },
       required: [true, "Notification type is required"],
     },
+    title: {
+      type: String,
+      maxlength: [200, "Title cannot exceed 200 characters"],
+    },
     message: {
       type: String,
       required: [true, "Notification message is required"],
       minlength: [1, "Message cannot be empty"],
       maxlength: [1000, "Message cannot exceed 1000 characters"],
+    },
+    metadata: {
+      type: Schema.Types.Mixed,
+      default: {},
     },
     status: {
       type: String,

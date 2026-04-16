@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
@@ -113,9 +113,14 @@ export async function POST(req: NextRequest) {
       userId,
       name: validatedData.name,
       description: validatedData.description || "",
-      enabled: validatedData.enabled !== false,
-      trigger: validatedData.trigger,
+      isActive: validatedData.isActive !== false,
+      triggers: validatedData.triggers,
       actions: validatedData.actions,
+      maxExecutions: validatedData.maxExecutions,
+      cooldownMinutes: validatedData.cooldownMinutes,
+      priority: validatedData.priority,
+      tags: validatedData.tags,
+      notes: validatedData.notes,
     });
 
     await workflow.save();

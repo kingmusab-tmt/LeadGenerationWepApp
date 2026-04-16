@@ -74,12 +74,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
 
   useEffect(() => {
     if (status === "loading") return;
-    if (
-      status === "unauthenticated" ||
-      !currentUser ||
-      currentUser.role !== "admin"
-    ) {
+    if (status === "unauthenticated" || !currentUser) {
       router.replace("/auth/sign-in");
+      return;
+    }
+
+    if (currentUser.role !== "admin") {
+      router.replace("/auth/unauthorized");
     }
   }, [status, currentUser, router]);
 

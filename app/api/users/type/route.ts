@@ -8,6 +8,13 @@ import {
   invalidateAllUserSessions,
 } from "@/lib/cachedSession";
 import { Buyer } from "@/models/leadbuyers";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 type SellerContact = {
   id: string;
@@ -39,7 +46,7 @@ const getLeadSellerContacts = async (): Promise<SellerContact[]> => {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return unauthorized("Authentication required");
   }
 
   try {
@@ -52,7 +59,23 @@ export async function POST(req: NextRequest) {
       role !== "business-admin" &&
       role !== "staff"
     ) {
-      return NextResponse.json({ message: "Invalid role" }, { status: 400 });
+      return badRequest("Invalid role");
+    }
+
+    const actor = session.user.id
+      ? await User.findById(session.user.id).select("_id role email")
+      : await User.findOne({ email: session.user.email })
+          .select("_id role email")
+          .lean();
+
+    if (!actor) {
+      return notFound("User");
+    }
+
+    const isPrivilegedTargetRole =
+      role === "staff" || role === "business-admin";
+    if (isPrivilegedTargetRole && actor.role !== "admin") {
+      return forbidden("Only admins can assign privileged roles");
     }
 
     // Log the session info for debugging
@@ -129,16 +152,14 @@ export async function POST(req: NextRequest) {
         "email:",
         session.user.email,
       );
-      return NextResponse.json(
-        { message: "User not found or role not updated" },
-        { status: 404 },
-      );
+      return notFound("User", "User not found or role not updated");
     }
   } catch (error) {
     console.error("Error updating role:", error);
-    return NextResponse.json(
-      { message: "Internal server error", error: String(error) },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Internal server error: ${error.message}`
+        : "Internal server error",
     );
   }
 }
@@ -146,7 +167,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return unauthorized("Authentication required");
   }
 
   try {
@@ -162,7 +183,7 @@ export async function DELETE() {
     }
 
     if (!deletedUser) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     if (session.user.email) {
@@ -177,9 +198,10 @@ export async function DELETE() {
     });
   } catch (error) {
     console.error("Error cancelling registration:", error);
-    return NextResponse.json(
-      { message: "Internal server error", error: String(error) },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Internal server error: ${error.message}`
+        : "Internal server error",
     );
   }
 }

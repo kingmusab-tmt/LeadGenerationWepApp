@@ -103,7 +103,7 @@ export interface IUser extends Document {
 
   holdMusicUrl?: string;
 
-  subscription?: ISubscription;
+  subscription?: ISubscription | null;
 
   stripeAccountId?: string;
   stripeOnboarded?: boolean;

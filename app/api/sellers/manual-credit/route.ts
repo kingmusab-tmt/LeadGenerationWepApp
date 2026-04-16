@@ -3,9 +3,16 @@ import connectDB from "@/lib/connectdb";
 import { Buyer } from "@/models/leadbuyers";
 import { Transaction } from "@/models/transactions";
 import { User } from "@/models/userModel";
+import { sendBuyerEmail } from "@/lib/buyerEmail";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
-import { sendNotification } from "@/lib/notificationService";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,10 +20,7 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await connectDB();
@@ -24,10 +28,7 @@ export async function POST(req: NextRequest) {
     const seller = await User.findOne({ email: session.user.email });
 
     if (!seller || seller.role !== "seller") {
-      return NextResponse.json(
-        { success: false, message: "Only sellers can perform this action" },
-        { status: 403 },
-      );
+      return forbidden("Only sellers can perform this action");
     }
 
     // Parse request body
@@ -36,29 +37,26 @@ export async function POST(req: NextRequest) {
 
     // Validate inputs
     if (!buyerId || !cashPaid || !numberOfCredits || !description) {
-      return NextResponse.json(
-        { success: false, message: "All fields are required" },
-        { status: 400 },
-      );
+      return badRequest("All fields are required");
     }
 
     if (cashPaid <= 0 || numberOfCredits <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Cash paid and credits must be positive numbers",
-        },
-        { status: 400 },
-      );
+      return badRequest("Cash paid and credits must be positive numbers");
     }
 
     // Find the buyer
     const buyer = await Buyer.findById(buyerId);
 
     if (!buyer) {
-      return NextResponse.json(
-        { success: false, message: "Buyer not found" },
-        { status: 404 },
+      return notFound("Buyer");
+    }
+
+    if (
+      buyer.registeredWith &&
+      String(buyer.registeredWith) !== String(seller._id)
+    ) {
+      return forbidden(
+        "This buyer does not belong to the authenticated seller",
       );
     }
 
@@ -98,14 +96,17 @@ export async function POST(req: NextRequest) {
 
     await buyerTransaction.save();
 
+    const sellerPreviousBalance = seller.walletBalance || 0;
+    const sellerCurrentBalance = sellerPreviousBalance + cashPaid;
+
     // Create a transaction record for the seller (income)
     const sellerTransaction = new Transaction({
       type: "seller_income",
       userId: seller._id,
       amount: cashPaid,
       currency: "usd",
-      previousBalance: seller.walletBalance || 0,
-      currentBalance: (seller.walletBalance || 0) + cashPaid,
+      previousBalance: sellerPreviousBalance,
+      currentBalance: sellerCurrentBalance,
       paymentGateway: "manual",
       status: "completed",
       metadata: {
@@ -125,28 +126,30 @@ export async function POST(req: NextRequest) {
 
     await sellerTransaction.save();
 
-    // Update seller's wallet balance
-    seller.walletBalance = (seller.walletBalance || 0) + cashPaid;
-    await seller.save();
+    // Update seller wallet balance without re-validating unrelated profile fields.
+    await User.updateOne(
+      { _id: seller._id },
+      { $set: { walletBalance: sellerCurrentBalance } },
+    );
 
-    // Get buyer's user account for notification
-    const buyerUser = await User.findById(buyer.registeredWith);
+    // Send email directly to the credited buyer using the same formatted buyer email template.
+    try {
+      const signInUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/auth/sign-in`;
 
-    // Send notification to the buyer
-    if (buyerUser) {
-      await sendNotification({
-        userId: (buyerUser._id as any).toString(),
-        title: "Wallet Credited",
-        message: `Your wallet has been credited with ${numberOfCredits} units. ${description}`,
-        type: "info",
-        metadata: {
-          amount: cashPaid,
-          units: numberOfCredits,
-          transactionId: buyerTransaction._id.toString(),
-          sellerId: (seller._id as any).toString(),
-          sellerName: seller.name,
-        },
+      await sendBuyerEmail({
+        variant: "credit",
+        buyerEmail: buyer.email,
+        buyerName: buyer.name,
+        buyerCompany: buyer.company || "Your Company",
+        buyerPhone: buyer.phone || "",
+        sellerName: seller.name || "Your Seller",
+        sellerCompany: seller.businessName || "Lead Seller",
+        signInUrl,
+        creditedUnits: numberOfCredits,
+        currentBalance,
       });
+    } catch (emailError) {
+      console.error("Failed to send manual credit email:", emailError);
     }
 
     return NextResponse.json(
@@ -164,15 +167,12 @@ export async function POST(req: NextRequest) {
       },
       { status: 200 },
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error processing manual credit:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Internal server error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Internal server error: ${error.message}`
+        : "Internal server error",
     );
   }
 }

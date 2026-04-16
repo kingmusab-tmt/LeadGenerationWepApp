@@ -22,6 +22,11 @@ import { User } from "@/models/userModel";
 import { ZapierActionsService } from "@/lib/integrations/services/zapierActionsService";
 import crypto from "crypto";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +65,7 @@ async function authenticateApiKey(
 
     // Check Zapier integration feature access
     const featureCheck = await checkFeatureAccess(
-      (user._id as any).toString(),
+      String(user._id),
       "zapierIntegration",
     );
     if (!featureCheck.allowed) {
@@ -72,7 +77,7 @@ async function authenticateApiKey(
 
     return {
       success: true,
-      userId: (user._id as any).toString(),
+      userId: String(user._id),
     };
   } catch (error) {
     console.error("API key authentication error:", error);
@@ -94,18 +99,22 @@ export async function POST(req: NextRequest) {
     // Authenticate
     const auth = await authenticateApiKey(req);
     if (!auth.success) {
-      return NextResponse.json(
-        { success: false, error: auth.error },
-        { status: 401 },
-      );
+      return unauthorized(auth.error || "Authentication failed");
     }
 
     // Parse request body
     const body = await req.json();
     const { action, data } = body;
 
+    if (!action || typeof action !== "string") {
+      return badRequest("Action is required");
+    }
+
     // Create service
-    const service = new ZapierActionsService(auth.userId!);
+    if (!auth.userId) {
+      return unauthorized("Authentication failed");
+    }
+    const service = new ZapierActionsService(auth.userId);
 
     // Route to appropriate action
     let result;
@@ -140,12 +149,8 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Unknown action: ${action}. Valid actions: create_lead, update_lead, search_leads, find_lead, assign_lead, update_status, get_lead`,
-          },
-          { status: 400 },
+        return badRequest(
+          `Unknown action: ${action}. Valid actions: create_lead, update_lead, search_leads, find_lead, assign_lead, update_status, get_lead`,
         );
     }
 
@@ -153,16 +158,15 @@ export async function POST(req: NextRequest) {
     if (result.success) {
       return NextResponse.json(result, { status: 200 });
     } else {
-      return NextResponse.json(result, { status: 400 });
+      return badRequest(result.error || "Action failed", {
+        success: false,
+        details: result,
+      });
     }
   } catch (error) {
     console.error("Zapier action error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
@@ -171,7 +175,7 @@ export async function POST(req: NextRequest) {
  * GET /api/integrations/zapier/actions
  * List available actions (for Zapier app configuration)
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     actions: [
       {

@@ -44,7 +44,7 @@ import {
   MoreVert,
   Visibility,
 } from "@mui/icons-material";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface User {

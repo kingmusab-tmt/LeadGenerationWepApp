@@ -114,7 +114,7 @@ class InvoiceEngine {
       notes?: string;
       termsConditions?: string;
       currency?: string;
-      paymentMethod?: string;
+      paymentMethod?: IInvoice["paymentMethod"];
     },
   ) {
     await dbConnect();
@@ -220,7 +220,7 @@ class InvoiceEngine {
 
   async markAsPaid(
     invoiceId: string,
-    paymentMethod: string,
+    paymentMethod: NonNullable<IInvoice["paymentMethod"]>,
     paymentDate?: Date,
   ) {
     await dbConnect();

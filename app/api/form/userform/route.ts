@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import Form from "@/models/form";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { internalError, unauthorized } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await getServerSession(authOptions);
   const userId = session?.user.id;
 
   try {
-    if (!session)
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!session) return unauthorized("Authentication required");
 
     // Connect to MongoDB
     await dbConnect();
@@ -21,9 +21,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(forms);
   } catch (error) {
     console.error("Failed to fetch forms:", error);
-    return NextResponse.json(
-      { message: "Failed to fetch forms." },
-      { status: 500 }
-    );
+    return internalError("Failed to fetch forms.");
   }
 }

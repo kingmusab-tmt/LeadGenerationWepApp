@@ -5,6 +5,12 @@ import dbConnect from "@/lib/connectdb";
 import { Tier } from "@/models/tier";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
@@ -60,7 +66,6 @@ async function createStripePricesForTier(
   tierName: string,
   monthlyPrice: number,
   annualPrice: number,
-  isTrialTier: boolean = false,
 ) {
   try {
     // Only create prices for paid tiers (not free/trial)
@@ -120,11 +125,11 @@ async function createStripePricesForTier(
 }
 
 // GET all tiers
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -132,10 +137,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(tiers);
   } catch (error) {
     console.error("Error fetching tiers:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch tiers" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch tiers");
   }
 }
 
@@ -144,7 +146,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const data = await req.json();
@@ -152,10 +154,7 @@ export async function POST(req: NextRequest) {
 
     // Validate required fields
     if (!data.name || !data.price || !data.description) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 },
-      );
+      return badRequest("Missing required fields");
     }
 
     // Set default order if not provided
@@ -212,10 +211,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(tier, { status: 201 });
   } catch (error) {
     console.error("Error creating tier:", error);
-    return NextResponse.json(
-      { error: "Failed to create tier" },
-      { status: 500 },
-    );
+    return internalError("Failed to create tier");
   }
 }
 
@@ -224,7 +220,7 @@ export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const updateData = await req.json();
@@ -232,7 +228,7 @@ export async function PUT(req: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+      return badRequest("Missing ID");
     }
 
     await dbConnect();
@@ -240,16 +236,8 @@ export async function PUT(req: NextRequest) {
     // Get the existing tier first
     const existingTier = await Tier.findById(id);
     if (!existingTier) {
-      return NextResponse.json({ error: "Tier not found" }, { status: 404 });
+      return notFound("Tier");
     }
-
-    // Check if price-related fields are being updated
-    const priceChanged =
-      updateData.price !== undefined && updateData.price !== existingTier.price;
-
-    const discountedPriceChanged =
-      updateData.discountedPrice !== undefined &&
-      updateData.discountedPrice !== existingTier.discountedPrice;
 
     // Create Stripe prices if missing and tier is paid
     if (
@@ -311,16 +299,13 @@ export async function PUT(req: NextRequest) {
     });
 
     if (!updatedTier) {
-      return NextResponse.json({ error: "Tier not found" }, { status: 404 });
+      return notFound("Tier");
     }
 
     return NextResponse.json(updatedTier);
   } catch (error) {
     console.error("Error updating tier:", error);
-    return NextResponse.json(
-      { error: "Failed to update tier" },
-      { status: 500 },
-    );
+    return internalError("Failed to update tier");
   }
 }
 
@@ -329,14 +314,14 @@ export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+      return badRequest("Missing ID");
     }
 
     await dbConnect();
@@ -344,7 +329,7 @@ export async function DELETE(req: NextRequest) {
     const deletedTier = await Tier.findByIdAndDelete(id);
 
     if (!deletedTier) {
-      return NextResponse.json({ error: "Tier not found" }, { status: 404 });
+      return notFound("Tier");
     }
 
     // Reorder remaining tiers
@@ -356,9 +341,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ message: "Tier deleted successfully" });
   } catch (error) {
     console.error("Error deleting tier:", error);
-    return NextResponse.json(
-      { error: "Failed to delete tier" },
-      { status: 500 },
-    );
+    return internalError("Failed to delete tier");
   }
 }

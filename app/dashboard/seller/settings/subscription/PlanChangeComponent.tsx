@@ -27,7 +27,7 @@ import {
   ArrowDownward as DowngradeIcon,
   Star as StarIcon,
 } from "@mui/icons-material";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Tier {
@@ -43,6 +43,13 @@ interface Tier {
   stripeMonthlyPriceId?: string;
   stripeAnnualPriceId?: string;
 }
+
+type TiersApiResponse = {
+  success?: boolean;
+  data?: {
+    tiers?: Tier[];
+  };
+};
 
 interface CurrentSubscription {
   subscriptionPlan?: string;
@@ -92,18 +99,22 @@ export default function PlanChangeComponent() {
         fetch("/api/subscriptions/manage"),
       ]);
 
-      const tiersData = await tiersRes.json();
+      const tiersPayload: TiersApiResponse | Tier[] = await tiersRes.json();
       const subscriptionData = await subscriptionRes.json();
 
-      if (Array.isArray(tiersData)) {
-        // Filter to show only seller tiers with Stripe pricing configured
-        const sellerTiers = tiersData.filter(
-          (t: Tier) =>
-            t.tierUserType === "seller" &&
-            (t.stripeMonthlyPriceId || t.stripeAnnualPriceId),
-        );
-        setTiers(sellerTiers);
-      }
+      const tiersData = Array.isArray(tiersPayload)
+        ? tiersPayload
+        : Array.isArray(tiersPayload.data?.tiers)
+          ? tiersPayload.data.tiers
+          : [];
+
+      // Filter to show only seller tiers with Stripe pricing configured
+      const sellerTiers = tiersData.filter(
+        (t: Tier) =>
+          t.tierUserType === "seller" &&
+          (t.stripeMonthlyPriceId || t.stripeAnnualPriceId),
+      );
+      setTiers(sellerTiers);
 
       if (subscriptionData.success) {
         setCurrentSubscription(subscriptionData.subscription);
@@ -155,7 +166,7 @@ export default function PlanChangeComponent() {
         setPreviewLoading(false);
       }
     },
-    [billingInterval, currentSubscription?.isTrial, notify],
+    [billingInterval, currentSubscription?.isTrial, notify, fetchWithCSRF],
   );
 
   // Refetch preview when billing interval changes and a tier is selected

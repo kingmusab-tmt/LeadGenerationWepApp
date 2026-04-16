@@ -4,6 +4,7 @@ import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { internalError, notFound } from "@/lib/api/error-handler";
 
 const toIsoDateOrNull = (value: unknown): string | null => {
   if (!value) return null;
@@ -37,13 +38,13 @@ export async function PUT(
       : null;
 
     if (!updatedUser && !updatedBuyer) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     const userResult = updatedUser || updatedBuyer;
 
     if (!userResult) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     let userSchemaDates: {
@@ -82,9 +83,6 @@ export async function PUT(
     });
   } catch (error) {
     console.error("Failed to update user status:", error);
-    return NextResponse.json(
-      { error: "Failed to update user status" },
-      { status: 500 },
-    );
+    return internalError("Failed to update user status");
   }
 }

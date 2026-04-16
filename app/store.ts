@@ -59,14 +59,22 @@ export async function injectDashboardReducers() {
   );
 }
 
+/**
+ * Dynamic type for lazy-loaded dashboard reducers.
+ * Allows type-safe access to injected slices.
+ */
+type DashboardReducers = {
+  formBuilder?: ReturnType<typeof import("@/lib/formBuilderSlice").default>;
+  leads?: ReturnType<typeof import("@/lib/leadsSlice").default>;
+  buyers?: ReturnType<typeof import("@/lib/buyersSlice").default>;
+  campaigns?: ReturnType<typeof import("@/lib/campaignsSlice").default>;
+  analytics?: ReturnType<typeof import("@/lib/analyticsSlice").default>;
+};
+
 // Define the RootState type — keep it matching the full shape so selectors work everywhere
 export type RootState = {
   user: ReturnType<typeof userReducer>;
   ui: ReturnType<typeof uiReducer>;
-  formBuilder: any;
-  leads: any;
-  buyers: any;
-  campaigns: any;
-  analytics: any;
-};
+} & DashboardReducers;
+
 export type AppDispatch = typeof store.dispatch;

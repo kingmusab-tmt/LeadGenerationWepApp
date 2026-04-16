@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import {
   Box,
   Button,
@@ -67,7 +67,7 @@ interface SmsCampaign {
 
 export default function SmsCampaignsPage() {
   const { currentUser } = useInitializeUser();
-  const { limits } = useSubscriptionLimits();
+  const { limits, isTrial } = useSubscriptionLimits();
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -135,7 +135,13 @@ export default function SmsCampaignsPage() {
       // Fetch SMS phone numbers from tracking numbers
       const numbersResponse = await fetch("/api/calls/twilio/get_numbers");
       if (numbersResponse.ok) {
-        const allNumbers = await numbersResponse.json();
+        const numbersPayload = await numbersResponse.json();
+        const allNumbers = Array.isArray(numbersPayload)
+          ? numbersPayload
+          : Array.isArray(numbersPayload?.data)
+            ? numbersPayload.data
+            : [];
+
         // Filter to only SMS numbers
         const smsNumbers = (allNumbers || [])
           .filter((num: any) => num.purpose === "sms")
@@ -395,7 +401,7 @@ export default function SmsCampaignsPage() {
   const smsSegments = Math.ceil(charCount / 160) || 0;
 
   // Check if user has access to SMS campaigns
-  if (limits && !limits.smsCampaignsEnabled) {
+  if (limits && !isTrial && !limits.smsCampaignsEnabled) {
     return (
       <Box
         sx={{

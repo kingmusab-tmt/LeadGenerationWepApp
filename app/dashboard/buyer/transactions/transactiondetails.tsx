@@ -14,6 +14,7 @@ import {
   Grid,
   useMediaQuery,
 } from "@mui/material";
+import type { ChipProps } from "@mui/material";
 import { formatCurrency, formatDate } from "@/utils/formater";
 
 interface Transaction {
@@ -71,7 +72,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
   if (!transaction) return null;
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): ChipProps["color"] => {
     switch (status) {
       case "completed":
         return "success";
@@ -402,7 +403,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                 transaction.status.charAt(0).toUpperCase() +
                 transaction.status.slice(1)
               }
-              color={getStatusColor(transaction.status) as any}
+              color={getStatusColor(transaction.status)}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>

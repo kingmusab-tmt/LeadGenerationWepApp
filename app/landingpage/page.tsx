@@ -1311,7 +1311,7 @@ const LandingPage = () => {
                 <Button
                   variant="outlined"
                   size="large"
-                  href="/auth/sign-up"
+                  href="/RegisterBuyer"
                   sx={{
                     borderColor: "white",
                     color: "white",

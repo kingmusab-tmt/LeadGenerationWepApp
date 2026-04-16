@@ -29,9 +29,15 @@ export {
 } from "./useSubscriptionCancel";
 export type { CancellationReason } from "./useSubscriptionCancel";
 
+// Confirm dialog hook
+export { useConfirm } from "./useConfirm";
+
 // Usage tracking hook
 export { useUsageTracking, USAGE_KEYS } from "./useUsageTracking";
 export type { UsageKey } from "./useUsageTracking";
+
+// Dashboard reducer injection helper
+export { useDashboardReducers } from "./useDashboardReducers";
 
 // Navigation hooks and provider
 export { useNavigation, useNavigationRouter } from "./useNavigation";

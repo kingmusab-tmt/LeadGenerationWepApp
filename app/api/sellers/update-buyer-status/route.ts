@@ -3,6 +3,11 @@ import connectDB from "@/lib/connectdb";
 import { Buyer } from "@/models/leadbuyers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  forbidden,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 /**
  * POST /api/sellers/update-buyer-status
@@ -17,10 +22,7 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await connectDB();
@@ -29,10 +31,7 @@ export async function POST(req: NextRequest) {
     const sellerRole = session.user.role;
 
     if (!sellerId || sellerRole !== "seller") {
-      return NextResponse.json(
-        { success: false, message: "Only sellers can perform this action" },
-        { status: 403 },
-      );
+      return forbidden("Only sellers can perform this action");
     }
 
     // Check if a specific buyerId was provided
@@ -64,13 +63,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error updating buyer status:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to update buyer status",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Failed to update buyer status: ${error.message}`
+        : "Failed to update buyer status",
     );
   }
 }
@@ -80,16 +76,13 @@ export async function POST(req: NextRequest) {
  * Checks buyers with status "new" and returns which ones would be updated
  * without actually updating them (dry run / preview).
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // Authenticate the seller
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await connectDB();
@@ -98,10 +91,7 @@ export async function GET(req: NextRequest) {
     const sellerRole = session.user.role;
 
     if (!sellerId || sellerRole !== "seller") {
-      return NextResponse.json(
-        { success: false, message: "Only sellers can perform this action" },
-        { status: 403 },
-      );
+      return forbidden("Only sellers can perform this action");
     }
 
     // Find all buyers with status "new" registered with this seller
@@ -175,13 +165,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error checking buyer status:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to check buyer status",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Failed to check buyer status: ${error.message}`
+        : "Failed to check buyer status",
     );
   }
 }

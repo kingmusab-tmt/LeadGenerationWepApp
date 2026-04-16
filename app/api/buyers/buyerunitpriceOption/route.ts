@@ -1,21 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { getServerSession } from "next-auth";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import { authOptions } from "@/auth";
+import { internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
 
     // Get the current session
     const session = await getServerSession(authOptions);
     if (!session || !session.user || session.user.role !== "buyer") {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     // Fetch the lead buyer using the session user email
@@ -23,12 +21,9 @@ export async function GET(req: NextRequest) {
       "registeredWith",
     );
     if (!buyer || !buyer.registeredWith) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Buyer not found or not registered with a seller",
-        },
-        { status: 404 },
+      return notFound(
+        "Buyer",
+        "Buyer not found or not registered with a seller",
       );
     }
 
@@ -37,10 +32,7 @@ export async function GET(req: NextRequest) {
       "unitPricingOptions",
     );
     if (!seller || !seller.unitPricingOptions) {
-      return NextResponse.json(
-        { success: false, message: "No unit pricing options found" },
-        { status: 404 },
-      );
+      return notFound("Seller", "No unit pricing options found");
     }
 
     return NextResponse.json({
@@ -49,9 +41,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching unit pricing options:", error);
-    return NextResponse.json(
-      { success: false, message: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

@@ -17,7 +17,7 @@ export interface ErrorLogEntry {
   ipAddress?: string;
   requestId?: string;
   stack?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 class ErrorLogger {
@@ -67,7 +67,7 @@ class ErrorLogger {
       path?: string;
       method?: string;
       userId?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
     },
   ): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -85,7 +85,7 @@ class ErrorLogger {
   /**
    * Log warning
    */
-  warn(message: string, metadata?: Record<string, any>): void {
+  warn(message: string, metadata?: Record<string, unknown>): void {
     this.log({
       level: "warn",
       code: "WARN",
@@ -97,7 +97,7 @@ class ErrorLogger {
   /**
    * Log info
    */
-  info(message: string, metadata?: Record<string, any>): void {
+  info(message: string, metadata?: Record<string, unknown>): void {
     this.log({
       level: "info",
       code: "INFO",
@@ -196,35 +196,45 @@ class ErrorLogger {
    * Send to external logging service
    */
   private sendToExternalService(entry: ErrorLogEntry): void {
-    // TODO: Implement integration with external services
-    // Examples:
-    // Sentry
-    // if (process.env.SENTRY_DSN) {
-    //   Sentry.captureException(new Error(entry.message), {
-    //     level: entry.level,
-    //     tags: { code: entry.code },
-    //     contexts: { custom: entry.metadata },
-    //   });
-    // }
-    // DataDog
-    // if (process.env.DATADOG_API_KEY) {
-    //   fetch('https://http-intake.logs.datadoghq.com/v1/input', {
-    //     method: 'POST',
-    //     headers: {
-    //       'DD-API-KEY': process.env.DATADOG_API_KEY,
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify(entry),
-    //   });
-    // }
-    // Custom logging endpoint
-    // if (process.env.LOGGING_ENDPOINT) {
-    //   fetch(process.env.LOGGING_ENDPOINT, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(entry),
-    //   }).catch(console.error);
-    // }
+    const loggingEndpoint = process.env.LOGGING_ENDPOINT;
+    const alertWebhookUrl = process.env.ALERT_WEBHOOK_URL;
+
+    if (loggingEndpoint) {
+      void fetch(loggingEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry),
+      }).catch((error) => {
+        console.warn("[ErrorLogger] Failed to send log to LOGGING_ENDPOINT", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+
+    if (entry.level === "error" && alertWebhookUrl) {
+      const alertPayload = {
+        type: "error_alert",
+        timestamp: entry.timestamp,
+        code: entry.code,
+        message: entry.message,
+        path: entry.path,
+        method: entry.method,
+        requestId: entry.requestId,
+      };
+
+      void fetch(alertWebhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(alertPayload),
+      }).catch((error) => {
+        console.warn(
+          "[ErrorLogger] Failed to send alert to ALERT_WEBHOOK_URL",
+          {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        );
+      });
+    }
   }
 
   private getLevelPrefix(level: ErrorLogEntry["level"]): string {
@@ -266,7 +276,6 @@ export function logApiError(
   userId?: string,
 ): void {
   const url = new URL(request.url);
-
   errorLogger.logError(error, {
     path: url.pathname,
     method: request.method,

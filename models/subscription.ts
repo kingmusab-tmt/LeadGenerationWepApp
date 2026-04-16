@@ -5,6 +5,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 // import dbConnect from "../utils/connectDB";
 
 interface ISubscription extends Document {
+  userId: string;
   endpoint: string;
   keys: {
     p256dh: string;
@@ -13,6 +14,7 @@ interface ISubscription extends Document {
 }
 
 const SubscriptionSchema: Schema = new Schema({
+  userId: { type: String, required: true, index: true },
   endpoint: { type: String, required: true, unique: true },
   keys: {
     p256dh: { type: String, required: true },

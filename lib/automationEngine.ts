@@ -151,6 +151,37 @@ class ActionExecutor {
 }
 
 export class AutomationEngine {
+  private static isSameCalendarDay(a: Date, b: Date): boolean {
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
+  private static async isInCooldownWindow(
+    workflowId: string,
+    leadId: string,
+    cooldownMinutes: number,
+  ): Promise<boolean> {
+    const latestExecution = await WorkflowExecution.findOne({
+      workflowId,
+      "triggerData.leadId": leadId,
+    })
+      .sort({ startedAt: -1 })
+      .select("startedAt")
+      .lean();
+
+    if (!latestExecution?.startedAt) {
+      return false;
+    }
+
+    const cooldownMs = cooldownMinutes * 60 * 1000;
+    const elapsedMs =
+      Date.now() - new Date(latestExecution.startedAt).getTime();
+    return elapsedMs < cooldownMs;
+  }
+
   /**
    * Trigger a workflow based on an event
    */
@@ -192,11 +223,28 @@ export class AutomationEngine {
         // Reset counter if new day
         const now = new Date();
         const resetTime = workflow.executionResetTime;
-        if (resetTime && now.getDate() !== resetTime.getDate()) {
+        if (resetTime && !this.isSameCalendarDay(now, resetTime)) {
           workflow.executionsCount = 0;
           workflow.executionResetTime = now;
         } else {
           console.log("Workflow reached max executions for today");
+          return;
+        }
+      }
+
+      if (
+        workflow.cooldownMinutes &&
+        workflow.cooldownMinutes > 0 &&
+        event.leadId
+      ) {
+        const isCoolingDown = await this.isInCooldownWindow(
+          String(workflow._id),
+          event.leadId,
+          workflow.cooldownMinutes,
+        );
+
+        if (isCoolingDown) {
+          console.log("Workflow execution skipped due to cooldown window");
           return;
         }
       }
@@ -280,8 +328,7 @@ export class AutomationEngine {
 
       // Update workflow stats
       workflow.totalExecutions = (workflow.totalExecutions || 0) + 1;
-      workflow.executionsCount =
-        ((workflow.executionsCount as unknown as number) || 0) + 1;
+      workflow.executionsCount = (workflow.executionsCount || 0) + 1;
       workflow.lastExecutedAt = new Date();
 
       if (allSuccess) {

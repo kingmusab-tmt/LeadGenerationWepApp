@@ -8,23 +8,23 @@ import { sendSmsNotification } from "@/utils/sms";
 import { sendPushNotification } from "@/utils/pushNotification";
 import { authOptions } from "@/auth";
 import { getServerSession } from "next-auth";
+import { invalidateLeadCache, invalidateBuyerCache } from "@/lib/cachedSession"; // Import cache invalidation functions
 import {
-  invalidateSessionCache,
-  invalidateLeadCache,
-  invalidateBuyerCache,
-} from "@/lib/cachedSession"; // Import cache invalidation functions
+  badRequest,
+  internalError,
+  methodNotAllowed,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function POST(req: NextRequest) {
   // Ensure the request is a POST request
   if (req.method !== "POST") {
-    return NextResponse.json(
-      { message: "Method not allowed" },
-      { status: 405 },
-    );
+    return methodNotAllowed();
   }
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "seller") {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return unauthorized("Authentication required");
   }
 
   try {
@@ -41,15 +41,18 @@ export async function POST(req: NextRequest) {
       !Array.isArray(leadIds) ||
       !Array.isArray(buyerIds)
     ) {
-      return NextResponse.json(
-        { message: "Missing or invalid leadIds or buyerIds in request body" },
-        { status: 400 },
+      return badRequest(
+        "Missing or invalid leadIds or buyerIds in request body",
       );
     }
 
     // Find all leads and buyers in the database
     const leads = (await Lead.find({ _id: { $in: leadIds } })) as Array<{
-      assignedTo: any;
+      assignedTo: Array<{
+        buyerId: { toString: () => string };
+        accepted: boolean;
+        rejected: boolean;
+      }>;
       status: string;
       save(): unknown;
       _id: string;
@@ -61,18 +64,15 @@ export async function POST(req: NextRequest) {
       const missingLeadIds = leadIds.filter(
         (id) => !leads.some((lead) => (lead._id as string).toString() === id),
       );
-      return NextResponse.json(
-        { message: `Leads not found: ${missingLeadIds.join(", ")}` },
-        { status: 404 },
-      );
+      return notFound("Lead", `Leads not found: ${missingLeadIds.join(", ")}`);
     }
     if (buyers.length !== buyerIds.length) {
       const missingBuyerIds = buyerIds.filter(
         (id) => !buyers.some((buyer) => buyer._id.toString() === id),
       );
-      return NextResponse.json(
-        { message: `Buyers not found: ${missingBuyerIds.join(", ")}` },
-        { status: 404 },
+      return notFound(
+        "Buyer",
+        `Buyers not found: ${missingBuyerIds.join(", ")}`,
       );
     }
 
@@ -214,16 +214,10 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error assigning leads:", error);
-    return NextResponse.json(
-      {
-        message: "Failed to assign leads",
-        error: error instanceof Error ? error.message : "Unknown error",
-        stack:
-          process.env.NODE_ENV === "development" && error instanceof Error
-            ? error.stack
-            : undefined,
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Failed to assign leads: ${error.message}`
+        : "Failed to assign leads",
     );
   }
 }

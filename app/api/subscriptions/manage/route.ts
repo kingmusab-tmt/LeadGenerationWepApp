@@ -7,6 +7,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
+import {
   cancelSubscriptionWithFeedback,
   reactivateSubscription,
   changeSubscriptionPlan,
@@ -23,6 +29,26 @@ import {
 import connectDB from "@/lib/connectdb";
 import { User } from "@/models/userModel";
 
+type StripeSubscriptionLike = {
+  id?: string;
+  status?: string;
+  current_period_end?: number;
+  current_period_start?: number;
+  cancel_at_period_end?: boolean;
+  cancel_at?: number | null;
+  default_payment_method?: {
+    card?: {
+      brand?: string;
+      last4?: string;
+      exp_month?: number;
+      exp_year?: number;
+    };
+  } | null;
+  items?: {
+    data?: Array<{ price?: { unit_amount?: number; currency?: string } }>;
+  };
+};
+
 /**
  * GET /api/subscriptions/manage
  * Get comprehensive subscription details including usage, limits, payment method
@@ -32,10 +58,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await connectDB();
@@ -45,10 +68,7 @@ export async function GET() {
     );
 
     if (!user) {
-      return NextResponse.json(
-        { success: false, message: "User not found" },
-        { status: 404 },
-      );
+      return notFound("User");
     }
 
     // Get live subscription details from Stripe
@@ -156,11 +176,18 @@ export async function GET() {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sub = stripeSubscription as any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const subscriptionData =
-      (user.subscription as any)?.toObject?.() || user.subscription;
+    const sub = stripeSubscription as StripeSubscriptionLike | null;
+    const subscriptionRaw = user.subscription as unknown;
+    const subscriptionData: Record<string, unknown> =
+      subscriptionRaw && typeof subscriptionRaw === "object"
+        ? "toObject" in subscriptionRaw &&
+          typeof (subscriptionRaw as { toObject?: unknown }).toObject ===
+            "function"
+          ? (
+              subscriptionRaw as { toObject: () => Record<string, unknown> }
+            ).toObject()
+          : (subscriptionRaw as Record<string, unknown>)
+        : {};
 
     return NextResponse.json({
       success: true,
@@ -170,8 +197,12 @@ export async function GET() {
           ? {
               id: sub.id,
               status: sub.status,
-              currentPeriodEnd: new Date(sub.current_period_end * 1000),
-              currentPeriodStart: new Date(sub.current_period_start * 1000),
+              currentPeriodEnd: sub.current_period_end
+                ? new Date(sub.current_period_end * 1000)
+                : null,
+              currentPeriodStart: sub.current_period_start
+                ? new Date(sub.current_period_start * 1000)
+                : null,
               cancelAtPeriodEnd: sub.cancel_at_period_end,
               cancelAt: sub.cancel_at ? new Date(sub.cancel_at * 1000) : null,
             }
@@ -184,10 +215,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error("[SubscriptionManageAPI] GET error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to get subscription details" },
-      { status: 500 },
-    );
+    return internalError("Failed to get subscription details");
   }
 }
 
@@ -200,10 +228,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     const body = await request.json();
@@ -225,10 +250,7 @@ export async function POST(request: NextRequest) {
 
         // Validate reason if provided
         if (reason && !CANCELLATION_REASONS.includes(reason)) {
-          return NextResponse.json(
-            { success: false, message: "Invalid cancellation reason" },
-            { status: 400 },
-          );
+          return badRequest("Invalid cancellation reason");
         }
 
         const result = await cancelSubscriptionWithFeedback(session.user.id, {
@@ -238,7 +260,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(result.message || "Failed to cancel subscription");
         }
 
         return NextResponse.json({
@@ -254,7 +276,9 @@ export async function POST(request: NextRequest) {
         const result = await reactivateSubscription(session.user.id);
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(
+            result.message || "Failed to reactivate subscription",
+          );
         }
 
         return NextResponse.json({
@@ -267,10 +291,7 @@ export async function POST(request: NextRequest) {
         const { newTierId, billingInterval } = params;
 
         if (!newTierId) {
-          return NextResponse.json(
-            { success: false, message: "New tier ID is required" },
-            { status: 400 },
-          );
+          return badRequest("New tier ID is required");
         }
 
         const result = await changeSubscriptionPlan(
@@ -280,7 +301,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(
+            result.message || "Failed to change subscription plan",
+          );
         }
 
         return NextResponse.json({
@@ -294,10 +317,7 @@ export async function POST(request: NextRequest) {
         const { returnUrl } = params;
 
         if (!returnUrl) {
-          return NextResponse.json(
-            { success: false, message: "Return URL is required" },
-            { status: 400 },
-          );
+          return badRequest("Return URL is required");
         }
 
         const result = await createBillingPortalSession(
@@ -306,7 +326,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(
+            result.message || "Failed to create billing portal session",
+          );
         }
 
         return NextResponse.json({
@@ -319,10 +341,7 @@ export async function POST(request: NextRequest) {
         const { newTierId, billingInterval, isTrialConversion } = params;
 
         if (!newTierId) {
-          return NextResponse.json(
-            { success: false, message: "New tier ID is required" },
-            { status: 400 },
-          );
+          return badRequest("New tier ID is required");
         }
 
         const result = await getProrationPreview(
@@ -333,7 +352,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(
+            result.message || "Failed to generate proration preview",
+          );
         }
 
         return NextResponse.json({
@@ -343,16 +364,10 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        return NextResponse.json(
-          { success: false, message: `Unknown action: ${action}` },
-          { status: 400 },
-        );
+        return badRequest(`Unknown action: ${action}`);
     }
   } catch (error) {
     console.error("[SubscriptionManageAPI] POST error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to process subscription action" },
-      { status: 500 },
-    );
+    return internalError("Failed to process subscription action");
   }
 }

@@ -82,3 +82,13 @@ export const {
   clearLoading,
 } = uiSlice.actions;
 export default uiSlice.reducer;
+
+// Selectors for type-safe state access
+export const selectNotifications = (state: { ui: UIState }) =>
+  state.ui.notifications;
+export const selectSidebarOpen = (state: { ui: UIState }) =>
+  state.ui.sidebarOpen;
+export const selectTheme = (state: { ui: UIState }) => state.ui.theme;
+export const selectLoading = (state: { ui: UIState }) => state.ui.loading;
+export const selectIsLoading = (state: { ui: UIState }, key: string) =>
+  state.ui.loading[key] ?? false;

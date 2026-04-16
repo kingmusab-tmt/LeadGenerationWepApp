@@ -175,7 +175,7 @@ const ContactPage = () => {
       >
         <Container maxWidth="lg">
           <Typography variant="h2" component="h1" gutterBottom>
-            We're Here to Help
+            We&apos;re Here to Help
           </Typography>
           <Typography variant="h5" maxWidth="md" mx="auto">
             Contact our team for support, sales inquiries, or partnership
@@ -539,26 +539,7 @@ const ContactPage = () => {
         </Container>
       </Box> */}
 
-      {/* CTA Section */}
-      {/* <Box bgcolor="primary.main" color="white" py={10} textAlign="center">
-        <Container maxWidth="md">
-          <Typography variant="h3" gutterBottom>
-            Ready to Transform Your Lead Management?
-          </Typography>
-          <Typography variant="h5" paragraph>
-            Schedule a personalized demo with our experts
-          </Typography>
-          <Button
-            variant="contained"
-            color="secondary"
-            size="large"
-            sx={{ mt: 3, px: 6, py: 2 }}
-            href="/demo"
-          >
-            Request a Demo
-          </Button>
-        </Container>
-      </Box> */}
+      {/* CTA Section intentionally omitted on this page. */}
 
       <Footer />
     </>

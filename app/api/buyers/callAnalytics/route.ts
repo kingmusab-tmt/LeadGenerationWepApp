@@ -4,28 +4,31 @@ import { Buyer } from "@/models/leadbuyers";
 import Call from "@/models/call";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function GET(req: NextRequest) {
   try {
     await dbConnect();
     const buyerId = req.nextUrl.searchParams.get("buyerId");
-    if (!buyerId)
-      return new NextResponse(JSON.stringify({ error: "Buyer ID required" }), {
-        status: 400,
-      });
+    if (!buyerId) return badRequest("Buyer ID required");
 
     const session = await getServerSession(authOptions);
     if (!session || !session.user?.id || session.user.role !== "buyer") {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-      });
+      return unauthorized("Authentication required");
     }
     const buyer = await Buyer.findById(buyerId);
+    if (!buyer) {
+      return notFound("Buyer");
+    }
     const email = buyer?.email;
     if (email !== session.user.email) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-      });
+      return forbidden("Forbidden");
     }
 
     const totalCallLeads = await Call.countDocuments({ buyerId });
@@ -38,19 +41,19 @@ export async function GET(req: NextRequest) {
     const conversionRate =
       totalCallLeads > 0 ? (answeredCallLeads / totalCallLeads) * 100 : 0;
 
-    return new NextResponse(
-      JSON.stringify({
-        totalCallLeads,
-        answeredCallLeads,
-        missedCallLeads,
-        conversionRate,
-      }),
-      { status: 200 }
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          totalCallLeads,
+          answeredCallLeads,
+          missedCallLeads,
+          conversionRate,
+        },
+      },
+      { status: 200 },
     );
-  } catch (error) {
-    return new NextResponse(
-      JSON.stringify({ error: "Failed to fetch analytics" }),
-      { status: 500 }
-    );
+  } catch {
+    return internalError("Failed to fetch analytics");
   }
 }

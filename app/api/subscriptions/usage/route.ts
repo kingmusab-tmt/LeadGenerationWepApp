@@ -7,7 +7,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import connectDB from "@/lib/connectdb";
-import { User } from "@/models/userModel";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 import {
   getUsageSummary,
   getUsageWarnings,
@@ -28,10 +32,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await connectDB();
@@ -57,10 +58,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[UsageAPI] GET error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to get usage data" },
-      { status: 500 },
-    );
+    return internalError("Failed to get usage data");
   }
 }
 
@@ -81,10 +79,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     const body = await request.json();
@@ -96,20 +91,13 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!usageKey) {
-      return NextResponse.json(
-        { success: false, message: "usageKey is required" },
-        { status: 400 },
-      );
+      return badRequest("usageKey is required");
     }
 
     // Validate usage key
     if (!USAGE_TO_LIMIT_MAP[usageKey]) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Invalid usageKey. Valid keys: ${Object.keys(USAGE_TO_LIMIT_MAP).join(", ")}`,
-        },
-        { status: 400 },
+      return badRequest(
+        `Invalid usageKey. Valid keys: ${Object.keys(USAGE_TO_LIMIT_MAP).join(", ")}`,
       );
     }
 
@@ -165,19 +153,10 @@ export async function POST(request: NextRequest) {
         message: result.message,
       });
     } else {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid action. Use 'check' or 'increment'",
-        },
-        { status: 400 },
-      );
+      return badRequest("Invalid action. Use 'check' or 'increment'");
     }
   } catch (error) {
     console.error("[UsageAPI] POST error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to process usage request" },
-      { status: 500 },
-    );
+    return internalError("Failed to process usage request");
   }
 }

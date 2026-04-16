@@ -50,7 +50,6 @@ const GoogleCityAutocomplete: React.FC<GoogleCityAutocompleteProps> = ({
   required = false,
   onBlur,
 }) => {
-  const [inputValue, setInputValue] = useState(value || "");
   const [options, setOptions] = useState<PlacePrediction[]>([]);
   const [loading, setLoading] = useState(false);
   const autocompleteServiceRef =
@@ -61,11 +60,6 @@ const GoogleCityAutocomplete: React.FC<GoogleCityAutocompleteProps> = ({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
-
-  // Update input when value prop changes
-  useEffect(() => {
-    setInputValue(value || "");
-  }, [value]);
 
   // Initialize autocomplete service when loaded
   useEffect(() => {
@@ -110,7 +104,7 @@ const GoogleCityAutocomplete: React.FC<GoogleCityAutocompleteProps> = ({
   // Debounced search
   const handleInputChange = useCallback(
     (_: React.SyntheticEvent, newInputValue: string) => {
-      setInputValue(newInputValue);
+      onChange(newInputValue);
 
       // Clear previous timer
       if (debounceTimerRef.current) {
@@ -122,7 +116,7 @@ const GoogleCityAutocomplete: React.FC<GoogleCityAutocompleteProps> = ({
         fetchPredictions(newInputValue);
       }, 300);
     },
-    [fetchPredictions],
+    [fetchPredictions, onChange],
   );
 
   // State abbreviation to full name mapping
@@ -268,7 +262,7 @@ const GoogleCityAutocomplete: React.FC<GoogleCityAutocompleteProps> = ({
       options={options}
       loading={loading}
       disabled={disabled}
-      inputValue={inputValue}
+      inputValue={value || ""}
       onInputChange={handleInputChange}
       onChange={handleChange}
       onBlur={onBlur}
@@ -342,7 +336,7 @@ const GoogleCityAutocomplete: React.FC<GoogleCityAutocompleteProps> = ({
         );
       }}
       noOptionsText={
-        inputValue.length < 2
+        (value || "").length < 2
           ? "Type at least 2 characters to search cities"
           : "No cities found"
       }

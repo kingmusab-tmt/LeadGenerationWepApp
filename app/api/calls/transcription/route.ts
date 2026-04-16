@@ -2,6 +2,7 @@ import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
 import { processCallAIAnalysis } from "@/lib/callAIAnalysis";
 import { NextRequest, NextResponse } from "next/server";
+import { callSecurityMiddleware } from "@/lib/security/callSecurity";
 
 /**
  * Twilio Transcription Callback Handler
@@ -10,6 +11,14 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function POST(req: NextRequest) {
   try {
+    const securityResponse = await callSecurityMiddleware(req, {
+      rateLimit: true,
+      validateWebhook: true,
+    });
+    if (securityResponse) {
+      return securityResponse;
+    }
+
     await dbConnect();
 
     const formData = await req.formData();
@@ -20,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     if (!callSid) {
       return NextResponse.json(
-        { error: "CallSid is required" },
+        { success: false, error: "CallSid is required" },
         { status: 400 },
       );
     }
@@ -30,7 +39,10 @@ export async function POST(req: NextRequest) {
       console.log(
         `Transcription ${transcriptionSid} for call ${callSid}: status=${transcriptionStatus}`,
       );
-      return NextResponse.json({ success: true, status: "skipped" });
+      return NextResponse.json({
+        success: true,
+        data: { status: "skipped" },
+      });
     }
 
     // Update call record with transcription
@@ -42,7 +54,10 @@ export async function POST(req: NextRequest) {
 
     if (!call) {
       console.warn(`Call not found for transcription: ${callSid}`);
-      return NextResponse.json({ error: "Call not found" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Call not found" },
+        { status: 404 },
+      );
     }
 
     // Trigger AI analysis if transcription was saved
@@ -56,13 +71,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      callSid,
-      transcriptionSid,
+      data: {
+        callSid,
+        transcriptionSid,
+      },
     });
   } catch (error) {
     console.error("Error handling transcription callback:", error);
     return NextResponse.json(
-      { error: "Failed to process transcription" },
+      { success: false, error: "Failed to process transcription" },
       { status: 500 },
     );
   }

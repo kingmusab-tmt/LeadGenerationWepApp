@@ -7,6 +7,13 @@ import { User } from "@/models";
 import dbConnect from "@/lib/connectdb";
 import { sendNotification } from "@/lib/notificationService";
 import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 /**
  * POST /api/leads/reject
@@ -22,10 +29,7 @@ export async function POST(request: NextRequest) {
     // ========================================
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
-      return NextResponse.json(
-        { error: "Unauthorized - authentication required" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     const buyerId = session.user.id;
@@ -36,10 +40,7 @@ export async function POST(request: NextRequest) {
     const { leadId, reason } = await request.json();
 
     if (!leadId) {
-      return NextResponse.json(
-        { error: "leadId is required" },
-        { status: 400 },
-      );
+      return badRequest("leadId is required");
     }
 
     // ========================================
@@ -47,19 +48,16 @@ export async function POST(request: NextRequest) {
     // ========================================
     const lead = (await Lead.findById(leadId)) as ILead | null;
     if (!lead) {
-      return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+      return notFound("Lead");
     }
 
     // Check if lead is assigned to this buyer
     const assignmentIndex = lead.assignedTo.findIndex(
-      (a: any) => a.buyerId.toString() === buyerId,
+      (a) => a.buyerId.toString() === buyerId,
     );
 
     if (assignmentIndex === -1) {
-      return NextResponse.json(
-        { error: "Lead is not assigned to this buyer" },
-        { status: 403 },
-      );
+      return forbidden("Lead is not assigned to this buyer");
     }
 
     // ========================================
@@ -76,7 +74,10 @@ export async function POST(request: NextRequest) {
     // ========================================
 
     // Try to assign to another matching buyer
-    let reassignedTo: any = null;
+    let reassignedTo: {
+      _id: unknown;
+      email?: string;
+    } | null = null;
     const otherBuyers = await Buyer.find({
       registeredWith: sellerUserId,
       isActive: true,
@@ -87,15 +88,15 @@ export async function POST(request: NextRequest) {
     // Find first buyer with matching criteria who hasn't rejected this lead
     for (const otherBuyer of otherBuyers) {
       const hasRejected = lead.assignedTo.some(
-        (a: any) =>
-          a.buyerId.toString() === otherBuyer._id.toString() &&
+        (a) =>
+          a.buyerId.toString() === String(otherBuyer._id) &&
           a.rejected === true,
       );
 
       if (!hasRejected) {
         // This buyer hasn't rejected yet - try to assign
         const newAssignment = {
-          buyerId: otherBuyer._id.toString(),
+          buyerId: String(otherBuyer._id),
           accepted: false,
           rejected: false,
           assignedAt: new Date(),
@@ -176,7 +177,7 @@ export async function POST(request: NextRequest) {
     if (reassignedTo) {
       try {
         await sendNotification({
-          userId: reassignedTo._id.toString(),
+          userId: String(reassignedTo._id),
           type: "info",
           title: "New Lead Assigned",
           message: `A new qualified lead has been assigned to you.`,
@@ -205,12 +206,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error processing lead rejection:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to process lead rejection",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Failed to process lead rejection: ${error.message}`
+        : "Failed to process lead rejection",
     );
   }
 }

@@ -1,22 +1,42 @@
 // POST /api/invoices/[id]/actions - Send invoice, mark as paid, etc
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Invoice } from "@/models/invoice";
 import { invoiceEngine } from "@/lib/invoiceEngine";
+import { ZodError } from "zod";
+import { mongoIdParamSchema } from "@/lib/validation/schemas";
+import {
+  successResponse,
+  unauthorized,
+  notFound,
+  forbidden,
+  badRequest,
+  internalError,
+  handleValidationError,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+    try {
+      mongoIdParamSchema.parse(id);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid invoice id");
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const url = new URL(req.url);
@@ -27,19 +47,19 @@ export async function POST(
     const invoice = await Invoice.findById(id);
 
     if (!invoice) {
-      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+      return notFound("Invoice");
     }
 
     // Check ownership
     if (invoice.userId.toString() !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbidden("You do not have access to this invoice");
     }
 
     // ==================== SEND ====================
     if (action === "send") {
       const result = await invoiceEngine.sendInvoice(id);
 
-      return NextResponse.json(result, { status: 200 });
+      return successResponse(result);
     }
 
     // ==================== MARK AS PAID ====================
@@ -48,31 +68,25 @@ export async function POST(
       const { paymentMethod, paymentDate } = body;
 
       if (!paymentMethod) {
-        return NextResponse.json(
-          { error: "Payment method required" },
-          { status: 400 }
-        );
+        return badRequest("Payment method required");
       }
 
       const updatedInvoice = await invoiceEngine.markAsPaid(
         id,
         paymentMethod,
-        paymentDate ? new Date(paymentDate) : undefined
+        paymentDate ? new Date(paymentDate) : undefined,
       );
 
-      return NextResponse.json(
-        { message: "Invoice marked as paid", invoice: updatedInvoice },
-        { status: 200 }
-      );
+      return successResponse({
+        message: "Invoice marked as paid",
+        invoice: updatedInvoice,
+      });
     }
 
     // ==================== SEND REMINDER ====================
     if (action === "send-reminder") {
       if (invoice.status === "paid") {
-        return NextResponse.json(
-          { error: "Cannot send reminder for paid invoice" },
-          { status: 400 }
-        );
+        return badRequest("Cannot send reminder for paid invoice");
       }
 
       // In production, this would send an email
@@ -81,10 +95,7 @@ export async function POST(
         lastReminderDate: new Date(),
       });
 
-      return NextResponse.json(
-        { message: "Reminder sent successfully" },
-        { status: 200 }
-      );
+      return successResponse({ message: "Reminder sent successfully" });
     }
 
     // ==================== DUPLICATE ====================
@@ -104,18 +115,15 @@ export async function POST(
         paymentMethod: invoice.paymentMethod,
       });
 
-      return NextResponse.json(
+      return successResponse(
         { message: "Invoice duplicated", invoice: newInvoice },
-        { status: 201 }
+        201,
       );
     }
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    return badRequest("Invalid action");
   } catch (error) {
     console.error("Error processing invoice action:", error);
-    return NextResponse.json(
-      { error: "Failed to process action" },
-      { status: 500 }
-    );
+    return internalError("Failed to process action");
   }
 }

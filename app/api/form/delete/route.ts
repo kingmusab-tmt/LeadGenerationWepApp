@@ -3,16 +3,14 @@ import dbConnect from "@/lib/connectdb";
 import Form from "@/models/form";
 import { authOptions } from "@/auth";
 import { getServerSession } from "next-auth";
+import { internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
 export async function DELETE(req: NextRequest) {
   try {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized. Please log in to update this lead." },
-        { status: 401 }
-      );
+      return unauthorized("Authentication required");
     }
 
     const { searchParams } = new URL(req.url);
@@ -21,14 +19,7 @@ export async function DELETE(req: NextRequest) {
     const deletedForm = await Form.findOneAndDelete({ formId: id });
 
     if (!deletedForm) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Form not found.",
-          error: `No form found with formId: ${id}`,
-        },
-        { status: 404 }
-      );
+      return notFound("Form", `No form found with formId: ${id}`);
     }
 
     return NextResponse.json({
@@ -37,15 +28,10 @@ export async function DELETE(req: NextRequest) {
       deletedForm,
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred";
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to delete form.",
-        error: errorMessage,
-      },
-      { status: 500 }
+    return internalError(
+      error instanceof Error
+        ? `Failed to delete form. ${error.message}`
+        : "Failed to delete form.",
     );
   }
 }

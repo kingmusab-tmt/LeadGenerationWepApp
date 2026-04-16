@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/connectdb";
 import { EmailCampaign } from "@/models/emailCampaign";
+import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,24 +13,18 @@ export async function GET(req: NextRequest) {
     const email = searchParams.get("email");
 
     if (!action || !campaignId) {
-      return NextResponse.json(
-        { error: "Missing required parameters" },
-        { status: 400 },
-      );
+      return badRequest("Missing required parameters");
     }
 
     // Validate action
     if (!["open", "click"].includes(action)) {
-      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+      return badRequest("Invalid action");
     }
 
     // Find the campaign
     const campaign = await EmailCampaign.findById(campaignId);
     if (!campaign) {
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 },
-      );
+      return notFound("Campaign");
     }
 
     // Update analytics based on action
@@ -89,11 +84,8 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Email tracking error:", error);
-    return NextResponse.json(
-      { error: "Failed to track email event" },
-      { status: 500 },
-    );
+    return internalError("Failed to track email event");
   }
 }

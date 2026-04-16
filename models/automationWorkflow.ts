@@ -33,13 +33,10 @@ export interface IAction {
   type: ActionType;
   config: {
     // For send_email
-    templateId?: string;
-    emailTemplate?: string;
     subject?: string;
     body?: string;
 
     // For send_sms
-    messageTemplate?: string;
     message?: string;
 
     // For create_notification
@@ -183,11 +180,8 @@ const WorkflowSchema: Schema = new Schema(
           required: true,
         },
         config: {
-          templateId: String,
-          emailTemplate: String,
           subject: String,
           body: String,
-          messageTemplate: String,
           message: String,
           notificationTitle: String,
           notificationBody: String,
@@ -229,7 +223,7 @@ const WorkflowSchema: Schema = new Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Execution History Schema
@@ -283,13 +277,20 @@ const WorkflowExecutionSchema: Schema = new Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
 WorkflowSchema.index({ userId: 1, isActive: 1 });
+WorkflowSchema.index({ userId: 1, isActive: 1, "triggers.type": 1 });
 WorkflowSchema.index({ createdAt: -1 });
 WorkflowExecutionSchema.index({ workflowId: 1, createdAt: -1 });
+WorkflowExecutionSchema.index({ workflowId: 1, userId: 1, createdAt: -1 });
+WorkflowExecutionSchema.index({
+  workflowId: 1,
+  "triggerData.leadId": 1,
+  startedAt: -1,
+});
 WorkflowExecutionSchema.index({ userId: 1, status: 1 });
 
 export const AutomationWorkflow: Model<IAutomationWorkflow> =
@@ -300,5 +301,5 @@ export const WorkflowExecution: Model<IWorkflowExecution> =
   mongoose.models.WorkflowExecution ||
   mongoose.model<IWorkflowExecution>(
     "WorkflowExecution",
-    WorkflowExecutionSchema
+    WorkflowExecutionSchema,
   );

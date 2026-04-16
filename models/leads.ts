@@ -28,7 +28,7 @@ export interface ILead extends Document {
   fields: Array<{
     id: string;
     label: string;
-    value: any; // Allow any type of value
+    value: unknown; // Allow any type of value
   }>;
   status:
     | "new"
@@ -189,6 +189,12 @@ const LeadSchema = new Schema<ILead>(
 );
 
 LeadSchema.index({ calls: 1 }); // PHASE 3: Index for call queries
+LeadSchema.index({ userId: 1 }); // Seller/user lookup queries
+LeadSchema.index({ formId: 1 }); // Form-origin lookup queries
+LeadSchema.index({ status: 1 }); // Status-based lead filters
+LeadSchema.index({ "assignedTo.buyerId": 1 }); // Buyer assignment lookup queries
+LeadSchema.index({ "soldTo.buyerId": 1 }); // Sold lead lookup queries
+LeadSchema.index({ userId: 1, status: 1 }); // Common seller lead list queries
 
 export const Lead: Model<ILead> =
   mongoose.models.Lead || mongoose.model<ILead>("Lead", LeadSchema);

@@ -3,6 +3,11 @@ import { getServerSession } from "next-auth/next";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -14,36 +19,24 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json(
-      { success: false, message: "Unauthorized" },
-      { status: 401 },
-    );
+    return unauthorized("Authentication required");
   }
 
   const { searchParams } = new URL(req.url);
   const idsParam = searchParams.get("ids");
 
   if (!idsParam) {
-    return NextResponse.json(
-      { success: false, message: "No user IDs provided" },
-      { status: 400 },
-    );
+    return badRequest("No user IDs provided");
   }
 
   const ids = idsParam.split(",").filter((id) => id.trim());
 
   if (ids.length === 0) {
-    return NextResponse.json(
-      { success: false, message: "No valid user IDs provided" },
-      { status: 400 },
-    );
+    return badRequest("No valid user IDs provided");
   }
 
   if (ids.length > 10) {
-    return NextResponse.json(
-      { success: false, message: "Maximum 10 user IDs allowed per request" },
-      { status: 400 },
-    );
+    return badRequest("Maximum 10 user IDs allowed per request");
   }
 
   try {
@@ -60,7 +53,7 @@ export async function GET(req: NextRequest) {
       { name: string; email: string; businessName?: string }
     > = {};
 
-    users.forEach((user: any) => {
+    users.forEach((user) => {
       userMap[user._id.toString()] = {
         name: user.name || "Unknown",
         email: user.email || "N/A",
@@ -74,9 +67,6 @@ export async function GET(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error looking up users:", error);
-    return NextResponse.json(
-      { success: false, message: "Error fetching user details" },
-      { status: 500 },
-    );
+    return internalError("Error fetching user details");
   }
 }

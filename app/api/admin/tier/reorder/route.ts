@@ -4,21 +4,23 @@ import dbConnect from "@/lib/connectdb";
 import { Tier } from "@/models/tier";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 // Update tier order (bulk update)
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const { tiers: updatedTiers } = await req.json();
 
     if (!Array.isArray(updatedTiers)) {
-      return NextResponse.json(
-        { error: "Invalid data format" },
-        { status: 400 }
-      );
+      return badRequest("Invalid data format");
     }
 
     await dbConnect();
@@ -34,9 +36,6 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating tiers:", error);
-    return NextResponse.json(
-      { error: "Failed to update tiers" },
-      { status: 500 }
-    );
+    return internalError("Failed to update tiers");
   }
 }

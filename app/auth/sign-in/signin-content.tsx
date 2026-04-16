@@ -1,10 +1,10 @@
 "use client";
 
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks";
 import { SignInPage } from "./signin";
 import { Box, CircularProgress } from "@mui/material";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -14,16 +14,9 @@ const SignInContent: React.FC = () => {
   const { data: session, status, update: updateSession } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isRedirecting, setIsRedirecting] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [startingTrial, setStartingTrial] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Function to start trial for existing users
-  const startTrialForExistingUser = useCallback(async () => {
+  const startTrialForExistingUser = async () => {
     if (startingTrial) return false;
     setStartingTrial(true);
 
@@ -50,7 +43,7 @@ const SignInContent: React.FC = () => {
     sessionStorage.removeItem("trialIntent");
     setStartingTrial(false);
     return false;
-  }, [startingTrial, updateSession]);
+  };
 
   useEffect(() => {
     // Wait for session to load first
@@ -60,7 +53,7 @@ const SignInContent: React.FC = () => {
     if (status === "unauthenticated") return;
 
     // If already redirecting or starting trial, skip
-    if (isRedirecting || startingTrial) return;
+    if (startingTrial) return;
 
     // Check for trial intent
     const trialParam = searchParams.get("trial");
@@ -78,7 +71,6 @@ const SignInContent: React.FC = () => {
         isSubActive,
         trialIntent,
       });
-      setIsRedirecting(true);
 
       if (role === "admin") {
         router.replace("/admindashboard/overview");
@@ -95,7 +87,6 @@ const SignInContent: React.FC = () => {
         // User doesn't have active subscription
         if (trialIntent) {
           // Start trial for existing user
-          setIsRedirecting(false); // Allow retrying
           startTrialForExistingUser().then((success) => {
             if (success) {
               router.replace("/dashboard/seller/overview");
@@ -111,7 +102,6 @@ const SignInContent: React.FC = () => {
       }
     } else if (role === "user") {
       console.log("[SignIn] User needs to complete registration");
-      setIsRedirecting(true);
       router.replace("/completeregistration");
     }
   }, [
@@ -119,19 +109,13 @@ const SignInContent: React.FC = () => {
     status,
     currentUser,
     router,
-    isRedirecting,
     searchParams,
-    startTrialForExistingUser,
     startingTrial,
+    updateSession,
+    csrfFetch,
   ]);
 
-  // Avoid hydration mismatch by waiting for client mount
-  if (
-    !isMounted ||
-    status === "loading" ||
-    status === "authenticated" ||
-    startingTrial
-  ) {
+  if (status === "loading" || status === "authenticated" || startingTrial) {
     return (
       <Box
         sx={{

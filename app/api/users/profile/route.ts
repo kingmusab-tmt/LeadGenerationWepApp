@@ -129,11 +129,9 @@ export async function PUT(req: NextRequest) {
     await dbConnect();
 
     // Determine filter based on _id or email from session
-    let filter: any = {};
+    let filter: { _id?: string; email: string } = { email: userEmail };
     if (validatedData._id) {
       filter = { _id: validatedData._id, email: userEmail };
-    } else {
-      filter = { email: userEmail };
     }
 
     // Find the user first
@@ -143,7 +141,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Prepare update object
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (validatedData.name) {
       // Capitalize first letter of each word
       updateData.name = validatedData.name.replace(
@@ -253,11 +251,9 @@ export async function PATCH(req: NextRequest) {
     await dbConnect();
 
     // Determine filter
-    let filter: any = {};
+    let filter: { _id?: string; email: string } = { email: userEmail };
     if (validatedData._id) {
       filter = { _id: validatedData._id, email: userEmail };
-    } else {
-      filter = { email: userEmail };
     }
 
     // Find the user first
@@ -267,7 +263,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Prepare update object
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (validatedData.name) {
       updateData.name = validatedData.name.replace(
         /\w\S*/g,

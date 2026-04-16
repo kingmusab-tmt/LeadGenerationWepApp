@@ -3,6 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { SmsCampaign, SmsEvent } from "@/models/smsCampaign";
+import {
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -15,21 +21,18 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
 
     const campaign = await SmsCampaign.findById(id);
     if (!campaign) {
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 },
-      );
+      return notFound("Campaign");
     }
 
     if (campaign.userId !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbidden("Forbidden");
     }
 
     const replies = await SmsEvent.find({
@@ -51,9 +54,6 @@ export async function GET(
     return NextResponse.json({ items });
   } catch (error) {
     console.error("[GET /api/marketing/sms/campaigns/[id]/replies]", error);
-    return NextResponse.json(
-      { error: "Failed to fetch campaign replies" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch campaign replies");
   }
 }

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
 import mongoose from "mongoose";
 import Call from "@/models/call";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { internalError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
 
@@ -73,9 +73,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ calls: formattedCalls });
   } catch (error) {
     console.error("Failed to fetch calls:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch calls" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch calls");
   }
 }

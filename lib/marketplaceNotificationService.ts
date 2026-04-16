@@ -186,14 +186,17 @@ export async function notifyMatchingBuyers(
         });
 
         const channels: string[] = ["dashboard"];
+        const hasPreference = (preference: "Email" | "SMS") =>
+          (buyer.notificationPreferences || []).some(
+            (value) => value.toLowerCase() === preference.toLowerCase(),
+          );
 
-        // Send email if enabled (optional enhancement)
-        if (buyer.notificationPreferences?.includes("Email")) {
+        // Include channel metadata when user preferences allow it.
+        if (hasPreference("Email")) {
           channels.push("email");
         }
 
-        // Send SMS if enabled (optional enhancement)
-        if (buyer.notificationPreferences?.includes("SMS")) {
+        if (hasPreference("SMS")) {
           channels.push("sms");
         }
 

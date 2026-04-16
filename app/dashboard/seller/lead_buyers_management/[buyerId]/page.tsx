@@ -61,8 +61,10 @@ const BuyerDetailsPage: React.FC = () => {
         const response = await fetch(`/api/buyers?buyerId=${buyerId}`);
         if (!response.ok) throw new Error("Failed to fetch buyer details");
 
-        const data = await response.json();
-        if (!data) {
+        const result = await response.json();
+        const buyerData = result?.data;
+
+        if (!buyerData) {
           setError("Buyer not found");
           setSnackbar({
             open: true,
@@ -71,8 +73,8 @@ const BuyerDetailsPage: React.FC = () => {
           });
         } else {
           setBuyer({
-            ...data,
-            notificationPreferences: data.notificationPreferences || [],
+            ...buyerData,
+            notificationPreferences: buyerData.notificationPreferences || [],
           });
           setSnackbar({
             open: true,

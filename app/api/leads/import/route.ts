@@ -5,11 +5,17 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import Papa from "papaparse";
 import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 interface Field {
   id: string;
   label: string;
-  value: any;
+  value: unknown;
 }
 
 export async function POST(request: Request) {
@@ -19,20 +25,14 @@ export async function POST(request: Request) {
     // Get user session
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
 
     if (!file) {
-      return NextResponse.json(
-        { success: false, message: "No file provided" },
-        { status: 400 },
-      );
+      return badRequest("No file provided");
     }
 
     // Read the file content
@@ -44,13 +44,7 @@ export async function POST(request: Request) {
     });
 
     if (!results.data || results.data.length < 2) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "CSV must have at least a header row and one data row",
-        },
-        { status: 400 },
-      );
+      return badRequest("CSV must have at least a header row and one data row");
     }
 
     const [headers, ...rows] = results.data;
@@ -64,12 +58,8 @@ export async function POST(request: Request) {
     );
     if (!usageCheck.allowed) {
       const remaining = Math.max(0, usageCheck.limit - usageCheck.currentUsage);
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Lead limit would be exceeded. You can import ${remaining} more leads (current: ${usageCheck.currentUsage}/${usageCheck.limit}). Please upgrade your plan.`,
-        },
-        { status: 403 },
+      return forbidden(
+        `Lead limit would be exceeded. You can import ${remaining} more leads (current: ${usageCheck.currentUsage}/${usageCheck.limit}). Please upgrade your plan.`,
       );
     }
 
@@ -155,15 +145,12 @@ export async function POST(request: Request) {
       success: true,
       message: `${leadsToImport.length} leads imported successfully!`,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error importing leads:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to import leads.",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Failed to import leads. ${error.message}`
+        : "Failed to import leads.",
     );
   }
 }

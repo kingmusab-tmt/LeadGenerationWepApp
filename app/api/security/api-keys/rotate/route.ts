@@ -11,6 +11,8 @@ import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/userModel";
 import { storeZapierActionApiKey } from "@/lib/security/apiKeyStorage";
 import { ApiKeySecurityService } from "@/lib/security/apiKeySecurityService";
+import { authOptions } from "@/auth";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,55 +21,80 @@ export const dynamic = "force-dynamic";
  * Rotate an API key
  */
 export async function POST(req: NextRequest) {
+  const limitResponse = checkSimpleRateLimit(req, {
+    scope: "api-key-rotate",
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (limitResponse) {
+    return limitResponse;
+  }
+
   await dbConnect();
 
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
     // Find user
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 },
+      );
     }
 
-    const userId = (user._id as any).toString();
+    const userId = String(user._id);
     const body = await req.json();
-    const { keyType, newKey } = body;
+    const { keyType } = body;
 
-    if (!keyType) {
+    if (!keyType || typeof keyType !== "string") {
       return NextResponse.json(
-        { error: "Key type is required" },
+        { success: false, error: "Key type is required and must be a string" },
+        { status: 400 },
+      );
+    }
+
+    if (keyType !== "zapier") {
+      return NextResponse.json(
+        { success: false, error: "Invalid key type" },
         { status: 400 },
       );
     }
 
     switch (keyType) {
-      case "zapier":
+      case "zapier": {
         // Generate new Zapier key
         const newZapierKey = ApiKeySecurityService.generateApiKey();
         await storeZapierActionApiKey(userId, newZapierKey);
         return NextResponse.json({
           success: true,
-          message: "Zapier API key rotated successfully",
-          apiKey: newZapierKey,
-          keyType: "zapier",
-          warning: "Save this key - it won't be shown again!",
+          data: {
+            message: "Zapier API key rotated successfully",
+            apiKey: newZapierKey,
+            keyType: "zapier",
+            warning: "Save this key - it won't be shown again!",
+          },
         });
+      }
 
       default:
         return NextResponse.json(
-          { error: "Invalid key type" },
+          { success: false, error: "Invalid key type" },
           { status: 400 },
         );
     }
   } catch (error) {
     console.error("Error rotating API key:", error);
     return NextResponse.json(
-      { error: "Failed to rotate API key" },
+      { success: false, error: "Failed to rotate API key" },
       { status: 500 },
     );
   }

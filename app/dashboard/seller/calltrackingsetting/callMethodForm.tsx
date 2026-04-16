@@ -99,6 +99,8 @@ export default function CallMethodForm({
   initialValues,
   onUpdateForwarding,
 }: CallMethodFormProps) {
+  const safeNumbers = Array.isArray(numbers) ? numbers : [];
+
   const { limits } = useSubscriptionLimits();
   const [selectedNumber, setSelectedNumber] = useState(
     initialValues?.phoneNumber || "",
@@ -554,7 +556,7 @@ export default function CallMethodForm({
           }}
           label="Select a Phone Number"
         >
-          {numbers.map((num) => (
+          {safeNumbers.map((num) => (
             <MenuItem key={num.phoneNumber} value={num.phoneNumber}>
               {num.phoneNumber} — {num.industry || "No industry"}
             </MenuItem>

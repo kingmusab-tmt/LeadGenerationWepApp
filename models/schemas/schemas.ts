@@ -244,7 +244,8 @@ export const SubscriptionSchema = {
   subscriptionTierId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Tier",
-    required: [true, "Subscription tier ID is required"],
+    required: false,
+    default: null,
   },
   subscriptionTierType: {
     type: String,

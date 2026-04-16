@@ -4,6 +4,12 @@ import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 interface SettingsPayload {
   type: "unit" | "call";
@@ -15,18 +21,18 @@ interface SettingsPayload {
   index?: number;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
     if (!session || session.user?.role !== "seller") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     return NextResponse.json(
@@ -38,10 +44,7 @@ export async function GET(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error in settings API:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }
 
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session || session.user?.role !== "seller") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const { type, data } = (await req.json()) as SettingsPayload;
@@ -64,10 +67,7 @@ export async function POST(req: NextRequest) {
         data.units <= 0 ||
         data.cost <= 0
       ) {
-        return NextResponse.json(
-          { error: "Units and cost must be positive numbers." },
-          { status: 400 },
-        );
+        return badRequest("Units and cost must be positive numbers.");
       }
     } else if (type === "call") {
       if (
@@ -76,16 +76,10 @@ export async function POST(req: NextRequest) {
         data.units <= 0 ||
         data.seconds <= 0
       ) {
-        return NextResponse.json(
-          { error: "Units and seconds must be positive numbers." },
-          { status: 400 },
-        );
+        return badRequest("Units and seconds must be positive numbers.");
       }
     } else {
-      return NextResponse.json(
-        { error: "Invalid settings type." },
-        { status: 400 },
-      );
+      return badRequest("Invalid settings type.");
     }
 
     const updateQuery =
@@ -114,7 +108,7 @@ export async function POST(req: NextRequest) {
     );
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     return NextResponse.json(
@@ -127,10 +121,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error in settings API:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }
 
@@ -140,33 +131,27 @@ export async function PUT(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session || session.user?.role !== "seller") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const { type, data, index } = (await req.json()) as SettingsPayload;
 
     // Validate input
     if (typeof index !== "number" || index < 0) {
-      return NextResponse.json(
-        { error: "Invalid index for edit" },
-        { status: 400 },
-      );
+      return badRequest("Invalid index for edit");
     }
 
     const user = await User.findOne({ email: session.user.email }).select(
       "unitPricingOptions callChargeOptions",
     );
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     // Update the appropriate option
     if (type === "unit") {
       if (index >= user.unitPricingOptions.length) {
-        return NextResponse.json(
-          { error: "Invalid index for unit pricing edit" },
-          { status: 400 },
-        );
+        return badRequest("Invalid index for unit pricing edit");
       }
       if (
         typeof data.units !== "number" ||
@@ -174,10 +159,7 @@ export async function PUT(req: NextRequest) {
         data.units <= 0 ||
         data.cost <= 0
       ) {
-        return NextResponse.json(
-          { error: "Units and cost must be positive numbers." },
-          { status: 400 },
-        );
+        return badRequest("Units and cost must be positive numbers.");
       }
       await User.updateOne(
         { email: session.user.email },
@@ -193,10 +175,7 @@ export async function PUT(req: NextRequest) {
       );
     } else if (type === "call") {
       if (index >= user.callChargeOptions.length) {
-        return NextResponse.json(
-          { error: "Invalid index for call charge edit" },
-          { status: 400 },
-        );
+        return badRequest("Invalid index for call charge edit");
       }
       if (
         typeof data.units !== "number" ||
@@ -204,10 +183,7 @@ export async function PUT(req: NextRequest) {
         data.units <= 0 ||
         data.seconds <= 0
       ) {
-        return NextResponse.json(
-          { error: "Units and seconds must be positive numbers." },
-          { status: 400 },
-        );
+        return badRequest("Units and seconds must be positive numbers.");
       }
       await User.updateOne(
         { email: session.user.email },
@@ -222,17 +198,14 @@ export async function PUT(req: NextRequest) {
         { runValidators: true },
       );
     } else {
-      return NextResponse.json(
-        { error: "Invalid settings type." },
-        { status: 400 },
-      );
+      return badRequest("Invalid settings type.");
     }
     const updatedUser = await User.findOne({
       email: session.user.email,
     }).select("unitPricingOptions callChargeOptions");
 
     if (!updatedUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     return NextResponse.json(
@@ -245,10 +218,7 @@ export async function PUT(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error in settings API:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }
 
@@ -257,8 +227,8 @@ export async function DELETE(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session || !session.user?.email || session.user?.role !== "seller") {
+      return unauthorized("Authentication required");
     }
 
     const { type, index } = (await req.json()) as {
@@ -270,16 +240,13 @@ export async function DELETE(req: NextRequest) {
       "unitPricingOptions callChargeOptions",
     );
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     // Delete the appropriate option
     if (type === "unit") {
       if (index < 0 || index >= user.unitPricingOptions.length) {
-        return NextResponse.json(
-          { error: "Invalid index for unit pricing delete" },
-          { status: 400 },
-        );
+        return badRequest("Invalid index for unit pricing delete");
       }
 
       const nextUnitPricingOptions = [...user.unitPricingOptions];
@@ -292,10 +259,7 @@ export async function DELETE(req: NextRequest) {
       );
     } else if (type === "call") {
       if (index < 0 || index >= user.callChargeOptions.length) {
-        return NextResponse.json(
-          { error: "Invalid index for call charge delete" },
-          { status: 400 },
-        );
+        return badRequest("Invalid index for call charge delete");
       }
 
       const nextCallChargeOptions = [...user.callChargeOptions];
@@ -307,10 +271,7 @@ export async function DELETE(req: NextRequest) {
         { runValidators: true },
       );
     } else {
-      return NextResponse.json(
-        { error: "Invalid settings type." },
-        { status: 400 },
-      );
+      return badRequest("Invalid settings type.");
     }
 
     const updatedUser = await User.findOne({
@@ -318,7 +279,7 @@ export async function DELETE(req: NextRequest) {
     }).select("unitPricingOptions callChargeOptions");
 
     if (!updatedUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     return NextResponse.json(
@@ -331,9 +292,6 @@ export async function DELETE(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error in settings API:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

@@ -53,6 +53,17 @@ interface Tier {
   isActive: boolean;
 }
 
+type TierApiResponse =
+  | {
+      success?: boolean;
+      error?: string;
+      data?: {
+        tiers?: Tier[];
+        degraded?: boolean;
+      };
+    }
+  | Tier[];
+
 const pricingFAQs = [
   {
     question: "Can I switch plans at any time?",
@@ -107,11 +118,35 @@ const PricingPage = () => {
     const fetchTiers = async () => {
       try {
         const response = await fetch("/api/tiers");
+        const payload: TierApiResponse = await response.json();
+
         if (!response.ok) {
-          throw new Error("Failed to fetch pricing tiers");
+          const errorMsg =
+            !Array.isArray(payload) && payload.error
+              ? payload.error
+              : "Failed to fetch pricing tiers";
+          throw new Error(errorMsg);
         }
-        const data = await response.json();
-        setTiers(data.filter((tier: Tier) => tier.isActive));
+
+        // Handle both response formats: direct array or wrapped in data.tiers
+        const tiersData = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload.data?.tiers)
+            ? payload.data.tiers
+            : [];
+
+        setTiers(tiersData);
+
+        const isDegraded =
+          !Array.isArray(payload) && Boolean(payload.data?.degraded);
+
+        if (isDegraded) {
+          setError(
+            "Pricing data is temporarily unavailable. Please try again shortly.",
+          );
+        } else {
+          setError(null);
+        }
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "An unknown error occurred",
@@ -637,7 +672,7 @@ const PricingPage = () => {
                 <Button
                   variant="contained"
                   size="large"
-                  href="/auth/sign-up"
+                  href="/RegisterBuyer"
                   sx={{
                     bgcolor: "white",
                     color: "primary.main",

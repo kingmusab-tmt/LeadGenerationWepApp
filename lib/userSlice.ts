@@ -79,3 +79,14 @@ const userSlice = createSlice({
 export const { setUser, updateUser, clearUser, setUserLoading, setUserError } =
   userSlice.actions;
 export default userSlice.reducer;
+
+// Selectors for type-safe state access
+export const selectCurrentUser = (state: { user: UserState }) =>
+  state.user.currentUser;
+export const selectUserLoading = (state: { user: UserState }) =>
+  state.user.loading;
+export const selectUserError = (state: { user: UserState }) => state.user.error;
+export const selectIsAuthenticated = (state: { user: UserState }) =>
+  state.user.currentUser !== null;
+export const selectUserRole = (state: { user: UserState }) =>
+  state.user.currentUser?.role ?? "guest";

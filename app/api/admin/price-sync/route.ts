@@ -16,6 +16,7 @@ import {
   getPriceAuditLog,
   getPriceSyncStatus,
 } from "@/lib/priceSyncService";
+import { badRequest, internalError } from "@/lib/api/error-handler";
 
 /**
  * GET - Get price sync status and audit log
@@ -62,10 +63,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[Admin Price Sync] GET error:", error);
-    return NextResponse.json(
-      { error: "Failed to get price sync status" },
-      { status: 500 },
-    );
+    return internalError("Failed to get price sync status");
   }
 }
 
@@ -88,19 +86,13 @@ export async function POST(request: NextRequest) {
     const { action, tierId, billingInterval = "month" } = body;
 
     if (!action) {
-      return NextResponse.json(
-        { error: "Action is required (validate, validate_all, sync)" },
-        { status: 400 },
-      );
+      return badRequest("Action is required (validate, validate_all, sync)");
     }
 
     switch (action) {
       case "validate": {
         if (!tierId) {
-          return NextResponse.json(
-            { error: "tierId is required for validate action" },
-            { status: 400 },
-          );
+          return badRequest("tierId is required for validate action");
         }
 
         const result = await validateTierPrice(tierId, billingInterval);
@@ -123,10 +115,7 @@ export async function POST(request: NextRequest) {
 
       case "sync": {
         if (!tierId) {
-          return NextResponse.json(
-            { error: "tierId is required for sync action" },
-            { status: 400 },
-          );
+          return badRequest("tierId is required for sync action");
         }
 
         const syncResult = await syncTierPricesWithStripe(tierId);
@@ -140,16 +129,10 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        return NextResponse.json(
-          { error: `Unknown action: ${action}` },
-          { status: 400 },
-        );
+        return badRequest(`Unknown action: ${action}`);
     }
   } catch (error) {
     console.error("[Admin Price Sync] POST error:", error);
-    return NextResponse.json(
-      { error: "Failed to process price sync request" },
-      { status: 500 },
-    );
+    return internalError("Failed to process price sync request");
   }
 }

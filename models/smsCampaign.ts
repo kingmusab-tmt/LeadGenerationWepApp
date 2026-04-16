@@ -6,15 +6,6 @@ export interface ISmsRecipient {
   variables?: Record<string, string | number>;
 }
 
-export interface ISmsTemplate extends Document {
-  userId: string;
-  name: string;
-  category: string;
-  textContent: string; // SMS body template
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
 export interface ISmsSegment extends Document {
   userId: string;
   name: string;
@@ -36,7 +27,6 @@ export type SmsCampaignStatus =
 export interface ISmsCampaign extends Document {
   userId: string;
   name: string;
-  templateId?: mongoose.Types.ObjectId;
   segmentId?: mongoose.Types.ObjectId;
   fromPhoneNumber?: string; // Twilio number allocated for this campaign
   recipients: ISmsRecipient[];
@@ -85,16 +75,6 @@ export interface ISmsEvent extends Document {
   createdAt?: Date;
 }
 
-const SmsTemplateSchema = new Schema<ISmsTemplate>(
-  {
-    userId: { type: String, required: true },
-    name: { type: String, required: true },
-    category: { type: String, default: "custom" },
-    textContent: { type: String, required: true },
-  },
-  { timestamps: true },
-);
-
 const SmsSegmentSchema = new Schema<ISmsSegment>(
   {
     userId: { type: String, required: true },
@@ -116,7 +96,6 @@ const SmsCampaignSchema = new Schema<ISmsCampaign>(
   {
     userId: { type: String, required: true },
     name: { type: String, required: true },
-    templateId: { type: Schema.Types.ObjectId, ref: "SmsTemplate" },
     segmentId: { type: Schema.Types.ObjectId, ref: "SmsSegment" },
     fromPhoneNumber: { type: String }, // Twilio number for this campaign
     recipients: [
@@ -200,15 +179,10 @@ const SmsEventSchema = new Schema<ISmsEvent>(
   { timestamps: true },
 );
 
-SmsTemplateSchema.index({ userId: 1, name: 1 }, { unique: true });
 SmsSegmentSchema.index({ userId: 1, name: 1 }, { unique: true });
 SmsCampaignSchema.index({ userId: 1, status: 1 });
 SmsQueueSchema.index({ userId: 1, status: 1 });
 SmsEventSchema.index({ userId: 1, type: 1 });
-
-export const SmsTemplate: Model<ISmsTemplate> =
-  mongoose.models.SmsTemplate ||
-  mongoose.model<ISmsTemplate>("SmsTemplate", SmsTemplateSchema);
 
 export const SmsSegment: Model<ISmsSegment> =
   mongoose.models.SmsSegment ||

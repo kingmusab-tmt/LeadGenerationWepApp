@@ -7,6 +7,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
+import {
   getPaymentMethods,
   createSetupIntent,
   setDefaultPaymentMethod,
@@ -24,10 +29,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await connectDB();
@@ -35,7 +37,7 @@ export async function GET() {
     const result = await getPaymentMethods(session.user.id);
 
     if (!result.success) {
-      return NextResponse.json(result, { status: 400 });
+      return badRequest(result.message || "Failed to get payment methods");
     }
 
     return NextResponse.json({
@@ -45,10 +47,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error("[PaymentMethodsAPI] GET error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to get payment methods" },
-      { status: 500 },
-    );
+    return internalError("Failed to get payment methods");
   }
 }
 
@@ -61,10 +60,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     const body = await request.json();
@@ -78,7 +74,7 @@ export async function POST(request: NextRequest) {
         const result = await createSetupIntent(session.user.id);
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(result.message || "Failed to create setup intent");
         }
 
         return NextResponse.json({
@@ -91,10 +87,7 @@ export async function POST(request: NextRequest) {
         const { paymentMethodId } = params;
 
         if (!paymentMethodId) {
-          return NextResponse.json(
-            { success: false, message: "Payment method ID is required" },
-            { status: 400 },
-          );
+          return badRequest("Payment method ID is required");
         }
 
         const result = await setDefaultPaymentMethod(
@@ -103,7 +96,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(
+            result.message || "Failed to set default payment method",
+          );
         }
 
         return NextResponse.json({
@@ -116,10 +111,7 @@ export async function POST(request: NextRequest) {
         const { paymentMethodId } = params;
 
         if (!paymentMethodId) {
-          return NextResponse.json(
-            { success: false, message: "Payment method ID is required" },
-            { status: 400 },
-          );
+          return badRequest("Payment method ID is required");
         }
 
         const result = await removePaymentMethod(
@@ -128,7 +120,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(
+            result.message || "Failed to remove payment method",
+          );
         }
 
         return NextResponse.json({
@@ -141,10 +135,7 @@ export async function POST(request: NextRequest) {
         const { paymentMethodId, setAsDefault = true } = params;
 
         if (!paymentMethodId) {
-          return NextResponse.json(
-            { success: false, message: "Payment method ID is required" },
-            { status: 400 },
-          );
+          return badRequest("Payment method ID is required");
         }
 
         const result = await attachPaymentMethod(
@@ -154,7 +145,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (!result.success) {
-          return NextResponse.json(result, { status: 400 });
+          return badRequest(
+            result.message || "Failed to attach payment method",
+          );
         }
 
         return NextResponse.json({
@@ -164,16 +157,10 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        return NextResponse.json(
-          { success: false, message: `Unknown action: ${action}` },
-          { status: 400 },
-        );
+        return badRequest(`Unknown action: ${action}`);
     }
   } catch (error) {
     console.error("[PaymentMethodsAPI] POST error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to process payment method action" },
-      { status: 500 },
-    );
+    return internalError("Failed to process payment method action");
   }
 }

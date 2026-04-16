@@ -4,6 +4,7 @@ import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin, escapeRegex } from "@/lib/api/adminAuth";
+import { internalError } from "@/lib/api/error-handler";
 
 const toIsoDateOrNull = (value: unknown): string | null => {
   if (!value) return null;
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status") || "all";
 
     // Base query conditions
-    const conditions: any = {};
+    const conditions: Record<string, unknown> = {};
 
     if (search) {
       conditions.$or = [
@@ -49,9 +50,9 @@ export async function GET(req: NextRequest) {
       .lean();
 
     // Fetch buyers separately if needed
-    let buyers: any[] = [];
+    let buyers: Array<Record<string, unknown>> = [];
     if (role === "all" || role === "buyer") {
-      const buyerConditions: any = {};
+      const buyerConditions: Record<string, unknown> = {};
       if (search) {
         buyerConditions.$or = [
           { name: { $regex: escapeRegex(search), $options: "i" } },
@@ -74,7 +75,8 @@ export async function GET(req: NextRequest) {
     >();
 
     users.forEach((userDoc) => {
-      const email = userDoc.email?.toLowerCase?.();
+      const email =
+        typeof userDoc.email === "string" ? userDoc.email.toLowerCase() : "";
       if (!email) return;
       normalizedUserDateByEmail.set(email, {
         createdAt: toIsoDateOrNull(userDoc.createdAt),
@@ -83,7 +85,9 @@ export async function GET(req: NextRequest) {
     });
 
     const buyerEmailsMissingDates = buyers
-      .map((buyerDoc) => buyerDoc.email?.toLowerCase?.())
+      .map((buyerDoc) =>
+        typeof buyerDoc.email === "string" ? buyerDoc.email.toLowerCase() : "",
+      )
       .filter(
         (email): email is string =>
           Boolean(email) && !normalizedUserDateByEmail.has(email),
@@ -97,7 +101,8 @@ export async function GET(req: NextRequest) {
         .lean();
 
       userDateRecords.forEach((userDoc) => {
-        const email = userDoc.email?.toLowerCase?.();
+        const email =
+          typeof userDoc.email === "string" ? userDoc.email.toLowerCase() : "";
         if (!email) return;
         normalizedUserDateByEmail.set(email, {
           createdAt: toIsoDateOrNull(userDoc.createdAt),
@@ -117,12 +122,12 @@ export async function GET(req: NextRequest) {
       })),
       ...buyers.map((b) => {
         const userDates = normalizedUserDateByEmail.get(
-          b.email?.toLowerCase?.() || "",
+          typeof b.email === "string" ? b.email.toLowerCase() : "",
         );
 
         return {
           ...b,
-          id: b._id.toString(),
+          id: String(b._id),
           _id: undefined,
           role: "buyer",
           verified: undefined,
@@ -136,9 +141,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ users: combinedUsers });
   } catch (error) {
     console.error("Failed to fetch users:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch users" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch users");
   }
 }

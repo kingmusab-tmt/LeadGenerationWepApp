@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateCSRFToken } from "@/lib/csrf";
+import { generateCSRFToken, refreshCSRFToken } from "@/lib/csrf";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 /**
  * API Route: GET /api/csrf-token
@@ -14,17 +15,19 @@ import { authOptions } from "@/auth";
  * const response = await fetch('/api/csrf-token');
  * const { csrfToken } = await response.json();
  */
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    // Get authenticated session
-    const session = await getServerSession(authOptions);
+    const limitResponse = checkSimpleRateLimit(req, {
+      scope: "csrf-token:get",
+      limit: 60,
+      windowMs: 60_000,
+    });
+    if (limitResponse) {
+      return limitResponse;
+    }
 
-    // Use email if authenticated, otherwise use IP or fallback to "public"
-    const clientIp =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      request.headers.get("x-real-ip") ||
-      "public";
-    const identifier = session?.user?.email || clientIp;
+    const session = await getServerSession(authOptions);
+    const identifier = session?.user?.email || "public";
 
     // Generate CSRF token for user or public access
     const { token } = generateCSRFToken(identifier);
@@ -58,25 +61,30 @@ export async function GET(request: NextRequest) {
  *
  * Refreshes the CSRF token (invalidates old, generates new)
  */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
+    const limitResponse = checkSimpleRateLimit(req, {
+      scope: "csrf-token:post",
+      limit: 30,
+      windowMs: 60_000,
+    });
+    if (limitResponse) {
+      return limitResponse;
+    }
+
     const session = await getServerSession(authOptions);
 
-    // Use email if authenticated, otherwise use IP or fallback to "public"
-    const clientIp =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      request.headers.get("x-real-ip") ||
-      "public";
-    const identifier = session?.user?.email || clientIp;
+    // Gate token refresh to authenticated users only
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "Unauthorized: token refresh requires authentication" },
+        { status: 401 },
+      );
+    }
 
-    // Refresh token
-    const { refreshCSRFToken } = await import("@/lib/csrf");
-    const { token } = refreshCSRFToken(identifier);
+    const { token } = await refreshCSRFToken(session.user.email);
 
-    const response = NextResponse.json({
-      csrfToken: token,
-      expiresIn: 3600,
-    });
+    const response = NextResponse.json({ csrfToken: token, expiresIn: 3600 });
 
     response.cookies.set("csrfToken", token, {
       httpOnly: false,

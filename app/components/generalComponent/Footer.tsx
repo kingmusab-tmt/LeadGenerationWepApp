@@ -2,7 +2,6 @@
 import React, { useCallback } from "react";
 import {
   Box,
-  Button,
   Container,
   Grid,
   Typography,
@@ -37,14 +36,14 @@ const Footer = React.memo(() => {
       component="footer"
       sx={{
         bgcolor: "background.paper",
-        py: { xs: 6, md: 8 },
+        py: { xs: 3, md: 4 },
         borderTop: "1px solid",
         borderColor: "divider",
       }}
     >
       <Container maxWidth={false} sx={{ px: { xs: 2, sm: 4, md: 6 } }}>
         <Grid container spacing={{ xs: 4, md: 6 }} alignItems="flex-start">
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Box display="flex" alignItems="center" mb={2}>
               <Image
                 src={logo}
@@ -60,82 +59,128 @@ const Footer = React.memo(() => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               The complete solution for modern lead management and distribution.
             </Typography>
-            {/* <Button
-              variant="contained"
-              color="primary"
-              component={Link}
-              href="/demo"
-              sx={{ mt: 1 }}
+            {/* Demo CTA intentionally omitted; contact route is used instead. */}
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Grid
+              container
+              spacing={{ xs: 3, md: 4 }}
+              justifyContent="center"
+              alignItems="flex-start"
             >
-              Request Demo
-            </Button> */}
+              <Grid size={{ xs: 6, md: 6 }}>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                  Resources
+                </Typography>
+                <List dense>
+                  {["Pricing", "Blog", "Contact", "Support"].map((text) => (
+                    <ListItem key={text} disableGutters>
+                      <MuiLink
+                        component={Link}
+                        href={`/${text.toLowerCase()}`}
+                        color="text.secondary"
+                        underline="hover"
+                        sx={{
+                          transition: "color 0.2s",
+                          "&:hover": { color: "primary.main" },
+                        }}
+                      >
+                        {text}
+                      </MuiLink>
+                    </ListItem>
+                  ))}
+                </List>
+              </Grid>
+              <Grid size={{ xs: 6, md: 6 }}>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                  Legal
+                </Typography>
+                <List dense>
+                  {[
+                    { label: "Legal", href: "/legal" },
+                    { label: "Terms of Service", href: "/terms-of-service" },
+                    {
+                      label: "Privacy Information",
+                      href: "/privacy-information",
+                    },
+                    {
+                      label: "Responsible Disclosure",
+                      href: "/responsible-disclosure",
+                    },
+                    { label: "Trust", href: "/trust" },
+                    {
+                      label: "Cookie Preferences",
+                      href: "/cookie-preferences",
+                    },
+                    {
+                      label: "Your Privacy Choices",
+                      href: "/your-privacy-choices",
+                    },
+                  ].map((linkItem) => (
+                    <ListItem key={linkItem.href} disableGutters>
+                      <MuiLink
+                        component={Link}
+                        href={linkItem.href}
+                        color="text.secondary"
+                        underline="hover"
+                        sx={{
+                          transition: "color 0.2s",
+                          "&:hover": { color: "primary.main" },
+                        }}
+                      >
+                        {linkItem.label}
+                      </MuiLink>
+                    </ListItem>
+                  ))}
+                  <ListItem disableGutters>
+                    <MuiLink
+                      component="button"
+                      type="button"
+                      onClick={openCookiePreferences}
+                      color="text.secondary"
+                      underline="hover"
+                      sx={{
+                        transition: "color 0.2s",
+                        border: "none",
+                        background: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        fontSize: "inherit",
+                        "&:hover": { color: "primary.main" },
+                      }}
+                    >
+                      Cookie Settings
+                    </MuiLink>
+                  </ListItem>
+                </List>
+              </Grid>
+            </Grid>
           </Grid>
-          <Grid size={{ xs: 6, md: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-              Product
-            </Typography>
-            <List dense>
-              {["Features", "Pricing"].map((text) => (
-                <ListItem key={text} disableGutters>
-                  <MuiLink
-                    component={Link}
-                    href={`/${text.toLowerCase()}`}
-                    color="text.secondary"
-                    underline="hover"
-                    sx={{
-                      transition: "color 0.2s",
-                      "&:hover": { color: "primary.main" },
-                    }}
-                  >
-                    {text}
-                  </MuiLink>
-                </ListItem>
-              ))}
-            </List>
-          </Grid>
-          <Grid size={{ xs: 6, md: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-              Resources
-            </Typography>
-            <List dense>
-              {["Blog", "Contact"].map((text) => (
-                <ListItem key={text} disableGutters>
-                  <MuiLink
-                    component={Link}
-                    href={`/${text.toLowerCase()}`}
-                    color="text.secondary"
-                    underline="hover"
-                    sx={{
-                      transition: "color 0.2s",
-                      "&:hover": { color: "primary.main" },
-                    }}
-                  >
-                    {text}
-                  </MuiLink>
-                </ListItem>
-              ))}
-            </List>
-          </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-              Contact Us
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Email: support@brixcot.com
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Phone: +1 (702) 800-9182
-            </Typography>
-            <Box mt={2.5}>
-              <MuiLink
-                component={Link}
-                href="/contact"
-                underline="hover"
-                color="primary.main"
-                fontWeight={600}
-              >
-                Contact our team
-              </MuiLink>
+          <Grid
+            size={{ xs: 12, md: 3 }}
+            sx={{ display: "flex", justifyContent: { md: "flex-end" } }}
+          >
+            <Box sx={{ textAlign: { xs: "left", md: "right" } }}>
+              <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                Contact Us
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Email: support@brixcot.com
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Phone: +1 (702) 800-9182
+              </Typography>
+              <Box mt={2.5}>
+                <MuiLink
+                  component={Link}
+                  href="/contact"
+                  underline="hover"
+                  color="primary.main"
+                  fontWeight={600}
+                >
+                  Contact our team
+                </MuiLink>
+              </Box>
             </Box>
           </Grid>
         </Grid>
@@ -195,61 +240,6 @@ const Footer = React.memo(() => {
           ))}
         </Box>
         <Divider sx={{ my: 4 }} />
-        <Box
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: { xs: 1.5, md: 2.5 },
-            mb: 3,
-          }}
-        >
-          {[
-            { label: "Legal", href: "/legal" },
-            { label: "Terms of Service", href: "/terms-of-service" },
-            { label: "Privacy Information", href: "/privacy-information" },
-            {
-              label: "Responsible Disclosure",
-              href: "/responsible-disclosure",
-            },
-            { label: "Trust", href: "/trust" },
-            { label: "Cookie Preferences", href: "/cookie-preferences" },
-            { label: "Your Privacy Choices", href: "/your-privacy-choices" },
-          ].map((linkItem) => (
-            <MuiLink
-              key={linkItem.href}
-              component={Link}
-              href={linkItem.href}
-              color="text.secondary"
-              underline="hover"
-              sx={{
-                fontSize: "0.85rem",
-                transition: "color 0.2s",
-                "&:hover": { color: "primary.main" },
-              }}
-            >
-              {linkItem.label}
-            </MuiLink>
-          ))}
-          <MuiLink
-            component="button"
-            type="button"
-            onClick={openCookiePreferences}
-            color="text.secondary"
-            underline="hover"
-            sx={{
-              fontSize: "0.85rem",
-              transition: "color 0.2s",
-              border: "none",
-              background: "none",
-              padding: 0,
-              cursor: "pointer",
-              "&:hover": { color: "primary.main" },
-            }}
-          >
-            Cookie Settings
-          </MuiLink>
-        </Box>
         <Box
           sx={{
             display: "flex",

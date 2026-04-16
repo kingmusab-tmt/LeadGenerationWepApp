@@ -112,3 +112,19 @@ export const {
   setError,
 } = analyticsSlice.actions;
 export default analyticsSlice.reducer;
+
+// Selectors for type-safe state access
+export const selectSellerOverview = (state: { analytics: AnalyticsState }) =>
+  state.analytics.sellerOverview;
+export const selectBuyerOverview = (state: { analytics: AnalyticsState }) =>
+  state.analytics.buyerOverview;
+export const selectAdminOverview = (state: { analytics: AnalyticsState }) =>
+  state.analytics.adminOverview;
+export const selectSubscriptionInfo = (state: { analytics: AnalyticsState }) =>
+  state.analytics.subscriptionInfo;
+export const selectTimeframe = (state: { analytics: AnalyticsState }) =>
+  state.analytics.timeframe;
+export const selectAnalyticsLoading = (state: { analytics: AnalyticsState }) =>
+  state.analytics.loading;
+export const selectAnalyticsError = (state: { analytics: AnalyticsState }) =>
+  state.analytics.error;

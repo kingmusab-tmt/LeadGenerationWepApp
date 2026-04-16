@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import {
   Box,
   Button,
@@ -64,7 +64,7 @@ interface Campaign {
 export default function EmailCampaigns() {
   const fetchWithCSRF = useCSRFFetch();
   const { currentUser } = useInitializeUser();
-  const { limits } = useSubscriptionLimits();
+  const { limits, isTrial } = useSubscriptionLimits();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -399,7 +399,7 @@ export default function EmailCampaigns() {
       : campaigns.filter((c) => c.status === filterStatus);
 
   // Check if user has access to email campaigns
-  if (limits && !limits.emailCampaignsEnabled) {
+  if (limits && !isTrial && !limits.emailCampaignsEnabled) {
     return (
       <Box
         sx={{

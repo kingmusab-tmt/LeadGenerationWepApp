@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
 import { Buyer } from "@/models/leadbuyers";
@@ -26,9 +26,8 @@ export async function GET(req: NextRequest) {
     const sellerId = session.user.id;
 
     // Validate query parameters
-    let queryParams;
     try {
-      queryParams = await getCallsQuerySchema.parseAsync(
+      await getCallsQuerySchema.parseAsync(
         Object.fromEntries(new URL(req.url).searchParams),
       );
     } catch (error) {

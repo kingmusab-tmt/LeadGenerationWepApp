@@ -106,10 +106,8 @@ export function calculateLeadScore(lead: ILead): LeadScoreResult {
   }
 
   // Preferred contact time provided: 1 point
-  const bestTimeField = lead.fields?.find((f) =>
-    f.label.toLowerCase().includes("best time to contact"),
-  );
-  if (bestTimeField && bestTimeField.value) {
+  const bestTimeToContact = getFieldValue(lead, "best time to contact");
+  if (bestTimeToContact && bestTimeToContact.trim().length > 0) {
     responsiveness += 1;
   }
 
@@ -148,17 +146,14 @@ export function calculateLeadScore(lead: ILead): LeadScoreResult {
   }
 
   // Has budget information with significant amount: 1 point
-  const budgetField = lead.fields?.find(
-    (f) =>
-      f.label.toLowerCase().includes("budget") ||
-      f.label.toLowerCase().includes("budget range"),
-  );
+  const budgetRaw =
+    getFieldValue(lead, "budget") || getFieldValue(lead, "budget range");
 
-  if (budgetField && budgetField.value) {
-    const budgetValue = Number(budgetField.value);
-    if (!isNaN(budgetValue) && budgetValue > 10000) {
+  if (budgetRaw) {
+    const numericBudget = Number(String(budgetRaw).replace(/[^0-9.]/g, ""));
+    if (!isNaN(numericBudget) && numericBudget > 10000) {
       valuePotential += 1;
-    } else if (!isNaN(budgetValue) && budgetValue > 0) {
+    } else if (!isNaN(numericBudget) && numericBudget > 0) {
       valuePotential += 0.5;
     }
   }

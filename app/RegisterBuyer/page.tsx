@@ -202,8 +202,8 @@ const RegisterBuyerPageContent: React.FC = () => {
           >
             <Typography variant="caption" display="block" sx={{ mb: 0.5 }}>
               <strong>Important:</strong> Make sure to select{" "}
-              <strong>"Buyer"</strong> during role selection to access the buyer
-              dashboard and marketplace.
+              <strong>&quot;Buyer&quot;</strong> during role selection to access
+              the buyer dashboard and marketplace.
             </Typography>
           </Box>
         </DialogContent>

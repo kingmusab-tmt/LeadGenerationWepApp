@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -30,29 +30,22 @@ export const SignInPage: React.FC<SignInPageProps> = () => {
   const [loading, setLoading] = useState(false);
   const [openTerms, setOpenTerms] = useState(false);
   const [openPrivacy, setOpenPrivacy] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [trialIntent, setTrialIntent] = useState(false);
   const theme = useTheme();
-  const isMobileQuery = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"), {
+    noSsr: true,
+  });
   const searchParams = useSearchParams();
+  const [trialIntent] = useState(() => {
+    if (typeof window === "undefined") return false;
 
-  // Use a state for isMobile that only updates after mount to prevent hydration mismatch
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    setIsMobile(isMobileQuery);
-
-    // Check for trial intent from URL params or session storage
     const trialParam = searchParams.get("trial");
     if (trialParam === "true") {
-      setTrialIntent(true);
-      // Store in sessionStorage to persist through OAuth flow
       sessionStorage.setItem("trialIntent", "true");
-    } else if (sessionStorage.getItem("trialIntent") === "true") {
-      setTrialIntent(true);
+      return true;
     }
-  }, [isMobileQuery, searchParams]);
+
+    return sessionStorage.getItem("trialIntent") === "true";
+  });
 
   const handleGoogleSignIn = () => {
     setLoading(true);

@@ -3,16 +3,20 @@ import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function GET(req: NextRequest) {
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized - Please log in" },
-        { status: 401 },
-      );
+      return unauthorized("Unauthorized - Please log in");
     }
 
     const { searchParams } = new URL(req.url);
@@ -20,18 +24,15 @@ export async function GET(req: NextRequest) {
 
     // Validate sellerId parameter
     if (!sellerId) {
-      return NextResponse.json(
-        { error: "Seller ID is required" },
-        { status: 400 },
-      );
+      return badRequest("Seller ID is required");
     }
 
-    // Authorization check - ensure user can only access their own data
-    if (session.user.id !== sellerId && session.user.role !== "seller") {
-      return NextResponse.json(
-        { error: "Forbidden - You can only access your own data" },
-        { status: 403 },
-      );
+    // Authorization check: seller can access own data, admin can access any seller.
+    const isAdmin = session.user.role === "admin";
+    const isOwnSeller =
+      session.user.role === "seller" && session.user.id === sellerId;
+    if (!isAdmin && !isOwnSeller) {
+      return forbidden("Forbidden - You can only access your own data");
     }
 
     // Connect to database
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
     ).lean();
 
     if (!user) {
-      return NextResponse.json({ error: "Seller not found" }, { status: 404 });
+      return notFound("Seller");
     }
 
     // Prepare response data
@@ -69,10 +70,7 @@ export async function GET(req: NextRequest) {
     console.error("Error in GET /api/calls/twilio/twiliostatus:", error);
 
     // Don't expose internal errors to client
-    return NextResponse.json(
-      { error: "An internal server error occurred" },
-      { status: 500 },
-    );
+    return internalError("An internal server error occurred");
   }
 }
 // This code handles the GET request to check the Twilio activation status for a seller.

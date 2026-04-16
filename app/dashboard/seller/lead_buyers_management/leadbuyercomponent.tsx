@@ -60,7 +60,7 @@ const BuyerTable = dynamic(
   { ssr: false },
 );
 import { IBuyer } from "@/models/leadbuyers";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import Papa from "papaparse";
@@ -144,7 +144,7 @@ const BuyersPage: React.FC = () => {
   }>({ open: false });
   const [subscriptionLimits, setSubscriptionLimits] = useState({
     currentCount: 0,
-    maxAllowed: 0,
+    maxAllowed: null as number | null,
   });
 
   // Subscription limits for export/import permissions
@@ -197,6 +197,21 @@ const BuyersPage: React.FC = () => {
 
   // ---------- Data Fetching ----------
 
+  const extractBuyers = (payload: unknown): IBuyer[] => {
+    if (Array.isArray(payload)) return payload;
+
+    if (
+      payload &&
+      typeof payload === "object" &&
+      "data" in payload &&
+      Array.isArray((payload as { data?: unknown }).data)
+    ) {
+      return (payload as { data: IBuyer[] }).data;
+    }
+
+    return [];
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -215,10 +230,12 @@ const BuyersPage: React.FC = () => {
       if (!limitsResponse.ok)
         throw new Error("Failed to fetch subscription limits");
 
-      const [buyersData, limitsData] = await Promise.all([
-        buyersResponse.json() as Promise<IBuyer[]>,
+      const [buyersPayload, limitsData] = await Promise.all([
+        buyersResponse.json(),
         limitsResponse.json(),
       ]);
+
+      const buyersData = extractBuyers(buyersPayload);
 
       setBuyers(buyersData);
       setSubscriptionLimits({
@@ -250,6 +267,15 @@ const BuyersPage: React.FC = () => {
   // ---------- Handlers ----------
 
   const handleAddNewBuyer = () => {
+    if (loading || subscriptionLimits.maxAllowed === null) {
+      setSnackbar({
+        open: true,
+        message: "Please wait while subscription limits are loading.",
+        severity: "info",
+      });
+      return;
+    }
+
     if (subscriptionLimits.currentCount >= subscriptionLimits.maxAllowed) {
       setSnackbar({
         open: true,
@@ -438,10 +464,11 @@ const BuyersPage: React.FC = () => {
   };
 
   const isLimitReached =
+    subscriptionLimits.maxAllowed !== null &&
     subscriptionLimits.currentCount >= subscriptionLimits.maxAllowed;
 
   const limitPercentage =
-    subscriptionLimits.maxAllowed > 0
+    subscriptionLimits.maxAllowed && subscriptionLimits.maxAllowed > 0
       ? Math.round(
           (subscriptionLimits.currentCount / subscriptionLimits.maxAllowed) *
             100,
@@ -479,7 +506,11 @@ const BuyersPage: React.FC = () => {
             variant="contained"
             startIcon={<PersonAddIcon />}
             onClick={handleAddNewBuyer}
-            disabled={isLimitReached}
+            disabled={
+              loading ||
+              subscriptionLimits.maxAllowed === null ||
+              isLimitReached
+            }
             size={isMobile ? "small" : "medium"}
           >
             Add Buyer
@@ -488,7 +519,7 @@ const BuyersPage: React.FC = () => {
       </Box>
 
       {/* Limit Warning */}
-      {isLimitReached && (
+      {subscriptionLimits.maxAllowed !== null && isLimitReached && (
         <Alert
           severity="warning"
           icon={<WarningIcon />}

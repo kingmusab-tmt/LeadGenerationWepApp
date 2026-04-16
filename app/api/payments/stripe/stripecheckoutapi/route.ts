@@ -9,13 +9,33 @@ import { Tier } from "@/models/tier";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import { createSubscriptionCheckout } from "@/lib/stripeSubscriptionService";
+import { env } from "@/lib/env";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
 });
 
 export async function POST(req: NextRequest) {
   await dbConnect();
+
+  let body: {
+    units?: number;
+    cost?: number;
+    tierId?: string;
+    billingInterval?: "month" | "year";
+    idempotencyKey?: string;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return badRequest("Invalid JSON in request body");
+  }
 
   const {
     units,
@@ -23,14 +43,11 @@ export async function POST(req: NextRequest) {
     tierId,
     billingInterval = "month",
     idempotencyKey: bodyIdempotencyKey,
-  } = await req.json();
+  } = body;
   const userSession = await getServerSession(authOptions);
 
   if (!userSession) {
-    return NextResponse.json(
-      { success: false, message: "User not authenticated" },
-      { status: 401 },
-    );
+    return unauthorized("User not authenticated");
   }
 
   try {
@@ -40,21 +57,12 @@ export async function POST(req: NextRequest) {
       // Handle subscription checkout using the subscription service
       const tier = await Tier.findById(tierId);
       if (!tier) {
-        return NextResponse.json(
-          { success: false, message: "Tier not found" },
-          { status: 404 },
-        );
+        return notFound("Tier");
       }
 
       // For free tiers, don't create Stripe checkout
       if (tier.tierType === "free") {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Free tier does not require payment checkout",
-          },
-          { status: 400 },
-        );
+        return badRequest("Free tier does not require payment checkout");
       }
 
       // Use the subscription service for recurring billing
@@ -62,14 +70,13 @@ export async function POST(req: NextRequest) {
         userSession.user.id,
         tierId,
         billingInterval as "month" | "year",
-        `${process.env.NEXTAUTH_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
-        `${process.env.NEXTAUTH_URL}/checkout?plan=${tierId}&payment=canceled`,
+        `${env.NEXTAUTH_URL}/checkout?plan=${tierId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        `${env.NEXTAUTH_URL}/checkout?plan=${tierId}&payment=canceled`,
       );
 
       if (!result.success) {
-        return NextResponse.json(
-          { success: false, message: result.message },
-          { status: 400 },
+        return badRequest(
+          result.message || "Failed to create checkout session",
         );
       }
 
@@ -84,33 +91,19 @@ export async function POST(req: NextRequest) {
         email: userSession.user.email,
       });
       if (!buyer) {
-        return NextResponse.json(
-          { success: false, message: "Buyer not found" },
-          { status: 404 },
-        );
+        return notFound("Buyer");
       }
       const sellerId = buyer.registeredWith; // Assuming buyer has a sellerId field
       if (!units || !cost || !sellerId) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "Units, cost, and sellerId are required for credit purchases",
-          },
-          { status: 400 },
+        return badRequest(
+          "Units, cost, and sellerId are required for credit purchases",
         );
       }
 
       // Get seller's Stripe account ID
       const seller = await User.findById(sellerId);
       if (!seller || !seller.stripeAccountId) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Seller payment account not configured",
-          },
-          { status: 400 },
-        );
+        return badRequest("Seller payment account not configured");
       }
 
       const sellerAccount = await stripe.accounts.retrieve(
@@ -118,13 +111,8 @@ export async function POST(req: NextRequest) {
       );
 
       if (!sellerAccount.charges_enabled || !sellerAccount.payouts_enabled) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "Seller payout account is not fully enabled. Please complete Stripe onboarding.",
-          },
-          { status: 400 },
+        return badRequest(
+          "Seller payout account is not fully enabled. Please complete Stripe onboarding.",
         );
       }
 
@@ -164,13 +152,13 @@ export async function POST(req: NextRequest) {
             destination: seller.stripeAccountId,
           },
         },
-        success_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
-        cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
+        success_url: `${env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=success`,
+        cancel_url: `${env.NEXTAUTH_URL}/dashboard/buyer/purchaseUnit?status=canceled`,
         customer_email: userSession.user.email,
         metadata: {
           units: units.toString(),
           userId: userSession.user.id,
-          sellerId: buyer.registeredWith.toString(),
+          sellerId: sellerId.toString(),
           purchaseType: "credits",
         },
       };
@@ -186,15 +174,8 @@ export async function POST(req: NextRequest) {
         idempotencyKey,
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Checkout session creation error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Internal server error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

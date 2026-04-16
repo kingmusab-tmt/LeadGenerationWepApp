@@ -124,6 +124,7 @@ const invoiceSchema = new Schema(
 invoiceSchema.index({ userId: 1, createdAt: -1 });
 invoiceSchema.index({ userId: 1, status: 1 });
 invoiceSchema.index({ userId: 1, isPaid: 1 });
+invoiceSchema.index({ userId: 1, dueDate: 1, status: 1 });
 invoiceSchema.index({ buyerId: 1, createdAt: -1 });
 invoiceSchema.index({ status: 1, dueDate: 1 }); // For overdue tracking
 invoiceSchema.index({ relatedTransactions: 1 }); // PHASE 3: Transaction lookup

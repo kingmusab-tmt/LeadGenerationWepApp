@@ -4,6 +4,13 @@ import { authOptions } from "@/auth";
 import Call from "@/models/call";
 import { invalidateCallCache } from "@/lib/cachedSession";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 /**
  * Call Disposition API
@@ -14,16 +21,17 @@ export async function PATCH(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "buyer") {
+      return forbidden("Buyer access required");
     }
 
     const { callId, disposition, dispositionNotes } = await req.json();
 
     if (!callId || !disposition) {
-      return NextResponse.json(
-        { error: "callId and disposition are required" },
-        { status: 400 },
-      );
+      return badRequest("callId and disposition are required");
     }
 
     const validDispositions = [
@@ -37,11 +45,8 @@ export async function PATCH(req: NextRequest) {
     ];
 
     if (!validDispositions.includes(disposition)) {
-      return NextResponse.json(
-        {
-          error: `Invalid disposition. Must be one of: ${validDispositions.join(", ")}`,
-        },
-        { status: 400 },
+      return badRequest(
+        `Invalid disposition. Must be one of: ${validDispositions.join(", ")}`,
       );
     }
 
@@ -52,10 +57,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!call) {
-      return NextResponse.json(
-        { error: "Call not found or not authorized" },
-        { status: 404 },
-      );
+      return notFound("Call");
     }
 
     call.disposition = disposition;
@@ -77,9 +79,6 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error updating disposition:", error);
-    return NextResponse.json(
-      { error: "Failed to update disposition" },
-      { status: 500 },
-    );
+    return internalError("Failed to update disposition");
   }
 }

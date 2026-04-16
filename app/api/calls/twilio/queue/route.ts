@@ -7,6 +7,7 @@ import {
   callSecurityMiddleware,
   CALL_DEFAULTS,
 } from "@/lib/security/callSecurity";
+import { env } from "@/lib/env";
 
 /**
  * POST /api/calls/twilio/queue
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
         maxLength: CALL_DEFAULTS.voicemailMaxLength,
         timeout: 5,
         playBeep: true,
-        recordingStatusCallback: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/voicemail`,
+        recordingStatusCallback: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/voicemail`,
       });
       twiml.say("Thank you for your message. Goodbye.");
       twiml.leave(); // Remove caller from queue

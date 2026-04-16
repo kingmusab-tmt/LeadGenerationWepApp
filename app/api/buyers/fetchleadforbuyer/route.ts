@@ -5,6 +5,7 @@ import { Buyer } from "@/models/leadbuyers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Types } from "mongoose";
+import { internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,10 +14,7 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session || session.user.role !== "buyer") {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     const buyer = await Buyer.findOne({ email: session.user.email }).select(
@@ -24,10 +22,7 @@ export async function GET(req: NextRequest) {
     );
 
     if (!buyer) {
-      return NextResponse.json(
-        { success: false, message: "Buyer not found" },
-        { status: 404 },
-      );
+      return notFound("Buyer");
     }
 
     const buyerId = buyer._id.toString();
@@ -76,7 +71,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Build the base query - ADDED userId FILTER FOR THE SELLER
-    const baseQuery: { [key: string]: any } = {
+    const baseQuery: Record<string, unknown> = {
       distributionMethod: "marketplace",
       exclusive: false,
     };
@@ -137,9 +132,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching leads for buyer:", error);
-    return NextResponse.json(
-      { success: false, message: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

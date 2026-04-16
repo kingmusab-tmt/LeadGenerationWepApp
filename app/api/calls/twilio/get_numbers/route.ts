@@ -6,44 +6,44 @@ import { User } from "@/models";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
+
+type TrackingNumberEntry = {
+  purpose?: string;
+  [key: string]: unknown;
+};
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-      });
+    if (!session?.user?.id || !session.user.role) {
+      return unauthorized("Authentication required");
     }
     // Ensure the user is authenticated and has a valid session
-    if (session.user.role !== "seller") {
-      return new NextResponse(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-      });
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Seller or admin access required");
     }
     await dbConnect();
 
     const purpose = req.nextUrl.searchParams.get("purpose");
     const seller = await User.findById(session.user.id);
-    if (!seller)
-      return new NextResponse(JSON.stringify({ error: "Seller not found" }), {
-        status: 404,
-      });
+    if (!seller) return notFound("Seller");
 
-    let numbers = seller.trackingNumbers || [];
+    let numbers = (seller.trackingNumbers || []) as TrackingNumberEntry[];
 
     // Filter by purpose if provided
     if (purpose) {
-      numbers = numbers.filter((num: any) => num.purpose === purpose);
+      numbers = numbers.filter((num) => num.purpose === purpose);
     }
 
-    return new NextResponse(JSON.stringify(numbers), {
-      status: 200,
-    });
+    return NextResponse.json({ success: true, data: numbers }, { status: 200 });
   } catch (error) {
-    return new NextResponse(
-      JSON.stringify({ error: "Failed to fetch numbers" }),
-      { status: 500 },
-    );
+    console.error("Error fetching Twilio numbers:", error);
+    return internalError("Failed to fetch numbers");
   }
 }

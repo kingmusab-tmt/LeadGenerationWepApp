@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
+import { env } from "@/lib/env";
 
 export const sendEmailNotification = async (buyerId: any, lead: any) => {
   try {
@@ -13,12 +14,22 @@ export const sendEmailNotification = async (buyerId: any, lead: any) => {
     const seller = await User.findOne({ _id: sellerId });
     // Fetch email configuration from buyer schema or use system defaults
     const emailConfig = {
-      host: seller?.emailSettings.smtpServer || process.env.EMAIL_SERVER!,
-      port: seller?.emailSettings.port || parseInt(process.env.EMAIL_PORT!, 10),
+      host:
+        seller?.emailSettings.smtpServer ||
+        env.EMAIL_SERVER ||
+        env.EMAIL_SERVER_HOST,
+      port: seller?.emailSettings.port || env.EMAIL_PORT,
       secure: true,
       auth: {
-        user: seller?.emailSettings.smtpUser || process.env.EMAIL_FROM!,
-        pass: seller?.emailSettings.smtpPassword || process.env.EMAIL_PASSWORD!,
+        user:
+          seller?.emailSettings.smtpUser ||
+          env.EMAIL_SERVER_USER ||
+          env.EMAIL_FROM,
+        pass:
+          seller?.emailSettings.smtpPassword ||
+          env.EMAIL_SERVER_PASSWORD ||
+          env.EMAIL_PASSWORD ||
+          "",
       },
     };
 
@@ -27,7 +38,9 @@ export const sendEmailNotification = async (buyerId: any, lead: any) => {
 
     // Email content
     const mailOptions = {
-      from: seller?.businessName || process.env.EMAIL_FROM,
+      from: seller?.businessName
+        ? `${seller.businessName} <${env.EMAIL_FROM}>`
+        : `${env.EMAIL_FROM_NAME || "Brixcot Support"} <${env.EMAIL_FROM}>`,
       to: buyer?.email,
       subject: "New Lead Assigned",
       text: `You have been assigned a new lead BRIXCOT. Please login to your account to view the details.`,

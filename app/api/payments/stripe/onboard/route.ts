@@ -1,23 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { User } from "@/models";
 import dbConnect from "@/lib/connectdb";
-import { getClientIp } from "request-ip";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { internalError, unauthorized } from "@/lib/api/error-handler";
+import { env } from "@/lib/env";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
 });
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json(
-        { message: "User authentication required" },
-        { status: 401 },
-      );
+      return unauthorized("User authentication required");
     }
     await dbConnect();
 
@@ -58,11 +56,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new account if none exists
-    const clientIp =
-      getClientIp({ headers: Object.fromEntries(request.headers.entries()) }) ||
-      request.headers.get("x-forwarded-for") ||
-      "";
-
     const account = await stripe.accounts.create({
       type: "express",
       capabilities: {
@@ -97,22 +90,19 @@ export async function POST(request: NextRequest) {
     console.error("Stripe onboarding error:", error);
     if (error instanceof Stripe.errors.StripeError) {
       return NextResponse.json(
-        { message: error.message },
+        { error: "Stripe onboarding failed" },
         { status: error.statusCode || 500 },
       );
     }
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }
 
 async function createOnboardingLink(accountId: string): Promise<string> {
   const accountLink = await stripe.accountLinks.create({
     account: accountId,
-    refresh_url: `${process.env.NEXTAUTH_URL}/dashboard/seller/settings?tab=stripe-onboarding&stripe_onboarding=restart&account_id=${accountId}`,
-    return_url: `${process.env.NEXTAUTH_URL}/dashboard/seller/settings?tab=stripe-onboarding&stripe_onboarding=success&account_id=${accountId}`,
+    refresh_url: `${env.NEXTAUTH_URL}/dashboard/seller/settings?tab=stripe-onboarding&stripe_onboarding=restart&account_id=${accountId}`,
+    return_url: `${env.NEXTAUTH_URL}/dashboard/seller/settings?tab=stripe-onboarding&stripe_onboarding=success&account_id=${accountId}`,
     type: "account_onboarding",
   });
   return accountLink.url;

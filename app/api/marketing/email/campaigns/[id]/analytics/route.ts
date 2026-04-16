@@ -5,18 +5,24 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { EmailCampaign } from "@/models/emailCampaign";
 import { EmailAnalyticsEngine } from "@/lib/emailMarketingEngine";
+import {
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -24,15 +30,12 @@ export async function GET(
     const campaign = await EmailCampaign.findById(id);
 
     if (!campaign) {
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 }
-      );
+      return notFound("Campaign");
     }
 
     // Check ownership
     if (campaign.userId.toString() !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbidden("Forbidden");
     }
 
     const analyticsEngine = new EmailAnalyticsEngine();
@@ -44,13 +47,10 @@ export async function GET(
         stats,
         detailedAnalytics,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Error fetching analytics:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch analytics" },
-      { status: 500 }
-    );
+    return internalError("Failed to fetch analytics");
   }
 }

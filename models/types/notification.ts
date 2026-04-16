@@ -7,7 +7,9 @@ import mongoose, { Document } from "mongoose";
 export interface INotification extends Document {
   userId: mongoose.Schema.Types.ObjectId;
   type: "info" | "alert";
+  title?: string;
   message: string;
+  metadata?: Record<string, unknown>;
   status: "read" | "unread";
   relatedEntityType?: "Lead" | "Form" | "Call" | "Campaign" | "Invoice"; // PHASE 3: Type of related entity
   relatedEntityId?: mongoose.Schema.Types.ObjectId; // PHASE 3: ID of related entity

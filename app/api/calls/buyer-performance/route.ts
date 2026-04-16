@@ -4,6 +4,20 @@ import { authOptions } from "@/auth";
 import Call from "@/models/call";
 import { NextRequest, NextResponse } from "next/server";
 import { PipelineStage } from "mongoose";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
+
+type BuyerPerformanceRow = {
+  totalCalls: number;
+  answeredCalls: number;
+  missedCalls: number;
+  answerRate: number;
+  conversionRate: number;
+};
 
 /**
  * Buyer Performance Dashboard API
@@ -14,17 +28,25 @@ export async function GET(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Seller or admin access required");
     }
 
     const searchParams = req.nextUrl.searchParams;
     const days = parseInt(searchParams.get("days") || "30", 10);
     const industry = searchParams.get("industry") || undefined;
 
+    if (Number.isNaN(days) || days < 1 || days > 365) {
+      return badRequest("days must be an integer between 1 and 365");
+    }
+
     const dateFrom = new Date();
     dateFrom.setDate(dateFrom.getDate() - days);
 
-    const matchStage: Record<string, any> = {
+    const matchStage: Record<string, unknown> = {
       userId: session.user.id,
       createdAt: { $gte: dateFrom },
       buyerId: { $exists: true, $ne: null },
@@ -163,36 +185,27 @@ export async function GET(req: NextRequest) {
       { $sort: { totalCalls: -1 } },
     ];
 
-    const buyerPerformance = await Call.aggregate(pipeline);
+    const buyerPerformance =
+      await Call.aggregate<BuyerPerformanceRow>(pipeline);
 
     // Also get summary totals
     const summary = {
       totalBuyers: buyerPerformance.length,
-      totalCalls: buyerPerformance.reduce(
-        (sum: number, b: any) => sum + b.totalCalls,
-        0,
-      ),
+      totalCalls: buyerPerformance.reduce((sum, b) => sum + b.totalCalls, 0),
       totalAnswered: buyerPerformance.reduce(
-        (sum: number, b: any) => sum + b.answeredCalls,
+        (sum, b) => sum + b.answeredCalls,
         0,
       ),
-      totalMissed: buyerPerformance.reduce(
-        (sum: number, b: any) => sum + b.missedCalls,
-        0,
-      ),
+      totalMissed: buyerPerformance.reduce((sum, b) => sum + b.missedCalls, 0),
       avgAnswerRate:
         buyerPerformance.length > 0
-          ? buyerPerformance.reduce(
-              (sum: number, b: any) => sum + b.answerRate,
-              0,
-            ) / buyerPerformance.length
+          ? buyerPerformance.reduce((sum, b) => sum + b.answerRate, 0) /
+            buyerPerformance.length
           : 0,
       avgConversionRate:
         buyerPerformance.length > 0
-          ? buyerPerformance.reduce(
-              (sum: number, b: any) => sum + b.conversionRate,
-              0,
-            ) / buyerPerformance.length
+          ? buyerPerformance.reduce((sum, b) => sum + b.conversionRate, 0) /
+            buyerPerformance.length
           : 0,
     };
 
@@ -204,9 +217,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching buyer performance:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch buyer performance" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch buyer performance");
   }
 }

@@ -1,6 +1,6 @@
 import Google from "next-auth/providers/google";
 import EmailProvider from "next-auth/providers/email";
-import client from "./lib/db";
+import { clientPromise } from "./lib/db";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { clearStaleTokens } from "./lib/clearStaleTokensServerAction";
 import { NextAuthOptions } from "next-auth";
@@ -11,13 +11,13 @@ import { createTransport } from "nodemailer";
 import { getCachedSession } from "./lib/cachedSession";
 
 export const authOptions = {
-  adapter: MongoDBAdapter(client),
+  adapter: MongoDBAdapter(clientPromise),
   secret: process.env.AUTH_SECRET as string, // Used to sign the session cookie so AuthJS can verify the session
 
   session: {
     strategy: "jwt",
     maxAge: 1 * 24 * 60 * 60, // 1 days in seconds (this value is also the default)
-    updateAge: 60 * 60, // Re-issue token every 24 hours
+    updateAge: 60 * 60, // Re-issue token every 1 hour
   },
   pages: {
     signIn: "/auth/sign-in",
@@ -53,15 +53,18 @@ export const authOptions = {
       },
     }),
     EmailProvider({
+      // Use a friendly sender display name in mailbox UIs.
+      from: `${process.env.EMAIL_FROM_NAME || "Brixcot Support"} <${process.env.EMAIL_FROM as string}>`,
       server: {
-        host: process.env.EMAIL_SERVER_HOST!,
-        port: 465,
+        host: process.env.EMAIL_SERVER_HOST || process.env.EMAIL_SERVER!,
+        port: Number(process.env.EMAIL_PORT || 465),
+        secure: Number(process.env.EMAIL_PORT || 465) === 465,
         auth: {
-          user: process.env.EMAIL_FROM!,
-          pass: process.env.EMAIL_SERVER_PASSWORD!,
+          user: process.env.EMAIL_SERVER_USER || process.env.EMAIL_FROM!,
+          pass:
+            process.env.EMAIL_SERVER_PASSWORD || process.env.EMAIL_PASSWORD!,
         },
       },
-      from: process.env.EMAIL_FROM as string,
       sendVerificationRequest: async ({ identifier, url, provider }) => {
         const { host } = new URL(url);
         const transport = createTransport(provider.server);
@@ -132,7 +135,7 @@ export const authOptions = {
       return url.startsWith(baseUrl) ? url : baseUrl;
     },
 
-    async jwt({ token, trigger, session, user, account }) {
+    async jwt({ token, trigger, session, user }) {
       if (user) {
         // Initial sign in - set basic profile data
         token.email = user.email;
@@ -142,7 +145,7 @@ export const authOptions = {
         token.role = user.role;
         token.isSubActive = user.isSubActive;
         if (Date.now() % 10 === 0) await clearStaleTokens(); // ~10% of the time
-      } else if (trigger === "update" && session?.name) {
+      } else if (trigger === "update" && session?.user) {
         // Manual session update triggered
         token.email = session.user?.email;
         token.name = session.user?.name;

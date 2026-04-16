@@ -9,6 +9,12 @@ import { authOptions } from "@/auth";
 import { CancellationFeedback } from "@/models/cancellationFeedback";
 import connectDB from "@/lib/connectdb";
 import { User } from "@/models/userModel";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 /**
  * Check if user is admin
@@ -32,20 +38,14 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await connectDB();
 
     // Check admin access
     if (!(await isAdmin(session.user.id))) {
-      return NextResponse.json(
-        { success: false, message: "Admin access required" },
-        { status: 403 },
-      );
+      return forbidden("Admin access required");
     }
 
     const { searchParams } = new URL(request.url);
@@ -106,12 +106,8 @@ export async function GET(request: NextRequest) {
         break;
 
       default:
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Invalid groupBy parameter. Use: reason, tier, or month",
-          },
-          { status: 400 },
+        return badRequest(
+          "Invalid groupBy parameter. Use: reason, tier, or month",
         );
     }
 
@@ -143,9 +139,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[CancellationAnalytics] GET error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to get cancellation analytics" },
-      { status: 500 },
-    );
+    return internalError("Failed to get cancellation analytics");
   }
 }

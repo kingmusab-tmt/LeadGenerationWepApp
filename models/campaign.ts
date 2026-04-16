@@ -1,14 +1,14 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-interface ICampaign extends Document {
-  userId: mongoose.Schema.Types.ObjectId;
+export interface ICampaign extends Document {
+  userId?: mongoose.Schema.Types.ObjectId;
   name: string;
   description?: string;
   startDate: Date;
   endDate?: Date;
   budget?: number;
   targetLeads: mongoose.Schema.Types.ObjectId[];
-  status: "active" | "completed" | "draft";
+  status: "active" | "completed" | "draft" | "scheduled" | "paused";
   performanceMetrics?: Record<string, unknown>;
   createdAt?: Date;
   updatedAt?: Date;
@@ -26,7 +26,7 @@ const CampaignSchema = new Schema<ICampaign>(
     targetLeads: [{ type: Schema.Types.ObjectId, ref: "Lead" }],
     status: {
       type: String,
-      enum: ["active", "completed", "draft"],
+      enum: ["active", "completed", "draft", "scheduled", "paused"],
       default: "draft",
     },
     performanceMetrics: { type: Object },

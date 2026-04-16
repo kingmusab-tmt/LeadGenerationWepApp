@@ -22,6 +22,10 @@ export default function UnauthorizedPage() {
     router.push("/auth/sign-in");
   };
 
+  const handleGoHome = () => {
+    router.push("/");
+  };
+
   // Countdown effect
   useEffect(() => {
     if (countdown === 0) {
@@ -48,7 +52,7 @@ export default function UnauthorizedPage() {
         </Typography>
 
         <Typography variant="body1" paragraph>
-          You don't have permission to access this page.
+          You don&apos;t have permission to access this page.
         </Typography>
 
         <Typography variant="body1" paragraph>
@@ -71,7 +75,15 @@ export default function UnauthorizedPage() {
           {countdown} seconds
         </Typography>
 
-        <Box sx={{ mt: 3, display: "flex", justifyContent: "center" }}>
+        <Box
+          sx={{
+            mt: 3,
+            display: "flex",
+            justifyContent: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
           <Button
             variant="contained"
             color="primary"
@@ -80,6 +92,9 @@ export default function UnauthorizedPage() {
             sx={{ px: 4 }}
           >
             Go to Login Now
+          </Button>
+          <Button variant="outlined" onClick={handleGoHome} size="large">
+            Back to Home
           </Button>
         </Box>
 

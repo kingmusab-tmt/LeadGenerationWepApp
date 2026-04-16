@@ -27,6 +27,7 @@ import {
   InputLabel,
   Pagination,
 } from "@mui/material";
+import type { ChipProps } from "@mui/material";
 import { CheckCircle, Cancel, Phone, Refresh } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
@@ -111,7 +112,7 @@ export default function ScheduledCallbacksPanel() {
     return new Date(dateStr).toLocaleString();
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): ChipProps["color"] => {
     switch (status) {
       case "pending":
         return "warning";
@@ -214,7 +215,7 @@ export default function ScheduledCallbacksPanel() {
                       <Chip
                         label={cb.status}
                         size="small"
-                        color={getStatusColor(cb.status) as any}
+                        color={getStatusColor(cb.status)}
                       />
                     </TableCell>
                     <TableCell>

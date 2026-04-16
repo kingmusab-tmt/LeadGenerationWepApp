@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
     await dbConnect();
 
-    const query: Record<string, any> = {};
+    const query: Record<string, string> = {};
     if (session.user.role !== "admin") {
       query.userId = session.user.id;
     }
@@ -133,9 +133,14 @@ export async function POST(req: NextRequest) {
     await invalidateAllUserSessions(session.user.id);
 
     return successResponse({ lead: newLead }, 201);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[POST /api/leads]", error);
-    if (error.code === 11000) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000
+    ) {
       return badRequest("Lead with this email already exists");
     }
     return internalError("Failed to create lead");
@@ -209,7 +214,7 @@ export async function PUT(req: NextRequest) {
     await invalidateAllUserSessions(session.user.id);
 
     return successResponse({ lead: updatedLead }, 200);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[PUT /api/leads]", error);
     return internalError("Failed to update lead");
   }

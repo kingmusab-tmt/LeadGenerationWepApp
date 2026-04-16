@@ -7,10 +7,18 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { randomBytes } from "crypto";
+import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
-import { WebhookConfig, IWebhookConfig } from "@/models/webhookConfig";
+import { WebhookConfig } from "@/models/webhookConfig";
 import { User } from "@/models/userModel";
 import { ZapierIntegrationService } from "@/lib/integrations/services/zapierService";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -18,25 +26,27 @@ export const dynamic = "force-dynamic";
  * GET /api/integrations/zapier
  * Get Zapier webhook configuration for current user
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   await dbConnect();
 
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     // Find user
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
+
+    const userId = String(user._id);
 
     // Find Zapier webhook configs
     const zapierConfigs = await WebhookConfig.find({
-      userId: (user._id as any).toString(),
+      userId,
       source: "zapier",
       isActive: true,
     });
@@ -47,10 +57,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching Zapier configs:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch Zapier configurations" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch Zapier configurations");
   }
 }
 
@@ -62,43 +69,39 @@ export async function POST(req: NextRequest) {
   await dbConnect();
 
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     // Find user
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
+
+    const userId = String(user._id);
 
     const body = await req.json();
     const { webhookUrl, events, description } = body;
 
     // Validate webhook URL
     if (!webhookUrl || !webhookUrl.startsWith("https://hooks.zapier.com/")) {
-      return NextResponse.json(
-        { error: "Invalid Zapier webhook URL" },
-        { status: 400 },
-      );
+      return badRequest("Invalid Zapier webhook URL");
     }
 
     // Validate events
     if (!events || Object.keys(events).length === 0) {
-      return NextResponse.json(
-        { error: "At least one event must be enabled" },
-        { status: 400 },
-      );
+      return badRequest("At least one event must be enabled");
     }
 
     // Generate secret for webhook signing
-    const secret = require("crypto").randomBytes(32).toString("hex");
+    const secret = randomBytes(32).toString("hex");
 
     // Create webhook config
     const webhookConfig = await WebhookConfig.create({
-      userId: (user._id as any).toString(),
+      userId,
       url: webhookUrl,
       source: "zapier",
       secret: secret,
@@ -114,7 +117,7 @@ export async function POST(req: NextRequest) {
     const zapierService = new ZapierIntegrationService(
       webhookUrl,
       secret,
-      (user._id as any).toString(),
+      userId,
     );
 
     const testSuccess = await zapierService.testConnection();
@@ -135,10 +138,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error creating Zapier config:", error);
-    return NextResponse.json(
-      { error: "Failed to create Zapier configuration" },
-      { status: 500 },
-    );
+    return internalError("Failed to create Zapier configuration");
   }
 }
 
@@ -150,41 +150,37 @@ export async function DELETE(req: NextRequest) {
   await dbConnect();
 
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     // Find user
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
+
+    const userId = String(user._id);
 
     // Get config ID from URL
     const url = new URL(req.url);
     const configId = url.pathname.split("/").pop();
 
     if (!configId) {
-      return NextResponse.json(
-        { error: "Configuration ID required" },
-        { status: 400 },
-      );
+      return badRequest("Configuration ID required");
     }
 
     // Find and delete config
     const config = await WebhookConfig.findOneAndDelete({
       _id: configId,
-      userId: (user._id as any).toString(),
+      userId,
       source: "zapier",
     });
 
     if (!config) {
-      return NextResponse.json(
-        { error: "Configuration not found" },
-        { status: 404 },
-      );
+      return notFound("Configuration");
     }
 
     return NextResponse.json({
@@ -193,9 +189,6 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error deleting Zapier config:", error);
-    return NextResponse.json(
-      { error: "Failed to delete Zapier configuration" },
-      { status: 500 },
-    );
+    return internalError("Failed to delete Zapier configuration");
   }
 }

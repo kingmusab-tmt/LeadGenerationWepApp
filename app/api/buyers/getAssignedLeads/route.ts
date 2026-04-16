@@ -1,18 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { Lead } from "@/models/leads"; // Import Lead model
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Buyer } from "@/models/leadbuyers"; // Import Buyer model
+import { internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // Get the current session
     const session = await getServerSession(authOptions);
 
     // Check if the session exists and the user is a buyer
     if (!session || session.user.role !== "buyer") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     // Connect to the database
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     );
 
     if (!buyer) {
-      return NextResponse.json({ error: "Buyer not found" }, { status: 404 });
+      return notFound("Buyer");
     }
 
     const buyerId = buyer._id;
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
     // Filter leads based on their status and buyer assignment
     const filteredLeads = leads.map((lead) => {
       const assignment = lead.assignedTo?.find(
-        (a: any) => a.buyerId.toString() === buyerId.toString(),
+        (a) => a.buyerId.toString() === buyerId.toString(),
       );
       const canRespond =
         !!assignment && !assignment.accepted && !assignment.rejected;
@@ -64,12 +65,12 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ leads: filteredLeads }, { status: 200 });
+    return NextResponse.json(
+      { success: true, data: { leads: filteredLeads } },
+      { status: 200 },
+    );
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

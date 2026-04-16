@@ -1,6 +1,6 @@
 // POST /api/invoices - Create invoice
 // GET /api/invoices - List invoices
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
@@ -8,6 +8,16 @@ import { Invoice } from "@/models/invoice";
 import { invoiceEngine } from "@/lib/invoiceEngine";
 import { invalidateAllUserSessions } from "@/lib/cachedSession"; // PHASE 3: Cache invalidation
 import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
+import { ZodError } from "zod";
+import { mongoIdParamSchema } from "@/lib/validation/schemas";
+import {
+  successResponse,
+  unauthorized,
+  internalError,
+  badRequest,
+  forbidden,
+  handleValidationError,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +25,20 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20", 10);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+
+    if (Number.isNaN(page) || Number.isNaN(limit) || page < 1 || limit < 1) {
+      return badRequest("page and limit must be positive integers");
+    }
+
     const skip = (page - 1) * limit;
 
     const query: Record<string, unknown> = { userId: session.user.id };
@@ -37,24 +52,18 @@ export async function GET(req: NextRequest) {
 
     const total = await Invoice.countDocuments(query);
 
-    return NextResponse.json(
-      {
-        invoices,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit),
-        },
+    return successResponse({
+      invoices,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
-      { status: 200 },
-    );
+    });
   } catch (error) {
     console.error("Error fetching invoices:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch invoices" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch invoices");
   }
 }
 
@@ -62,7 +71,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -83,15 +92,23 @@ export async function POST(req: NextRequest) {
       paymentMethod,
     } = body;
 
+    if (buyerId) {
+      try {
+        mongoIdParamSchema.parse(buyerId);
+      } catch (error) {
+        if (error instanceof ZodError) {
+          return handleValidationError(error);
+        }
+        return badRequest("Invalid buyerId");
+      }
+    }
+
     if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
-      return NextResponse.json(
-        { error: "Line items required" },
-        { status: 400 },
-      );
+      return badRequest("Line items required");
     }
 
     if (!dueDate) {
-      return NextResponse.json({ error: "Due date required" }, { status: 400 });
+      return badRequest("Due date required");
     }
 
     // Check subscription limit for invoices
@@ -101,12 +118,8 @@ export async function POST(req: NextRequest) {
       1,
     );
     if (!usageCheck.allowed) {
-      return NextResponse.json(
-        {
-          error:
-            usageCheck.message || "Invoice limit reached for your subscription",
-        },
-        { status: 403 },
+      return forbidden(
+        usageCheck.message || "Invoice limit reached for your subscription",
       );
     }
 
@@ -128,12 +141,9 @@ export async function POST(req: NextRequest) {
     // PHASE 3: Invalidate user cache after creating invoice
     await invalidateAllUserSessions(session.user.id);
 
-    return NextResponse.json(invoice, { status: 201 });
+    return successResponse({ invoice }, 201);
   } catch (error) {
     console.error("Error creating invoice:", error);
-    return NextResponse.json(
-      { error: "Failed to create invoice" },
-      { status: 500 },
-    );
+    return internalError("Failed to create invoice");
   }
 }

@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
 import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
+import { callSecurityMiddleware } from "@/lib/security/callSecurity";
 
 export async function POST(req: NextRequest) {
   try {
+    const securityResponse = await callSecurityMiddleware(req, {
+      rateLimit: true,
+      validateWebhook: true,
+    });
+    if (securityResponse) return securityResponse;
+
     await dbConnect();
 
     // Parse the form data sent by Twilio
@@ -34,14 +41,26 @@ export async function POST(req: NextRequest) {
     }
 
     const durationSeconds = callDuration ? parseInt(callDuration, 10) : 0;
+    const normalizedRecordingUrl = recordingUrl || "No Record";
+    const normalizedAnsweredBy = answeredBy || "N/A";
+
+    const isDuplicateDelivery =
+      existingCall.callStatus === callStatus &&
+      (existingCall.recordingUrl || "No Record") === normalizedRecordingUrl &&
+      (existingCall.answeredBy || "N/A") === normalizedAnsweredBy &&
+      (existingCall.callDuration || 0) === durationSeconds;
+
+    if (isDuplicateDelivery) {
+      return NextResponse.json({ success: true, updatedCall: existingCall });
+    }
 
     // Update the call record
     const updatedCall = await Call.findOneAndUpdate(
       { callSid },
       {
         callStatus,
-        answeredBy: answeredBy || "N/A",
-        recordingUrl: recordingUrl || "No Record",
+        answeredBy: normalizedAnsweredBy,
+        recordingUrl: normalizedRecordingUrl,
         callDuration: durationSeconds || null,
       },
       { new: true }, // Return the updated document
@@ -56,13 +75,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return new NextResponse(JSON.stringify({ success: true, updatedCall }), {
-      status: 200,
-    });
+    return NextResponse.json({ success: true, updatedCall });
   } catch (error) {
     console.error("Error updating call record:", error);
-    return new NextResponse(
-      JSON.stringify({ error: "Failed to update call record" }),
+    return NextResponse.json(
+      { success: false, message: "Failed to update call record" },
       { status: 500 },
     );
   }

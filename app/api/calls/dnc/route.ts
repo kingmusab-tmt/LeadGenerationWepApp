@@ -3,6 +3,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { User } from "@/models";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
+
+type TrackingNumberEntry = {
+  phoneNumber?: string;
+  dncEnabled?: boolean;
+  dncList?: string[];
+};
 
 /**
  * DNC (Do-Not-Call) List Management API
@@ -15,30 +27,24 @@ export async function GET(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const phoneNumber = req.nextUrl.searchParams.get("phoneNumber");
     if (!phoneNumber) {
-      return NextResponse.json(
-        { error: "phoneNumber query parameter is required" },
-        { status: 400 },
-      );
+      return badRequest("phoneNumber query parameter is required");
     }
 
     const seller = await User.findById(session.user.id);
     if (!seller) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
-    const tn = seller.trackingNumbers?.find(
-      (n: any) => n.phoneNumber === phoneNumber,
-    );
+    const trackingNumbers =
+      (seller.trackingNumbers as TrackingNumberEntry[] | undefined) || [];
+    const tn = trackingNumbers.find((n) => n.phoneNumber === phoneNumber);
     if (!tn) {
-      return NextResponse.json(
-        { error: "Tracking number not found" },
-        { status: 404 },
-      );
+      return notFound("Tracking number");
     }
 
     return NextResponse.json({
@@ -49,10 +55,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching DNC list:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch DNC list" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch DNC list");
   }
 }
 
@@ -61,31 +64,25 @@ export async function POST(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const { phoneNumber, numbers } = await req.json();
 
     if (!phoneNumber || !numbers || !Array.isArray(numbers)) {
-      return NextResponse.json(
-        { error: "phoneNumber and numbers[] are required" },
-        { status: 400 },
-      );
+      return badRequest("phoneNumber and numbers[] are required");
     }
 
     const seller = await User.findById(session.user.id);
     if (!seller) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
-    const tn = seller.trackingNumbers?.find(
-      (n: any) => n.phoneNumber === phoneNumber,
-    );
+    const trackingNumbers =
+      (seller.trackingNumbers as TrackingNumberEntry[] | undefined) || [];
+    const tn = trackingNumbers.find((n) => n.phoneNumber === phoneNumber);
     if (!tn) {
-      return NextResponse.json(
-        { error: "Tracking number not found" },
-        { status: 404 },
-      );
+      return notFound("Tracking number");
     }
 
     const currentList = new Set(tn.dncList || []);
@@ -111,10 +108,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error adding to DNC list:", error);
-    return NextResponse.json(
-      { error: "Failed to add to DNC list" },
-      { status: 500 },
-    );
+    return internalError("Failed to add to DNC list");
   }
 }
 
@@ -123,31 +117,25 @@ export async function DELETE(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const { phoneNumber, number } = await req.json();
 
     if (!phoneNumber || !number) {
-      return NextResponse.json(
-        { error: "phoneNumber and number are required" },
-        { status: 400 },
-      );
+      return badRequest("phoneNumber and number are required");
     }
 
     const seller = await User.findById(session.user.id);
     if (!seller) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
-    const tn = seller.trackingNumbers?.find(
-      (n: any) => n.phoneNumber === phoneNumber,
-    );
+    const trackingNumbers =
+      (seller.trackingNumbers as TrackingNumberEntry[] | undefined) || [];
+    const tn = trackingNumbers.find((n) => n.phoneNumber === phoneNumber);
     if (!tn) {
-      return NextResponse.json(
-        { error: "Tracking number not found" },
-        { status: 404 },
-      );
+      return notFound("Tracking number");
     }
 
     const before = (tn.dncList || []).length;
@@ -163,9 +151,6 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error removing from DNC list:", error);
-    return NextResponse.json(
-      { error: "Failed to remove from DNC list" },
-      { status: 500 },
-    );
+    return internalError("Failed to remove from DNC list");
   }
 }

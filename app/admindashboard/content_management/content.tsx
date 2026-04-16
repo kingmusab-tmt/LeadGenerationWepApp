@@ -52,7 +52,7 @@ import {
   FlagOutlined,
 } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 import { AdminLead } from "@/types/lead";
 
 interface CallRecord {

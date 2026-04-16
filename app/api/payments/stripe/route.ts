@@ -1,51 +1,67 @@
 import { NextResponse, NextRequest } from "next/server";
 import Stripe from "stripe";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
+import { env } from "@/lib/env";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const { paymentMethodId, tierId, amount, isYearly } = await req.json();
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return unauthorized("Authentication required");
+    }
+
+    let body: {
+      paymentMethodId?: string;
+      tierId?: string;
+      amount?: string | number;
+      isYearly?: boolean;
+    };
+    try {
+      body = await req.json();
+    } catch {
+      return badRequest("Invalid JSON in request body");
+    }
+
+    const { paymentMethodId, tierId, amount, isYearly } = body;
 
     // Validate required fields
     if (!paymentMethodId || !tierId || !amount) {
-      return NextResponse.json(
-        {
-          error: "Missing required fields",
-          details: {
-            paymentMethodId: !paymentMethodId ? "Missing" : "Provided",
-            tierId: !tierId ? "Missing" : "Provided",
-            amount: !amount ? "Missing" : "Provided",
-          },
-        },
-        { status: 400 },
-      );
+      return badRequest("Missing required fields", {
+        paymentMethodId: !paymentMethodId ? "Missing" : "Provided",
+        tierId: !tierId ? "Missing" : "Provided",
+        amount: !amount ? "Missing" : "Provided",
+      });
+    }
+
+    const parsedAmount =
+      typeof amount === "number" ? amount : parseFloat(String(amount));
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return badRequest("Amount must be a positive number");
     }
 
     // Validate and construct return URL
-    const baseUrl = process.env.NEXTAUTH_URL;
-    if (!baseUrl) {
-      throw new Error("NEXTAUTH_URL environment variable is not set");
-    }
-
-    let returnUrl: string;
-    try {
-      returnUrl = new URL("/checkout/success", baseUrl).toString();
-    } catch (err) {
-      throw new Error(`Invalid NEXTAUTH_URL: ${baseUrl}`);
-    }
+    const returnUrl = new URL("/checkout/success", env.NEXTAUTH_URL).toString();
 
     // Create payment intent with detailed error handling
     const paymentIntent = await stripe.paymentIntents
       .create({
-        amount: Math.round(parseFloat(amount) * 100),
+        amount: Math.round(parsedAmount * 100),
         currency: "usd",
         payment_method: paymentMethodId,
         confirm: true,
         return_url: returnUrl,
         metadata: {
+          userId: session.user.id,
           tierId,
           isYearly: String(isYearly),
           source: "nextjs-checkout",
@@ -78,27 +94,14 @@ export async function POST(req: NextRequest) {
         });
 
       default:
-        return NextResponse.json(
-          {
-            error: "Payment processing failed",
-            paymentIntentStatus: paymentIntent.status,
-            declineCode: paymentIntent.last_payment_error?.decline_code,
-            paymentError: paymentIntent.last_payment_error?.message,
-          },
-          { status: 400 },
-        );
+        return badRequest("Payment processing failed", {
+          paymentIntentStatus: paymentIntent.status,
+          declineCode: paymentIntent.last_payment_error?.decline_code,
+          paymentError: paymentIntent.last_payment_error?.message,
+        });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Checkout Error:", error);
-
-    return NextResponse.json(
-      {
-        error: "Payment processing failed",
-        message: error.message,
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-        type: error.type || "server_error",
-      },
-      { status: 500 },
-    );
+    return internalError("Payment processing failed");
   }
 }

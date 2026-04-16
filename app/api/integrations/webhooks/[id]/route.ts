@@ -12,9 +12,14 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { WebhookConfig } from "@/models/webhookConfig";
-import { encryptData } from "@/lib/encryption";
 import { z } from "zod";
-import type { Types } from "mongoose";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -55,26 +60,32 @@ const updateWebhookSchema = z.object({
 /**
  * Get authenticated user and verify webhook ownership
  */
-async function verifyWebhookOwnership(webhookId: string) {
+type OwnershipResult =
+  | { webhook: typeof WebhookConfig.prototype; userId: string }
+  | { errorResponse: NextResponse };
+
+async function verifyWebhookOwnership(
+  webhookId: string,
+): Promise<OwnershipResult> {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    return { error: "Unauthorized", status: 401 };
+  if (!session?.user?.id) {
+    return { errorResponse: unauthorized("Authentication required") };
   }
 
   if (!webhookId || !webhookId.match(/^[0-9a-fA-F]{24}$/)) {
-    return { error: "Invalid webhook ID", status: 400 };
+    return { errorResponse: badRequest("Invalid webhook ID") };
   }
 
   const webhook = await WebhookConfig.findById(webhookId);
   if (!webhook) {
-    return { error: "Webhook not found", status: 404 };
+    return { errorResponse: notFound("Webhook") };
   }
 
-  if (webhook.userId.toString() !== (session.user as any)._id) {
-    return { error: "Forbidden", status: 403 };
+  if (webhook.userId.toString() !== session.user.id) {
+    return { errorResponse: forbidden("Forbidden") };
   }
 
-  return { webhook, user: session.user };
+  return { webhook, userId: session.user.id };
 }
 
 /**
@@ -90,20 +101,21 @@ export async function GET(
   try {
     const { id } = await params;
     const result = await verifyWebhookOwnership(id);
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
+    if ("errorResponse" in result) {
+      return result.errorResponse;
     }
 
-    const webhook = (result as any).webhook as any;
+    const webhook = result.webhook;
     const { searchParams } = new URL(req.url);
     const includeLogs = searchParams.get("logs") === "true";
-    const logsLimit = parseInt(searchParams.get("logsLimit") || "50");
+    const logsLimit = parseInt(searchParams.get("logsLimit") || "50", 10);
     const includeDailyStats = searchParams.get("dailyStats") === "true";
 
-    const webhookData: any = webhook.toObject();
+    if (Number.isNaN(logsLimit) || logsLimit < 1 || logsLimit > 500) {
+      return badRequest("logsLimit must be an integer between 1 and 500");
+    }
+
+    const webhookData: Record<string, unknown> = webhook.toObject();
 
     // Add statistics
     if (includeDailyStats) {
@@ -131,10 +143,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching webhook:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch webhook" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch webhook");
   }
 }
 
@@ -151,14 +160,11 @@ export async function PUT(
   try {
     const { id } = await params;
     const result = await verifyWebhookOwnership(id);
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
+    if ("errorResponse" in result) {
+      return result.errorResponse;
     }
 
-    const webhook = (result as any).webhook as any;
+    const webhook = result.webhook;
     const body = await req.json();
 
     let validatedData;
@@ -220,15 +226,12 @@ export async function PUT(
       (v) => v === true,
     );
     if (!hasEnabledEvent) {
-      return NextResponse.json(
-        { error: "At least one event must be enabled" },
-        { status: 400 },
-      );
+      return badRequest("At least one event must be enabled");
     }
 
     await webhook.save();
 
-    const webhookData: any = webhook.toObject();
+    const webhookData: Record<string, unknown> = webhook.toObject();
     webhookData.successRate = webhook.getSuccessRate?.() || 0;
     webhookData.isHealthy = webhook.isHealthy?.() || false;
     delete webhookData.secret;
@@ -240,10 +243,7 @@ export async function PUT(
     });
   } catch (error) {
     console.error("Error updating webhook:", error);
-    return NextResponse.json(
-      { error: "Failed to update webhook" },
-      { status: 500 },
-    );
+    return internalError("Failed to update webhook");
   }
 }
 
@@ -260,17 +260,14 @@ export async function DELETE(
   try {
     const { id } = await params;
     const result = await verifyWebhookOwnership(id);
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
+    if ("errorResponse" in result) {
+      return result.errorResponse;
     }
 
-    const webhook = (result as any).webhook as any;
+    const webhook = result.webhook;
 
     // Log deletion for audit trail
-    const deletedData = webhook.toObject();
+    webhook.toObject();
 
     await WebhookConfig.deleteOne({ _id: webhook._id });
 
@@ -285,9 +282,6 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("Error deleting webhook:", error);
-    return NextResponse.json(
-      { error: "Failed to delete webhook" },
-      { status: 500 },
-    );
+    return internalError("Failed to delete webhook");
   }
 }

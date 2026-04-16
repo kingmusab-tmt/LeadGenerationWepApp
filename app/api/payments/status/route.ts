@@ -1,25 +1,26 @@
-// pages/api/payments/status.ts
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import Stripe from "stripe";
 import dbConnect from "@/lib/connectdb";
 import { Transaction } from "@/models/transactions";
+import { env } from "@/lib/env";
+import {
+  badRequest,
+  internalError,
+  successResponse,
+} from "@/lib/api/error-handler";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
 });
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   await dbConnect();
 
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
-  //("sessionId", sessionId);
 
   if (!sessionId) {
-    return NextResponse.json(
-      { error: "sessionId is required" },
-      { status: 400 },
-    );
+    return badRequest("sessionId is required");
   }
 
   try {
@@ -31,8 +32,8 @@ export async function GET(req: Request) {
       gatewayTransactionId: sessionId,
     });
 
-    return NextResponse.json({
-      success:
+    return successResponse({
+      paymentStatus:
         session.payment_status === "paid"
           ? "succeeded"
           : session.payment_status,
@@ -40,11 +41,7 @@ export async function GET(req: Request) {
       transactionStatus: transaction?.status,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
-      { status: 500 },
-    );
+    console.error("[PaymentStatusAPI] GET error:", error);
+    return internalError("Failed to verify payment status");
   }
 }

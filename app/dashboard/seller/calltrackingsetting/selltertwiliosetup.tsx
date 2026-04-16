@@ -212,7 +212,13 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       const numbersResponse = await fetch(
         `/api/calls/twilio/get_numbers?sellerId=${sellerId}`,
       );
-      const numbersData = await numbersResponse.json();
+      const numbersPayload = await numbersResponse.json();
+      const numbersData = Array.isArray(numbersPayload)
+        ? numbersPayload
+        : Array.isArray(numbersPayload?.data)
+          ? numbersPayload.data
+          : [];
+
       setNumbers(numbersData);
       setLoading(false);
 
@@ -934,7 +940,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                       </Typography>
                       <Button
                         component={NextLink}
-                        href="/subscription"
+                        href="/dashboard/seller/settings/subscription"
                         variant="contained"
                         size="small"
                       >
@@ -1360,7 +1366,11 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseLimitDialog}>Cancel</Button>
-          <Button variant="contained" component={NextLink} href="/subscription">
+          <Button
+            variant="contained"
+            component={NextLink}
+            href="/dashboard/seller/settings/subscription"
+          >
             Upgrade Now
           </Button>
         </DialogActions>

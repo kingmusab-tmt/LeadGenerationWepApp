@@ -116,3 +116,18 @@ export const {
   setError,
 } = leadsSlice.actions;
 export default leadsSlice.reducer;
+
+// Selectors for type-safe state access
+export const selectLeads = (state: { leads: LeadsState }) => state.leads.leads;
+export const selectSelectedLeads = (state: { leads: LeadsState }) =>
+  state.leads.selectedLeads;
+export const selectLeadsFilters = (state: { leads: LeadsState }) =>
+  state.leads.filters;
+export const selectLeadsPagination = (state: { leads: LeadsState }) =>
+  state.leads.pagination;
+export const selectLeadsLoading = (state: { leads: LeadsState }) =>
+  state.leads.loading;
+export const selectLeadsError = (state: { leads: LeadsState }) =>
+  state.leads.error;
+export const selectLeadById = (state: { leads: LeadsState }, id: string) =>
+  state.leads.leads.find((l) => l._id === id) ?? null;

@@ -2,6 +2,7 @@ import dbConnect from "@/lib/connectdb";
 import { createScheduledCallback } from "@/utils/callFeatureServices";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
+import { callSecurityMiddleware } from "@/lib/security/callSecurity";
 
 /**
  * Callback Request Handler
@@ -10,10 +11,16 @@ import twilio from "twilio";
  */
 export async function POST(req: NextRequest) {
   try {
+    const securityResponse = await callSecurityMiddleware(req, {
+      rateLimit: true,
+      validateWebhook: true,
+    });
+    if (securityResponse) return securityResponse;
+
     await dbConnect();
 
     const formData = await req.formData();
-    const digits = formData.get("Digits") as string;
+    const digits = (formData.get("Digits") as string) || "";
     const callSid = req.nextUrl.searchParams.get("callSid") || "";
     const from = decodeURIComponent(req.nextUrl.searchParams.get("from") || "");
     const to = decodeURIComponent(req.nextUrl.searchParams.get("to") || "");
@@ -22,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const twiml = new twilio.twiml.VoiceResponse();
 
-    if (digits === "1" || digits) {
+    if (digits === "1") {
       // Create a scheduled callback
       await createScheduledCallback({
         sellerId,

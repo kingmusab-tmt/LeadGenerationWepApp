@@ -126,3 +126,19 @@ export const {
   setError,
 } = buyersSlice.actions;
 export default buyersSlice.reducer;
+
+// Selectors for type-safe state access
+export const selectBuyers = (state: { buyers: BuyersState }) =>
+  state.buyers.buyers;
+export const selectSelectedBuyers = (state: { buyers: BuyersState }) =>
+  state.buyers.selectedBuyers;
+export const selectBuyersFilters = (state: { buyers: BuyersState }) =>
+  state.buyers.filters;
+export const selectBuyersPagination = (state: { buyers: BuyersState }) =>
+  state.buyers.pagination;
+export const selectBuyersLoading = (state: { buyers: BuyersState }) =>
+  state.buyers.loading;
+export const selectBuyersError = (state: { buyers: BuyersState }) =>
+  state.buyers.error;
+export const selectBuyerById = (state: { buyers: BuyersState }, id: string) =>
+  state.buyers.buyers.find((b) => b._id === id) ?? null;

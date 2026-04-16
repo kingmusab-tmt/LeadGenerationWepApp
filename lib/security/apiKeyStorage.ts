@@ -7,10 +7,17 @@
 
 import { User } from "@/models/userModel";
 import {
+  ApiKeyAuditEvent,
   ApiKeySecurityService,
   ApiKeyType,
   generateExpirationDate,
 } from "./apiKeySecurityService";
+
+type ZapierApiKeyFields = {
+  zapierApiKeyId?: string;
+  zapierApiKeyHash?: string;
+  zapierApiKeyCreatedAt?: Date;
+};
 
 /**
  * Store Zapier Action API Key (hashed)
@@ -40,9 +47,11 @@ export async function storeZapierActionApiKey(
         twilioPhoneNumber: "",
       };
     }
-    (user.apiSettings as any).zapierApiKeyId = keyId;
-    (user.apiSettings as any).zapierApiKeyHash = hashedValue;
-    (user.apiSettings as any).zapierApiKeyCreatedAt = new Date();
+    const apiSettings = user.apiSettings as typeof user.apiSettings &
+      ZapierApiKeyFields;
+    apiSettings.zapierApiKeyId = keyId;
+    apiSettings.zapierApiKeyHash = hashedValue;
+    apiSettings.zapierApiKeyCreatedAt = new Date();
     await user.save();
   }
 }
@@ -64,26 +73,27 @@ export async function verifyZapierActionApiKey(
   }
 
   // Check if expired
-  const createdAt = (user.apiSettings as any)?.zapierApiKeyCreatedAt;
-  const expiresAt = generateExpirationDate(365);
+  const apiSettings = (user.apiSettings || {}) as ZapierApiKeyFields;
+  const createdAt = apiSettings.zapierApiKeyCreatedAt;
 
-  if (createdAt && new Date(createdAt) > expiresAt) {
-    return { valid: false };
+  if (createdAt) {
+    const expiryDate = new Date(createdAt);
+    expiryDate.setDate(expiryDate.getDate() + 365);
+
+    if (new Date() > expiryDate) {
+      return { valid: false };
+    }
   }
 
   // Log usage
-  const keyId = (user.apiSettings as any)?.zapierApiKeyId;
+  const keyId = apiSettings.zapierApiKeyId;
   if (keyId) {
-    await ApiKeySecurityService.logKeyUsage(
-      keyId,
-      (user._id as any).toString(),
-      true,
-    );
+    await ApiKeySecurityService.logKeyUsage(keyId, String(user._id), true);
   }
 
   return {
     valid: true,
-    userId: (user._id as any).toString(),
+    userId: String(user._id),
   };
 }
 
@@ -94,14 +104,15 @@ export async function revokeAllUserKeys(userId: string): Promise<void> {
   const user = await User.findById(userId);
   if (!user?.apiSettings) return;
 
-  const apiSettings = user.apiSettings as any;
+  const apiSettings = user.apiSettings as typeof user.apiSettings &
+    ZapierApiKeyFields;
 
   // Log revocations
   if (apiSettings.zapierApiKeyId) {
     await ApiKeySecurityService.logAuditEvent({
       keyId: apiSettings.zapierApiKeyId,
       userId,
-      event: "revoked" as any,
+      event: ApiKeyAuditEvent.REVOKED,
       timestamp: new Date(),
       success: true,
     });

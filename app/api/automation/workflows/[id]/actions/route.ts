@@ -3,15 +3,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import AutomationEngine from "@/lib/automationEngine";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
 async function getUserFromSession() {
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== "seller" || !session.user.id) {
-    return {
-      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
+    return { error: unauthorized("Authentication required") };
   }
   return { userId: session.user.id };
 }
@@ -19,7 +22,7 @@ async function getUserFromSession() {
 // POST /api/automation/workflows/[id]/actions
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   await dbConnect();
   const { userId, error } = await getUserFromSession();
@@ -36,7 +39,7 @@ export async function POST(
         const result = await AutomationEngine.manualTrigger(
           id,
           userId,
-          body.context
+          body.context,
         );
         return NextResponse.json(result, {
           status: result.success ? 200 : 400,
@@ -50,17 +53,14 @@ export async function POST(
             success: reset,
             message: reset ? "Counter reset" : "Failed to reset",
           },
-          { status: reset ? 200 : 400 }
+          { status: reset ? 200 : 400 },
         );
 
       default:
-        return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+        return badRequest("Unknown action");
     }
   } catch (err) {
     console.error("Error performing workflow action:", err);
-    return NextResponse.json(
-      { error: "Failed to perform action" },
-      { status: 500 }
-    );
+    return internalError("Failed to perform action");
   }
 }

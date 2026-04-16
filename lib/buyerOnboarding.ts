@@ -20,6 +20,16 @@ const getOnboardingStateStorageKey = (email?: string): string => {
   return `${BUYER_ONBOARDING_STATE_PREFIX}:${normalizedEmail}`;
 };
 
+const sanitizeBuyerSteps = (steps: unknown): BuyerOnboardingStep[] => {
+  if (!Array.isArray(steps)) {
+    return [];
+  }
+
+  return steps.filter((step): step is BuyerOnboardingStep =>
+    BUYER_ONBOARDING_STEPS.includes(step as BuyerOnboardingStep),
+  );
+};
+
 const readOnboardingState = (
   email?: string,
 ): {
@@ -40,17 +50,13 @@ const readOnboardingState = (
     }
 
     const parsed = JSON.parse(raw) as {
-      completedSteps?: BuyerOnboardingStep[];
-      skippedSteps?: BuyerOnboardingStep[];
+      completedSteps?: unknown;
+      skippedSteps?: unknown;
     };
 
     return {
-      completedSteps: Array.isArray(parsed.completedSteps)
-        ? parsed.completedSteps
-        : [],
-      skippedSteps: Array.isArray(parsed.skippedSteps)
-        ? parsed.skippedSteps
-        : [],
+      completedSteps: sanitizeBuyerSteps(parsed.completedSteps),
+      skippedSteps: sanitizeBuyerSteps(parsed.skippedSteps),
     };
   } catch {
     return { completedSteps: [], skippedSteps: [] };
@@ -101,4 +107,9 @@ export const isBuyerOnboardingFlowComplete = (email?: string): boolean => {
   const state = readOnboardingState(email);
   const done = new Set([...state.completedSteps, ...state.skippedSteps]);
   return BUYER_ONBOARDING_STEPS.every((step) => done.has(step));
+};
+
+export const resetBuyerOnboardingState = (email?: string): void => {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(getOnboardingStateStorageKey(email));
 };

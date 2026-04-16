@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
 import { getServerSession } from "next-auth";
@@ -9,7 +8,7 @@ import {
   internalError,
 } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
 

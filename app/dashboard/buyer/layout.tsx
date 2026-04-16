@@ -33,13 +33,14 @@ import {
   CallMade,
   CallReceivedRounded,
   People,
+  Notifications,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import { isBuyerOnboardingFlowComplete } from "@/lib/buyerOnboarding";
 import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
 
@@ -74,7 +75,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   useEffect(() => {
     if (status === "loading" || userLoading || !currentUser) return;
 
-    if (currentUser.role !== "buyer") return;
+    const isBuyerRole =
+      currentUser.role === "buyer" || currentUser.role === "staff";
+
+    if (!isBuyerRole) {
+      if (currentUser.role === "admin") {
+        router.replace("/admindashboard/overview");
+      } else if (
+        currentUser.role === "seller" ||
+        currentUser.role === "business-admin"
+      ) {
+        router.replace("/dashboard/seller/overview");
+      } else {
+        router.replace("/completeregistration");
+      }
+      return;
+    }
 
     const onboardingFlowComplete = isBuyerOnboardingFlowComplete(
       currentUser.email,
@@ -326,6 +342,30 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               </ListItemIcon>
             </Tooltip>
             <ListItemText primary="Transactions" />
+          </ListItem>
+
+          <ListItem
+            component="button"
+            onClick={() => handleNavigation("notifications")}
+            sx={{
+              color: "blue",
+              backgroundColor: "white",
+              border: "none",
+              "&:hover": {
+                backgroundColor: "blue",
+                color: "white",
+                "& .MuiListItemIcon-root": {
+                  color: "white",
+                },
+              },
+            }}
+          >
+            <Tooltip title="Notifications" placement="right">
+              <ListItemIcon sx={{ color: "blue" }}>
+                <Notifications />
+              </ListItemIcon>
+            </Tooltip>
+            <ListItemText primary="Notifications" />
           </ListItem>
 
           <ListItem

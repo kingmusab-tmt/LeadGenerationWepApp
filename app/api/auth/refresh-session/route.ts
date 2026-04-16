@@ -5,18 +5,29 @@
  */
 
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { forceRefreshUserSession, getCachedSession } from "@/lib/cachedSession";
 import connectDB from "@/lib/connectdb";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 /**
  * POST /api/auth/refresh-session
  * Force refresh the current user's session cache
  * Call this after returning from Stripe checkout to ensure subscription is reflected
  */
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    const limitResponse = checkSimpleRateLimit(req, {
+      scope: "auth-refresh-session",
+      limit: 20,
+      windowMs: 60_000,
+    });
+    if (limitResponse) {
+      return limitResponse;
+    }
+
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
@@ -35,10 +46,7 @@ export async function POST() {
 
     if (!result.success) {
       return NextResponse.json(
-        {
-          success: false,
-          message: result.error || "Failed to refresh session",
-        },
+        { success: false, message: "Failed to refresh session" },
         { status: 500 },
       );
     }

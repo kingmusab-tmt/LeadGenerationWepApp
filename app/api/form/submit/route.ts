@@ -7,11 +7,16 @@ import { processLeadDistribution } from "@/lib/leadAssignmentService";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 import { sendNotification } from "@/lib/notificationService";
 import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
+import {
+  badRequest,
+  internalError,
+  methodNotAllowed,
+} from "@/lib/api/error-handler";
 
 interface Field {
   id: string;
   label: string;
-  value: any; // Allow any type of value
+  value: unknown;
 }
 
 interface RequestData {
@@ -107,10 +112,7 @@ function checkRateLimit(ip: string): boolean {
 export async function POST(request: Request) {
   // Ensure the request is a POST request
   if (request.method !== "POST") {
-    return NextResponse.json(
-      { success: false, message: "Method not allowed" },
-      { status: 405 },
-    );
+    return methodNotAllowed();
   }
 
   try {
@@ -126,13 +128,7 @@ export async function POST(request: Request) {
 
     // Check rate limit
     if (!checkRateLimit(clientIp)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Too many submissions. Please try again later.",
-        },
-        { status: 429 },
-      );
+      return badRequest("Too many submissions. Please try again later.");
     }
 
     // Honeypot check (if honeypot field has value, it's likely a bot)
@@ -152,21 +148,12 @@ export async function POST(request: Request) {
       if (timeDiff < 3000) {
         // Submitted in less than 3 seconds
         console.log("Form submitted too quickly - possible spam");
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Please take your time filling out the form.",
-          },
-          { status: 400 },
-        );
+        return badRequest("Please take your time filling out the form.");
       }
     }
 
     if (!data || !data.userId || !data.fields || !Array.isArray(data.fields)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid data structure." },
-        { status: 400 },
-      );
+      return badRequest("Invalid data structure.");
     }
 
     const formRecord =
@@ -174,8 +161,8 @@ export async function POST(request: Request) {
         ? ((await Form.findOne({ formId: data.formId })
             .select("_id userId recaptchaEnabled")
             .lean()) as {
-            _id: any;
-            userId: any;
+            _id: unknown;
+            userId: unknown;
             recaptchaEnabled?: boolean;
           } | null)
         : null;
@@ -189,13 +176,8 @@ export async function POST(request: Request) {
       const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
 
       if (!recaptchaSecret) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "reCAPTCHA is enabled for this form but not configured on the server.",
-          },
-          { status: 500 },
+        return internalError(
+          "reCAPTCHA is enabled for this form but not configured on the server.",
         );
       }
 
@@ -206,19 +188,15 @@ export async function POST(request: Request) {
       });
 
       if (!recaptchaResult.success) {
-        return NextResponse.json(
-          { success: false, message: recaptchaResult.message },
-          { status: 400 },
+        return badRequest(
+          recaptchaResult.message || "reCAPTCHA verification failed.",
         );
       }
     }
 
     // Validate fields
     if (data.fields.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "Form cannot be empty." },
-        { status: 400 },
-      );
+      return badRequest("Form cannot be empty.");
     }
 
     // Extract location data from fields if available
@@ -360,11 +338,26 @@ export async function POST(request: Request) {
           const seller = await User.findById(formOwnerId)
             .select("leadPricing")
             .lean();
-          const pricing = (seller as any)?.leadPricing || {
-            high: 10,
-            medium: 5,
-            low: 2,
-          };
+          const pricing =
+            seller && typeof seller === "object"
+              ? (
+                  seller as {
+                    leadPricing?: {
+                      high?: number;
+                      medium?: number;
+                      low?: number;
+                    };
+                  }
+                ).leadPricing || {
+                  high: 10,
+                  medium: 5,
+                  low: 2,
+                }
+              : {
+                  high: 10,
+                  medium: 5,
+                  low: 2,
+                };
           const unitPrice =
             qualityLevel === "High"
               ? pricing.high
@@ -522,17 +515,13 @@ export async function POST(request: Request) {
       success: true,
       message: "Thank you! Your information has been submitted successfully.",
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error capturing lead:", error);
 
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to capture lead.",
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred.",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Failed to capture lead. ${error.message}`
+        : "Failed to capture lead.",
     );
   }
 }

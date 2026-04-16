@@ -6,6 +6,12 @@ import { callSecurityMiddleware } from "@/lib/security/callSecurity";
 import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 /**
  * POST /api/calls/voicemail
@@ -37,16 +43,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (!callSid) {
-      return new NextResponse(JSON.stringify({ error: "Missing CallSid" }), {
-        status: 400,
-      });
+      return badRequest("Missing CallSid");
     }
 
     if (recordingStatus !== "completed") {
       debugLog("Voicemail recording not completed", { recordingStatus });
-      return new NextResponse(JSON.stringify({ status: "ignored" }), {
-        status: 200,
-      });
+      return NextResponse.json({ status: "ignored" }, { status: 200 });
     }
 
     // Update the call record with voicemail data
@@ -66,10 +68,7 @@ export async function POST(req: NextRequest) {
 
     if (!updatedCall) {
       debugLog("Call record not found for voicemail", { callSid }, "warn");
-      return new NextResponse(
-        JSON.stringify({ error: "Call record not found" }),
-        { status: 404 },
-      );
+      return notFound("Call record");
     }
 
     debugLog("Voicemail saved successfully", {
@@ -90,13 +89,10 @@ export async function POST(req: NextRequest) {
       recordingUrl: recordingUrl || "",
     });
 
-    return new NextResponse(JSON.stringify({ success: true }), { status: 200 });
+    return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     debugLog("Voicemail callback failed", { error }, "error");
-    return new NextResponse(
-      JSON.stringify({ error: "Voicemail processing failed" }),
-      { status: 500 },
-    );
+    return internalError("Voicemail processing failed");
   }
 }
 
@@ -108,9 +104,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-      });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -119,6 +113,10 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const listenedFilter = searchParams.get("listened"); // "true", "false", or null for all
+
+    if (Number.isNaN(page) || Number.isNaN(limit) || page < 1 || limit < 1) {
+      return badRequest("page and limit must be positive integers");
+    }
 
     const query: Record<string, unknown> = {
       userId: session.user.id,
@@ -153,10 +151,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     debugLog("Voicemail list failed", { error }, "error");
-    return new NextResponse(
-      JSON.stringify({ error: "Failed to fetch voicemails" }),
-      { status: 500 },
-    );
+    return internalError("Failed to fetch voicemails");
   }
 }
 
@@ -168,9 +163,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-      });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -179,9 +172,7 @@ export async function PATCH(req: NextRequest) {
     const { callId } = body;
 
     if (!callId) {
-      return new NextResponse(JSON.stringify({ error: "Missing callId" }), {
-        status: 400,
-      });
+      return badRequest("Missing callId");
     }
 
     const updatedCall = await Call.findOneAndUpdate(
@@ -194,18 +185,12 @@ export async function PATCH(req: NextRequest) {
     );
 
     if (!updatedCall) {
-      return new NextResponse(
-        JSON.stringify({ error: "Voicemail not found" }),
-        { status: 404 },
-      );
+      return notFound("Voicemail");
     }
 
     return NextResponse.json({ success: true, data: updatedCall });
   } catch (error) {
     debugLog("Voicemail mark listened failed", { error }, "error");
-    return new NextResponse(
-      JSON.stringify({ error: "Failed to update voicemail" }),
-      { status: 500 },
-    );
+    return internalError("Failed to update voicemail");
   }
 }

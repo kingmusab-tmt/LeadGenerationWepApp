@@ -18,7 +18,6 @@ import {
   Divider,
   Button,
   Skeleton,
-  Chip,
   Alert,
   Snackbar,
   Paper,
@@ -29,13 +28,13 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningIcon from "@mui/icons-material/Warning";
 import BusinessIcon from "@mui/icons-material/Business";
 import StorefrontIcon from "@mui/icons-material/Storefront";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks";
 
 interface Tier {
   discountPercentage: number;
   discountedPrice: string;
-  renewalPrice: any;
+  renewalPrice: string | number;
   annualPrice?: string;
   _id: string;
   id: string;
@@ -50,6 +49,15 @@ interface Tier {
   ctaText: string;
   order: number;
 }
+
+type TiersApiResponse = {
+  success?: boolean;
+  data?: {
+    tiers?: Tier[];
+    degraded?: boolean;
+  };
+  error?: string;
+};
 
 interface SubscriptionCheckResponse {
   isActive: boolean;
@@ -149,10 +157,23 @@ export default function PricingSection() {
 
         // Fetch pricing tiers for non-subscribed users, users with expiring subscriptions, or unauthenticated users
         const tiersResponse = await fetch("/api/tiers");
+        const tiersPayload: TiersApiResponse | Tier[] =
+          await tiersResponse.json();
+
         if (!tiersResponse.ok) {
-          throw new Error("Failed to fetch pricing tiers");
+          throw new Error(
+            !Array.isArray(tiersPayload) && tiersPayload.error
+              ? tiersPayload.error
+              : "Failed to fetch pricing tiers",
+          );
         }
-        const tiersData = await tiersResponse.json();
+
+        const tiersData = Array.isArray(tiersPayload)
+          ? tiersPayload
+          : Array.isArray(tiersPayload.data?.tiers)
+            ? tiersPayload.data.tiers
+            : [];
+
         setTiers(tiersData);
       } catch (err) {
         console.error("Error:", err);
@@ -163,7 +184,7 @@ export default function PricingSection() {
     };
 
     checkSubscriptionAndFetchTiers();
-  }, [currentUser]);
+  }, [currentUser, session?.user?.isSubActive]);
 
   // Handle redirect after component render
   useEffect(() => {
@@ -231,10 +252,11 @@ export default function PricingSection() {
         // Redirect to checkout for paid tiers
         router.push(`/checkout?plan=${tier._id}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error processing subscription:", err);
       // Only set generic error if it's not the specific trial error
-      if (!err.message?.includes("already used your free trial")) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (!errorMessage.includes("already used your free trial")) {
         setError(
           "Failed to process your request. Please try again or contact support.",
         );
@@ -458,8 +480,8 @@ export default function PricingSection() {
         {subscriptionInfo?.usedTrial && !isRenewing && (
           <Alert severity="info" sx={{ mb: 4, maxWidth: 600, mx: "auto" }}>
             <Typography variant="body2">
-              You've already used your free trial. Upgrade to a paid plan to
-              continue using our services.
+              You&apos;ve already used your free trial. Upgrade to a paid plan
+              to continue using our services.
             </Typography>
           </Alert>
         )}

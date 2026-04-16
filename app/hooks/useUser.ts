@@ -16,12 +16,71 @@ import {
 } from "@/lib/userSlice";
 
 /**
+ * Shape of user data returned from various API endpoints
+ * Handles multiple naming conventions
+ */
+interface UserApiResponse {
+  user?: {
+    id?: string;
+    _id?: string;
+    userId?: string;
+    uid?: string;
+    name?: string;
+    fullName?: string;
+    email?: string;
+    mail?: string;
+    image?: string;
+    avatar?: string;
+    role?: string;
+    userRole?: string;
+    mobile?: string;
+    phone?: string;
+    mobileNumber?: string;
+    businessName?: string;
+    businessEmail?: string;
+    businessPhone?: string;
+    businessWebsite?: string;
+    companyDescription?: string;
+    industryNiche?: string;
+    businessAddress?: Record<string, unknown>;
+    isSubActive?: boolean;
+    isSubscriptionActive?: boolean;
+  };
+  id?: string;
+  _id?: string;
+  userId?: string;
+  uid?: string;
+  name?: string;
+  fullName?: string;
+  email?: string;
+  mail?: string;
+  image?: string;
+  avatar?: string;
+  role?: string;
+  userRole?: string;
+  mobile?: string;
+  phone?: string;
+  mobileNumber?: string;
+  businessName?: string;
+  businessEmail?: string;
+  businessPhone?: string;
+  businessWebsite?: string;
+  companyDescription?: string;
+  industryNiche?: string;
+  businessAddress?: Record<string, unknown>;
+  isSubActive?: boolean;
+  isSubscriptionActive?: boolean;
+}
+
+/**
  * Normalizes various API response formats into consistent User object
  * Handles multiple naming conventions from different API endpoints
  * @param data Raw API response data
  * @returns Normalized User object
  */
-export const normalizeUser = (data: any): User => {
+export const normalizeUser = (
+  data: UserApiResponse | null | undefined,
+): User => {
   const raw = data?.user ?? data;
   if (!raw) {
     return {};
@@ -88,11 +147,22 @@ export const useInitializeUser = () => {
       dispatch(setUserLoading(true));
 
       try {
-        const response = await axios.get("/api/users");
+        const response = await axios.get(
+          "/api/users",
+          force
+            ? {
+                params: { _t: Date.now() },
+                headers: {
+                  "Cache-Control": "no-cache",
+                  Pragma: "no-cache",
+                },
+              }
+            : undefined,
+        );
         const normalized = normalizeUser(response.data);
         dispatch(setUser(normalized));
         return normalized;
-      } catch (error: any) {
+      } catch (error) {
         dispatch(setUserError("Failed to load user"));
         if (axios.isAxiosError(error) && error.response?.status === 401) {
           dispatch(clearUser());

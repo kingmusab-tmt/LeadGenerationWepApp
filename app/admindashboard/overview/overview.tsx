@@ -126,12 +126,12 @@ const initialOverviewData = {
 
 // Compute percentage change between two most recent months
 const computeTrend = (
-  data: { month: string; [key: string]: any }[],
+  data: Array<Record<string, string | number>>,
   valueKey: string,
 ): number => {
   if (!data || data.length < 2) return 0;
-  const current = data[data.length - 1]?.[valueKey] ?? 0;
-  const previous = data[data.length - 2]?.[valueKey] ?? 0;
+  const current = Number(data[data.length - 1]?.[valueKey] ?? 0);
+  const previous = Number(data[data.length - 2]?.[valueKey] ?? 0);
   if (previous === 0) return current > 0 ? 100 : 0;
   return Math.round(((current - previous) / previous) * 100);
 };

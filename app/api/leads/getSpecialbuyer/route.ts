@@ -5,36 +5,32 @@ import dbConnect from "@/lib/connectdb";
 import { Buyer } from "@/models/leadbuyers";
 import { authOptions } from "@/auth";
 import mongoose from "mongoose";
+import {
+  internalError,
+  methodNotAllowed,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function GET(req: NextRequest) {
   // Ensure the request is a GET request
   if (req.method !== "GET") {
-    return NextResponse.json(
-      { message: "Method not allowed" },
-      { status: 405 }
-    );
+    return methodNotAllowed();
   }
   // Ensure the user is authenticated and has the role of "seller"
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "seller") {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return unauthorized("Authentication required");
   }
 
   try {
     // Connect to the database
     await dbConnect();
 
-    // Get user session
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "seller") {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(req.url);
     const preferredMethod = searchParams.get("preferredMethod");
 
     // Create filter object
-    const filter: any = {
+    const filter: Record<string, unknown> = {
       registeredWith: new mongoose.Types.ObjectId(session.user.id),
     };
 
@@ -49,9 +45,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(filteredBuyers, { status: 200 });
   } catch (error) {
     console.error("Error fetching lead buyers:", error);
-    return NextResponse.json(
-      { message: "Failed to fetch lead buyers" },
-      { status: 500 }
-    );
+    return internalError("Failed to fetch lead buyers");
   }
 }

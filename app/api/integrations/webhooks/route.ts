@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
-import { WebhookConfig, IWebhookConfig } from "@/models/webhookConfig";
+import { WebhookConfig } from "@/models/webhookConfig";
 import { encryptData } from "@/lib/encryption";
 import crypto from "crypto";
 import { z } from "zod";
@@ -18,6 +18,11 @@ import {
   checkAndIncrementUsage,
   checkFeatureAccess,
 } from "@/lib/subscriptionLimitsService";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -59,10 +64,21 @@ const createWebhookSchema = z.object({
 async function getAuthenticatedUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
-    return { error: "Unauthorized", status: 401 };
+    return { error: unauthorized("Authentication required"), status: 401 };
   }
   return { user: session.user };
 }
+
+type AuthenticatedWebhookUser = {
+  _id?: { toString(): string } | string;
+  id?: string;
+};
+
+type WebhookDocWithStats = {
+  toObject(): Record<string, unknown>;
+  getSuccessRate?: () => number;
+  isHealthy?: () => boolean;
+};
 
 /**
  * GET /api/integrations/webhooks
@@ -87,15 +103,13 @@ export async function GET(req: NextRequest) {
     const isActive = searchParams.get("isActive");
 
     if (page < 1 || limit < 1 || limit > 100) {
-      return NextResponse.json(
-        { error: "Invalid pagination parameters" },
-        { status: 400 },
-      );
+      return badRequest("Invalid pagination parameters");
     }
 
     // Build filter query
+    const authenticatedUser = authResult.user as AuthenticatedWebhookUser;
     const filter: Record<string, unknown> = {
-      userId: (authResult.user as any)._id,
+      userId: authenticatedUser._id,
     };
 
     if (source) {
@@ -117,12 +131,13 @@ export async function GET(req: NextRequest) {
     const total = await WebhookConfig.countDocuments(filter);
 
     // Add computed fields
-    const webhooksWithStats = webhooks.map((webhook: any) => {
-      const webhookObj = webhook.toObject();
+    const webhooksWithStats = webhooks.map((webhook) => {
+      const webhookRecord = webhook as WebhookDocWithStats;
+      const webhookObj = webhookRecord.toObject();
       return {
         ...webhookObj,
-        successRate: (webhook as any).getSuccessRate?.() || 0,
-        isHealthy: (webhook as any).isHealthy?.() || false,
+        successRate: webhookRecord.getSuccessRate?.() || 0,
+        isHealthy: webhookRecord.isHealthy?.() || false,
       };
     });
 
@@ -138,10 +153,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching webhooks:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch webhooks" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch webhooks");
   }
 }
 
@@ -155,10 +167,7 @@ export async function POST(req: NextRequest) {
   try {
     const authResult = await getAuthenticatedUser();
     if (authResult.error) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status },
-      );
+      return authResult.error;
     }
 
     // Parse and validate request body
@@ -169,13 +178,7 @@ export async function POST(req: NextRequest) {
       validatedData = createWebhookSchema.parse(body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return NextResponse.json(
-          {
-            error: "Validation failed",
-            details: error.issues,
-          },
-          { status: 400 },
-        );
+        return badRequest("Validation failed", { details: error.issues });
       }
       throw error;
     }
@@ -185,36 +188,28 @@ export async function POST(req: NextRequest) {
       (v) => v === true,
     );
     if (!hasEnabledEvent) {
-      return NextResponse.json(
-        { error: "At least one event must be enabled" },
-        { status: 400 },
-      );
+      return badRequest("At least one event must be enabled");
     }
 
     // Check subscription limit for webhooks
+    const authenticatedUser = authResult.user as AuthenticatedWebhookUser;
     const userId =
-      (authResult.user as any)._id?.toString() || (authResult.user as any).id;
+      typeof authenticatedUser._id === "string"
+        ? authenticatedUser._id
+        : authenticatedUser._id?.toString() || authenticatedUser.id || "";
 
     // Check webhookIntegration feature access
     const featureCheck = await checkFeatureAccess(userId, "webhookIntegration");
     if (!featureCheck.allowed) {
-      return NextResponse.json(
-        {
-          error:
-            "Webhook integration is not available on your current plan. Please upgrade to access this feature.",
-        },
-        { status: 403 },
+      return badRequest(
+        "Webhook integration is not available on your current plan. Please upgrade to access this feature.",
       );
     }
 
     const usageCheck = await checkAndIncrementUsage(userId, "maxWebhooks", 1);
     if (!usageCheck.allowed) {
-      return NextResponse.json(
-        {
-          error:
-            usageCheck.message || "Webhook limit reached for your subscription",
-        },
-        { status: 403 },
+      return badRequest(
+        usageCheck.message || "Webhook limit reached for your subscription",
       );
     }
 
@@ -226,7 +221,10 @@ export async function POST(req: NextRequest) {
 
     // Create webhook
     const webhook = new WebhookConfig({
-      userId: (authResult.user as any)._id,
+      userId:
+        typeof authenticatedUser._id === "string"
+          ? authenticatedUser._id
+          : authenticatedUser._id,
       name: validatedData.name,
       description: validatedData.description,
       url: validatedData.url,

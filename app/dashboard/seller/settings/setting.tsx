@@ -37,14 +37,14 @@ import APISettingsPage from "./apisetting/page";
 import SubscriptionManagement from "./subscription/SubscriptionManagement";
 import ChangePlanModal from "./subscription/ChangePlanModal";
 import dynamic from "next/dynamic";
-import { useInitializeUser, useAppDispatch } from "@/lib/hooks";
+import { useInitializeUser, useAppDispatch } from "@/app/hooks";
 
 const PaymentMethodsManager = dynamic(
   () => import("./subscription/PaymentMethodsManager"),
   { ssr: false },
 );
 import { updateUser } from "@/lib/userSlice";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 
 // Interface for the minimal user data needed
 interface BasicUserInfo {
@@ -71,6 +71,7 @@ interface BasicUserInfo {
 
 interface ApiError {
   message: string;
+  error?: string;
   errors?: string[];
   status: number;
   success: boolean;
@@ -285,20 +286,41 @@ const AccountSettings = () => {
     clearFieldErrors();
 
     try {
-      // Create payload with only the allowed fields
-      const updatePayload: UpdateUserPayload = {
-        name: editableUser.name,
-        mobileNumber: editableUser.mobileNumber,
-        businessName: editableUser.businessName,
-        businessEmail: editableUser.businessEmail,
-        businessPhone: editableUser.businessPhone,
-        businessWebsite: editableUser.businessWebsite,
-        companyDescription: editableUser.companyDescription,
-        industryNiche: editableUser.industryNiche,
-        businessAddress: editableUser.businessAddress,
+      const toOptional = (value?: string) => {
+        if (typeof value !== "string") return value;
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
       };
 
-      // Remove undefined fields
+      const sanitizedAddress = editableUser.businessAddress
+        ? {
+            addressLine1: toOptional(editableUser.businessAddress.addressLine1),
+            addressLine2: toOptional(editableUser.businessAddress.addressLine2),
+            city: toOptional(editableUser.businessAddress.city),
+            state: toOptional(editableUser.businessAddress.state),
+            country: toOptional(editableUser.businessAddress.country),
+            postCode: toOptional(editableUser.businessAddress.postCode),
+          }
+        : undefined;
+
+      const hasAddressValues = Boolean(
+        sanitizedAddress && Object.values(sanitizedAddress).some(Boolean),
+      );
+
+      // Create payload with only allowed, non-empty fields
+      const updatePayload: UpdateUserPayload = {
+        name: toOptional(editableUser.name),
+        mobileNumber: toOptional(editableUser.mobileNumber),
+        businessName: toOptional(editableUser.businessName),
+        businessEmail: toOptional(editableUser.businessEmail),
+        businessPhone: toOptional(editableUser.businessPhone),
+        businessWebsite: toOptional(editableUser.businessWebsite),
+        companyDescription: toOptional(editableUser.companyDescription),
+        industryNiche: toOptional(editableUser.industryNiche),
+        businessAddress: hasAddressValues ? sanitizedAddress : undefined,
+      };
+
+      // Remove undefined keys
       Object.keys(updatePayload).forEach((key) => {
         if (updatePayload[key as keyof UpdateUserPayload] === undefined) {
           delete updatePayload[key as keyof UpdateUserPayload];
@@ -316,7 +338,9 @@ const AccountSettings = () => {
 
       if (response.data.success) {
         showSnackbar(
-          response.data.message || "Profile updated successfully!",
+          response.data.data?.message ||
+            response.data.message ||
+            "Profile updated successfully!",
           "success",
         );
 
@@ -335,9 +359,30 @@ const AccountSettings = () => {
           }),
         );
 
-        // Update local state with any sanitized data from the response if needed
-        // Note: The API doesn't return the updated user, so we assume our local state is correct
-        // If you want to be safe, you could refetch the user data here
+        const latest = await refreshUser(true);
+        if (latest) {
+          setEditableUser({
+            _id: latest.id || "",
+            name: latest.name || "",
+            email: latest.email || "",
+            mobileNumber: latest.mobileNumber || latest.mobile || "",
+            businessName: latest.businessName || "",
+            businessEmail: latest.businessEmail || "",
+            businessPhone: latest.businessPhone || "",
+            businessWebsite: latest.businessWebsite || "",
+            companyDescription: latest.companyDescription || "",
+            industryNiche: latest.industryNiche || "",
+            businessAddress: {
+              addressLine1: latest.businessAddress?.addressLine1 || "",
+              addressLine2: latest.businessAddress?.addressLine2 || "",
+              city: latest.businessAddress?.city || "",
+              state: latest.businessAddress?.state || "",
+              country: latest.businessAddress?.country || "",
+              postCode: latest.businessAddress?.postCode || "",
+            },
+            image: latest.image || "",
+          });
+        }
       } else {
         // Handle API response that indicates failure but didn't throw error
         showSnackbar(
@@ -356,7 +401,10 @@ const AccountSettings = () => {
         const errorData: ApiError = error.response.data;
 
         // Show main error message
-        showSnackbar(errorData.message || "Failed to update profile", "error");
+        showSnackbar(
+          errorData.message || errorData.error || "Failed to update profile",
+          "error",
+        );
 
         // Extract and set field-specific errors
         if (errorData.errors && errorData.errors.length > 0) {

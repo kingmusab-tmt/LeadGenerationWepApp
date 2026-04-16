@@ -5,10 +5,12 @@
  * Date: January 21, 2026
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import WebhookConfig from "@/models/webhookConfig";
+import { internalError, unauthorized } from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -16,26 +18,24 @@ export const dynamic = "force-dynamic";
  * GET /api/integrations/stats/count
  * Get count of active integrations
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   await dbConnect();
 
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const count = await WebhookConfig.countDocuments({
+      userId: session.user.id,
       isActive: true,
     });
 
     return NextResponse.json({ count });
   } catch (error) {
     console.error("Error getting integration count:", error);
-    return NextResponse.json(
-      { error: "Failed to get integration count" },
-      { status: 500 },
-    );
+    return internalError("Failed to get integration count");
   }
 }

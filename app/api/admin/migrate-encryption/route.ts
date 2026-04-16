@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     for (const user of usersWithCreditSetup) {
       try {
-        const updates: any = {};
+        const updates: Record<string, string> = {};
         let needsUpdate = false;
 
         // Migrate stripeSecretKey if it exists and doesn't have new format

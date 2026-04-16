@@ -5,7 +5,7 @@ import mongoose from "mongoose";
  * Handles all subscription-related user data
  */
 export interface ISubscription {
-  subscriptionTierId: string;
+  subscriptionTierId: mongoose.Types.ObjectId | string | null;
   subscriptionTierType: "free" | "paid"; // Subscription tier type (free or paid)
   subscriptionTierUserType: "seller" | "business"; // User type for the subscription tier
   subscriptionPlan: string; // Subscription plan name

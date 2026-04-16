@@ -21,7 +21,6 @@ import {
   Collapse,
   Divider,
   useTheme,
-  useMediaQuery,
 } from "@mui/material";
 import {
   Dashboard,
@@ -42,20 +41,19 @@ import {
   AccountBalanceWallet,
   Email,
   Sms,
-  ViewList,
   Extension,
 } from "@mui/icons-material";
 import { useRouter, usePathname } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import InactivityLogout from "@/app/components/generalComponent/InactivityLogout";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import { useSession } from "next-auth/react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import { isSellerOnboardingFlowComplete } from "@/lib/sellerOnboarding";
 import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
 
 interface UserDashboardProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const DRAWER_WIDTH = 260;
@@ -151,7 +149,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   useDashboardReducers();
   const { currentUser, loading: userLoading } = useInitializeUser();
   const { status } = useSession();
-  const { limits } = useSubscriptionLimits();
+  const { limits, isTrial, loading: limitsLoading } = useSubscriptionLimits();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([
     "lead_management",
@@ -160,7 +158,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const [loading, setLoading] = useState(false);
 
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const router = useRouter();
   const pathname = usePathname();
 
@@ -177,31 +174,54 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   }, [userLoading, currentUser, status, router]);
 
   useEffect(() => {
-    if (status === "loading" || userLoading || !currentUser) return;
+    if (status === "loading" || userLoading || limitsLoading || !currentUser)
+      return;
 
     const isSellerRole =
       currentUser.role === "seller" || currentUser.role === "business-admin";
-    if (!isSellerRole) return;
+    if (!isSellerRole) {
+      if (currentUser.role === "admin") {
+        router.replace("/admindashboard/overview");
+      } else if (currentUser.role === "buyer" || currentUser.role === "staff") {
+        router.replace("/dashboard/buyer/overview");
+      } else {
+        router.replace("/completeregistration");
+      }
+      return;
+    }
 
     const onboardingFlowComplete = isSellerOnboardingFlowComplete(
       currentUser.email,
     );
 
-    if (!onboardingFlowComplete) {
+    // Only enforce onboarding from the seller dashboard root.
+    // Do not interrupt navigation to nested dashboard pages.
+    if (
+      pathname === "/dashboard/seller" &&
+      !isTrial &&
+      !onboardingFlowComplete
+    ) {
       router.replace("/seller-onboarding");
     }
-  }, [status, userLoading, currentUser, pathname, router]);
+  }, [
+    status,
+    userLoading,
+    limitsLoading,
+    currentUser,
+    pathname,
+    isTrial,
+    router,
+  ]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
   const handleNavigation = (path: string) => {
+    const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
     setLoading(true);
-    router.push(`/dashboard/seller/${path}`);
-    if (isMobile) {
-      setMobileOpen(false);
-    }
+    router.push(`/dashboard/seller/${normalizedPath}`);
+    setMobileOpen(false);
     setTimeout(() => setLoading(false), 500);
   };
 
@@ -247,14 +267,23 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     if (!limits) return true;
     if (
       item.path === "email-campaigns" &&
+      !isTrial &&
       limits.emailCampaignsEnabled === false
     ) {
       return false;
     }
-    if (item.path === "sms-campaigns" && limits.smsCampaignsEnabled === false) {
+    if (
+      item.path === "sms-campaigns" &&
+      !isTrial &&
+      limits.smsCampaignsEnabled === false
+    ) {
       return false;
     }
-    if (item.path === "integrations" && limits.zapierIntegration === false) {
+    if (
+      item.path === "integrations" &&
+      !isTrial &&
+      limits.zapierIntegration === false
+    ) {
       return false;
     }
     return true;
@@ -271,21 +300,19 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       }}
     >
       {/* Mobile close control */}
-      {isMobile && (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "flex-end",
-            p: 1,
-            borderBottom: 1,
-            borderColor: "divider",
-          }}
-        >
-          <IconButton onClick={handleDrawerToggle} edge="end">
-            <Close />
-          </IconButton>
-        </Box>
-      )}
+      <Box
+        sx={{
+          display: { xs: "flex", md: "none" },
+          justifyContent: "flex-end",
+          p: 1,
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
+      >
+        <IconButton onClick={handleDrawerToggle} edge="end">
+          <Close />
+        </IconButton>
+      </Box>
 
       {/* Main Navigation */}
       <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>

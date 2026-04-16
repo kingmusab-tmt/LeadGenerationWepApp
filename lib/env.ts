@@ -2,34 +2,71 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  TWILIO_ACCOUNT_SID: z.string(),
-  TWILIO_AUTH_TOKEN: z.string(),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
+
+  // Core auth/session
+  NEXTAUTH_URL: z.string().url(),
+  AUTH_SECRET: z.string().min(1),
+  AUTH_GOOGLE_ID: z.string().min(1),
+  AUTH_GOOGLE_SECRET: z.string().min(1),
+
+  // Database/cache
+  MONGODB_URI: z.string().min(1),
+  REDIS_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
-  NEXTAUTH_URL: z.string().url(),
-  AUTH_SECRET: z.string(),
-  AUTH_GOOGLE_ID: z.string(),
-  AUTH_GOOGLE_SECRET: z.string(),
-  EMAIL_FROM: z.string(),
-  EMAIL_SERVER_USER: z.string(),
-  ENCRYPTION_KEY: z.string(),
-  ENCRYPTION_IV: z.string(),
-  EMAIL_SERVER: z.string(),
-  EMAIL_PASSWORD: z.string(),
-  EMAIL_PORT: z.number(),
-  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string(),
-  VAPID_EMAIL: z.string().email(),
-  NEXT_PUBLIC_VT_TOKEN: z.string(),
-  NEXT_PUBLIC_DOMAIN: z.string(),
-  NEXT_SECRET_VT_SECRET: z.string(),
-  NEXT_HTTPS: z.boolean(),
-  MONGODB_URI: z.string(),
-  VAPID_PRIVATE_KEY: z.string(),
+
+  // Twilio
+  TWILIO_ACCOUNT_SID: z.string(),
+  TWILIO_AUTH_TOKEN: z.string(),
   TWILIO_PHONE_NUMBER: z.string(),
-  STRIPE_WEBHOOK_SECRET: z.string(),
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string(),
-  STRIPE_SECRET_KEY: z.string(),
+  TWILIO_FROM_NUMBER: z.string().optional(),
+
+  // Email
+  EMAIL_FROM_NAME: z.string().optional(),
+  EMAIL_FROM: z.string().email(),
+  EMAIL_SERVER: z.string().optional(),
+  EMAIL_SERVER_HOST: z.string().optional(),
+  EMAIL_SERVER_USER: z.string().optional(),
+  EMAIL_PASSWORD: z.string().optional(),
+  EMAIL_SERVER_PASSWORD: z.string().optional(),
+  EMAIL_PORT: z.coerce.number().int().positive().default(465),
+
+  // Security/crypto
+  ENCRYPTION_KEY: z.string().min(1),
+  ENCRYPTION_IV: z.string().min(1),
+
+  // Push/web
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().min(1),
+  VAPID_PRIVATE_KEY: z.string().min(1),
+  VAPID_EMAIL: z.string().email(),
+  NEXT_PUBLIC_DOMAIN: z.string().min(1),
+  NEXT_PUBLIC_BASE_URL: z.string().url().optional(),
+
+  // Stripe
+  STRIPE_WEBHOOK_SECRET: z.string().min(1),
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().min(1),
+  STRIPE_SECRET_KEY: z.string().min(1),
+
+  // AI/integrations
+  GEMINI_API_KEY: z.string().optional(),
+  GOOGLE_AI_STUDIO_KEY: z.string().optional(),
+  API_BASE_URL: z.string().url().optional(),
+
+  // Frontend public keys
+  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
+  NEXT_PUBLIC_TAWKPROPERTYID: z.string().optional(),
+  NEXT_PUBLIC_TAWKWIDGETID: z.string().optional(),
+
+  // Legacy VT flags still used in some views
+  NEXT_PUBLIC_VT_TOKEN: z.string().optional(),
+  NEXT_SECRET_VT_SECRET: z.string().optional(),
+  NEXT_HTTPS: z.coerce.boolean().default(false),
+
   NEXT_PUBLIC_RECAPTCHA_SITE_KEY: z.string().optional(),
   RECAPTCHA_SECRET_KEY: z.string().optional(),
 });
+
 export const env = envSchema.parse(process.env);

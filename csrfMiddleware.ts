@@ -16,6 +16,7 @@ const SAFE_METHODS = ["GET", "HEAD", "OPTIONS"];
 // Routes that should skip CSRF validation
 const CSRF_EXEMPT_ROUTES = [
   "/api/auth", // NextAuth routes handle their own CSRF
+  "/api/csrf-token", // Token mint/refresh endpoint
   "/api/webhooks", // Webhook endpoints (use signatures instead)
   "/api/health", // Health check endpoints
 ];
@@ -40,28 +41,37 @@ export async function csrfMiddleware(request: NextRequest) {
     secret: process.env.AUTH_SECRET,
   });
 
-  if (!token || !token.email) {
-    // No authenticated user - skip CSRF (handled by auth middleware)
-    return NextResponse.next();
-  }
+  const clientIp =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "public";
+  const identifier = (token?.email as string) || clientIp;
 
-  // Extract CSRF token from headers or body
+  // Extract CSRF token from headers + cookie for double-submit check
   const csrfToken =
     request.headers.get("x-csrf-token") || request.headers.get("X-CSRF-Token");
+  const cookieToken = request.cookies.get("csrfToken")?.value;
 
-  if (!csrfToken) {
+  if (!csrfToken || !cookieToken) {
     console.warn(
-      `[CSRF] Missing token for ${method} ${pathname} by ${token.email}`,
+      `[CSRF] Missing token for ${method} ${pathname} by ${identifier}`,
     );
     return NextResponse.json({ error: "CSRF token missing" }, { status: 403 });
   }
 
+  if (csrfToken !== cookieToken) {
+    console.warn(
+      `[CSRF] Header/cookie token mismatch for ${method} ${pathname} by ${identifier}`,
+    );
+    return NextResponse.json({ error: "Invalid CSRF token" }, { status: 403 });
+  }
+
   // Verify CSRF token
-  const isValid = verifyCSRFToken(csrfToken, token.email as string);
+  const isValid = verifyCSRFToken(csrfToken, identifier);
 
   if (!isValid) {
     console.warn(
-      `[CSRF] Invalid token for ${method} ${pathname} by ${token.email}`,
+      `[CSRF] Invalid token for ${method} ${pathname} by ${identifier}`,
     );
     return NextResponse.json({ error: "Invalid CSRF token" }, { status: 403 });
   }

@@ -6,7 +6,10 @@
 
 import { User, IUser } from "@/models";
 import dbConnect from "@/lib/connectdb";
-import { ISubscriptionLimits } from "@/models/types/subscription";
+import {
+  ISubscriptionLimits,
+  ISubscriptionUsage,
+} from "@/models/types/subscription";
 import { sendNotification } from "@/lib/notificationService";
 
 // Session tracking interface
@@ -80,11 +83,37 @@ export const USAGE_TO_LIMIT_MAP: Record<string, keyof ISubscriptionLimits> = {
   buyers: "buyers",
   maxWebhooks: "maxWebhooks",
   smsCampaigns: "smsCampaignsPerMonth",
+  smsCampaignsPerMonth: "smsCampaignsPerMonth",
   invoices: "invoicesPerMonth",
+  invoicesPerMonth: "invoicesPerMonth",
   workflowExecutions: "automationWorkflows",
+  automationWorkflows: "automationWorkflows",
   teamMembersCount: "teamMembers",
   activeSessions: "maxConcurrentSessions",
 };
+
+const USAGE_TO_TRACKING_MAP: Record<string, string> = {
+  leads: "leads",
+  callSeconds: "callSeconds",
+  forms: "forms",
+  buyers: "buyers",
+  maxWebhooks: "maxWebhooks",
+  smsCampaigns: "smsCampaigns",
+  smsCampaignsPerMonth: "smsCampaigns",
+  invoices: "invoices",
+  invoicesPerMonth: "invoices",
+  workflowExecutions: "workflowExecutions",
+  automationWorkflows: "workflowExecutions",
+  teamMembersCount: "teamMembersCount",
+  activeSessions: "activeSessions",
+};
+
+function resolveUsageField(usageKey: string): string {
+  if (usageKey === "maxWebhooks") {
+    return usageKey;
+  }
+  return USAGE_TO_TRACKING_MAP[usageKey] || usageKey;
+}
 
 // Notification message templates
 const NOTIFICATION_MESSAGES = {
@@ -104,9 +133,13 @@ const RESOURCE_DISPLAY_NAMES: Record<string, string> = {
   callSeconds: "call minutes",
   forms: "forms",
   buyers: "buyers",
+  maxWebhooks: "webhooks",
   smsCampaigns: "SMS campaigns",
+  smsCampaignsPerMonth: "SMS campaigns",
   invoices: "invoices",
+  invoicesPerMonth: "invoices",
   workflowExecutions: "automation workflows",
+  automationWorkflows: "automation workflows",
   teamMembersCount: "team members",
   activeSessions: "concurrent sessions",
 };
@@ -133,9 +166,11 @@ export async function checkNumericLimit(
 
   const limit =
     (user.subscription?.subscriptionLimits?.[limitKey] as number) ?? 0;
+  const usageField = resolveUsageField(usageKey);
   const subscriptionUsage = user.subscription?.subscriptionUsage;
   const usage = subscriptionUsage
-    ? ((subscriptionUsage as unknown as Record<string, number>)[usageKey] ?? 0)
+    ? ((subscriptionUsage as unknown as Record<string, number>)[usageField] ??
+      0)
     : 0;
 
   // 0 means unlimited
@@ -189,12 +224,12 @@ export async function checkFeatureAccess(
  */
 export async function incrementUsage(
   userId: string,
-  usageKey: string,
+  usageField: string,
   amount: number = 1,
 ): Promise<boolean> {
   await dbConnect();
 
-  const updatePath = `subscription.subscriptionUsage.${usageKey}`;
+  const updatePath = `subscription.subscriptionUsage.${usageField}`;
   const result = await User.findByIdAndUpdate(userId, {
     $inc: { [updatePath]: amount },
   });
@@ -252,15 +287,17 @@ export async function checkAndIncrementUsage(
 
   const limit =
     (user.subscription?.subscriptionLimits?.[limitKey] as number) ?? 0;
+  const usageField = resolveUsageField(usageKey);
   const subscriptionUsage = user.subscription?.subscriptionUsage;
   const currentUsage = subscriptionUsage
-    ? ((subscriptionUsage as unknown as Record<string, number>)[usageKey] ?? 0)
+    ? ((subscriptionUsage as unknown as Record<string, number>)[usageField] ??
+      0)
     : 0;
 
   // 0 means unlimited
   if (limit === 0) {
     // Increment usage (for tracking purposes)
-    await incrementUsage(userId, usageKey, amount);
+    await incrementUsage(userId, usageField, amount);
     return {
       success: true,
       allowed: true,
@@ -309,7 +346,7 @@ export async function checkAndIncrementUsage(
   }
 
   // Increment the usage
-  const incrementResult = await incrementUsage(userId, usageKey, amount);
+  const incrementResult = await incrementUsage(userId, usageField, amount);
   if (!incrementResult) {
     return {
       success: false,
@@ -478,6 +515,7 @@ export async function getUsageWarnings(userId: string): Promise<
     level: "warning" | "critical" | "exceeded";
     message: string;
   }[] = [];
+  const processedUsageFields = new Set<string>();
 
   const limits = user.subscription?.subscriptionLimits;
   const usage = user.subscription?.subscriptionUsage;
@@ -487,11 +525,17 @@ export async function getUsageWarnings(userId: string): Promise<
   }
 
   for (const [usageKey, limitKey] of Object.entries(USAGE_TO_LIMIT_MAP)) {
+    const usageField = resolveUsageField(usageKey);
+    if (processedUsageFields.has(usageField)) {
+      continue;
+    }
+    processedUsageFields.add(usageField);
+
     const limit = (limits as unknown as Record<string, number>)[limitKey] ?? 0;
     if (limit === 0) continue; // Skip unlimited
 
     const currentUsage =
-      (usage as unknown as Record<string, number>)[usageKey] ?? 0;
+      (usage as unknown as Record<string, number>)[usageField] ?? 0;
     const percentage = Math.round((currentUsage / limit) * 100);
 
     if (percentage >= 100) {
@@ -554,9 +598,11 @@ export async function canPerformAction(
 
   const limit =
     (user.subscription?.subscriptionLimits?.[limitKey] as number) ?? 0;
+  const usageField = resolveUsageField(usageKey);
   const subscriptionUsage = user.subscription?.subscriptionUsage;
   const currentUsage = subscriptionUsage
-    ? ((subscriptionUsage as unknown as Record<string, number>)[usageKey] ?? 0)
+    ? ((subscriptionUsage as unknown as Record<string, number>)[usageField] ??
+      0)
     : 0;
 
   // 0 means unlimited

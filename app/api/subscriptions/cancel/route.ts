@@ -7,17 +7,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
+import {
   cancelSubscriptionWithFeedback,
   reactivateSubscription,
   getSubscriptionDetails,
 } from "@/lib/stripeSubscriptionService";
 import {
-  CancellationFeedback,
   CANCELLATION_REASONS,
   CancellationReason,
 } from "@/models/cancellationFeedback";
 import connectDB from "@/lib/connectdb";
 import { User } from "@/models/userModel";
+
+type StripeSubscriptionLike = {
+  status?: string;
+  current_period_end?: number;
+  cancel_at_period_end?: boolean;
+};
 
 /**
  * GET /api/subscriptions/cancel
@@ -28,10 +39,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await connectDB();
@@ -39,10 +47,7 @@ export async function GET() {
     const user = await User.findById(session.user.id).select("subscription");
 
     if (!user) {
-      return NextResponse.json(
-        { success: false, message: "User not found" },
-        { status: 404 },
-      );
+      return notFound("User");
     }
 
     const subscription = user.subscription;
@@ -54,13 +59,16 @@ export async function GET() {
     if (subscription?.stripeSubscriptionId) {
       const result = await getSubscriptionDetails(session.user.id);
       if (result.success) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sub = result.subscription as any;
-        stripeDetails = {
-          status: sub.status,
-          currentPeriodEnd: new Date(sub.current_period_end * 1000),
-          cancelAtPeriodEnd: sub.cancel_at_period_end,
-        };
+        const sub = result.subscription as StripeSubscriptionLike | undefined;
+        if (sub) {
+          stripeDetails = {
+            status: sub.status,
+            currentPeriodEnd: sub.current_period_end
+              ? new Date(sub.current_period_end * 1000)
+              : null,
+            cancelAtPeriodEnd: sub.cancel_at_period_end,
+          };
+        }
       }
     }
 
@@ -79,10 +87,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error("[CancelAPI] GET error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to get cancellation status" },
-      { status: 500 },
-    );
+    return internalError("Failed to get cancellation status");
   }
 }
 
@@ -102,10 +107,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     const body = await request.json();
@@ -121,24 +123,14 @@ export async function POST(request: NextRequest) {
 
     // Validate reason if provided
     if (reason && !CANCELLATION_REASONS.includes(reason)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Invalid cancellation reason. Must be one of: ${CANCELLATION_REASONS.join(", ")}`,
-        },
-        { status: 400 },
+      return badRequest(
+        `Invalid cancellation reason. Must be one of: ${CANCELLATION_REASONS.join(", ")}`,
       );
     }
 
     // Validate cancelAt
     if (cancelAt !== "now" && cancelAt !== "period_end") {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "cancelAt must be 'now' or 'period_end'",
-        },
-        { status: 400 },
-      );
+      return badRequest("cancelAt must be 'now' or 'period_end'");
     }
 
     const cancelImmediately = cancelAt === "now";
@@ -150,7 +142,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success) {
-      return NextResponse.json(result, { status: 400 });
+      return badRequest(result.message || "Failed to cancel subscription");
     }
 
     return NextResponse.json({
@@ -162,10 +154,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[CancelAPI] POST error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to cancel subscription" },
-      { status: 500 },
-    );
+    return internalError("Failed to cancel subscription");
   }
 }
 
@@ -178,16 +167,13 @@ export async function PUT() {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     const result = await reactivateSubscription(session.user.id);
 
     if (!result.success) {
-      return NextResponse.json(result, { status: 400 });
+      return badRequest(result.message || "Failed to reactivate subscription");
     }
 
     return NextResponse.json({
@@ -197,9 +183,6 @@ export async function PUT() {
     });
   } catch (error) {
     console.error("[CancelAPI] PUT error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to reactivate subscription" },
-      { status: 500 },
-    );
+    return internalError("Failed to reactivate subscription");
   }
 }

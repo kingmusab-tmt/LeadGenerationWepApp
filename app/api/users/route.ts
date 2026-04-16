@@ -5,15 +5,17 @@ import { User } from "@/models";
 import { NextRequest, NextResponse } from "next/server";
 import { Buyer } from "@/models/leadbuyers";
 import { invalidateSessionCache } from "@/lib/cachedSession";
+import {
+  internalError,
+  methodNotAllowed,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   // Ensure the request is a GET request
   if (req.method !== "GET") {
-    return NextResponse.json(
-      { success: false, message: "Method not allowed" },
-      { status: 405 },
-    );
+    return methodNotAllowed();
   }
   await dbConnect();
 
@@ -21,17 +23,11 @@ export async function GET(req: NextRequest) {
 
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json(
-      { success: false, message: "Unauthorized" },
-      { status: 401 },
-    );
+    return unauthorized("Authentication required");
   }
   const email = session?.user?.email;
   if (!email) {
-    return Response.json(
-      { success: false, message: "User Email not Found" },
-      { status: 401 },
-    );
+    return unauthorized("User email not found");
   }
   filterUser = { email };
 
@@ -42,7 +38,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await User.findOne(filterUser)
       .select(
-        "name email image role mobile mobileNumber businessName isSubActive stripeCustomerId currentPlan subscription.subscriptionLimits",
+        "name email image role mobile mobileNumber businessName businessEmail businessPhone businessWebsite companyDescription industryNiche businessAddress isSubActive stripeCustomerId currentPlan subscription.isTrial subscription.subscriptionLimits",
       )
       .lean();
 
@@ -57,7 +53,7 @@ export async function GET(req: NextRequest) {
     if (user.role === "buyer") {
       const leadbuyerDetail = await Buyer.findOne({
         email: user.email,
-      } as any)
+      })
         .select("name email walletBalance autoAccept preferences")
         .lean();
       return NextResponse.json(
@@ -70,9 +66,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ user }, { status: 200, headers: cacheHeaders });
   } catch (error) {
     console.error("[/api/users] Error:", error);
-    return NextResponse.json(
-      { success: false, message: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

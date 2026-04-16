@@ -3,22 +3,25 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { WorkflowExecution } from "@/models/automationWorkflow";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
 async function getUserFromSession() {
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== "seller" || !session.user.id) {
-    return {
-      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
+    return { error: unauthorized("Authentication required") };
   }
   return { userId: session.user.id };
 }
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   await dbConnect();
   const { userId, error } = await getUserFromSession();
@@ -31,6 +34,15 @@ export async function GET(
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const status = searchParams.get("status");
+
+    if (
+      !Number.isFinite(page) ||
+      page < 1 ||
+      !Number.isFinite(limit) ||
+      limit < 1
+    ) {
+      return badRequest("Invalid pagination parameters");
+    }
 
     const filter: Record<string, unknown> = { workflowId: id, userId };
     if (status) {
@@ -49,13 +61,10 @@ export async function GET(
         executions,
         pagination: { page, limit, total, pages: Math.ceil(total / limit) },
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     console.error("Error fetching execution history:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch execution history" },
-      { status: 500 }
-    );
+    return internalError("Failed to fetch execution history");
   }
 }

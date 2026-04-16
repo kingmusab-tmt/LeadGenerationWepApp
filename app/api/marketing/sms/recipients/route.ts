@@ -4,8 +4,28 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Buyer } from "@/models/leadbuyers";
 import { Lead } from "@/models/leads";
+import { internalError, unauthorized } from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
+
+type BuyerRecipientDoc = {
+  phone?: string;
+  name?: string;
+  company?: string;
+};
+
+type LeadFieldDoc = {
+  label?: string;
+  id?: string;
+  value?: unknown;
+};
+
+type LeadRecipientDoc = {
+  phone?: string;
+  name?: string;
+  company?: string;
+  fields?: LeadFieldDoc[];
+};
 
 /**
  * GET /api/marketing/sms/recipients
@@ -17,7 +37,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -45,11 +65,14 @@ export async function GET(req: NextRequest) {
       const buyers = await Buyer.find(
         { registeredWith: session.user.id, isActive: true },
         { phone: 1, name: 1, company: 1 },
-      ).lean();
+      ).lean<BuyerRecipientDoc[]>();
 
       results.buyers = buyers
-        .filter((b: any) => b.phone)
-        .map((b: any) => ({
+        .filter(
+          (b): b is BuyerRecipientDoc & { phone: string } =>
+            typeof b.phone === "string" && b.phone.trim().length > 0,
+        )
+        .map((b) => ({
           phone: b.phone,
           name: b.name || "",
           company: b.company || "",
@@ -62,19 +85,19 @@ export async function GET(req: NextRequest) {
       const leads = await Lead.find(
         { userId: session.user.id },
         { phone: 1, name: 1, company: 1, fields: 1 },
-      ).lean();
+      ).lean<LeadRecipientDoc[]>();
 
       const phoneRegex = /phone|phone\s*number|mobile|cell/i;
       const nameRegex = /^name$|full\s*name/i;
 
       results.leads = leads
-        .map((l: any) => {
+        .map((l) => {
           // 1. Try top-level phone field
           let phone = l.phone || "";
           // 2. Fallback: search fields array for phone
           if (!phone && l.fields) {
             const phoneField = l.fields.find(
-              (f: any) =>
+              (f) =>
                 phoneRegex.test(f.label || "") || phoneRegex.test(f.id || ""),
             );
             if (phoneField?.value) phone = String(phoneField.value).trim();
@@ -83,7 +106,7 @@ export async function GET(req: NextRequest) {
           // Extract name: top-level first, then fields array
           let name = l.name || "";
           if (!name && l.fields) {
-            const nameField = l.fields.find((f: any) =>
+            const nameField = l.fields.find((f) =>
               nameRegex.test(f.label || ""),
             );
             if (nameField?.value) name = String(nameField.value).trim();
@@ -96,15 +119,12 @@ export async function GET(req: NextRequest) {
             type: "lead",
           };
         })
-        .filter((l: { phone: string }) => l.phone);
+        .filter((l) => Boolean(l.phone));
     }
 
     return NextResponse.json(results, { status: 200 });
   } catch (error) {
     console.error("Error fetching SMS recipients:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch recipients" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch recipients");
   }
 }

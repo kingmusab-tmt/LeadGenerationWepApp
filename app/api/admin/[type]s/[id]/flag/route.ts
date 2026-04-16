@@ -4,6 +4,7 @@ import { Lead } from "@/models/leads";
 import Call from "@/models/call";
 import dbConnects from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 
 export async function PUT(
   req: NextRequest,
@@ -26,7 +27,7 @@ export async function PUT(
       ).lean();
 
       if (!updatedLead) {
-        return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+        return notFound("Lead");
       }
 
       return NextResponse.json({
@@ -44,7 +45,7 @@ export async function PUT(
       ).lean();
 
       if (!updatedCall) {
-        return NextResponse.json({ error: "Call not found" }, { status: 404 });
+        return notFound("Call");
       }
 
       // Handle both array and object cases for updatedCall
@@ -57,16 +58,10 @@ export async function PUT(
         },
       });
     } else {
-      return NextResponse.json(
-        { error: "Invalid content type" },
-        { status: 400 },
-      );
+      return badRequest("Invalid content type");
     }
   } catch (error) {
     console.error("Failed to flag content:", error);
-    return NextResponse.json(
-      { error: "Failed to flag content" },
-      { status: 500 },
-    );
+    return internalError("Failed to flag content");
   }
 }

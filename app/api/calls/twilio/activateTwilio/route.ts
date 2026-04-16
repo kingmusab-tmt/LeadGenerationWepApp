@@ -3,28 +3,50 @@ import dbConnect from "@/lib/connectdb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { User } from "@/models";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id || !session.user?.role) {
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Seller or admin access required");
     }
 
     await dbConnect();
-    const { sellerId, action } = await req.json();
+
+    let body: { sellerId?: string; action?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return badRequest("Invalid JSON in request body");
+    }
+    const { sellerId, action } = body;
 
     if (!sellerId || !action) {
-      return NextResponse.json(
-        { error: "sellerId and action are required" },
-        { status: 400 },
-      );
+      return badRequest("sellerId and action are required");
+    }
+
+    if (
+      session.user.role !== "admin" &&
+      String(sellerId) !== String(session.user.id)
+    ) {
+      return forbidden("You can only update your own Twilio activation state");
     }
 
     const seller = await User.findById(sellerId);
     if (!seller) {
-      return NextResponse.json({ error: "Seller not found" }, { status: 404 });
+      return notFound("Seller");
     }
 
     if (action === "activate") {
@@ -32,10 +54,7 @@ export async function POST(req: NextRequest) {
     } else if (action === "deactivate") {
       seller.twilioActivated = false;
     } else {
-      return NextResponse.json(
-        { error: "Invalid action. Use 'activate' or 'deactivate'" },
-        { status: 400 },
-      );
+      return badRequest("Invalid action. Use 'activate' or 'deactivate'");
     }
 
     await seller.save();
@@ -43,19 +62,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: `Twilio ${action}d successfully`,
-        twilioActivated: seller.twilioActivated,
+        data: {
+          message: `Twilio ${action}d successfully`,
+          twilioActivated: seller.twilioActivated,
+        },
       },
       { status: 200 },
     );
   } catch (error) {
     console.error("Twilio activation error:", error);
-    return NextResponse.json(
-      {
-        error: "Operation failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 },
-    );
+    return internalError("Operation failed");
   }
 }

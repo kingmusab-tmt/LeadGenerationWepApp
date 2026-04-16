@@ -39,7 +39,7 @@ import {
   OndemandVideo,
 } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 
 interface Video {
   _id: string;

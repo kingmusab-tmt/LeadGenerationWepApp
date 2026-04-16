@@ -90,12 +90,23 @@ const UserSchema: Schema = new Schema<IUser>(
       },
       default: "user",
     },
-    notificationPreferences: [
-      {
-        type: String,
-        enum: ["email", "sms", "dashboard"],
-      },
-    ],
+    notificationPreferences: {
+      type: [String],
+      enum: ["Email", "SMS", "In-App Notification"],
+      default: ["Email"],
+      set: (values: string[]) =>
+        (values || []).map((value) => {
+          const normalized = String(value || "")
+            .trim()
+            .toLowerCase();
+          if (normalized === "email") return "Email";
+          if (normalized === "sms") return "SMS";
+          if (normalized === "dashboard" || normalized === "push") {
+            return "In-App Notification";
+          }
+          return value;
+        }),
+    },
     image: { type: String },
     pushToken: { type: String },
     walletBalance: {

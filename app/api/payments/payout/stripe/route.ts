@@ -5,8 +5,16 @@ import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Transaction } from "@/models/transactions";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  paymentRequired,
+  unauthorized,
+} from "@/lib/api/error-handler";
+import { env } from "@/lib/env";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
 });
 
@@ -17,50 +25,38 @@ interface StripePayoutRequest {
 
 export async function POST(req: Request) {
   try {
-    if (req.method !== "POST") {
-      return NextResponse.json(
-        { message: "Method not allowed" },
-        { status: 405 },
-      );
-    }
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id || !session?.user?.email) {
+      return unauthorized("Authentication required");
     }
 
-    const body = (await req.json()) as StripePayoutRequest;
+    let body: StripePayoutRequest;
+    try {
+      body = (await req.json()) as StripePayoutRequest;
+    } catch {
+      return badRequest("Invalid JSON in request body");
+    }
 
     // Validate input
     if (!body.amount || !body.currency) {
-      return NextResponse.json(
-        { message: "Missing required fields" },
-        { status: 400 },
-      );
+      return badRequest("Missing required fields");
     }
     await dbConnect();
     const seller = await User.findOne({
       email: session.user.email,
-    });
-    if (
-      !seller ||
-      !seller.stripeAccountId ||
-      seller.walletBalance < body.amount
-    ) {
-      return NextResponse.json(
-        {
-          message:
-            "Seller not found or Stripe account not linked or Insufficient Balance",
-        },
-        { status: 404 },
-      );
+    }).select("role stripeAccountId walletBalance name email");
+
+    if (!seller || seller.role !== "seller") {
+      return forbidden("Payout access requires a seller account");
     }
 
-    await stripe.charges.create({
-      amount: 5000, // $50
-      currency: "usd",
-      source: "tok_bypassPending", // Optional, use this to skip pending in test
-      description: "Test funding charge",
-    });
+    if (!seller.stripeAccountId) {
+      return forbidden("Stripe account not linked");
+    }
+
+    if (seller.walletBalance < body.amount) {
+      return badRequest("Insufficient wallet balance");
+    }
 
     // Convert amount to cents (Stripe uses smallest currency unit)
     const amountInCents = Math.round(body.amount * 100);
@@ -74,10 +70,7 @@ export async function POST(req: Request) {
     );
 
     if (!availableBalance || availableBalance.amount < amountInCents) {
-      return NextResponse.json(
-        { message: "Insufficient funds in platform Stripe account" },
-        { status: 402 },
-      );
+      return paymentRequired("Insufficient funds in platform Stripe account");
     }
 
     // Proceed with transfer
@@ -101,8 +94,8 @@ export async function POST(req: Request) {
       userId: session.user.id,
       amount: body.amount,
       currency: "usd",
-      previousBalance: updatedSeller?.walletBalance || 0,
-      currentBalance: (updatedSeller?.walletBalance || 0) - body.amount,
+      previousBalance: (updatedSeller?.walletBalance || 0) + body.amount,
+      currentBalance: updatedSeller?.walletBalance || 0,
       status: "pending",
       paymentGateway: "stripe",
       gatewayTransactionId: transfer.id,
@@ -130,7 +123,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           success: false,
-          message: "Transferred funds not yet available for payout.",
+          error: "Transferred funds not yet available for payout.",
         },
         { status: 400 },
       );
@@ -150,20 +143,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Payout initiated successfully.",
-      transferId: transfer.id,
-      payoutId: payout.id,
-      updatedBalance: updatedSeller?.walletBalance,
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: "An error occurred while initiating payout.",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
+      data: {
+        message: "Payout initiated successfully.",
+        transferId: transfer.id,
+        payoutId: payout.id,
+        updatedBalance: updatedSeller?.walletBalance,
       },
-      { status: 500 },
-    );
+    });
+  } catch (error: unknown) {
+    console.error("[StripePayoutAPI] POST error:", error);
+    return internalError("An error occurred while initiating payout.");
   }
 }

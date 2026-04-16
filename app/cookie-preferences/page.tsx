@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Button,
@@ -33,10 +33,50 @@ const CookiePreferencesPage = () => {
     | "functional"
     | "advertising";
 
+  const getStoredPreferences = (): {
+    analytics: boolean;
+    functional: boolean;
+    advertising: boolean;
+  } => {
+    if (typeof document === "undefined") {
+      return { analytics: false, functional: false, advertising: false };
+    }
+
+    const match = document.cookie.match(
+      /(?:^|; )brix_cookie_preferences=([^;]*)/,
+    );
+    if (!match) {
+      return { analytics: false, functional: false, advertising: false };
+    }
+
+    try {
+      const parsed = JSON.parse(decodeURIComponent(match[1])) as {
+        analytics?: boolean;
+        functional?: boolean;
+        advertising?: boolean;
+      };
+      return {
+        analytics: Boolean(parsed.analytics),
+        functional: Boolean(parsed.functional),
+        advertising: Boolean(parsed.advertising),
+      };
+    } catch {
+      return { analytics: false, functional: false, advertising: false };
+    }
+  };
+
+  const initialPreferences = getStoredPreferences();
+
   const [manageModalOpen, setManageModalOpen] = useState(false);
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
-  const [functionalEnabled, setFunctionalEnabled] = useState(false);
-  const [advertisingEnabled, setAdvertisingEnabled] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(
+    initialPreferences.analytics,
+  );
+  const [functionalEnabled, setFunctionalEnabled] = useState(
+    initialPreferences.functional,
+  );
+  const [advertisingEnabled, setAdvertisingEnabled] = useState(
+    initialPreferences.advertising,
+  );
   const [expandedDetails, setExpandedDetails] = useState<
     Record<CookieCategoryKey, boolean>
   >({
@@ -100,26 +140,6 @@ const CookiePreferencesPage = () => {
     const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
     return match ? decodeURIComponent(match[1]) : null;
   };
-
-  useEffect(() => {
-    const rawPrefs = getCookie("brix_cookie_preferences");
-    if (!rawPrefs) return;
-
-    try {
-      const parsed = JSON.parse(rawPrefs) as {
-        analytics?: boolean;
-        functional?: boolean;
-        advertising?: boolean;
-      };
-      setAnalyticsEnabled(Boolean(parsed.analytics));
-      setFunctionalEnabled(Boolean(parsed.functional));
-      setAdvertisingEnabled(Boolean(parsed.advertising));
-    } catch {
-      setAnalyticsEnabled(false);
-      setFunctionalEnabled(false);
-      setAdvertisingEnabled(false);
-    }
-  }, []);
 
   const handleSaveCookiePreferences = () => {
     const preferences = {

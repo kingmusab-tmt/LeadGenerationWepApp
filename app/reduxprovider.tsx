@@ -1,4 +1,4 @@
-// app/providers.tsx
+// app/reduxprovider.tsx
 "use client";
 import { Provider } from "react-redux";
 import { store } from "./store";

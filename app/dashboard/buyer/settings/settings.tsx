@@ -31,9 +31,9 @@ import { styled } from "@mui/system";
 import { industryNiches } from "@/utils/industryNiches";
 import { industryServices } from "@/utils/industryServices";
 import { LEAD_SOURCES } from "@/utils/leadSources";
-import { useInitializeUser, useAppDispatch, normalizeUser } from "@/lib/hooks";
+import { useInitializeUser, useAppDispatch, normalizeUser } from "@/app/hooks";
 import { setUser, updateUser } from "@/lib/userSlice";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 import GooglePlacesAutocomplete from "@/app/components/GooglePlacesAutocomplete";
 import GoogleTimezoneAutocomplete from "@/app/components/GoogleTimezoneAutocomplete";
 import {
@@ -1425,9 +1425,10 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                                   variant="caption"
                                   color="textSecondary"
                                 >
-                                  This option must be set to 'YES' to receive
-                                  phone calls. When set to 'NO', you will not
-                                  receive any phone calls or call notifications.
+                                  This option must be set to &apos;YES&apos; to
+                                  receive phone calls. When set to
+                                  &apos;NO&apos;, you will not receive any phone
+                                  calls or call notifications.
                                 </Typography>
                               </Box>
                             }

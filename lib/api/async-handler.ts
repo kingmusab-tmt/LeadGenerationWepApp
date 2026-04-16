@@ -8,6 +8,7 @@ import {
   externalServiceError,
   ErrorCode,
 } from "./error-handler";
+import { logApiError, errorLogger } from "./error-logger";
 import mongoose from "mongoose";
 
 // ============================================
@@ -26,6 +27,20 @@ export type RouteHandlerWithParams = (
   context: { params: Promise<Record<string, string>> | Record<string, string> },
 ) => Promise<NextResponse>;
 
+type RouteContext = {
+  params: Promise<Record<string, string>> | Record<string, string>;
+};
+
+type SessionUser = {
+  id: string;
+  email?: string | null;
+  role?: string | null;
+};
+
+type AuthenticatedSession = {
+  user: SessionUser;
+};
+
 // ============================================
 // ASYNC ROUTE WRAPPER
 // ============================================
@@ -40,12 +55,7 @@ export type RouteHandlerWithParams = (
  * });
  */
 export function withErrorHandler(handler: RouteHandler): RouteHandler {
-  return async (
-    req: NextRequest,
-    context?: {
-      params: Promise<Record<string, string>> | Record<string, string>;
-    },
-  ) => {
+  return async (req: NextRequest, context?: RouteContext) => {
     try {
       return await handler(req, context);
     } catch (error) {
@@ -60,12 +70,7 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
 export function withErrorHandlerParams(
   handler: RouteHandlerWithParams,
 ): RouteHandlerWithParams {
-  return async (
-    req: NextRequest,
-    context: {
-      params: Promise<Record<string, string>> | Record<string, string>;
-    },
-  ) => {
+  return async (req: NextRequest, context: RouteContext) => {
     try {
       return await handler(req, context);
     } catch (error) {
@@ -79,17 +84,15 @@ export function withErrorHandlerParams(
 // ============================================
 
 function handleError(error: unknown, req: NextRequest): NextResponse {
-  const { pathname, searchParams } = new URL(req.url);
+  const { searchParams } = new URL(req.url);
 
-  // Log error with context
-  console.error("[API Error]", {
-    path: pathname,
-    method: req.method,
-    params: Object.fromEntries(searchParams),
-    error: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
-    timestamp: new Date().toISOString(),
-  });
+  logApiError(error, req);
+  if (searchParams.size > 0) {
+    errorLogger.info("API request params on error", {
+      method: req.method,
+      params: Object.fromEntries(searchParams),
+    });
+  }
 
   // Handle Zod validation errors
   if (error instanceof ZodError) {
@@ -241,25 +244,10 @@ export function logError(
     path: string;
     method: string;
     userId?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   },
 ) {
-  const errorDetails = {
-    message: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
-    name: error instanceof Error ? error.name : typeof error,
-    context,
-    timestamp: new Date().toISOString(),
-  };
-
-  // In production, you might want to send this to a logging service
-  // like Sentry, LogRocket, DataDog, etc.
-  if (process.env.NODE_ENV === "production") {
-    // TODO: Send to logging service
-    // Sentry.captureException(error, { contexts: { custom: context } });
-  }
-
-  console.error("[Error Log]", JSON.stringify(errorDetails, null, 2));
+  errorLogger.logError(error, context);
 }
 
 // ============================================
@@ -276,7 +264,7 @@ export function logError(
  * });
  */
 export function withValidation<T>(
-  schema: { parseAsync: (data: any) => Promise<T> },
+  schema: { parseAsync: (data: unknown) => Promise<T> },
   handler: (req: NextRequest, data: T, context?: any) => Promise<NextResponse>,
 ): RouteHandler {
   return withErrorHandler(async (req, context) => {
@@ -290,7 +278,7 @@ export function withValidation<T>(
  * Wraps route handler with query parameter validation
  */
 export function withQueryValidation<T>(
-  schema: { parseAsync: (data: any) => Promise<T> },
+  schema: { parseAsync: (data: unknown) => Promise<T> },
   handler: (
     req: NextRequest,
     queryData: T,
@@ -324,7 +312,7 @@ export function withAuth(
   handler: (
     req: NextRequest,
     session: {
-      user: { id: string; email?: string | null; role?: string | null };
+      user: SessionUser;
     },
     context?: any,
   ) => Promise<NextResponse>,
@@ -352,7 +340,7 @@ export function withAuth(
       }
     }
 
-    return handler(req, session as any, context);
+    return handler(req, session as AuthenticatedSession, context);
   });
 }
 
@@ -360,11 +348,11 @@ export function withAuth(
  * Combines authentication and validation
  */
 export function withAuthAndValidation<T>(
-  schema: { parseAsync: (data: any) => Promise<T> },
+  schema: { parseAsync: (data: unknown) => Promise<T> },
   handler: (
     req: NextRequest,
     session: {
-      user: { id: string; email?: string | null; role?: string | null };
+      user: SessionUser;
     },
     data: T,
     context?: any,

@@ -271,7 +271,9 @@ export class WebhookManager {
    */
   static async processIncoming(
     req: Request,
-    config: WebhookConfig,
+    config: Pick<WebhookConfig, "secret" | "isActive"> & {
+      events?: WebhookConfig["events"];
+    },
   ): Promise<{ success: boolean; message: string; error?: string }> {
     try {
       // Verify signature
@@ -341,7 +343,9 @@ export class WebhookManager {
       // Check if this event type is configured
       const eventKey = `${payload.type}${payload.action
         .charAt(0)
-        .toUpperCase()}${payload.action.slice(1)}` as keyof typeof config.events;
+        .toUpperCase()}${payload.action.slice(1)}` as keyof NonNullable<
+        typeof config.events
+      >;
       if (config.events && !config.events[eventKey]) {
         return {
           success: false,

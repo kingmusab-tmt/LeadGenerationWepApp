@@ -4,22 +4,26 @@ import dbConnect from "@/lib/connectdb";
 import { getServerSession } from "next-auth";
 import Form from "@/models/form";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     const { formId } = await req.json();
 
     if (!formId) {
-      return NextResponse.json(
-        { success: false, message: "Form ID is required" },
-        { status: 400 },
-      );
+      return badRequest("Form ID is required");
     }
 
     await dbConnect();
@@ -28,18 +32,12 @@ export async function POST(req: NextRequest) {
     const originalForm = await Form.findOne({ formId });
 
     if (!originalForm) {
-      return NextResponse.json(
-        { success: false, message: "Original form not found" },
-        { status: 404 },
-      );
+      return notFound("Form", "Original form not found");
     }
 
     // Verify that the user owns the form or is authorized to clone it
     if (originalForm.userId.toString() !== session.user.id) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized to clone this form" },
-        { status: 403 },
-      );
+      return forbidden("Unauthorized to clone this form");
     }
 
     // Generate a new formId for the cloned form
@@ -79,13 +77,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to clone form:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to clone form.",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error
+        ? `Failed to clone form. ${error.message}`
+        : "Failed to clone form.",
     );
   }
 }

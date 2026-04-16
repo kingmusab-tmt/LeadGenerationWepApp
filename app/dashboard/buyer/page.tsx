@@ -1,7 +1,7 @@
 import UserDashboard from "./layout";
 
 const BuyerDashboard: React.FC = () => {
-  return <UserDashboard children={undefined} />;
+  return <UserDashboard>{null}</UserDashboard>;
 };
 
 export default BuyerDashboard;

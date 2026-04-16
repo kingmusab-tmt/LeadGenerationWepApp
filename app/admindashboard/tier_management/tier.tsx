@@ -54,7 +54,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PreviewIcon from "@mui/icons-material/Preview";
 import PeopleIcon from "@mui/icons-material/People";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 
 interface TierLimits {
   // Core Limits

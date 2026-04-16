@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 
 // ============================================
 // ERROR TYPES
@@ -52,7 +52,7 @@ export interface ApiErrorResponse {
   success: false;
   error: string;
   code: ErrorCode;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   timestamp?: string;
 }
 
@@ -71,11 +71,35 @@ export class ApiError extends Error {
     public statusCode: number,
     public code: ErrorCode,
     message: string,
-    public details?: Record<string, any>,
+    public details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+type MongoDuplicateKeyError = Error & {
+  code: number;
+  keyPattern?: Record<string, unknown>;
+  keyValue?: Record<string, unknown>;
+};
+
+type TwilioLikeError = Error & {
+  status?: number;
+};
+
+function isMongoDuplicateKeyError(
+  error: unknown,
+): error is MongoDuplicateKeyError {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as MongoDuplicateKeyError).code === 11000
+  );
+}
+
+function isTwilioLikeError(error: unknown): error is TwilioLikeError {
+  return error instanceof Error && "status" in error;
 }
 
 // ============================================
@@ -97,7 +121,7 @@ export function errorResponse(
   message: string,
   statusCode: number,
   code: ErrorCode,
-  details?: Record<string, any>,
+  details?: Record<string, unknown>,
 ) {
   return NextResponse.json(
     {
@@ -118,12 +142,12 @@ export function errorResponse(
 export function handleValidationError(error: ZodError<unknown>) {
   const details: Record<string, string[]> = {};
 
-  error.issues.forEach((err: any) => {
-    const path = err.path.join(".");
+  error.issues.forEach((issue) => {
+    const path = issue.path.join(".");
     if (!details[path]) {
       details[path] = [];
     }
-    details[path].push(err.message);
+    details[path].push(issue.message);
   });
 
   return errorResponse(
@@ -158,7 +182,7 @@ export function conflict(message: string) {
   return errorResponse(message, 409, ErrorCode.CONFLICT);
 }
 
-export function badRequest(message: string, details?: Record<string, any>) {
+export function badRequest(message: string, details?: Record<string, unknown>) {
   return errorResponse(message, 400, ErrorCode.BAD_REQUEST, details);
 }
 
@@ -172,7 +196,7 @@ export function rateLimited(message = "Too many requests") {
 
 export function unprocessableEntity(
   message: string,
-  details?: Record<string, any>,
+  details?: Record<string, unknown>,
 ) {
   return errorResponse(message, 422, ErrorCode.UNPROCESSABLE_ENTITY, details);
 }
@@ -215,7 +239,10 @@ export function quotaExceeded(message = "Quota exceeded") {
   return errorResponse(message, 429, ErrorCode.QUOTA_EXCEEDED);
 }
 
-export function duplicateEntry(message: string, details?: Record<string, any>) {
+export function duplicateEntry(
+  message: string,
+  details?: Record<string, unknown>,
+) {
   return errorResponse(message, 409, ErrorCode.DUPLICATE_ENTRY, details);
 }
 
@@ -229,7 +256,7 @@ export function invalidState(message: string) {
 
 export function databaseError(
   message = "Database operation failed",
-  details?: Record<string, any>,
+  details?: Record<string, unknown>,
 ) {
   return errorResponse(message, 500, ErrorCode.DATABASE_ERROR, details);
 }
@@ -251,11 +278,17 @@ export function externalServiceError(service: string, message?: string) {
   );
 }
 
-export function twilioError(message: string, details?: Record<string, any>) {
+export function twilioError(
+  message: string,
+  details?: Record<string, unknown>,
+) {
   return errorResponse(message, 502, ErrorCode.TWILIO_ERROR, details);
 }
 
-export function stripeError(message: string, details?: Record<string, any>) {
+export function stripeError(
+  message: string,
+  details?: Record<string, unknown>,
+) {
   return errorResponse(message, 502, ErrorCode.STRIPE_ERROR, details);
 }
 
@@ -305,7 +338,7 @@ export async function validateRequest<T>(
   schema: z.ZodSchema<T>,
 ): Promise<T> {
   const data = await req.json();
-  return schema.parseAsync(data) as Promise<T>;
+  return schema.parseAsync(data);
 }
 
 export async function validateQuery<T>(
@@ -314,14 +347,14 @@ export async function validateQuery<T>(
 ): Promise<T> {
   const searchParams = new URL(url).searchParams;
   const data = Object.fromEntries(searchParams);
-  return schema.parseAsync(data) as Promise<T>;
+  return schema.parseAsync(data);
 }
 
 export function validateParam<T>(
   value: string | string[] | undefined,
   schema: z.ZodSchema<T>,
 ): T {
-  return schema.parse(value) as T;
+  return schema.parse(value);
 }
 
 // ============================================
@@ -345,5 +378,3 @@ export function createValidationMiddleware<T>(schema: z.ZodSchema<T>) {
     }
   };
 }
-
-import { z } from "zod";

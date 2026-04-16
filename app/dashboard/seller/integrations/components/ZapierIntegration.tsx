@@ -319,8 +319,8 @@ export default function ZapierIntegration({ onNotify }: Props) {
               <Card>
                 <CardContent>
                   <Alert severity="info">
-                    No Zapier webhooks configured yet. Click "Add Webhook" to
-                    get started.
+                    No Zapier webhooks configured yet. Click &quot;Add
+                    Webhook&quot; to get started.
                   </Alert>
                 </CardContent>
               </Card>

@@ -191,7 +191,7 @@ const AssignedLeads: React.FC = () => {
           No assigned leads available
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          You currently don't have any leads assigned to you. Please check back
+          You currently do not have any leads assigned to you. Please check back
           later.
         </Typography>
       </Container>
@@ -317,8 +317,8 @@ const AssignedLeads: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            You don't have enough credits to purchase this lead. Please add more
-            credits to your wallet to continue.
+            You do not have enough credits to purchase this lead. Please add
+            more credits to your wallet to continue.
           </DialogContentText>
           {currentBalance !== null && (
             <Box

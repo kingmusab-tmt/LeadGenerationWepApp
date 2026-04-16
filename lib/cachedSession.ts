@@ -116,7 +116,7 @@ export async function invalidateAllUserSessions(userId: string) {
     for (const key of sessionKeys) {
       const sessionData = memoryCache.get<any>(key);
       if (sessionData?.id === userId) {
-        memoryCache.deletePattern(key);
+        memoryCache.delete(key);
         invalidatedCount++;
       }
     }

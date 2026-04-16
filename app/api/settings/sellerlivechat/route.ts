@@ -4,16 +4,20 @@ import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -22,20 +26,14 @@ export async function GET(req: NextRequest) {
       const buyer = await Buyer.findOne({ email: session.user.email });
 
       if (!buyer || !buyer.registeredWith) {
-        return NextResponse.json(
-          { success: false, message: "Buyer or associated seller not found" },
-          { status: 404 },
-        );
+        return notFound("Buyer", "Buyer or associated seller not found");
       }
 
       // Use the registeredWith ID to find the seller in the User model
       const seller = await User.findById(buyer.registeredWith);
 
       if (!seller) {
-        return NextResponse.json(
-          { success: false, message: "Seller user not found" },
-          { status: 404 },
-        );
+        return notFound("Seller", "Seller user not found");
       }
       //("property ID", seller.tawkPropertyId);
       //("widget ID", seller.tawkWidgetId);
@@ -64,13 +62,10 @@ export async function GET(req: NextRequest) {
         { status: 200 },
       );
     }
+    return forbidden("Unsupported role for live chat settings");
   } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Internal Server Error",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error ? error.message : "Internal Server Error",
     );
   }
 }
@@ -79,10 +74,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user || session.user.role !== "seller") {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
     await dbConnect();
 
@@ -90,10 +82,7 @@ export async function POST(req: NextRequest) {
     const { tawkPropertyId, tawkWidgetId } = body;
 
     if (!tawkPropertyId || !tawkWidgetId) {
-      return NextResponse.json(
-        { success: false, message: "Missing fields" },
-        { status: 400 },
-      );
+      return badRequest("Missing fields");
     }
 
     const updatedSeller = await User.findOneAndUpdate(
@@ -115,12 +104,8 @@ export async function POST(req: NextRequest) {
       { status: 200 },
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Internal Server Error",
-      },
-      { status: 500 },
+    return internalError(
+      error instanceof Error ? error.message : "Internal Server Error",
     );
   }
 }

@@ -135,3 +135,24 @@ export const {
   setError,
 } = campaignsSlice.actions;
 export default campaignsSlice.reducer;
+
+// Selectors for type-safe state access
+export const selectEmailCampaigns = (state: { campaigns: CampaignsState }) =>
+  state.campaigns.emailCampaigns;
+export const selectSmsCampaigns = (state: { campaigns: CampaignsState }) =>
+  state.campaigns.smsCampaigns;
+export const selectActiveCampaign = (state: { campaigns: CampaignsState }) =>
+  state.campaigns.activeCampaign;
+export const selectCampaignsFilters = (state: { campaigns: CampaignsState }) =>
+  state.campaigns.filters;
+export const selectCampaignsLoading = (state: { campaigns: CampaignsState }) =>
+  state.campaigns.loading;
+export const selectCampaignsError = (state: { campaigns: CampaignsState }) =>
+  state.campaigns.error;
+export const selectCampaignById = (
+  state: { campaigns: CampaignsState },
+  id: string,
+) =>
+  [...state.campaigns.emailCampaigns, ...state.campaigns.smsCampaigns].find(
+    (c) => c._id === id,
+  ) ?? null;

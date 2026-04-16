@@ -3,16 +3,24 @@ import dbConnect from "@/lib/connectdb";
 import FAQ from "@/models/FAQ";
 import { authOptions } from "@/auth";
 import { getServerSession } from "next-auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  methodNotAllowed,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function GET(req: NextRequest) {
   // Ensure the request is a GET request
   if (req.method !== "GET") {
-    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+    return methodNotAllowed();
   }
   const session = await getServerSession(authOptions);
   try {
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
     await dbConnect();
 
@@ -34,28 +42,22 @@ export async function GET(req: NextRequest) {
     }).sort({ createdAt: -1 });
 
     return NextResponse.json(faqs);
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch FAQs" },
-      { status: 500 },
-    );
+  } catch {
+    return internalError("Failed to fetch FAQs");
   }
 }
 
 export async function POST(req: NextRequest) {
   // Ensure the request is a POST request
   if (req.method !== "POST") {
-    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+    return methodNotAllowed();
   }
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized("Authentication required");
   }
   if (session.user.role !== "admin") {
-    return NextResponse.json(
-      { error: "Forbidden: Only admins can create FAQs" },
-      { status: 403 },
-    );
+    return forbidden("Forbidden: Only admins can create FAQs");
   }
   try {
     await dbConnect();
@@ -63,10 +65,7 @@ export async function POST(req: NextRequest) {
     const { question, answer, category } = await req.json();
 
     if (!question || !answer) {
-      return NextResponse.json(
-        { error: "Question and answer are required" },
-        { status: 400 },
-      );
+      return badRequest("Question and answer are required");
     }
 
     const newFAQ = new FAQ({
@@ -78,15 +77,20 @@ export async function POST(req: NextRequest) {
     await newFAQ.save();
 
     return NextResponse.json(newFAQ, { status: 201 });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to create FAQ" },
-      { status: 500 },
-    );
+  } catch {
+    return internalError("Failed to create FAQ");
   }
 }
 
 export async function PUT(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return unauthorized("Authentication required");
+  }
+  if (session.user.role !== "admin") {
+    return forbidden("Forbidden: Only admins can update FAQs");
+  }
+
   try {
     await dbConnect();
     const { searchParams } = new URL(req.url);
@@ -98,19 +102,24 @@ export async function PUT(req: NextRequest) {
     });
 
     if (!updatedFAQ) {
-      return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
+      return notFound("FAQ");
     }
 
     return NextResponse.json(updatedFAQ);
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to update FAQ" },
-      { status: 500 },
-    );
+  } catch {
+    return internalError("Failed to update FAQ");
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return unauthorized("Authentication required");
+  }
+  if (session.user.role !== "admin") {
+    return forbidden("Forbidden: Only admins can delete FAQs");
+  }
+
   try {
     await dbConnect();
 
@@ -118,26 +127,20 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { error: "FAQ ID is required" },
-        { status: 400 },
-      );
+      return badRequest("FAQ ID is required");
     }
 
     const deletedFAQ = await FAQ.findByIdAndDelete(id);
 
     if (!deletedFAQ) {
-      return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
+      return notFound("FAQ");
     }
 
     return NextResponse.json(
       { message: "FAQ deleted successfully" },
       { status: 200 },
     );
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to delete FAQ" },
-      { status: 500 },
-    );
+  } catch {
+    return internalError("Failed to delete FAQ");
   }
 }

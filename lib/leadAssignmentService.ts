@@ -35,6 +35,41 @@ export interface AssignmentResult {
   }>;
 }
 
+type WeeklyScheduleEntry = {
+  enabled: boolean;
+  start: string;
+  end: string;
+};
+
+type WeeklySchedule =
+  | Record<string, WeeklyScheduleEntry>
+  | Map<string, WeeklyScheduleEntry>;
+
+interface SellerAssignmentSettings {
+  autoAssignLeads?: boolean;
+  maxAutoAssignPerDay?: number;
+  currentAutoAssignedToday?: number;
+  distributionMode?: "automatic" | "marketplace" | "both";
+  aiQualityThreshold?: number;
+  industryRoundRobinIndex?: Map<string, number>;
+  lastAssignedIndex?: number;
+}
+
+function getWeeklyScheduleEntry(
+  weeklySchedule: WeeklySchedule | undefined,
+  dayName: string,
+): WeeklyScheduleEntry | undefined {
+  if (!weeklySchedule) {
+    return undefined;
+  }
+
+  if (weeklySchedule instanceof Map) {
+    return weeklySchedule.get(dayName);
+  }
+
+  return weeklySchedule[dayName];
+}
+
 /**
  * Check if a buyer's criteria matches the lead
  */
@@ -420,10 +455,10 @@ function matchesBuyerCriteria(
 
       // Check weekly schedule first (more granular than simple workingHours)
       if (buyer.weeklySchedule) {
-        const daySchedule =
-          buyer.weeklySchedule instanceof Map
-            ? buyer.weeklySchedule.get(dayName)
-            : (buyer.weeklySchedule as any)[dayName];
+        const daySchedule = getWeeklyScheduleEntry(
+          buyer.weeklySchedule as WeeklySchedule,
+          dayName,
+        );
 
         if (daySchedule) {
           if (!daySchedule.enabled) {
@@ -702,7 +737,7 @@ async function notifyBuyer(buyer: IBuyer, lead: ILead): Promise<string[]> {
     // Determine if lead contact details should be shown
     // Show details if buyer has auto-accept enabled or has already accepted
     const buyerAssignment = lead.assignedTo?.find(
-      (a: any) => a.buyerId.toString() === buyer._id.toString(),
+      (assignment) => assignment.buyerId.toString() === buyer._id.toString(),
     );
     const showContactDetails =
       buyer.autoAcceptMatchingLeads || buyerAssignment?.accepted;
@@ -811,11 +846,13 @@ export async function processLeadDistribution(
     // ========================================
     // 2. GET SELLER PREFERENCES FOR DISTRIBUTION
     // ========================================
-    let seller;
+    let seller: SellerAssignmentSettings | null;
     try {
-      seller = await User.findById(sellerId).select(
-        "autoAssignLeads maxAutoAssignPerDay currentAutoAssignedToday distributionMode aiQualityThreshold industryRoundRobinIndex lastAssignedIndex",
-      );
+      seller = (await User.findById(sellerId)
+        .select(
+          "autoAssignLeads maxAutoAssignPerDay currentAutoAssignedToday distributionMode aiQualityThreshold industryRoundRobinIndex lastAssignedIndex",
+        )
+        .lean()) as SellerAssignmentSettings | null;
     } catch (error) {
       result.errors.push({
         step: "fetch_seller_preferences",
@@ -824,9 +861,9 @@ export async function processLeadDistribution(
       seller = null;
     }
 
-    const autoAssignEnabled = (seller as any)?.autoAssignLeads === true;
-    const distributionMode = (seller as any)?.distributionMode || "marketplace";
-    const aiQualityThreshold = (seller as any)?.aiQualityThreshold ?? 50;
+    const autoAssignEnabled = seller?.autoAssignLeads === true;
+    const distributionMode = seller?.distributionMode || "marketplace";
+    const aiQualityThreshold = seller?.aiQualityThreshold ?? 50;
 
     // Calculate whether this lead should be auto-assigned based on mode
     const shouldAutoAssign = (() => {
@@ -893,9 +930,8 @@ export async function processLeadDistribution(
     // ========================================
 
     // Get seller's auto-assignment limit
-    const maxAutoAssignPerDay = (seller as any)?.maxAutoAssignPerDay || 50;
-    const currentAutoAssignedToday =
-      (seller as any)?.currentAutoAssignedToday || 0;
+    const maxAutoAssignPerDay = seller?.maxAutoAssignPerDay || 50;
+    const currentAutoAssignedToday = seller?.currentAutoAssignedToday || 0;
 
     if (currentAutoAssignedToday >= maxAutoAssignPerDay) {
       console.log(
@@ -907,7 +943,7 @@ export async function processLeadDistribution(
       });
     } else {
       // Choose first matching buyer for assignment
-      let primaryBuyer = matchingBuyers[0];
+      const primaryBuyer = matchingBuyers[0];
 
       const assigned = await assignLeadToBuyer(lead, primaryBuyer);
 

@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { Transaction } from "@/models/transactions";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 
 export async function POST(
   req: NextRequest,
@@ -18,24 +19,15 @@ export async function POST(
 
     const transaction = await Transaction.findById(id);
     if (!transaction) {
-      return NextResponse.json(
-        { error: "Transaction not found" },
-        { status: 404 },
-      );
+      return notFound("Transaction");
     }
 
     if (transaction.status === "refunded") {
-      return NextResponse.json(
-        { error: "Transaction has already been refunded" },
-        { status: 400 },
-      );
+      return badRequest("Transaction has already been refunded");
     }
 
     if (transaction.status !== "completed") {
-      return NextResponse.json(
-        { error: "Only completed transactions can be refunded" },
-        { status: 400 },
-      );
+      return badRequest("Only completed transactions can be refunded");
     }
 
     // Update the original transaction status to refunded
@@ -66,9 +58,6 @@ export async function POST(
     });
   } catch (err) {
     console.error("Failed to process refund:", err);
-    return NextResponse.json(
-      { error: "Failed to process refund" },
-      { status: 500 },
-    );
+    return internalError("Failed to process refund");
   }
 }

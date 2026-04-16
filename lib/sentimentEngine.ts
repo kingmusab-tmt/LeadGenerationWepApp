@@ -8,7 +8,17 @@ export function analyzeSentiment(text: string): {
   positive: string[];
   negative: string[];
 } {
-  const result = sentiment.analyze(text);
+  const normalizedText = text.trim();
+  if (!normalizedText) {
+    return {
+      score: 0,
+      comparative: 0,
+      positive: [],
+      negative: [],
+    };
+  }
+
+  const result = sentiment.analyze(normalizedText);
   return {
     score: result.score,
     comparative: result.comparative,

@@ -18,8 +18,9 @@ import {
 import { ZodError } from "zod";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { env } from "@/lib/env";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
 /**
  * POST /api/payments
@@ -64,9 +65,14 @@ export async function POST(req: NextRequest) {
       },
       201,
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[POST /api/payments]", error);
-    if (error.type === "StripeInvalidRequestError") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "type" in error &&
+      (error as { type?: string }).type === "StripeInvalidRequestError"
+    ) {
       return badRequest("Invalid payment details");
     }
     return internalError("Failed to create payment");

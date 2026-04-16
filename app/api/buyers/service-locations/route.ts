@@ -2,20 +2,32 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
+import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 // GET - Fetch buyer's service locations
 export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "buyer" && session.user.role !== "admin") {
+      return forbidden("Buyer or admin access required");
     }
 
     await dbConnect();
 
     const buyer = await Buyer.findOne({ email: session.user.email });
     if (!buyer) {
-      return NextResponse.json({ error: "Buyer not found" }, { status: 404 });
+      return notFound("Buyer");
     }
 
     return NextResponse.json({
@@ -25,19 +37,20 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Error fetching service locations:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch service locations" },
-      { status: 500 }
-    );
+    return internalError("Failed to fetch service locations");
   }
 }
 
 // POST - Add a new service location
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "buyer" && session.user.role !== "admin") {
+      return forbidden("Buyer or admin access required");
     }
 
     await dbConnect();
@@ -46,15 +59,12 @@ export async function POST(req: Request) {
     const { city, state, country, zipCodes, radius } = body;
 
     if (!city || !state) {
-      return NextResponse.json(
-        { error: "City and state are required" },
-        { status: 400 }
-      );
+      return badRequest("City and state are required");
     }
 
     const buyer = await Buyer.findOne({ email: session.user.email });
     if (!buyer) {
-      return NextResponse.json({ error: "Buyer not found" }, { status: 404 });
+      return notFound("Buyer");
     }
 
     // Add new service location
@@ -77,19 +87,20 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("Error adding service location:", error);
-    return NextResponse.json(
-      { error: "Failed to add service location" },
-      { status: 500 }
-    );
+    return internalError("Failed to add service location");
   }
 }
 
 // PUT - Update service locations settings
 export async function PUT(req: Request) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "buyer" && session.user.role !== "admin") {
+      return forbidden("Buyer or admin access required");
     }
 
     await dbConnect();
@@ -99,7 +110,7 @@ export async function PUT(req: Request) {
 
     const buyer = await Buyer.findOne({ email: session.user.email });
     if (!buyer) {
-      return NextResponse.json({ error: "Buyer not found" }, { status: 404 });
+      return notFound("Buyer");
     }
 
     // Update service locations
@@ -122,19 +133,20 @@ export async function PUT(req: Request) {
     });
   } catch (error) {
     console.error("Error updating service locations:", error);
-    return NextResponse.json(
-      { error: "Failed to update service locations" },
-      { status: 500 }
-    );
+    return internalError("Failed to update service locations");
   }
 }
 
 // DELETE - Remove a service location
 export async function DELETE(req: Request) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
+    }
+
+    if (session.user.role !== "buyer" && session.user.role !== "admin") {
+      return forbidden("Buyer or admin access required");
     }
 
     await dbConnect();
@@ -143,24 +155,18 @@ export async function DELETE(req: Request) {
     const index = searchParams.get("index");
 
     if (index === null) {
-      return NextResponse.json(
-        { error: "Location index is required" },
-        { status: 400 }
-      );
+      return badRequest("Location index is required");
     }
 
     const buyer = await Buyer.findOne({ email: session.user.email });
     if (!buyer) {
-      return NextResponse.json({ error: "Buyer not found" }, { status: 404 });
+      return notFound("Buyer");
     }
 
     // Remove location at specified index
-    const locationIndex = parseInt(index);
+    const locationIndex = parseInt(index, 10);
     if (locationIndex < 0 || locationIndex >= buyer.serviceLocations.length) {
-      return NextResponse.json(
-        { error: "Invalid location index" },
-        { status: 400 }
-      );
+      return badRequest("Invalid location index");
     }
 
     buyer.serviceLocations.splice(locationIndex, 1);
@@ -173,9 +179,6 @@ export async function DELETE(req: Request) {
     });
   } catch (error) {
     console.error("Error removing service location:", error);
-    return NextResponse.json(
-      { error: "Failed to remove service location" },
-      { status: 500 }
-    );
+    return internalError("Failed to remove service location");
   }
 }

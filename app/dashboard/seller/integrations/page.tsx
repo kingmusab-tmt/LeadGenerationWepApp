@@ -54,7 +54,7 @@ function TabPanel(props: TabPanelProps) {
 
 export default function IntegrationsPage() {
   const { data: session, status } = useSession();
-  const { limits, loading: limitsLoading } = useSubscriptionLimits();
+  const { limits, isTrial, loading: limitsLoading } = useSubscriptionLimits();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -102,7 +102,7 @@ export default function IntegrationsPage() {
   }
 
   // Check if user has zapierIntegration feature
-  if (limits && !limits.zapierIntegration) {
+  if (limits && !isTrial && !limits.zapierIntegration) {
     return (
       <Box
         sx={{

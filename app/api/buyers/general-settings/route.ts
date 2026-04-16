@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Buyer } from "@/models/leadbuyers";
+import { internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +19,23 @@ const sanitizePreferredZones = (
 ): { city?: string; state?: string; zipCodes?: string[] }[] => {
   if (!Array.isArray(zones)) return [];
   return zones
-    .map((zone: any) => ({
-      city: zone?.city?.trim?.() || undefined,
-      state: zone?.state?.trim?.() || undefined,
-      zipCodes: sanitizeStringArray(zone?.zipCodes),
-    }))
+    .map((zone) => {
+      const zoneObj =
+        zone && typeof zone === "object"
+          ? (zone as Record<string, unknown>)
+          : {};
+      return {
+        city:
+          typeof zoneObj.city === "string"
+            ? zoneObj.city.trim() || undefined
+            : undefined,
+        state:
+          typeof zoneObj.state === "string"
+            ? zoneObj.state.trim() || undefined
+            : undefined,
+        zipCodes: sanitizeStringArray(zoneObj.zipCodes),
+      };
+    })
     .filter((zone) => zone.city || zone.state || (zone.zipCodes || []).length);
 };
 
@@ -37,29 +50,32 @@ const sanitizeServiceLocations = (
 }[] => {
   if (!Array.isArray(locations)) return [];
   return locations
-    .map((loc: any) => ({
-      city: loc?.city?.trim?.() || "",
-      state: loc?.state?.trim?.() || "",
-      country: loc?.country?.trim?.() || "USA",
-      zipCodes: sanitizeStringArray(loc?.zipCodes),
-      radius: typeof loc?.radius === "number" ? loc.radius : 25,
-    }))
+    .map((loc) => {
+      const locObj =
+        loc && typeof loc === "object" ? (loc as Record<string, unknown>) : {};
+      return {
+        city: typeof locObj.city === "string" ? locObj.city.trim() : "",
+        state: typeof locObj.state === "string" ? locObj.state.trim() : "",
+        country:
+          typeof locObj.country === "string" && locObj.country.trim()
+            ? locObj.country.trim()
+            : "USA",
+        zipCodes: sanitizeStringArray(locObj.zipCodes),
+        radius: typeof locObj.radius === "number" ? locObj.radius : 25,
+      };
+    })
     .filter((loc) => loc.city || loc.state || (loc.zipCodes || []).length);
 };
 
 async function getBuyerFromSession() {
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== "buyer" || !session.user.email) {
-    return {
-      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
+    return { error: unauthorized("Authentication required") };
   }
 
   const buyer = await Buyer.findOne({ email: session.user.email });
   if (!buyer) {
-    return {
-      error: NextResponse.json({ error: "Buyer not found" }, { status: 404 }),
-    };
+    return { error: notFound("Buyer") };
   }
 
   return { buyer };
@@ -326,9 +342,6 @@ export async function PUT(req: NextRequest) {
     );
   } catch (err) {
     console.error("Failed to update buyer settings", err);
-    return NextResponse.json(
-      { error: "Failed to update settings" },
-      { status: 500 },
-    );
+    return internalError("Failed to update settings");
   }
 }

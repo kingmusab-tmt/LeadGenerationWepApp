@@ -9,7 +9,6 @@ import { ZodError } from "zod";
 import { createFormSchema } from "@/lib/validation/schemas";
 import {
   successResponse,
-  unauthorized,
   badRequest,
   notFound,
   conflict,
@@ -25,11 +24,6 @@ import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return unauthorized("Authentication required");
-    }
-
     const { searchParams } = new URL(req.url);
     const formId = searchParams.get("formId");
 
@@ -39,7 +33,11 @@ export async function GET(req: NextRequest) {
 
     await dbConnect();
 
-    const form = await Form.findOne({ formId }).lean();
+    const form = await Form.findOne({ formId })
+      .select(
+        "userId formId fields formName leadSource description styleConfig recaptchaEnabled redirectUrl",
+      )
+      .lean();
     if (!form) {
       return notFound("Form not found");
     }
@@ -58,16 +56,21 @@ export async function GET(req: NextRequest) {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return unauthorized("Authentication required");
+    if (!session?.user) {
+      return forbidden("Authentication required");
     }
 
     // Parse and validate request body
     let body;
     try {
       body = await request.json();
-    } catch (error) {
+    } catch {
       return badRequest("Invalid JSON in request body");
+    }
+
+    const creatorUserId = session?.user?.id || body?.userId;
+    if (!creatorUserId) {
+      return badRequest("User ID is required");
     }
 
     let validatedData;
@@ -83,11 +86,7 @@ export async function POST(request: Request) {
     await dbConnect();
 
     // Check subscription limit for forms
-    const usageCheck = await checkAndIncrementUsage(
-      session.user.id,
-      "forms",
-      1,
-    );
+    const usageCheck = await checkAndIncrementUsage(creatorUserId, "forms", 1);
     if (!usageCheck.allowed) {
       return forbidden(
         usageCheck.message ||
@@ -106,8 +105,8 @@ export async function POST(request: Request) {
 
     const formId = uuidv4();
 
-    const newForm = await Form.create({
-      userId: session.user.id,
+    await Form.create({
+      userId: creatorUserId,
       formId,
       fields: validatedData.fields,
       formName: validatedData.name,
@@ -119,7 +118,7 @@ export async function POST(request: Request) {
     });
 
     // PHASE 2: Invalidate user cache after creating form
-    await invalidateAllUserSessions(session.user.id);
+    await invalidateAllUserSessions(creatorUserId);
 
     const formUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/forms/${formId}`;
     const embedCode = `<script type="text/javascript">

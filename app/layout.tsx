@@ -2,8 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/authprovider";
-import { NavigationProvider } from "../context/handlenavigation";
+import { NavigationProvider } from "@/app/hooks";
 import MuiThemeProvider from "@/lib/theme/MuiThemeProvider";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { Providers } from "@/app/reduxprovider";
 import { CSRFProvider } from "@/app/hooks/useCSRF";
 import ClientOverlays from "@/app/components/ClientOverlays";
@@ -192,18 +193,20 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <MuiThemeProvider>
-          <AuthProvider>
-            <NavigationProvider>
-              <Providers>
-                <CSRFProvider>
-                  {children}
-                  <ClientOverlays />
-                </CSRFProvider>
-              </Providers>
-            </NavigationProvider>
-          </AuthProvider>
-        </MuiThemeProvider>
+        <AppRouterCacheProvider>
+          <MuiThemeProvider>
+            <AuthProvider>
+              <NavigationProvider>
+                <Providers>
+                  <CSRFProvider>
+                    {children}
+                    <ClientOverlays />
+                  </CSRFProvider>
+                </Providers>
+              </NavigationProvider>
+            </AuthProvider>
+          </MuiThemeProvider>
+        </AppRouterCacheProvider>
       </body>
     </html>
   );

@@ -16,6 +16,7 @@ import {
   handleInvoicePaid,
   handlePaymentFailed,
 } from "@/lib/stripeSubscriptionService";
+import { env } from "@/lib/env";
 
 /**
  * Check if a Stripe event has already been processed.
@@ -51,9 +52,14 @@ async function claimEventForProcessing(
     // If upsertedCount is 1, we successfully claimed it (new document created)
     // If upsertedCount is 0, it already existed (another process claimed it)
     return result.upsertedCount === 1;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Duplicate key error means another process claimed it first
-    if (error.code === 11000) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000
+    ) {
       return false;
     }
     throw error;
@@ -101,7 +107,7 @@ async function markEventProcessed(
   );
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
 });
 
@@ -121,9 +127,35 @@ type LegacyInvoiceSubscription = {
   subscription?: string | Stripe.Subscription | null;
 };
 
+type StripeAccountWithId = {
+  id?: string;
+};
+
+type StripeInvoiceWithSubscription = Stripe.Invoice & {
+  subscription?: string | Stripe.Subscription | null;
+};
+
+type StripeTransferWithStatus = Stripe.Transfer & {
+  status?: string;
+};
+
+type StripeSubscriptionWithPeriodEnd = Stripe.Subscription & {
+  current_period_end?: number;
+};
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
-  const signature = req.headers.get("stripe-signature")!;
+  const signature = req.headers.get("stripe-signature");
+
+  if (!signature) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Missing stripe-signature header",
+      },
+      { status: 400 },
+    );
+  }
 
   console.log("[StripeWebhook] ===== WEBHOOK RECEIVED =====");
   console.log("[StripeWebhook] Signature present:", !!signature);
@@ -135,24 +167,23 @@ export async function POST(req: NextRequest) {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!,
+      env.STRIPE_WEBHOOK_SECRET,
     );
     console.log("[StripeWebhook] ✓ Signature verified successfully");
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       "[StripeWebhook] ✗ Webhook signature verification failed:",
       error,
     );
     console.error("[StripeWebhook] Error details:", {
-      message: error?.message,
-      type: error?.type,
+      message: error instanceof Error ? error.message : undefined,
+      type: error instanceof Stripe.errors.StripeError ? error.type : undefined,
     });
 
     return NextResponse.json(
       {
         success: false,
         message: "Webhook signature verification failed",
-        error: error?.message || "Unknown error",
       },
       { status: 400 },
     );
@@ -213,7 +244,10 @@ export async function POST(req: NextRequest) {
       case "account.updated":
         console.log("[StripeWebhook] → Handling account.updated");
         const account = event.data.object;
-        console.log("[StripeWebhook] Account ID:", (account as any)?.id);
+        console.log(
+          "[StripeWebhook] Account ID:",
+          (account as StripeAccountWithId)?.id,
+        );
         if (
           account &&
           typeof account === "object" &&
@@ -230,12 +264,7 @@ export async function POST(req: NextRequest) {
         console.log("[StripeWebhook] → Handling checkout.session.completed");
         const session = event.data.object as Stripe.Checkout.Session;
         console.log("[StripeWebhook] Session ID:", session.id);
-        console.log("[StripeWebhook] Customer:", session.customer);
         console.log("[StripeWebhook] Amount total:", session.amount_total);
-        console.log(
-          "[StripeWebhook] Metadata:",
-          JSON.stringify(session.metadata, null, 2),
-        );
         return await handleCheckoutSessionCompleted(session, event.id);
 
       // Subscription lifecycle events
@@ -245,18 +274,12 @@ export async function POST(req: NextRequest) {
         const updatedSubscription = event.data.object as Stripe.Subscription;
         console.log("[StripeWebhook] Subscription ID:", updatedSubscription.id);
         console.log("[StripeWebhook] Status:", updatedSubscription.status);
-        console.log("[StripeWebhook] Customer:", updatedSubscription.customer);
-        console.log(
-          "[StripeWebhook] Metadata:",
-          JSON.stringify(updatedSubscription.metadata, null, 2),
-        );
         return await handleSubscriptionUpdated(updatedSubscription);
 
       case "customer.subscription.deleted":
         console.log("[StripeWebhook] → Handling customer.subscription.deleted");
         const deletedSubscription = event.data.object as Stripe.Subscription;
         console.log("[StripeWebhook] Subscription ID:", deletedSubscription.id);
-        console.log("[StripeWebhook] Customer:", deletedSubscription.customer);
         return await handleSubscriptionDeleted(deletedSubscription);
 
       // Invoice events for renewal
@@ -270,7 +293,7 @@ export async function POST(req: NextRequest) {
         );
         console.log(
           "[StripeWebhook] Subscription:",
-          (paidInvoice as any).subscription,
+          (paidInvoice as StripeInvoiceWithSubscription).subscription,
         );
         return await handleInvoicePaidEvent(paidInvoice);
 
@@ -280,7 +303,7 @@ export async function POST(req: NextRequest) {
         console.log("[StripeWebhook] Invoice ID:", failedInvoice.id);
         console.log(
           "[StripeWebhook] Subscription:",
-          (failedInvoice as any).subscription,
+          (failedInvoice as StripeInvoiceWithSubscription).subscription,
         );
         return await handleInvoicePaymentFailed(failedInvoice);
 
@@ -294,7 +317,7 @@ export async function POST(req: NextRequest) {
         );
         console.log(
           "[StripeWebhook] Subscription:",
-          (upcomingInvoice as any).subscription,
+          (upcomingInvoice as StripeInvoiceWithSubscription).subscription,
         );
         return await handleInvoiceUpcoming(upcomingInvoice);
 
@@ -309,10 +332,6 @@ export async function POST(req: NextRequest) {
         console.log(
           "[StripeWebhook] Amount:",
           createdPaymentIntent.amount / 100,
-        );
-        console.log(
-          "[StripeWebhook] Metadata:",
-          JSON.stringify(createdPaymentIntent.metadata, null, 2),
         );
         await handlePaymentIntentCreated(createdPaymentIntent);
         console.log("[StripeWebhook] ✓ payment_intent.created processed");
@@ -416,28 +435,27 @@ export async function POST(req: NextRequest) {
 
       default:
         console.log("[StripeWebhook] ⚠ Unhandled event type:", event.type);
-        console.log(
-          "[StripeWebhook] Event data:",
-          JSON.stringify(event.data, null, 2),
-        );
         return NextResponse.json({ received: true });
     }
 
     console.log("[StripeWebhook] ===== WEBHOOK COMPLETED SUCCESSFULLY =====");
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[StripeWebhook] ✗✗✗ WEBHOOK ERROR ✗✗✗");
-    console.error("[StripeWebhook] Error type:", error?.name);
-    console.error("[StripeWebhook] Error message:", error?.message);
-    console.error("[StripeWebhook] Error stack:", error?.stack);
+    console.error(
+      "[StripeWebhook] Error type:",
+      error instanceof Error ? error.name : "Unknown",
+    );
+    console.error(
+      "[StripeWebhook] Error message:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
     console.error("[StripeWebhook] Event type:", event?.type);
     console.error("[StripeWebhook] Event ID:", event?.id);
     return NextResponse.json(
       {
         success: false,
         message: "Internal server error",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
       },
       { status: 500 },
     );
@@ -505,11 +523,6 @@ async function handleCheckoutSessionCompleted(
   const metadata = session.metadata
     ? (session.metadata as unknown as Metadata)
     : null;
-
-  console.log(
-    "[handleCheckoutSessionCompleted] Metadata:",
-    JSON.stringify(metadata, null, 2),
-  );
 
   if (!metadata?.purchaseType || !metadata?.userId) {
     console.error(
@@ -606,14 +619,17 @@ async function handleTransferEvent(
   console.log("[handleTransferEvent] Transfer ID:", transfer.id);
   console.log("[handleTransferEvent] Destination:", transfer.destination);
   console.log("[handleTransferEvent] Amount:", transfer.amount / 100);
-  console.log("[handleTransferEvent] Status:", (transfer as any).status);
+  console.log(
+    "[handleTransferEvent] Status:",
+    (transfer as StripeTransferWithStatus).status,
+  );
 
   // Verify transfers to seller accounts
   // transfer.created = funds initiated to seller
   // transfer.updated = transfer metadata/status updated
   // transfer.reversed = transfer was reversed (partial or full)
 
-  const updateData: any = {
+  const updateData: Record<string, unknown> = {
     "metadata.transferId": transfer.id,
     "metadata.transferStatus": eventType,
     "metadata.transferDate": new Date(transfer.created * 1000),
@@ -1249,8 +1265,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       const renewalPrice =
         parseFloat(tier.renewalPrice || "0") * durationMonths;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sub = subscription as any;
+      const sub = subscription as StripeSubscriptionWithPeriodEnd;
       const newExpiryDate = sub.current_period_end
         ? new Date(sub.current_period_end * 1000)
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -1563,7 +1578,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   );
   console.log(
     "[handleInvoicePaymentFailed] Subscription:",
-    (invoice as any).subscription,
+    (invoice as StripeInvoiceWithSubscription).subscription,
   );
   console.log(
     "[handleInvoicePaymentFailed] Amount due:",
@@ -1654,10 +1669,6 @@ async function handlePaymentIntentCreated(paymentIntent: Stripe.PaymentIntent) {
   );
   console.log("[handlePaymentIntentCreated] Currency:", paymentIntent.currency);
   console.log("[handlePaymentIntentCreated] Status:", paymentIntent.status);
-  console.log(
-    "[handlePaymentIntentCreated] Metadata:",
-    JSON.stringify(paymentIntent.metadata, null, 2),
-  );
 
   // Log payment intent creation for audit trail
   // Can be used to track payment flow and detect issues early

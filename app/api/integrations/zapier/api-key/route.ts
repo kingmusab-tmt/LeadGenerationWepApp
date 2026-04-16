@@ -5,47 +5,59 @@
  * Date: January 21, 2026
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/userModel";
 import crypto from "crypto";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
+import {
+  internalError,
+  notFound,
+  unauthorized,
+  forbidden,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
+
+type ZapierApiSettings = {
+  twilioSid?: string;
+  twilioAuthToken?: string;
+  twilioPhoneNumber?: string;
+  zapierApiKeyHash?: string;
+  zapierApiKeyTruncated?: string;
+  zapierApiKeyCreatedAt?: Date;
+};
 
 /**
  * POST /api/integrations/zapier/api-key
  * Generate a new API key for Zapier actions
  */
-export async function POST(req: NextRequest) {
+export async function POST() {
   await dbConnect();
 
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     // Find user
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     // Check Zapier integration feature access
     const featureCheck = await checkFeatureAccess(
-      (user._id as any).toString(),
+      String(user._id),
       "zapierIntegration",
     );
     if (!featureCheck.allowed) {
-      return NextResponse.json(
-        {
-          error:
-            "Zapier integration is not available on your current plan. Please upgrade to access this feature.",
-        },
-        { status: 403 },
+      return forbidden(
+        "Zapier integration is not available on your current plan. Please upgrade to access this feature.",
       );
     }
 
@@ -66,9 +78,10 @@ export async function POST(req: NextRequest) {
 
     // Store hash + truncated preview (first 8 + last 4 chars)
     const truncatedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
-    (user.apiSettings as any).zapierApiKeyHash = apiKeyHash;
-    (user.apiSettings as any).zapierApiKeyTruncated = truncatedKey;
-    (user.apiSettings as any).zapierApiKeyCreatedAt = new Date();
+    const apiSettings = user.apiSettings as ZapierApiSettings;
+    apiSettings.zapierApiKeyHash = apiKeyHash;
+    apiSettings.zapierApiKeyTruncated = truncatedKey;
+    apiSettings.zapierApiKeyCreatedAt = new Date();
 
     await user.save();
 
@@ -83,10 +96,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error generating API key:", error);
-    return NextResponse.json(
-      { error: "Failed to generate API key" },
-      { status: 500 },
-    );
+    return internalError("Failed to generate API key");
   }
 }
 
@@ -94,27 +104,28 @@ export async function POST(req: NextRequest) {
  * DELETE /api/integrations/zapier/api-key
  * Revoke/delete the current API key
  */
-export async function DELETE(req: NextRequest) {
+export async function DELETE() {
   await dbConnect();
 
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     // Find user
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     // Remove API key hash
     if (user.apiSettings) {
-      delete (user.apiSettings as any).zapierApiKeyHash;
-      delete (user.apiSettings as any).zapierApiKeyTruncated;
-      delete (user.apiSettings as any).zapierApiKeyCreatedAt;
+      const apiSettings = user.apiSettings as ZapierApiSettings;
+      delete apiSettings.zapierApiKeyHash;
+      delete apiSettings.zapierApiKeyTruncated;
+      delete apiSettings.zapierApiKeyCreatedAt;
       await user.save();
     }
 
@@ -124,10 +135,7 @@ export async function DELETE(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error revoking API key:", error);
-    return NextResponse.json(
-      { error: "Failed to revoke API key" },
-      { status: 500 },
-    );
+    return internalError("Failed to revoke API key");
   }
 }
 
@@ -135,26 +143,26 @@ export async function DELETE(req: NextRequest) {
  * GET /api/integrations/zapier/api-key
  * Check if API key exists (doesn't return the key itself)
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   await dbConnect();
 
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     // Find user
     const user = await User.findOne({ email: session.user.email });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
-    const hasApiKey = !!(user.apiSettings as any)?.zapierApiKeyHash;
-    const createdAt = (user.apiSettings as any)?.zapierApiKeyCreatedAt;
-    const truncatedKey =
-      (user.apiSettings as any)?.zapierApiKeyTruncated || null;
+    const apiSettings = (user.apiSettings || {}) as ZapierApiSettings;
+    const hasApiKey = !!apiSettings.zapierApiKeyHash;
+    const createdAt = apiSettings.zapierApiKeyCreatedAt;
+    const truncatedKey = apiSettings.zapierApiKeyTruncated || null;
 
     return NextResponse.json({
       exists: hasApiKey,
@@ -166,9 +174,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error checking API key:", error);
-    return NextResponse.json(
-      { error: "Failed to check API key" },
-      { status: 500 },
-    );
+    return internalError("Failed to check API key");
   }
 }

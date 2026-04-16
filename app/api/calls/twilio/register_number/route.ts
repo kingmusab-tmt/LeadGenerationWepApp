@@ -4,25 +4,44 @@ import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
+import { env } from "@/lib/env";
 
 // Initialize Twilio client with system credentials
-const SYSTEM_TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const SYSTEM_TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const SYSTEM_TWILIO_ACCOUNT_SID = env.TWILIO_ACCOUNT_SID;
+const SYSTEM_TWILIO_AUTH_TOKEN = env.TWILIO_AUTH_TOKEN;
 const systemClient = twilio(
   SYSTEM_TWILIO_ACCOUNT_SID,
   SYSTEM_TWILIO_AUTH_TOKEN,
 );
 
+type TwilioLikeError = Error & {
+  code?: number;
+};
+
+function isTwilioLikeError(error: unknown): error is TwilioLikeError {
+  return error instanceof Error;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const userSession = await getServerSession(authOptions);
 
-    if (!userSession || !userSession.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userSession?.user?.id || !userSession.user?.role) {
+      return unauthorized("Authentication required");
     }
 
-    if (userSession.user.role !== "seller") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (
+      userSession.user.role !== "seller" &&
+      userSession.user.role !== "admin"
+    ) {
+      return forbidden("Seller or admin access required");
     }
 
     await dbConnect();
@@ -30,15 +49,22 @@ export async function POST(req: NextRequest) {
     const { sellerId, areaCode, industry, method, twilioNumber, purpose } =
       await req.json();
 
-    // Use sellerId from request or fall back to session user
-    const userId = sellerId || userSession.user.id;
+    // Only admins may target another seller via sellerId
+    const userId =
+      userSession.user.role === "admin" && sellerId
+        ? sellerId
+        : userSession.user.id;
+    if (
+      userSession.user.role !== "admin" &&
+      sellerId &&
+      String(sellerId) !== String(userSession.user.id)
+    ) {
+      return forbidden("You can only register numbers for your own account");
+    }
 
     // Validate required fields
     if (!industry || !method) {
-      return NextResponse.json(
-        { error: "industry and method are required" },
-        { status: 400 },
-      );
+      return badRequest("industry and method are required");
     }
 
     // For SMS, areaCode is optional - we'll use a default if not provided
@@ -49,21 +75,14 @@ export async function POST(req: NextRequest) {
       "+subscription +trackingNumbers",
     );
     if (!user) {
-      return NextResponse.json(
-        { error: "Seller not found. Please provide a valid sellerId." },
-        { status: 404 },
-      );
+      return notFound("Seller");
     }
 
     // Check subscription limits
     const subscription = user.subscription;
     if (!subscription || !subscription.isSubscriptionActive) {
-      return NextResponse.json(
-        {
-          error:
-            "No active subscription found. Please subscribe to a plan first.",
-        },
-        { status: 403 },
+      return forbidden(
+        "No active subscription found. Please subscribe to a plan first.",
       );
     }
 
@@ -73,6 +92,7 @@ export async function POST(req: NextRequest) {
     if (currentTwilioNumbers >= maxAllowed) {
       return NextResponse.json(
         {
+          success: false,
           error: "You've reached your Twilio number limit.",
           limitReached: true,
           currentCount: currentTwilioNumbers,
@@ -90,12 +110,7 @@ export async function POST(req: NextRequest) {
       );
 
       if (hasExistingNumber) {
-        return NextResponse.json(
-          {
-            error: "You already have a number for this industry.",
-          },
-          { status: 400 },
-        );
+        return badRequest("You already have a number for this industry.");
       }
     }
 
@@ -106,12 +121,8 @@ export async function POST(req: NextRequest) {
         purchasedNumber = twilioNumber;
       } else if (finalAreaCode) {
         if (!user.twilioAccountSid || !user.twilioAuthToken) {
-          return NextResponse.json(
-            {
-              error:
-                "Twilio credentials not found. Please set them in settings.",
-            },
-            { status: 400 },
+          return badRequest(
+            "Twilio credentials not found. Please set them in settings.",
           );
         }
 
@@ -126,45 +137,33 @@ export async function POST(req: NextRequest) {
           });
 
         if (numbers.length === 0) {
-          return NextResponse.json(
-            { error: "No available phone numbers for the provided area code." },
-            { status: 404 },
+          return notFound(
+            "No available phone numbers for the provided area code",
           );
         }
 
         const purchased = await userClient.incomingPhoneNumbers.create({
           phoneNumber: numbers[0].phoneNumber,
           friendlyName: `Seller ${userId} - ${industry}`,
-          voiceUrl: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${userId}`,
+          voiceUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${userId}`,
           voiceMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
       } else {
-        return NextResponse.json(
-          {
-            error:
-              "Either areaCode or twilioNumber must be provided for Manual method.",
-          },
-          { status: 400 },
+        return badRequest(
+          "Either areaCode or twilioNumber must be provided for Manual method.",
         );
       }
     } else if (method === "Automatic") {
       if (finalAreaCode && !/^\d{3}$/.test(finalAreaCode)) {
-        return NextResponse.json(
-          { error: "Invalid area code. It must be a 3-digit number." },
-          { status: 400 },
-        );
+        return badRequest("Invalid area code. It must be a 3-digit number.");
       }
 
       // For SMS, always use system credentials
       if (purpose === "sms") {
         if (!SYSTEM_TWILIO_ACCOUNT_SID || !SYSTEM_TWILIO_AUTH_TOKEN) {
-          return NextResponse.json(
-            {
-              error:
-                "System Twilio credentials not configured. Please contact administrator to set up TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.",
-            },
-            { status: 500 },
+          return internalError(
+            "System Twilio credentials not configured. Please contact administrator to set up TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.",
           );
         }
 
@@ -178,16 +177,15 @@ export async function POST(req: NextRequest) {
           });
 
         if (numbers.length === 0) {
-          return NextResponse.json(
-            { error: "No available phone numbers for the provided area code." },
-            { status: 404 },
+          return notFound(
+            "No available phone numbers for the provided area code",
           );
         }
 
         const purchased = await systemClient.incomingPhoneNumbers.create({
           phoneNumber: numbers[0].phoneNumber,
           friendlyName: `SMS - ${userId}`,
-          smsUrl: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/marketing/sms/inbound`,
+          smsUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/marketing/sms/inbound`,
           smsMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
@@ -208,25 +206,21 @@ export async function POST(req: NextRequest) {
           });
 
         if (numbers.length === 0) {
-          return NextResponse.json(
-            { error: "No available phone numbers for the provided area code." },
-            { status: 404 },
+          return notFound(
+            "No available phone numbers for the provided area code",
           );
         }
 
         const purchased = await clientToUse.incomingPhoneNumbers.create({
           phoneNumber: numbers[0].phoneNumber,
           friendlyName: `Seller ${userId} - ${industry}`,
-          voiceUrl: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${userId}`,
+          voiceUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${userId}`,
           voiceMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
       }
     } else {
-      return NextResponse.json(
-        { error: "Invalid method. Must be 'Manual' or 'Automatic'." },
-        { status: 400 },
-      );
+      return badRequest("Invalid method. Must be 'Manual' or 'Automatic'.");
     }
 
     // Add the purchased number to the seller's tracking numbers
@@ -260,19 +254,22 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        phoneNumber: purchasedNumber,
-        currentCount: currentTwilioNumbers + 1,
-        maxAllowed: maxAllowed,
-        message: `You've used ${
-          currentTwilioNumbers + 1
-        } of ${maxAllowed} allowed Twilio numbers.`,
+        success: true,
+        data: {
+          phoneNumber: purchasedNumber,
+          currentCount: currentTwilioNumbers + 1,
+          maxAllowed: maxAllowed,
+          message: `You've used ${
+            currentTwilioNumbers + 1
+          } of ${maxAllowed} allowed Twilio numbers.`,
+        },
       },
       { status: 200 },
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in POST /api/call_twilio/register_number:", error);
 
-    if (error instanceof Error && "code" in error) {
+    if (isTwilioLikeError(error) && error.code !== undefined) {
       let errorMessage = error.message;
       if (error.code === 21211) {
         errorMessage =
@@ -282,14 +279,16 @@ export async function POST(req: NextRequest) {
           "Twilio authentication failed. Please check your credentials.";
       }
       return NextResponse.json(
-        { error: `Twilio error: ${errorMessage} (Code: ${error.code})` },
+        {
+          success: false,
+          error: `Twilio error: ${errorMessage} (Code: ${error.code})`,
+        },
         { status: 500 },
       );
     }
 
-    return NextResponse.json(
-      { error: "An unexpected error occurred. Please try again later." },
-      { status: 500 },
+    return internalError(
+      "An unexpected error occurred. Please try again later.",
     );
   }
 }

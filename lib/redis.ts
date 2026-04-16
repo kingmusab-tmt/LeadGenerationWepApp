@@ -1,50 +1,71 @@
 import redis, { RedisClientType } from "redis";
 
-let redisClient: RedisClientType;
+let redisClient: RedisClientType | null = null;
+let redisConnectPromise: Promise<RedisClientType | null> | null = null;
+
+const DEFAULT_SESSION_TTL_SECONDS = 86400;
+const DEFAULT_USER_CACHE_TTL_SECONDS = 3600;
+
+function getRedisUrl(): string {
+  return process.env.REDIS_URL || "redis://localhost:6379";
+}
 
 /**
  * Get or create Redis client connection
  */
 export async function getRedisClient(): Promise<RedisClientType | null> {
-  if (redisClient && redisClient.isOpen) {
+  if (redisClient?.isOpen) {
     return redisClient;
   }
 
-  try {
-    // Create new Redis client
-    redisClient = redis.createClient({
-      url: process.env.REDIS_URL || "redis://localhost:6379",
-    });
-
-    // Handle errors
-    redisClient.on("error", (err) => {
-      console.error("[Redis Error]", err);
-    });
-
-    redisClient.on("connect", () => {
-      console.log("[Redis] Connected successfully");
-    });
-
-    // Connect to Redis
-    await redisClient.connect();
-
-    return redisClient;
-  } catch (error) {
-    console.warn(
-      "[Redis] Connection failed - running without Redis cache:",
-      error instanceof Error ? error.message : error,
-    );
-    return null;
+  if (redisConnectPromise) {
+    return redisConnectPromise;
   }
+
+  redisConnectPromise = (async () => {
+    try {
+      if (!redisClient) {
+        redisClient = redis.createClient({
+          url: getRedisUrl(),
+        });
+
+        redisClient.on("error", (err) => {
+          console.error("[Redis Error]", err);
+        });
+
+        redisClient.on("connect", () => {
+          console.log("[Redis] Connected successfully");
+        });
+      }
+
+      if (!redisClient.isOpen) {
+        await redisClient.connect();
+      }
+
+      return redisClient;
+    } catch (error) {
+      console.warn(
+        "[Redis] Connection failed - running without Redis cache:",
+        error instanceof Error ? error.message : error,
+      );
+      return null;
+    } finally {
+      redisConnectPromise = null;
+    }
+  })();
+
+  return redisConnectPromise;
 }
 
 /**
  * Close Redis connection
  */
 export async function closeRedisConnection() {
-  if (redisClient && redisClient.isOpen) {
+  if (redisClient?.isOpen) {
     await redisClient.quit();
   }
+  redisClient = null;
+  redisConnectPromise = null;
 }
 
 /**
@@ -80,7 +101,7 @@ export async function getSessionCache(
 export async function setSessionCache(
   sessionToken: string,
   sessionData: any,
-  ttlSeconds: number = 86400,
+  ttlSeconds: number = DEFAULT_SESSION_TTL_SECONDS,
 ): Promise<void> {
   try {
     const client = await getRedisClient();
@@ -125,19 +146,15 @@ export async function invalidateUserSessions(userId: string): Promise<void> {
       return; // Redis not available
     }
 
-    const keys = await client.keys(`user-sessions:${userId}:*`);
+    const userSessionSetKey = `user-sessions:${userId}`;
+    const sessionTokens = await client.sMembers(userSessionSetKey);
 
-    if (keys.length > 0) {
-      for (const key of keys) {
-        // Get session token from key pattern: user-sessions:userId:sessionToken
-        const sessionToken = key.split(":").pop();
-        if (sessionToken) {
-          await client.del(`session:${sessionToken}`);
-        }
-      }
-      // Also delete the session list
-      await client.del(`user-sessions:${userId}`);
+    if (sessionTokens.length > 0) {
+      const sessionKeys = sessionTokens.map((token) => `session:${token}`);
+      await client.del(sessionKeys);
     }
+
+    await client.del(userSessionSetKey);
   } catch (error) {
     console.error("[Redis] Error invalidating user sessions:", error);
   }
@@ -159,7 +176,7 @@ export async function trackUserSession(
     // Store session token in a set for the user
     await client.sAdd(`user-sessions:${userId}`, sessionToken);
     // Set expiry to 24 hours
-    await client.expire(`user-sessions:${userId}`, 86400);
+    await client.expire(`user-sessions:${userId}`, DEFAULT_SESSION_TTL_SECONDS);
   } catch (error) {
     console.error("[Redis] Error tracking user session:", error);
   }
@@ -187,7 +204,7 @@ export async function getUserSessionsCount(userId: string): Promise<number> {
 export async function setUserCache(
   userId: string,
   userData: any,
-  ttlSeconds: number = 3600, // 1 hour default
+  ttlSeconds: number = DEFAULT_USER_CACHE_TTL_SECONDS,
 ): Promise<void> {
   try {
     const client = await getRedisClient();

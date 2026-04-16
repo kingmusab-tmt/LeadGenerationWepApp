@@ -15,6 +15,13 @@ import dbConnect from "@/lib/connectdb";
 import { WebhookConfig } from "@/models/webhookConfig";
 import { WebhookManager } from "@/lib/integrations/webhookHandler";
 import { decryptData } from "@/lib/encryption";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -39,44 +46,32 @@ export async function POST(req: NextRequest) {
     const timestamp = req.headers.get("x-webhook-timestamp");
 
     if (!webhookId || !signature) {
-      return NextResponse.json(
-        {
-          error: "Missing required headers: x-webhook-id, x-webhook-signature",
-        },
-        { status: 400 },
+      return badRequest(
+        "Missing required headers: x-webhook-id, x-webhook-signature",
       );
     }
 
     // Validate webhook ID format
     if (!webhookId || !webhookId.match(/^[0-9a-fA-F]{24}$/)) {
-      return NextResponse.json(
-        { error: "Invalid webhook ID format" },
-        { status: 400 },
-      );
+      return badRequest("Invalid webhook ID format");
     }
 
     // Fetch webhook configuration
     const webhook = await WebhookConfig.findById(webhookId);
     if (!webhook) {
-      return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
+      return notFound("Webhook");
     }
 
     if (!webhook.isActive) {
-      return NextResponse.json(
-        { error: "Webhook is inactive" },
-        { status: 403 },
-      );
+      return forbidden("Webhook is inactive");
     }
 
     // Parse request body
     let payload: Record<string, unknown>;
     try {
       payload = await req.json();
-    } catch (error) {
-      return NextResponse.json(
-        { error: "Invalid JSON in request body" },
-        { status: 400 },
-      );
+    } catch {
+      return badRequest("Invalid JSON in request body");
     }
 
     // Decrypt secret
@@ -85,10 +80,7 @@ export async function POST(req: NextRequest) {
       secret = decryptData(webhook.secret);
     } catch (error) {
       console.error("Error decrypting webhook secret:", error);
-      return NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 },
-      );
+      return internalError("Internal server error");
     }
 
     // Verify signature with replay protection
@@ -105,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     if (!isValid) {
       console.warn("Invalid webhook signature for ID:", webhookId);
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      return unauthorized("Invalid signature");
     }
 
     // Determine event type from payload
@@ -135,14 +127,7 @@ export async function POST(req: NextRequest) {
                         : null;
 
     if (eventKey && !webhook.events[eventKey as keyof typeof webhook.events]) {
-      return NextResponse.json(
-        {
-          error: "This webhook is not configured for this event type",
-          received: eventType,
-          action: eventAction,
-        },
-        { status: 403 },
-      );
+      return forbidden("This webhook is not configured for this event type");
     }
 
     // Check rate limits
@@ -161,39 +146,30 @@ export async function POST(req: NextRequest) {
       webhook.rateLimit?.maxPerMinute &&
       recentLogs.length >= webhook.rateLimit.maxPerMinute
     ) {
-      return NextResponse.json(
-        {
-          error: "Rate limit exceeded (per minute)",
-          limit: webhook.rateLimit.maxPerMinute,
-        },
-        { status: 429 },
-      );
+      return badRequest("Rate limit exceeded (per minute)", {
+        limit: webhook.rateLimit.maxPerMinute,
+      });
     }
 
     if (
       webhook.rateLimit?.maxPerHour &&
       hourlyLogs.length >= webhook.rateLimit.maxPerHour
     ) {
-      return NextResponse.json(
-        {
-          error: "Rate limit exceeded (per hour)",
-          limit: webhook.rateLimit.maxPerHour,
-        },
-        { status: 429 },
-      );
+      return badRequest("Rate limit exceeded (per hour)", {
+        limit: webhook.rateLimit.maxPerHour,
+      });
     }
 
     // Process the webhook
-    const result = await WebhookManager.processIncoming(req, webhook as any);
+    const result = await WebhookManager.processIncoming(req, {
+      secret,
+      isActive: webhook.isActive,
+    });
 
     if (!result.success) {
-      return NextResponse.json(
-        {
-          error: result.error || "Failed to process webhook",
-          message: result.message,
-        },
-        { status: 400 },
-      );
+      return badRequest(result.error || "Failed to process webhook", {
+        message: result.message,
+      });
     }
 
     // Record successful dispatch
@@ -213,10 +189,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error processing incoming webhook:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }
 
@@ -224,7 +197,7 @@ export async function POST(req: NextRequest) {
  * GET /api/integrations/webhooks/incoming
  * Verify webhook endpoint is active (for external service health checks)
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     status: "active",
     message: "Webhook endpoint is ready to receive webhooks",

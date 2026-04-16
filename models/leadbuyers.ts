@@ -2,7 +2,6 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 // Define the interface for the Buyer document
 export interface IBuyer extends Document {
-  industries: any;
   _id: string;
   name: string;
   company: string;
@@ -122,7 +121,7 @@ export interface IBuyer extends Document {
     rating: number;
     comment: string;
   }[];
-  registeredWith: mongoose.Types.ObjectId;
+  registeredWith?: mongoose.Types.ObjectId | null;
   leadTypes: ("exclusive" | "shared")[];
   maxPricePerLead: number;
   autoAcceptMatchingLeads: boolean;
@@ -149,7 +148,7 @@ export interface IBuyer extends Document {
     fields: Array<{
       id: string;
       label: string;
-      value: any;
+      value: unknown;
     }>;
     aiQualityScore?: number;
     qualityLevel?: "High" | "Medium" | "Low";

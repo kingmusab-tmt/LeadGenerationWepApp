@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 
 interface ConfirmOptions {
   title?: string;
@@ -27,26 +27,29 @@ export function useConfirm() {
     open: false,
     message: "",
   });
+  const resolveRef = useRef<((value: boolean) => void) | null>(null);
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
+      resolveRef.current = resolve;
       setConfirmState({
         open: true,
         ...options,
-        resolve,
       });
     });
   }, []);
 
   const handleConfirm = useCallback(() => {
-    confirmState.resolve?.(true);
+    resolveRef.current?.(true);
+    resolveRef.current = null;
     setConfirmState({ open: false, message: "" });
-  }, [confirmState]);
+  }, []);
 
   const handleCancel = useCallback(() => {
-    confirmState.resolve?.(false);
+    resolveRef.current?.(false);
+    resolveRef.current = null;
     setConfirmState({ open: false, message: "" });
-  }, [confirmState]);
+  }, []);
 
   return {
     confirm,

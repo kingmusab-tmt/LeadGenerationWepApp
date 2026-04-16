@@ -27,6 +27,13 @@ interface BuyerOption {
   email: string;
 }
 
+interface BuyerApiItem {
+  _id: string;
+  name: string;
+  company: string;
+  email: string;
+}
+
 const ManualCreditPage: React.FC = () => {
   const [buyers, setBuyers] = useState<BuyerOption[]>([]);
   const [selectedBuyer, setSelectedBuyer] = useState<BuyerOption | null>(null);
@@ -47,9 +54,12 @@ const ManualCreditPage: React.FC = () => {
       try {
         const response = await fetch("/api/buyers");
         if (!response.ok) throw new Error("Failed to fetch buyers");
-        const data = await response.json();
+        const result = await response.json();
+        const buyersData: BuyerApiItem[] = Array.isArray(result?.data)
+          ? (result.data as BuyerApiItem[])
+          : [];
 
-        const formattedBuyers = data.map((buyer: any) => ({
+        const formattedBuyers = buyersData.map((buyer) => ({
           id: buyer._id,
           name: buyer.name,
           company: buyer.company,
@@ -57,7 +67,7 @@ const ManualCreditPage: React.FC = () => {
         }));
 
         setBuyers(formattedBuyers);
-      } catch (error) {
+      } catch {
         setSnackbar({
           open: true,
           message: "Failed to load buyers",
@@ -137,10 +147,12 @@ const ManualCreditPage: React.FC = () => {
       setCashPaid("");
       setNumberOfCredits("");
       setDescription("");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to add credits";
       setSnackbar({
         open: true,
-        message: error.message || "Failed to add credits",
+        message,
         severity: "error",
       });
     } finally {
@@ -164,7 +176,7 @@ const ManualCreditPage: React.FC = () => {
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          Credit units to a buyer's account when they pay cash directly.
+          Credit units to a buyer&lsquo;s account when they pay cash directly.
         </Typography>
 
         <Box component="form" onSubmit={handleSubmit}>
@@ -177,16 +189,45 @@ const ManualCreditPage: React.FC = () => {
             onChange={(event, newValue) => setSelectedBuyer(newValue)}
             getOptionLabel={(option) => option?.name || ""}
             isOptionEqualToValue={(option, value) => option.id === value.id}
-            renderOption={(props, option) => (
-              <Box component="li" {...props}>
-                <Box>
-                  <Typography variant="body1">{option.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    ({option.company})
-                  </Typography>
-                </Box>
-              </Box>
-            )}
+            renderOption={(props, option) => {
+              const optionProps = props as unknown as {
+                key: React.Key;
+                ref?: React.Ref<HTMLLIElement>;
+                className?: string;
+                id?: string;
+                onClick?: React.MouseEventHandler<HTMLLIElement>;
+                onMouseMove?: React.MouseEventHandler<HTMLLIElement>;
+                onTouchStart?: React.TouchEventHandler<HTMLLIElement>;
+                tabIndex?: number;
+                role?: string;
+                ["data-option-index"]?: number;
+                ["aria-disabled"]?: boolean;
+                ["aria-selected"]?: boolean;
+              };
+              return (
+                <li
+                  key={optionProps.key}
+                  ref={optionProps.ref}
+                  className={optionProps.className}
+                  id={optionProps.id}
+                  onClick={optionProps.onClick}
+                  onMouseMove={optionProps.onMouseMove}
+                  onTouchStart={optionProps.onTouchStart}
+                  tabIndex={optionProps.tabIndex}
+                  role={optionProps.role}
+                  data-option-index={optionProps["data-option-index"]}
+                  aria-disabled={optionProps["aria-disabled"]}
+                  aria-selected={optionProps["aria-selected"]}
+                >
+                  <Box>
+                    <Typography variant="body1">{option.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      ({option.company})
+                    </Typography>
+                  </Box>
+                </li>
+              );
+            }}
             renderInput={(params) => (
               <TextField
                 {...params}

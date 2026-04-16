@@ -1,40 +1,36 @@
 "use server";
 
 import { getServerSession } from "next-auth";
-import client from "./db";
 import { authOptions } from "@/auth";
+import dbConnect from "@/lib/connectdb";
+import { User } from "@/models/userModel";
 
 export const setName = async (name: string) => {
-  // Check if the user is authenticated
-const session = await getServerSession(authOptions);
-  if (!session) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
     throw new Error("Unauthorized");
   }
 
-  const userId: string | null = session.user?.id;
-  if (userId === null) {
-    throw new Error("User ID is null");
+  const trimmedName = String(name || "").trim();
+  if (trimmedName.length < 2 || trimmedName.length > 100) {
+    throw new Error("Name must be between 2 and 100 characters");
   }
 
-  // Sanitize input
-  const uuidRegExp: RegExp =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-  if (typeof userId !== "string" || !uuidRegExp.test(userId)) {
-    throw new Error("Invalid UUID");
+  // Reject control characters to avoid malformed profile data
+  if (/[\x00-\x1F\x7F]/.test(trimmedName)) {
+    throw new Error("Name contains invalid characters");
   }
-  name = name.trim();
 
-  // Update the user's name in the database
   try {
-    const db = client.db("your_database_name"); // Replace with your database name
-    const usersCollection = db.collection("users"); // Replace with your collection name
+    await dbConnect();
 
-    const result = await usersCollection.updateOne(
-      { id: userId }, // Match user by ID
-      { $set: { name: name } } // Update the name field
+    const result = await User.updateOne(
+      { _id: session.user.id },
+      { $set: { name: trimmedName } },
+      { runValidators: true },
     );
 
-    if (result.matchedCount === 0) {
+    if (!result.matchedCount) {
       throw new Error("User not found");
     }
 

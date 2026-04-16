@@ -3,7 +3,7 @@
 
 "use client";
 
-import { createContext } from "react";
+import { createContext, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type React from "react";
 
@@ -33,12 +33,17 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const router = useRouter();
 
-  const navigateTo = (path: string) => {
-    router.push(`/dashboard/${path}`, { scroll: false });
-  };
+  const navigateTo = useCallback(
+    (path: string) => {
+      router.push(`/dashboard/${path}`, { scroll: false });
+    },
+    [router],
+  );
+
+  const value = useMemo(() => ({ navigateTo }), [navigateTo]);
 
   return (
-    <NavigationContext.Provider value={{ navigateTo }}>
+    <NavigationContext.Provider value={value}>
       {children}
     </NavigationContext.Provider>
   );

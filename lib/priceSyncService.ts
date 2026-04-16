@@ -671,7 +671,7 @@ export async function notifyAdminOfPriceSyncIssues(
 
   await sendNotification({
     userId: adminUserId,
-    type: "system",
+    type: "alert",
     title: "Price Sync Alert",
     message: `${issues.length} tier(s) have price mismatches. ${issueDetails.replace(/\n/g, " ")} Please review and sync prices in the admin dashboard.`,
     metadata: {

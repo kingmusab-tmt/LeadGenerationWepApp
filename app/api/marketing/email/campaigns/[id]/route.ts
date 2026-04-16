@@ -6,6 +6,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { EmailCampaign, EmailQueue } from "@/models/emailCampaign";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +21,14 @@ export const dynamic = "force-dynamic";
  * Get campaign details
  */
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -29,24 +36,18 @@ export async function GET(
     const campaign = await EmailCampaign.findById(id);
 
     if (!campaign) {
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 },
-      );
+      return notFound("Campaign");
     }
 
     // Check ownership
     if (campaign.userId.toString() !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbidden("Forbidden");
     }
 
     return NextResponse.json(campaign, { status: 200 });
   } catch (error) {
     console.error("Error fetching campaign:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch campaign" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch campaign");
   }
 }
 
@@ -62,7 +63,7 @@ export async function PUT(
     const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -70,22 +71,18 @@ export async function PUT(
     const campaign = await EmailCampaign.findById(id);
 
     if (!campaign) {
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 },
-      );
+      return notFound("Campaign");
     }
 
     // Check ownership
     if (campaign.userId.toString() !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbidden("Forbidden");
     }
 
     // Cannot update if campaign is sending or completed
     if (["sending", "completed"].includes(campaign.status)) {
-      return NextResponse.json(
-        { error: `Cannot update campaign with status: ${campaign.status}` },
-        { status: 400 },
+      return badRequest(
+        `Cannot update campaign with status: ${campaign.status}`,
       );
     }
 
@@ -138,10 +135,7 @@ export async function PUT(
     );
   } catch (error) {
     console.error("Error updating campaign:", error);
-    return NextResponse.json(
-      { error: "Failed to update campaign" },
-      { status: 500 },
-    );
+    return internalError("Failed to update campaign");
   }
 }
 
@@ -150,14 +144,14 @@ export async function PUT(
  * Delete campaign
  */
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -165,23 +159,17 @@ export async function DELETE(
     const campaign = await EmailCampaign.findById(id);
 
     if (!campaign) {
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 },
-      );
+      return notFound("Campaign");
     }
 
     // Check ownership
     if (campaign.userId.toString() !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbidden("Forbidden");
     }
 
     // Cannot delete if campaign is sending
     if (campaign.status === "sending") {
-      return NextResponse.json(
-        { error: "Cannot delete campaign while sending" },
-        { status: 400 },
-      );
+      return badRequest("Cannot delete campaign while sending");
     }
 
     // Delete campaign and associated queue items
@@ -194,9 +182,6 @@ export async function DELETE(
     );
   } catch (error) {
     console.error("Error deleting campaign:", error);
-    return NextResponse.json(
-      { error: "Failed to delete campaign" },
-      { status: 500 },
-    );
+    return internalError("Failed to delete campaign");
   }
 }

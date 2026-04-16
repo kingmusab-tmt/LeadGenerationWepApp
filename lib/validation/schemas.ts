@@ -116,7 +116,6 @@ export const createEmailCampaignSchema = z.object({
       frequency: z.enum(["daily", "weekly", "monthly"]).optional(),
     })
     .optional(),
-  template: z.string().optional(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -163,7 +162,6 @@ export const createSMSCampaignSchema = z.object({
       recurring: z.boolean().optional(),
     })
     .optional(),
-  template: z.string().optional(),
 });
 
 export const updateSMSCampaignSchema = createSMSCampaignSchema.partial();
@@ -283,30 +281,75 @@ export const createNotificationSchema = z.object({
 export const createAutomationWorkflowSchema = z.object({
   name: z.string().min(1, "Workflow name is required").max(100),
   description: z.string().max(500).optional(),
-  trigger: z.object({
-    type: z.enum([
-      "lead_created",
-      "email_opened",
-      "link_clicked",
-      "form_submitted",
-    ]),
-    conditions: z.record(z.string(), z.any()).optional(),
-  }),
+  isActive: z.boolean().optional(),
+  triggers: z
+    .array(
+      z.object({
+        type: z.enum([
+          "lead_received",
+          "lead_accepted",
+          "lead_qualified",
+          "scheduled",
+          "manual",
+        ]),
+        conditions: z
+          .array(
+            z.object({
+              field: z.string().min(1),
+              operator: z.enum([
+                "equals",
+                "contains",
+                "greater_than",
+                "less_than",
+                "in_array",
+                "exists",
+              ]),
+              value: z.union([
+                z.string(),
+                z.number(),
+                z.boolean(),
+                z.array(z.string()),
+              ]),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .min(1, "At least one trigger is required"),
   actions: z
     .array(
       z.object({
         type: z.enum([
           "send_email",
           "send_sms",
-          "add_tag",
-          "assign_owner",
-          "webhook",
+          "create_notification",
+          "assign_buyer",
+          "update_lead",
         ]),
-        params: z.record(z.string(), z.any()),
+        config: z
+          .object({
+            subject: z.string().optional(),
+            body: z.string().optional(),
+            message: z.string().optional(),
+            notificationTitle: z.string().optional(),
+            notificationBody: z.string().optional(),
+            notificationType: z
+              .enum(["info", "success", "warning", "error"])
+              .optional(),
+            buyerId: z.string().optional(),
+            updateFields: z.record(z.string(), z.any()).optional(),
+            delayMinutes: z.coerce.number().int().min(0).optional(),
+            priority: z.enum(["low", "normal", "high"]).optional(),
+          })
+          .default({}),
       }),
     )
     .min(1, "At least one action is required"),
-  enabled: z.boolean().optional(),
+  maxExecutions: z.coerce.number().int().positive().optional(),
+  cooldownMinutes: z.coerce.number().int().min(0).optional(),
+  priority: z.enum(["low", "normal", "high"]).optional(),
+  tags: z.array(z.string()).optional(),
+  notes: z.string().max(1000).optional(),
 });
 
 export const updateAutomationWorkflowSchema =

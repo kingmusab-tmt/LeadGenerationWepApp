@@ -65,8 +65,9 @@ export function useSessionRefresh(
         }
 
         return { success: true, session: data.session };
-      } catch (err: any) {
-        const errorMessage = err.message || "Failed to refresh session";
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to refresh session";
         setError(errorMessage);
         return { success: false, error: errorMessage };
       } finally {

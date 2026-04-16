@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -12,20 +14,37 @@ interface GenerateCampaignRequest {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+
     const body: GenerateCampaignRequest = await req.json();
     const { campaignType, description, includeRecipientName, recipientSource } =
       body;
 
     if (!description || description.trim().length === 0) {
       return NextResponse.json(
-        { error: "Description is required" },
+        { success: false, error: "Description is required" },
         { status: 400 },
       );
     }
 
     if (!["email", "sms"].includes(campaignType)) {
       return NextResponse.json(
-        { error: "Invalid campaign type" },
+        { success: false, error: "Invalid campaign type" },
+        { status: 400 },
+      );
+    }
+
+    if (
+      !["leads", "buyers", "leadsAndBuyers", "all"].includes(recipientSource)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid recipient source" },
         { status: 400 },
       );
     }
@@ -56,10 +75,16 @@ export async function POST(req: NextRequest) {
       success: true,
       data: generatedContent,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("AI generation error:", error);
     return NextResponse.json(
-      { error: error?.message || "Failed to generate campaign content" },
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate campaign content",
+      },
       { status: 500 },
     );
   }

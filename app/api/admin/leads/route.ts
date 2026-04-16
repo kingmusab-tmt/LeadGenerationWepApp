@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
 import mongoose from "mongoose";
 import { Lead } from "@/models/leads";
 import { User } from "@/models";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { internalError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
 
@@ -34,7 +34,12 @@ export async function GET(req: NextRequest) {
               name: (lead.userId as unknown as { name: string }).name,
             }
           : {
-              id: (lead.userId as any)?.toString() || "",
+              id:
+                typeof lead.userId === "string"
+                  ? lead.userId
+                  : lead.userId
+                    ? String(lead.userId)
+                    : "",
               name: "",
             },
       buyer:
@@ -53,9 +58,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ leads: formattedLeads });
   } catch (error) {
     console.error("Failed to fetch leads:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch leads" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch leads");
   }
 }

@@ -159,9 +159,20 @@ const RoleSelectionPage: React.FC = () => {
             router.push("/seller-onboarding");
             return;
           } else {
-            // Trial failed (possibly already used), redirect to plan page
-            console.error("[CompleteRegistration] Failed to start trial");
+            const trialError = await trialResponse.json().catch(() => null);
+            const trialMessage =
+              trialError?.message ||
+              "Your free trial could not be started. Please review the available plans.";
+
+            // Expected rejections such as an already-used trial should not be treated as errors.
             sessionStorage.removeItem("trialIntent");
+
+            setSnackbar({
+              open: true,
+              message: trialMessage,
+              severity: trialResponse.status === 409 ? "info" : "warning",
+            });
+
             router.push("/plan");
             return;
           }
@@ -375,7 +386,7 @@ const RoleSelectionPage: React.FC = () => {
                   Available Roles
                 </Typography>
                 <Typography variant="body1" color="text.secondary" gutterBottom>
-                  Choose how you'll be using our platform:
+                  Choose how you&apos;ll be using our platform:
                 </Typography>
 
                 <Box

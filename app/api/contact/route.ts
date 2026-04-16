@@ -36,12 +36,12 @@ export async function POST(req: NextRequest) {
       secure: Number(process.env.EMAIL_PORT) === 465,
       auth: {
         user: process.env.EMAIL_SERVER_USER,
-        pass: process.env.EMAIL_PASSWORD,
+        pass: process.env.EMAIL_SERVER_PASSWORD || process.env.EMAIL_PASSWORD,
       },
     });
 
     await transporter.sendMail({
-      from: `"BRIXCOT Contact Form" <${process.env.EMAIL_FROM}>`,
+      from: `"${process.env.EMAIL_FROM_NAME || "BRIXCOT Contact Form"}" <${process.env.EMAIL_FROM}>`,
       to: process.env.EMAIL_FROM, // deliver to the support inbox
       replyTo: email,
       subject: subject

@@ -7,6 +7,12 @@ import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Types } from "mongoose";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,28 +21,19 @@ export async function POST(req: NextRequest) {
 
     // Validate unitCost
     if (typeof unitCost !== "number" || unitCost <= 0) {
-      return NextResponse.json(
-        { success: false, message: "Invalid unit cost" },
-        { status: 400 },
-      );
+      return badRequest("Invalid unit cost");
     }
 
     // Get the session to retrieve the buyer's email
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "buyer") {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 },
-      );
+      return unauthorized("Authentication required");
     }
 
     // Find the buyer using the session email
     const buyer = await Buyer.findOne({ email: session.user.email });
     if (!buyer) {
-      return NextResponse.json(
-        { success: false, message: "Buyer not found" },
-        { status: 404 },
-      );
+      return notFound("Buyer");
     }
 
     // Ensure walletBalance is a valid number
@@ -46,35 +43,23 @@ export async function POST(req: NextRequest) {
 
     // Check if the buyer has sufficient wallet balance
     if (buyer.walletUnit < unitCost) {
-      return NextResponse.json(
-        { success: false, message: "Insufficient wallet balance" },
-        { status: 400 },
-      );
+      return badRequest("Insufficient wallet balance");
     }
 
     // Find the lead
     const lead = await Lead.findById(leadId);
     if (!lead) {
-      return NextResponse.json(
-        { success: false, message: "Lead not found" },
-        { status: 404 },
-      );
+      return notFound("Lead");
     }
 
     // Check if the lead is available
     if (lead.status !== "available") {
-      return NextResponse.json(
-        { success: false, message: "Lead is not available for purchase" },
-        { status: 400 },
-      );
+      return badRequest("Lead is not available for purchase");
     }
 
     // Check if the lead is already sold out
     if (lead.soldCount >= lead.shareNumber) {
-      return NextResponse.json(
-        { success: false, message: "Lead is no longer available" },
-        { status: 400 },
-      );
+      return badRequest("Lead is no longer available");
     }
 
     // Update the lead
@@ -162,9 +147,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error purchasing lead:", error);
-    return NextResponse.json(
-      { success: false, message: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 import StripeOnboarding from "@/app/components/sellerComponent/payout/stripeonboarding/StripeOnboarding";
 import React from "react";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 
 type StripeOnboardingPageProps = {
   onSaveHandlerReady?: ((saveHandler: () => Promise<boolean>) => void) | null;

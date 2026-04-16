@@ -33,9 +33,9 @@ import UnitPricingComponent from "@/app/dashboard/seller/settings/unitsetting/pa
 import StripeOnboardingPage from "@/app/dashboard/seller/settings/stripeonboarding/page";
 import LeadDistributionSettings from "@/app/dashboard/seller/settings/leadsellersetting/page";
 import EmailSettingsPage from "@/app/dashboard/seller/settings/emailsetting/page";
-import { useInitializeUser, useAppDispatch } from "@/lib/hooks";
+import { useInitializeUser, useAppDispatch } from "@/app/hooks";
 import { updateUser } from "@/lib/userSlice";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 import {
   SELLER_ONBOARDING_STEPS,
   SellerOnboardingStep,
@@ -88,6 +88,9 @@ interface UpdateUserPayload {
 }
 
 const hasText = (value?: string) => Boolean(value && value.trim().length > 0);
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
 
 const isGeneralStepComplete = (user: BasicUserInfo | null) => {
   if (!user) return false;
@@ -244,6 +247,20 @@ const SellerOnboardingPage = () => {
     if (userLoading) return;
     if (!currentUser) {
       router.replace("/auth/sign-in");
+      return;
+    }
+
+    const isSellerRole =
+      currentUser.role === "seller" || currentUser.role === "business-admin";
+
+    if (!isSellerRole) {
+      if (currentUser.role === "admin") {
+        router.replace("/admindashboard/overview");
+      } else if (currentUser.role === "buyer" || currentUser.role === "staff") {
+        router.replace("/dashboard/buyer/overview");
+      } else {
+        router.replace("/completeregistration");
+      }
     }
   }, [userLoading, currentUser, router]);
 
@@ -363,14 +380,31 @@ const SellerOnboardingPage = () => {
 
       notify(response.data.message || "Failed to save profile", "error");
       return false;
-    } catch (error: any) {
-      if (error.response?.data?.errors) {
-        setFieldErrors(extractFieldErrors(error.response.data.errors));
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        isStringArray(
+          (error as { response?: { data?: { errors?: unknown } } }).response
+            ?.data?.errors,
+        )
+      ) {
+        const validationErrors = (
+          error as { response?: { data?: { errors?: string[] } } }
+        ).response?.data?.errors;
+        setFieldErrors(extractFieldErrors(validationErrors ?? []));
       }
-      notify(
-        error.response?.data?.message || "Failed to save profile information",
-        "error",
-      );
+      const errorMessage =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: unknown } } })
+          .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || "Failed to save profile information"
+          : "Failed to save profile information";
+      notify(errorMessage, "error");
       return false;
     } finally {
       setSaving(false);

@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Build update object — use dot notation for emailSettings to avoid wiping unaffected fields
-    const updateObj: Record<string, any> = {};
+    const updateObj: Record<string, unknown> = {};
     if (typeof validatedData.autoAssignLeads === "boolean") {
       updateObj.autoAssignLeads = validatedData.autoAssignLeads;
     }

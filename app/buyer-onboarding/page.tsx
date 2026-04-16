@@ -24,8 +24,8 @@ import {
   Room as LocationIcon,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
-import { useInitializeUser } from "@/lib/hooks";
-import { useNotification } from "@/lib/useNotification";
+import { useInitializeUser } from "@/app/hooks";
+import { useNotification } from "@/app/hooks";
 import AccountSettings from "@/app/dashboard/buyer/settings/settings";
 import {
   BUYER_ONBOARDING_STEPS,
@@ -112,7 +112,16 @@ const BuyerOnboardingPage = () => {
     }
 
     if (currentUser.role !== "buyer") {
-      router.replace("/dashboard/buyer/overview");
+      if (currentUser.role === "admin") {
+        router.replace("/admindashboard/overview");
+      } else if (
+        currentUser.role === "seller" ||
+        currentUser.role === "business-admin"
+      ) {
+        router.replace("/dashboard/seller/overview");
+      } else {
+        router.replace("/completeregistration");
+      }
     }
   }, [userLoading, currentUser, router]);
 

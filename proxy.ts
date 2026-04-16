@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { verifyCSRFToken } from "./lib/csrf";
 
 /**
  * Next.js Proxy (formerly middleware)
@@ -21,11 +22,21 @@ const publicRoutes = [
   "/contact",
   "/how-it-works",
   "/support",
+  "/pricing",
   "/follow-up",
   "/form",
   "/register-buyer",
   "/plan",
   "/demo",
+  "/private-policy",
+  "/terms-of-service",
+  "/legal",
+  "/responsible-disclosure",
+  "/trust",
+  "/cookie-preferences",
+  "/your-privacy-choices",
+  /^\/privacy-information$/, // Exact match for /privacy-information
+  "/privacy-information",
   /^\/form\/.*$/,
 ];
 
@@ -67,9 +78,10 @@ export async function proxy(request: NextRequest) {
 
   // ✅ Skip public routes
   const isPublicRoute = publicRoutes.some((route) => {
-    return typeof route === "string"
-      ? pathname.startsWith(route)
-      : route.test(pathname);
+    if (typeof route === "string") {
+      return route === "/" ? pathname === "/" : pathname.startsWith(route);
+    }
+    return route.test(pathname);
   });
 
   if (isPublicRoute) {
@@ -88,12 +100,6 @@ export async function proxy(request: NextRequest) {
   // Note: NextAuth middleware reads the JWT without running callbacks, so token
   // can be stale immediately after DB updates. Let dashboard pages enforce
   // subscription via server-side checks to avoid redirect loops.
-  const isDashboardRoute = pathname.startsWith("/dashboard/");
-  const isAllowedSubscriptionRoute =
-    pathname.startsWith("/plan") ||
-    pathname.startsWith("/checkout") ||
-    pathname.startsWith("/subscription-expired");
-
   // Removed subscription enforcement in middleware to avoid loops due to stale JWTs
   // Dashboard and API routes perform fresh subscription checks and handle redirects.
 
@@ -175,9 +181,11 @@ async function csrfProtection(request: NextRequest) {
   // Routes that REQUIRE CSRF protection (sensitive operations)
   const CSRF_REQUIRED_ROUTES = [
     "/api/payments", // All payment operations
+    "/api/subscriptions", // Subscription operations
     "/api/admin", // Admin operations
     "/api/security", // API key management
     "/api/settings", // Settings changes
+    "/api/users", // User profile and role operations
     "/api/users/type", // Role changes
     "/api/users/profile", // Profile updates
   ];
@@ -227,6 +235,27 @@ async function csrfProtection(request: NextRequest) {
   if (csrfToken !== cookieToken) {
     console.warn(
       `[CSRF] Token mismatch: ${method} ${pathname} by ${token.email}`,
+    );
+    return NextResponse.json(
+      {
+        error: "Invalid CSRF token",
+        message: "Token expired or invalid. Please refresh and try again.",
+      },
+      { status: 403 },
+    );
+  }
+
+  // Verify signed CSRF token content against request identity.
+  const clientIp =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "public";
+  const identifier = (token?.email as string) || clientIp;
+
+  const isTokenValid = verifyCSRFToken(csrfToken, identifier);
+  if (!isTokenValid) {
+    console.warn(
+      `[CSRF] Signature validation failed: ${method} ${pathname} by ${identifier}`,
     );
     return NextResponse.json(
       {

@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import FAQ from "@/models/FAQ";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
+
+async function requireAdmin() {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user?.role !== "admin") {
+    return forbidden("Forbidden: Admin access required");
+  }
+  return null;
+}
 
 /**
  * GET /api/help/faqs
@@ -28,10 +44,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(faqs, { status: 200 });
   } catch (error) {
     console.error("Error fetching FAQs:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch FAQs" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch FAQs");
   }
 }
 
@@ -41,16 +54,16 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const authResponse = await requireAdmin();
+    if (authResponse) return authResponse;
+
     await dbConnect();
 
     const body = await req.json();
     const { question, answer, category, targetAudience } = body;
 
     if (!question || !answer) {
-      return NextResponse.json(
-        { error: "Question and answer are required" },
-        { status: 400 },
-      );
+      return badRequest("Question and answer are required");
     }
 
     const newFaq = await FAQ.create({
@@ -63,10 +76,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(newFaq, { status: 201 });
   } catch (error) {
     console.error("Error creating FAQ:", error);
-    return NextResponse.json(
-      { error: "Failed to create FAQ" },
-      { status: 500 },
-    );
+    return internalError("Failed to create FAQ");
   }
 }
 
@@ -76,16 +86,16 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
+    const authResponse = await requireAdmin();
+    if (authResponse) return authResponse;
+
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { error: "FAQ ID is required" },
-        { status: 400 },
-      );
+      return badRequest("FAQ ID is required");
     }
 
     const body = await req.json();
@@ -103,16 +113,13 @@ export async function PUT(req: NextRequest) {
     );
 
     if (!updatedFaq) {
-      return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
+      return notFound("FAQ");
     }
 
     return NextResponse.json(updatedFaq, { status: 200 });
   } catch (error) {
     console.error("Error updating FAQ:", error);
-    return NextResponse.json(
-      { error: "Failed to update FAQ" },
-      { status: 500 },
-    );
+    return internalError("Failed to update FAQ");
   }
 }
 
@@ -122,22 +129,22 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
+    const authResponse = await requireAdmin();
+    if (authResponse) return authResponse;
+
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { error: "FAQ ID is required" },
-        { status: 400 },
-      );
+      return badRequest("FAQ ID is required");
     }
 
     const deletedFaq = await FAQ.findByIdAndDelete(id);
 
     if (!deletedFaq) {
-      return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
+      return notFound("FAQ");
     }
 
     return NextResponse.json(
@@ -146,9 +153,6 @@ export async function DELETE(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error deleting FAQ:", error);
-    return NextResponse.json(
-      { error: "Failed to delete FAQ" },
-      { status: 500 },
-    );
+    return internalError("Failed to delete FAQ");
   }
 }

@@ -30,7 +30,7 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import { useSession } from "next-auth/react";
 import axios from "axios";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
@@ -408,7 +408,8 @@ const CheckoutContent = () => {
                       color="text.secondary"
                       paragraph
                     >
-                      You've selected the <strong>{tier.name}</strong> plan.
+                      You&apos;ve selected the <strong>{tier.name}</strong>{" "}
+                      plan.
                     </Typography>
 
                     <Box mb={3}>
@@ -690,8 +691,8 @@ const CheckoutContent = () => {
         <DialogTitle id="cancel-order-title">Cancel Order</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to cancel this order? You'll be returned to
-            the plans page.
+            Are you sure you want to cancel this order? You&apos;ll be returned
+            to the plans page.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

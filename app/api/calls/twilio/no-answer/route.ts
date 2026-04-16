@@ -9,6 +9,7 @@ import {
   callSecurityMiddleware,
   CALL_DEFAULTS,
 } from "@/lib/security/callSecurity";
+import { env } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
   try {
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
             {
               callerId: call.from,
               timeout: 20, // 20 seconds before retrying
-              action: `https://${process.env.NEXTAUTH_URL}/api/call_twillo/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+              action: `https://${env.NEXTAUTH_URL}/api/call_twillo/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
             },
             nextBuyer.phone,
           );
@@ -158,7 +159,7 @@ export async function POST(req: NextRequest) {
             {
               callerId: call.from,
               timeout: 20, // 20 seconds before retrying
-              action: `https://${process.env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+              action: `https://${env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
             },
             num,
           );
@@ -174,7 +175,7 @@ export async function POST(req: NextRequest) {
               {
                 callerId: call.from,
                 timeout: 20, // 20 seconds before retrying
-                action: `https://${process.env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+                action: `https://${env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
               },
               buyer.phone,
             );
@@ -227,8 +228,8 @@ export async function POST(req: NextRequest) {
     return new NextResponse(
       JSON.stringify({
         error: "No-answer handling failed",
-        details: errorMessage,
-        stack: error instanceof Error ? error.stack : null, // Include stack trace for debugging
+        details:
+          process.env.NODE_ENV === "development" ? errorMessage : undefined,
       }),
       { status: 500 },
     );

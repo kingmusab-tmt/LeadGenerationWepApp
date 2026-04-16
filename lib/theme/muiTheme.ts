@@ -148,6 +148,12 @@ export function createAppTheme(mode: PaletteMode = "light") {
 
     // Component customization
     components: {
+      MuiUseMediaQuery: {
+        defaultProps: {
+          noSsr: true,
+        },
+      },
+
       // Button customization
       MuiButton: {
         styleOverrides: {

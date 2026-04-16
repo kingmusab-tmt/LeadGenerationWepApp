@@ -73,14 +73,7 @@ export async function POST(req: NextRequest) {
     if (!session?.user) return unauthorized();
 
     const body = await req.json();
-    const {
-      name,
-      textContent,
-      recipients,
-      schedule,
-      template,
-      fromPhoneNumber,
-    } = body;
+    const { name, textContent, recipients, schedule, fromPhoneNumber } = body;
 
     if (!name || !textContent) {
       return badRequest("Campaign name and message are required");
@@ -107,7 +100,6 @@ export async function POST(req: NextRequest) {
       textContent,
       fromPhoneNumber: fromPhoneNumber || undefined,
       recipients: recipients || [],
-      templateId: template || undefined,
       scheduleAt: schedule?.scheduledTime
         ? new Date(schedule.scheduledTime)
         : undefined,
@@ -124,9 +116,14 @@ export async function POST(req: NextRequest) {
     });
 
     return successResponse(campaign, 201);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[POST /api/marketing/sms/campaigns]", error);
-    if (error.code === 11000) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000
+    ) {
       return badRequest("Campaign with this name already exists");
     }
     return internalError("Failed to create SMS campaign");

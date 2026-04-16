@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useCallback } from "react";
 import { Snackbar, Alert, AlertColor } from "@mui/material";
-import { useAppSelector, useAppDispatch } from "@/lib/hooks";
+import { useAppSelector, useAppDispatch } from "@/app/hooks";
 import { removeNotification } from "@/lib/uiSlice";
 
 const NotificationManager: React.FC = () => {

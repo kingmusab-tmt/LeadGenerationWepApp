@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  badRequest,
+  internalError,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL =
@@ -35,24 +40,18 @@ interface GenerateFormResponse {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== "seller") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthorized("Authentication required");
   }
 
   if (!GEMINI_API_KEY) {
-    return NextResponse.json(
-      { error: "Gemini API key not configured" },
-      { status: 500 },
-    );
+    return internalError("Gemini API key not configured");
   }
 
   try {
     const { prompt } = await req.json();
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Prompt is required" },
-        { status: 400 },
-      );
+      return badRequest("Prompt is required");
     }
 
     const systemPrompt = `You are an expert form builder assistant. Based on the user's description of leads they want to capture, generate a structured form in JSON format.
@@ -88,6 +87,7 @@ Respond ONLY with valid JSON, no additional text or markdown.`;
     const response = await fetch(GEMINI_API_URL, {
       method: "POST",
       headers: {
+        "x-goog-api-key": GEMINI_API_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -107,20 +107,12 @@ Respond ONLY with valid JSON, no additional text or markdown.`;
           maxOutputTokens: 2048,
         },
       }),
-      // @ts-ignore
-      headers: {
-        "x-goog-api-key": GEMINI_API_KEY,
-        "Content-Type": "application/json",
-      },
     });
 
     if (!response.ok) {
       const error = await response.json();
       console.error("Gemini API error:", error);
-      return NextResponse.json(
-        { error: "Failed to generate form with AI" },
-        { status: response.status },
-      );
+      return internalError("Failed to generate form with AI");
     }
 
     const data = await response.json();
@@ -131,10 +123,7 @@ Respond ONLY with valid JSON, no additional text or markdown.`;
         "Unexpected API response structure:",
         JSON.stringify(data, null, 2),
       );
-      return NextResponse.json(
-        { error: "No response from AI" },
-        { status: 500 },
-      );
+      return internalError("No response from AI");
     }
 
     // Parse JSON response
@@ -151,22 +140,16 @@ Respond ONLY with valid JSON, no additional text or markdown.`;
       formData = JSON.parse(cleanJson);
     } catch (parseError) {
       console.error("JSON parse error:", parseError, "Text:", generatedText);
-      return NextResponse.json(
-        { error: "Failed to parse AI response" },
-        { status: 500 },
-      );
+      return internalError("Failed to parse AI response");
     }
 
     // Validate and sanitize the response
     if (!formData.fields || !Array.isArray(formData.fields)) {
-      return NextResponse.json(
-        { error: "Invalid form structure from AI" },
-        { status: 500 },
-      );
+      return internalError("Invalid form structure from AI");
     }
 
     // Add unique IDs to fields
-    const fieldsWithIds = formData.fields.map((field, index) => ({
+    const fieldsWithIds = formData.fields.map((field) => ({
       ...field,
       id: field.id || Math.random().toString(),
     }));
@@ -184,9 +167,6 @@ Respond ONLY with valid JSON, no additional text or markdown.`;
     );
   } catch (error) {
     console.error("Error generating form:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

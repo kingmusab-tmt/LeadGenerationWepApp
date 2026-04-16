@@ -32,7 +32,7 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks";
 
 // Initialize Stripe - lazy load only on client side

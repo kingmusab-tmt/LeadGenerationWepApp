@@ -1,23 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-// Email Campaign Types
-export interface IEmailTemplate {
-  _id?: mongoose.Types.ObjectId;
-  name: string;
-  subject: string;
-  htmlContent: string;
-  textContent: string;
-  previewText: string;
-  variables: string[]; // e.g., {{firstName}}, {{companyName}}
-  category:
-    | "welcome"
-    | "promotional"
-    | "newsletter"
-    | "lead_notification"
-    | "custom";
-  createdAt?: Date;
-}
-
 export interface IEmailSegment {
   _id?: mongoose.Types.ObjectId;
   name: string;
@@ -67,7 +49,6 @@ export interface IEmailCampaign extends Document {
   userId: mongoose.Schema.Types.ObjectId; // Seller/User ID
   name: string;
   description?: string;
-  templateId: mongoose.Schema.Types.ObjectId;
   segmentId: mongoose.Schema.Types.ObjectId;
   subject: string;
   previewText?: string;
@@ -138,7 +119,13 @@ export interface IEmailQueue extends Document {
   campaignId: mongoose.Schema.Types.ObjectId;
   recipientEmail: string;
   recipientId?: mongoose.Schema.Types.ObjectId;
-  status: "pending" | "sending" | "sent" | "failed" | "bounced";
+  status:
+    | "pending"
+    | "sending"
+    | "sent"
+    | "failed"
+    | "bounced"
+    | "unsubscribed";
   messageId?: string;
   attemptCount: number;
   lastAttempt?: Date;
@@ -193,10 +180,6 @@ const EmailCampaignSchema = new Schema<IEmailCampaign>(
       index: true,
     },
     description: String,
-    templateId: {
-      type: Schema.Types.ObjectId,
-      ref: "EmailTemplate",
-    },
     segmentId: {
       type: Schema.Types.ObjectId,
       ref: "EmailSegment",
@@ -361,45 +344,6 @@ const EmailCampaignSchema = new Schema<IEmailCampaign>(
   },
 );
 
-// Email Template Schema
-const EmailTemplateSchema = new Schema<IEmailTemplate>(
-  {
-    name: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    subject: {
-      type: String,
-      required: true,
-    },
-    htmlContent: {
-      type: String,
-      required: true,
-    },
-    textContent: String,
-    previewText: {
-      type: String,
-      maxlength: 150,
-    },
-    variables: [String],
-    category: {
-      type: String,
-      enum: [
-        "welcome",
-        "promotional",
-        "newsletter",
-        "lead_notification",
-        "custom",
-      ],
-      default: "custom",
-    },
-  },
-  {
-    timestamps: true,
-  },
-);
-
 // Email Segment Schema
 const EmailSegmentSchema = new Schema<IEmailSegment>(
   {
@@ -450,7 +394,7 @@ const EmailQueueSchema = new Schema<IEmailQueue>(
     },
     status: {
       type: String,
-      enum: ["pending", "sending", "sent", "failed", "bounced"],
+      enum: ["pending", "sending", "sent", "failed", "bounced", "unsubscribed"],
       default: "pending",
       index: true,
     },
@@ -542,10 +486,6 @@ EmailTrackingEventSchema.index({
 export const EmailCampaign: Model<IEmailCampaign> =
   mongoose.models.EmailCampaign ||
   mongoose.model<IEmailCampaign>("EmailCampaign", EmailCampaignSchema);
-
-export const EmailTemplate: Model<IEmailTemplate> =
-  mongoose.models.EmailTemplate ||
-  mongoose.model<IEmailTemplate>("EmailTemplate", EmailTemplateSchema);
 
 export const EmailSegment: Model<IEmailSegment> =
   mongoose.models.EmailSegment ||

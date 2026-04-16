@@ -50,7 +50,7 @@ import {
   Visibility,
 } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 
 interface Transaction {
   id: string;

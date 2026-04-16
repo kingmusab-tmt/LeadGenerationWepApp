@@ -7,6 +7,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Transaction } from "@/models/transactions";
 import { Types } from "mongoose";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 // Define the type for objects in the assignedTo array
 interface AssignedBuyer {
@@ -19,13 +25,13 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session?.user?.role !== "buyer") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); // Unauthorized
+      return unauthorized("Authentication required");
     }
 
     const buyerEmail = session.user.email;
     const buyer = await Buyer.findOne({ email: buyerEmail });
     if (!buyer) {
-      return NextResponse.json({ error: "Buyer not found" }, { status: 404 }); // Buyer not found
+      return notFound("Buyer");
     }
 
     const buyerId = buyer._id;
@@ -33,14 +39,11 @@ export async function POST(req: NextRequest) {
     const { leadId, action } = await req.json(); // action: 'accept' or 'reject'
 
     if (!leadId || !action) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 },
-      );
+      return badRequest("Missing required fields");
     }
 
     if (action !== "accept" && action !== "reject") {
-      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+      return badRequest("Invalid action");
     }
 
     // Connect to the database
@@ -49,7 +52,7 @@ export async function POST(req: NextRequest) {
     // Fetch the lead
     const lead = await Lead.findById(leadId);
     if (!lead) {
-      return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+      return notFound("Lead");
     }
     //(lead.assignedTo);
 
@@ -60,20 +63,14 @@ export async function POST(req: NextRequest) {
     );
 
     if (!isAssigned) {
-      return NextResponse.json(
-        { error: "Lead not assigned to this buyer" },
-        { status: 400 },
-      );
+      return badRequest("Lead not assigned to this buyer");
     }
 
     if (action === "accept") {
       // Check if the buyer has sufficient wallet balance
       if (buyer.walletUnit < lead.unit) {
         //("Insufficient credit balance");
-        return NextResponse.json(
-          { error: "Insufficient credit balance" },
-          { status: 400 },
-        );
+        return badRequest("Insufficient credit balance");
       }
 
       // Deduct the unit price from the buyer's wallet balance
@@ -188,13 +185,10 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({ message: "Lead rejected" }, { status: 200 });
     } else {
-      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+      return badRequest("Invalid action");
     }
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }

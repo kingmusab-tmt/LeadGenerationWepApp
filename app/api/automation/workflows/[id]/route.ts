@@ -7,22 +7,26 @@ import {
   WorkflowExecution,
 } from "@/models/automationWorkflow";
 import { Types } from "mongoose";
+import {
+  badRequest,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
 async function getUserFromSession() {
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== "seller" || !session.user.id) {
-    return {
-      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
+    return { error: unauthorized("Authentication required") };
   }
   return { userId: session.user.id };
 }
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   await dbConnect();
   const { userId, error } = await getUserFromSession();
@@ -33,25 +37,19 @@ export async function GET(
   try {
     const workflow = await AutomationWorkflow.findOne({ _id: id, userId });
     if (!workflow) {
-      return NextResponse.json(
-        { error: "Workflow not found" },
-        { status: 404 }
-      );
+      return notFound("Workflow");
     }
 
     return NextResponse.json(workflow, { status: 200 });
   } catch (err) {
     console.error("Error fetching workflow:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch workflow" },
-      { status: 500 }
-    );
+    return internalError("Failed to fetch workflow");
   }
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   await dbConnect();
   const { userId, error } = await getUserFromSession();
@@ -63,10 +61,7 @@ export async function PUT(
     const body = await req.json();
 
     if (body.name !== undefined && !body.name?.trim()) {
-      return NextResponse.json(
-        { error: "Workflow name cannot be empty" },
-        { status: 400 }
-      );
+      return badRequest("Workflow name cannot be empty");
     }
 
     const updateFields: Record<string, unknown> = {};
@@ -89,29 +84,23 @@ export async function PUT(
     const workflow = await AutomationWorkflow.findOneAndUpdate(
       { _id: id, userId },
       { $set: updateFields },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!workflow) {
-      return NextResponse.json(
-        { error: "Workflow not found" },
-        { status: 404 }
-      );
+      return notFound("Workflow");
     }
 
     return NextResponse.json(workflow, { status: 200 });
   } catch (err) {
     console.error("Error updating workflow:", err);
-    return NextResponse.json(
-      { error: "Failed to update workflow" },
-      { status: 500 }
-    );
+    return internalError("Failed to update workflow");
   }
 }
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   await dbConnect();
   const { userId, error } = await getUserFromSession();
@@ -123,10 +112,7 @@ export async function DELETE(
     const result = await AutomationWorkflow.deleteOne({ _id: id, userId });
 
     if (result.deletedCount === 0) {
-      return NextResponse.json(
-        { error: "Workflow not found" },
-        { status: 404 }
-      );
+      return notFound("Workflow");
     }
 
     // Clean up execution history
@@ -134,13 +120,10 @@ export async function DELETE(
 
     return NextResponse.json(
       { message: "Workflow deleted successfully" },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     console.error("Error deleting workflow:", err);
-    return NextResponse.json(
-      { error: "Failed to delete workflow" },
-      { status: 500 }
-    );
+    return internalError("Failed to delete workflow");
   }
 }

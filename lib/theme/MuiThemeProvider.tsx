@@ -9,7 +9,6 @@ import {
 } from "react";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import type { PaletteMode } from "@mui/material";
 import { createAppTheme } from "./muiTheme";
 
@@ -32,7 +31,7 @@ export function useColorMode() {
 /**
  * Client-side MUI Theme Provider
  * Wraps the application with Material-UI theme, CssBaseline, and dark-mode toggle.
- * Uses AppRouterCacheProvider for proper SSR hydration with Next.js App Router.
+ * AppRouterCacheProvider is applied in app/layout.tsx at the server boundary.
  */
 export default function MuiThemeProvider({
   children,
@@ -51,13 +50,11 @@ export default function MuiThemeProvider({
   const ctx = useMemo(() => ({ mode, toggleTheme }), [mode, toggleTheme]);
 
   return (
-    <AppRouterCacheProvider>
-      <ColorModeContext.Provider value={ctx}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          {children}
-        </ThemeProvider>
-      </ColorModeContext.Provider>
-    </AppRouterCacheProvider>
+    <ColorModeContext.Provider value={ctx}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        {children}
+      </ThemeProvider>
+    </ColorModeContext.Provider>
   );
 }

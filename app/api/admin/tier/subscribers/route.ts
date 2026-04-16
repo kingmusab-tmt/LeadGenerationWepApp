@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
 import { User } from "@/models";
+import { internalError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
 
@@ -36,9 +36,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ counts });
   } catch (err) {
     console.error("Failed to fetch subscriber counts:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch subscriber counts" },
-      { status: 500 },
-    );
+    return internalError("Failed to fetch subscriber counts");
   }
 }

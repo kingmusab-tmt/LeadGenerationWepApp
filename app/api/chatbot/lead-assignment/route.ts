@@ -67,10 +67,12 @@ class RoundRobinAssigner {
         return false;
 
       // Check industry match
+      const preferredIndustries = buyer.leadPreferences?.industries ?? [];
+
       if (
         lead.industry &&
-        buyer.industries.length > 0 &&
-        !buyer.industries.includes(lead.industry)
+        preferredIndustries.length > 0 &&
+        !preferredIndustries.includes(lead.industry)
       ) {
         return false;
       }

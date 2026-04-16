@@ -44,6 +44,7 @@ export interface SubscriptionLimits {
 
 interface UseSubscriptionLimitsReturn {
   limits: SubscriptionLimits | null;
+  isTrial: boolean;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -55,6 +56,7 @@ interface UseSubscriptionLimitsReturn {
  */
 export function useSubscriptionLimits(): UseSubscriptionLimitsReturn {
   const [limits, setLimits] = useState<SubscriptionLimits | null>(null);
+  const [isTrial, setIsTrial] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
@@ -65,6 +67,8 @@ export function useSubscriptionLimits(): UseSubscriptionLimitsReturn {
       setError(null);
       const response = await axios.get("/api/users");
       const userData = response.data?.user;
+
+      setIsTrial(Boolean(userData?.subscription?.isTrial));
 
       // subscriptionLimits can be nested under subscription or at top level
       const limits =
@@ -101,6 +105,7 @@ export function useSubscriptionLimits(): UseSubscriptionLimitsReturn {
 
   return {
     limits,
+    isTrial,
     loading,
     error,
     refresh: fetchLimits,

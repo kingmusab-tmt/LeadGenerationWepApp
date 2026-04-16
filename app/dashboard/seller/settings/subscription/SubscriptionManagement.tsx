@@ -33,7 +33,7 @@ import {
   AttachMoney as MoneyIcon,
   Upgrade as UpgradeIcon,
 } from "@mui/icons-material";
-import { useNotification } from "@/lib/useNotification";
+import { useNotification } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks";
 import UsageLimitsCard from "./UsageLimitsCard";
 import {

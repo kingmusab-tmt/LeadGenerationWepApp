@@ -4,6 +4,7 @@ import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 
 const toIsoDateOrNull = (value: unknown): string | null => {
   if (!value) return null;
@@ -25,16 +26,13 @@ export async function PUT(
     const { status, role } = await req.json();
 
     if (!status && !role) {
-      return NextResponse.json(
-        { error: "Either status or role must be provided" },
-        { status: 400 },
-      );
+      return badRequest("Either status or role must be provided");
     }
 
     // First find the user to check their current role
     const user = await User.findById(id).lean();
 
-    let updateData: { status?: string; role?: string } = {};
+    const updateData: { status?: string; role?: string } = {};
     if (status) updateData.status = status;
     if (role) updateData.role = role;
 
@@ -77,7 +75,7 @@ export async function PUT(
     }
 
     if (!updatedRecord) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     let userSchemaDates: {
@@ -118,15 +116,12 @@ export async function PUT(
     });
   } catch (error) {
     console.error("Failed to update user:", error);
-    return NextResponse.json(
-      { error: "Failed to update user" },
-      { status: 500 },
-    );
+    return internalError("Failed to update user");
   }
 }
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { error } = await requireAdmin();
@@ -158,7 +153,7 @@ export async function DELETE(
     }
 
     if (!deletedRecord) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFound("User");
     }
 
     return NextResponse.json({
@@ -177,9 +172,6 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("Failed to delete user:", error);
-    return NextResponse.json(
-      { error: "Failed to delete user" },
-      { status: 500 },
-    );
+    return internalError("Failed to delete user");
   }
 }

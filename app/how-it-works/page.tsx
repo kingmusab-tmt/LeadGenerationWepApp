@@ -47,7 +47,7 @@ const HowItWorksPage = () => {
       <Box bgcolor="primary.main" color="white" py={10}>
         <Container maxWidth="lg">
           <Typography variant="h2" component="h1" gutterBottom align="center">
-            How LeadConnect Pro Works
+            How Brixcot
           </Typography>
           <Typography variant="h5" align="center">
             A simple, powerful solution to manage your leads efficiently
@@ -101,44 +101,6 @@ const HowItWorksPage = () => {
         </Container>
       </Box>
 
-      {/* Integration Section */}
-      <Box py={10} bgcolor="background.paper">
-        <Container maxWidth="lg">
-          <Typography variant="h3" align="center" gutterBottom>
-            Seamless Integrations
-          </Typography>
-          <Typography
-            variant="subtitle1"
-            align="center"
-            color="text.secondary"
-            paragraph
-          >
-            Connect with the tools you already use
-          </Typography>
-
-          <Grid container spacing={4} mt={6} justifyContent="center">
-            {["Zapier", "Facebook", "Google Ads"].map((integration) => (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={integration}>
-                <Paper
-                  elevation={2}
-                  sx={{ p: 3, textAlign: "center", width: 150 }}
-                >
-                  <Box
-                    component="img"
-                    src={`/integrations/${integration
-                      .toLowerCase()
-                      .replace(" ", "-")}.png`}
-                    alt={integration}
-                    sx={{ height: 40, mb: 1 }}
-                  />
-                  <Typography>{integration}</Typography>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
-      </Box>
-
       {/* CTA Section */}
       <Box py={10} bgcolor="primary.main" color="white">
         <Container maxWidth="md" sx={{ textAlign: "center" }}>
@@ -146,16 +108,16 @@ const HowItWorksPage = () => {
             Ready to Get Started?
           </Typography>
           <Typography variant="h5" paragraph>
-            See how LeadConnect Pro can transform your lead management
+            See how Brixcotcan transform your lead management
           </Typography>
           <Button
             variant="contained"
-            color="secondary"
+            color="primary"
             size="large"
             sx={{ mt: 4, px: 6, py: 2 }}
-            href="/demo"
+            href="/contact"
           >
-            Request a Demo
+            Try Brixcot for Free
           </Button>
         </Container>
       </Box>

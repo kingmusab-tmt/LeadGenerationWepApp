@@ -3,6 +3,7 @@
 import twilio from "twilio";
 import { Buyer } from "@/models/leadbuyers";
 import { User } from "@/models";
+import { env } from "@/lib/env";
 
 export const sendSmsNotification = async (buyer: any, lead: any) => {
   try {
@@ -10,12 +11,15 @@ export const sendSmsNotification = async (buyer: any, lead: any) => {
     // Fetch seller details
     const seller = await User.findById(leadbuyer?.registeredWith);
     // Fetch Twilio configuration from buyer schema or use system defaults
-    const accountSid =
-      seller?.apiSettings.twilioSid || process.env.TWILIO_ACCOUNT_SID;
+    const accountSid = seller?.apiSettings.twilioSid || env.TWILIO_ACCOUNT_SID;
     const authToken =
-      seller?.apiSettings.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      seller?.apiSettings.twilioAuthToken || env.TWILIO_AUTH_TOKEN;
     const fromNumber =
-      seller?.apiSettings.twilioPhoneNumber || process.env.TWILIO_FROM_NUMBER;
+      seller?.apiSettings.twilioPhoneNumber || env.TWILIO_FROM_NUMBER;
+
+    if (!accountSid || !authToken || !fromNumber) {
+      throw new Error("Twilio SMS configuration is incomplete");
+    }
 
     // Initialize Twilio client
     const client = twilio(accountSid, authToken);

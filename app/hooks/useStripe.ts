@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
+import type { Stripe } from "@stripe/stripe-js";
 
 /**
  * Hook for initializing Stripe payment processing
@@ -23,7 +24,7 @@ import { loadStripe } from "@stripe/stripe-js";
  * );
  */
 export function useStripePromise() {
-  const [stripePromise, setStripePromise] = useState<any>(null);
+  const [stripePromise, setStripePromise] = useState<Stripe | null>(null);
 
   useEffect(() => {
     const initializeStripe = async () => {

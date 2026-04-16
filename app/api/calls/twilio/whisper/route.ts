@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 import { debugLog } from "@/utils/callHandlers";
 import { callSecurityMiddleware } from "@/lib/security/callSecurity";
+import { env } from "@/lib/env";
 
 /**
  * POST /api/calls/twilio/whisper
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
 
         const gather = twiml.gather({
           numDigits: 1,
-          action: `https://${process.env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}`,
+          action: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}`,
           method: "POST",
           timeout: 10,
         });

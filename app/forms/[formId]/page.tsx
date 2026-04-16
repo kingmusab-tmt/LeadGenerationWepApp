@@ -156,7 +156,7 @@ export default function FormPage() {
     };
   }, [loading, submitted]);
 
-  const handleSubmit = async (formData: { [key: string]: any }) => {
+  const handleSubmit = async (formData: Record<string, unknown>) => {
     setLoading(true);
     setErrors({});
 

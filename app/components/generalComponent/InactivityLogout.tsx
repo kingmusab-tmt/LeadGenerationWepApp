@@ -23,7 +23,6 @@ const InactivityLogout = () => {
   const resetInactivityTimer = () => {
     if (logoutTimer.current) clearTimeout(logoutTimer.current);
     if (modalTimer.current) clearTimeout(modalTimer.current);
-    setShowModal(false);
 
     logoutTimer.current = setTimeout(() => {
       // Show modal after 1 hour of inactivity
@@ -42,6 +41,7 @@ const InactivityLogout = () => {
   };
 
   const handleContinue = () => {
+    setShowModal(false);
     resetInactivityTimer();
   };
 
@@ -57,7 +57,7 @@ const InactivityLogout = () => {
     const handleActivity = () => resetInactivityTimer();
 
     activityEvents.forEach((event) =>
-      window.addEventListener(event, handleActivity)
+      window.addEventListener(event, handleActivity),
     );
 
     resetInactivityTimer();
@@ -66,7 +66,7 @@ const InactivityLogout = () => {
       if (logoutTimer.current) clearTimeout(logoutTimer.current);
       if (modalTimer.current) clearTimeout(modalTimer.current);
       activityEvents.forEach((event) =>
-        window.removeEventListener(event, handleActivity)
+        window.removeEventListener(event, handleActivity),
       );
     };
   }, []);
@@ -76,8 +76,8 @@ const InactivityLogout = () => {
       <DialogTitle>Session Timeout</DialogTitle>
       <DialogContent>
         <Typography>
-          You've been inactive for a while. For your security, you'll be logged
-          out soon.
+          You&apos;ve been inactive for a while. For your security, you&apos;ll
+          be logged out soon.
         </Typography>
         <Typography mt={1} fontWeight="bold">
           Do you want to continue your session?

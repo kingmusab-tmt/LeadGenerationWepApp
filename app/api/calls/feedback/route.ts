@@ -1,6 +1,5 @@
 // app/api/calls/feedback/[callId]/route.ts
-import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
 import { Transaction } from "@/models/transactions";
@@ -8,11 +7,47 @@ import { sendNotification } from "@/lib/notificationService";
 import { Buyer } from "@/models/leadbuyers";
 import { User } from "@/models";
 import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
+
+type FeedbackState = {
+  buyerRating?: boolean;
+  sellerApproved?: boolean;
+  sellerComment?: string;
+  refundAmount?: number;
+  refundedAt?: Date;
+};
+
+type FeedbackCallDoc = {
+  _id: string;
+  userId: string;
+  sellerId: string;
+  buyerId: string;
+  callSid: string;
+  from: string;
+  to: string;
+  unitsCharged: number;
+  paymentStatus: string;
+  feedback?: FeedbackState;
+  save(): Promise<unknown>;
+};
 
 export async function POST(req: NextRequest) {
   await dbConnect();
 
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email || !session.user.role) {
+      return unauthorized("Authentication required");
+    }
+
     const url = new URL(req.url);
     const callId = url.searchParams.get("callId");
     const body = await req.json();
@@ -21,27 +56,54 @@ export async function POST(req: NextRequest) {
     // Find the call record
     const call = await Call.findById(callId);
     if (!call) {
-      return NextResponse.json({ error: "Call not found" }, { status: 404 });
+      return notFound("Call");
     }
 
     if (isSellerReview) {
+      const isAdmin = session.user.role === "admin";
+      const isSellerOwner =
+        session.user.role === "seller" &&
+        (String(call.userId) === String(session.user.id) ||
+          String(call.sellerId) === String(session.user.id));
+
+      if (!isAdmin && !isSellerOwner) {
+        return forbidden("Forbidden");
+      }
+
       // Handle seller review/approval
-      return handleSellerReview(call, approved, comment);
+      return handleSellerReview(
+        call as unknown as FeedbackCallDoc,
+        approved,
+        comment,
+      );
     } else {
+      const buyerProfile = await Buyer.findOne({ email: session.user.email })
+        .select("_id")
+        .lean();
+      const isBuyerOwner =
+        session.user.role === "buyer" &&
+        !!buyerProfile?._id &&
+        String(call.buyerId) === String(buyerProfile._id);
+
+      if (!isBuyerOwner) {
+        return forbidden("Forbidden");
+      }
+
       // Handle buyer feedback
-      return handleBuyerFeedback(call, feedback, callDuration);
+      return handleBuyerFeedback(
+        call as unknown as FeedbackCallDoc,
+        feedback,
+        callDuration,
+      );
     }
   } catch (error) {
     console.error("Error processing feedback:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return internalError("Internal server error");
   }
 }
 
 async function handleBuyerFeedback(
-  call: any,
+  call: FeedbackCallDoc,
   feedback: boolean,
   callDuration: number,
 ) {
@@ -64,19 +126,17 @@ async function handleBuyerFeedback(
 }
 
 async function handleSellerReview(
-  call: any,
+  call: FeedbackCallDoc,
   approved: boolean,
   comment: string,
 ) {
   // Verify this is a pending refund case
   if (call.paymentStatus !== "pending_refund") {
-    return NextResponse.json(
-      { error: "This call doesn't require seller review" },
-      { status: 400 },
-    );
+    return badRequest("This call doesn't require seller review");
   }
 
   // Update seller decision
+  call.feedback = call.feedback || {};
   call.feedback.sellerApproved = approved;
   call.feedback.sellerComment = comment;
 
@@ -111,7 +171,8 @@ async function handleSellerReview(
   });
 }
 
-async function processRefund(call: any) {
+async function processRefund(call: FeedbackCallDoc) {
+  call.feedback = call.feedback || {};
   // 1. Refund units to buyer
   const buyer = await Buyer.findById(call.buyerId);
   if (buyer) {

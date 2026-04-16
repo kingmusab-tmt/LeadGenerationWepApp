@@ -37,7 +37,7 @@ import {
 } from "recharts";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useInitializeUser } from "@/lib/hooks";
+import { useInitializeUser } from "@/app/hooks";
 import {
   ArrowUpward,
   ArrowDownward,
@@ -105,6 +105,9 @@ const initialOverviewData = {
   },
   totalLeadBuyers: 0,
   newLeadBuyers: 0,
+  totalLeadBuyerCredits: 0,
+  totalLeadBuyerUsedCredits: 0,
+  totalLeadBuyerRemainingCredits: 0,
   newLeads: 0,
   purchasedLeads: 0,
   leadTrends: {
@@ -179,6 +182,7 @@ const Overview: React.FC = () => {
   });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isSessionSubActive = session?.user?.isSubActive === true;
 
   // Auth redirects are handled by the seller layout - no need to duplicate here
 
@@ -225,7 +229,7 @@ const Overview: React.FC = () => {
           }
 
           if (!expiryDate) {
-            if (session?.user?.isSubActive === true) {
+            if (isSessionSubActive) {
               return;
             }
             router.push("/plan");
@@ -249,7 +253,8 @@ const Overview: React.FC = () => {
           ]);
 
           if (overviewResponse.ok) {
-            const data = await overviewResponse.json();
+            const payload = await overviewResponse.json();
+            const data = payload?.data ?? payload;
             setOverviewData({
               ...initialOverviewData,
               ...data,
@@ -283,7 +288,7 @@ const Overview: React.FC = () => {
     if (status === "authenticated" && currentUser && !userLoading) {
       fetchOverviewData();
     }
-  }, [currentUser, router, status, userLoading]);
+  }, [currentUser, isSessionSubActive, router, status, userLoading]);
 
   const handleTimeframeChange = (
     event: SelectChangeEvent<"daily" | "weekly" | "monthly">,
@@ -319,7 +324,6 @@ const Overview: React.FC = () => {
     [overviewData.leadStatusDistribution],
   );
 
-  const revenueTrendData = overviewData.revenueTrend || [];
   const leadSourcesData = overviewData.leadSources || [];
   const salesPerformanceData = overviewData.salesPerformance?.[timeframe] || [];
   const topLeadBuyersData = overviewData.topLeadBuyers || [];
@@ -574,7 +578,7 @@ const Overview: React.FC = () => {
           </StyledPaper>
         </Grid>
 
-        {/* ROI */}
+        {/* Lead Buyer Credits */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
           <StyledPaper>
             <Box
@@ -583,7 +587,7 @@ const Overview: React.FC = () => {
               alignItems="center"
             >
               <Typography variant="h6" color="primary">
-                Campaign ROI
+                Lead Buyer Credits
               </Typography>
               <LocalAtm color="primary" />
             </Box>
@@ -591,9 +595,51 @@ const Overview: React.FC = () => {
               variant="h4"
               sx={{ color: "info.main", fontWeight: "bold" }}
             >
-              {overviewData.campaignPerformance?.roi || 0}%
+              {(overviewData.totalLeadBuyerUsedCredits || 0) +
+                (overviewData.totalLeadBuyerRemainingCredits || 0)}
             </Typography>
-            <Typography variant="caption">Return on Investment</Typography>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 2,
+                mt: 1,
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                >
+                  Used Credit
+                </Typography>
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  color="text.primary"
+                >
+                  {overviewData.totalLeadBuyerUsedCredits || 0}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: "right" }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                >
+                  Remaining Credit
+                </Typography>
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  color="text.primary"
+                >
+                  {overviewData.totalLeadBuyerRemainingCredits || 0}
+                </Typography>
+              </Box>
+            </Box>
           </StyledPaper>
         </Grid>
 
@@ -649,7 +695,7 @@ const Overview: React.FC = () => {
               <Star sx={{ mr: 1 }} /> Top Lead Buyers
             </Typography>
             <Stack spacing={1}>
-              {(overviewData.topLeadBuyers || []).map((buyer, index) => (
+              {topLeadBuyersData.map((buyer, index) => (
                 <Box key={buyer.id}>
                   <Box display="flex" justifyContent="space-between">
                     <Typography variant="subtitle1">

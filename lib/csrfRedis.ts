@@ -1,5 +1,9 @@
 import { getRedisClient } from "./redis";
-import { createHash, randomBytes } from "crypto";
+import {
+  createHash,
+  randomBytes,
+  timingSafeEqual as cryptoTimingSafeEqual,
+} from "crypto";
 
 /**
  * Redis-Backed CSRF Token Implementation
@@ -106,14 +110,12 @@ export async function refreshCSRFTokenRedis(userId: string): Promise<string> {
  * Timing-safe string comparison
  */
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+
+  if (bufA.length !== bufB.length) {
     return false;
   }
 
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-
-  return result === 0;
+  return cryptoTimingSafeEqual(bufA, bufB);
 }

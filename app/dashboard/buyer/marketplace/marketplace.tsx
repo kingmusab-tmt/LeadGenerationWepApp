@@ -113,10 +113,17 @@ const BuyerLeads: React.FC = () => {
       );
       setLeads(refreshedResponse.data.data);
       setTotalLeads(refreshedResponse.data.pagination.total);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error purchasing lead:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to purchase lead.";
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: string } } })
+          .response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || "Failed to purchase lead."
+          : "Failed to purchase lead.";
       showSnackbar(errorMessage, "error");
     } finally {
       setPurchaseLoading(false);

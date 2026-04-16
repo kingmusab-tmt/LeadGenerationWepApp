@@ -5,18 +5,37 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Invoice } from "@/models/invoice";
 import { invoiceEngine } from "@/lib/invoiceEngine";
+import { ZodError } from "zod";
+import { mongoIdParamSchema } from "@/lib/validation/schemas";
+import {
+  unauthorized,
+  notFound,
+  forbidden,
+  internalError,
+  badRequest,
+  handleValidationError,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+    try {
+      mongoIdParamSchema.parse(id);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return handleValidationError(error);
+      }
+      return badRequest("Invalid invoice id");
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized("Authentication required");
     }
 
     await dbConnect();
@@ -24,12 +43,12 @@ export async function GET(
     const invoice = await Invoice.findById(id);
 
     if (!invoice) {
-      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+      return notFound("Invoice");
     }
 
     // Check ownership
     if (invoice.userId.toString() !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbidden("You do not have access to this invoice");
     }
 
     const pdfBuffer = await invoiceEngine.generatePDF(id);
@@ -43,9 +62,6 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error generating PDF:", error);
-    return NextResponse.json(
-      { error: "Failed to generate PDF" },
-      { status: 500 }
-    );
+    return internalError("Failed to generate PDF");
   }
 }

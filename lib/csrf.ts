@@ -1,4 +1,8 @@
-import { createHash, randomBytes } from "crypto";
+import {
+  createHmac,
+  randomBytes,
+  timingSafeEqual as cryptoTimingSafeEqual,
+} from "crypto";
 
 /**
  * CSRF Token Implementation
@@ -14,11 +18,18 @@ import { createHash, randomBytes } from "crypto";
  * - Call verifyCSRFToken() to validate
  */
 
-const TOKEN_LENGTH = 32; // 32 bytes = 256 bits
+const TOKEN_LENGTH = 16; // 16 random bytes for nonce
 const TOKEN_EXPIRY = 3600000; // 1 hour in milliseconds
 
-// In-memory token storage (use Redis in production for distributed systems)
-const tokenStore = new Map<string, { secret: string; timestamp: number }>();
+function getSigningSecret(): string {
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error(
+      "CSRF signing secret not configured: AUTH_SECRET or NEXTAUTH_SECRET must be set",
+    );
+  }
+  return secret;
+}
 
 /**
  * Generate a new CSRF token
@@ -35,21 +46,17 @@ export function generateCSRFToken(userId: string): {
   token: string;
   secret: string;
 } {
-  // Generate cryptographically secure random secret
-  const secret = randomBytes(TOKEN_LENGTH).toString("hex");
-
-  // Generate token by hashing secret + userId
-  const token = createHash("sha256")
-    .update(secret + userId)
+  const timestamp = Date.now().toString();
+  const nonce = randomBytes(TOKEN_LENGTH).toString("hex");
+  const payload = `${userId}:${timestamp}:${nonce}`;
+  const signature = createHmac("sha256", getSigningSecret())
+    .update(payload)
     .digest("hex");
 
-  // Store secret with timestamp for expiry
-  tokenStore.set(userId, {
-    secret,
-    timestamp: Date.now(),
-  });
+  const tokenBody = `${timestamp}:${nonce}:${signature}`;
+  const token = Buffer.from(tokenBody, "utf8").toString("base64url");
 
-  return { token, secret };
+  return { token, secret: nonce };
 }
 
 /**
@@ -66,25 +73,32 @@ export function generateCSRFToken(userId: string): {
  * }
  */
 export function verifyCSRFToken(token: string, userId: string): boolean {
-  const stored = tokenStore.get(userId);
+  try {
+    const decoded = Buffer.from(token, "base64url").toString("utf8");
+    const [timestampRaw, nonce, signature] = decoded.split(":");
 
-  if (!stored) {
-    return false; // No token found for user
-  }
+    if (!timestampRaw || !nonce || !signature) {
+      return false;
+    }
 
-  // Check token expiry
-  if (Date.now() - stored.timestamp > TOKEN_EXPIRY) {
-    tokenStore.delete(userId); // Clean up expired token
+    const timestamp = Number(timestampRaw);
+    if (!Number.isFinite(timestamp)) {
+      return false;
+    }
+
+    if (Date.now() - timestamp > TOKEN_EXPIRY) {
+      return false;
+    }
+
+    const payload = `${userId}:${timestampRaw}:${nonce}`;
+    const expectedSignature = createHmac("sha256", getSigningSecret())
+      .update(payload)
+      .digest("hex");
+
+    return timingSafeEqual(signature, expectedSignature);
+  } catch {
     return false;
   }
-
-  // Regenerate expected token from stored secret
-  const expectedToken = createHash("sha256")
-    .update(stored.secret + userId)
-    .digest("hex");
-
-  // Constant-time comparison to prevent timing attacks
-  return timingSafeEqual(token, expectedToken);
 }
 
 /**
@@ -96,8 +110,17 @@ export function verifyCSRFToken(token: string, userId: string): boolean {
  * // Call on logout
  * invalidateCSRFToken(session.user.id);
  */
-export function invalidateCSRFToken(userId: string): void {
-  tokenStore.delete(userId);
+export async function invalidateCSRFToken(userId: string): Promise<void> {
+  try {
+    const { getRedisClient } = await import("@/lib/redis");
+    const client = await getRedisClient();
+    if (!client) {
+      return;
+    }
+    await client.del(`csrf_token:${userId}`);
+  } catch (error) {
+    console.error("[CSRF] Error invalidating token:", error);
+  }
 }
 
 /**
@@ -107,13 +130,13 @@ export function invalidateCSRFToken(userId: string): void {
  * @returns New token object
  *
  * @example
- * const { token } = refreshCSRFToken(session.user.id);
+ * const { token } = await refreshCSRFToken(session.user.id);
  */
-export function refreshCSRFToken(userId: string): {
+export async function refreshCSRFToken(userId: string): Promise<{
   token: string;
   secret: string;
-} {
-  invalidateCSRFToken(userId);
+}> {
+  await invalidateCSRFToken(userId);
   return generateCSRFToken(userId);
 }
 
@@ -125,12 +148,7 @@ export function refreshCSRFToken(userId: string): {
  * setInterval(cleanupExpiredTokens, 10 * 60 * 1000);
  */
 export function cleanupExpiredTokens(): void {
-  const now = Date.now();
-  for (const [userId, data] of tokenStore.entries()) {
-    if (now - data.timestamp > TOKEN_EXPIRY) {
-      tokenStore.delete(userId);
-    }
-  }
+  // No-op for stateless tokens.
 }
 
 /**
@@ -138,20 +156,12 @@ export function cleanupExpiredTokens(): void {
  * Prevents timing attacks by comparing all characters
  */
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+
+  if (bufA.length !== bufB.length) {
     return false;
   }
 
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-
-  return result === 0;
-}
-
-// Auto-cleanup expired tokens every 10 minutes
-if (typeof window === "undefined") {
-  // Server-side only
-  setInterval(cleanupExpiredTokens, 10 * 60 * 1000);
+  return cryptoTimingSafeEqual(bufA, bufB);
 }

@@ -5,6 +5,13 @@ import dbConnect from "@/lib/connectdb";
 import { SmsCampaign } from "@/models/smsCampaign";
 import { smsMarketingEngine } from "@/lib/smsMarketingEngine";
 import { getSubscriptionLimits } from "@/lib/subscriptionLimitsService";
+import {
+  badRequest,
+  forbidden,
+  internalError,
+  notFound,
+  unauthorized,
+} from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
@@ -15,21 +22,15 @@ export async function POST(
   const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user) return unauthorized("Authentication required");
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
     await dbConnect();
     const campaign = await SmsCampaign.findById(id);
-    if (!campaign)
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 },
-      );
-    if (campaign.userId !== session.user.id)
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!campaign) return notFound("Campaign");
+    if (campaign.userId !== session.user.id) return forbidden("Forbidden");
 
     if (action === "send") {
       // Check recipient limit
@@ -38,30 +39,21 @@ export async function POST(
       const maxRecipients = limits?.smsRecipientsPerCampaign || 0;
 
       if (maxRecipients > 0 && recipientCount > maxRecipients) {
-        return NextResponse.json(
-          {
-            error: `Recipient limit exceeded. Your plan allows ${maxRecipients} recipients per SMS campaign, but this campaign has ${recipientCount}.`,
-            limit: maxRecipients,
-            current: recipientCount,
-          },
-          { status: 403 },
+        return forbidden(
+          `Recipient limit exceeded. Your plan allows ${maxRecipients} recipients per SMS campaign, but this campaign has ${recipientCount}.`,
         );
       }
 
       // Ensure campaign has a Twilio phone number assigned
       if (!campaign.fromPhoneNumber) {
-        return NextResponse.json(
-          {
-            error:
-              "No phone number assigned to this campaign. Please generate or assign a Twilio phone number before sending.",
-          },
-          { status: 400 },
+        return badRequest(
+          "No phone number assigned to this campaign. Please generate or assign a Twilio phone number before sending.",
         );
       }
 
       const result = await smsMarketingEngine.sendCampaignImmediate(id);
       if (!result.success)
-        return NextResponse.json({ error: result.message }, { status: 400 });
+        return badRequest(result.message || "Failed to send campaign");
       return NextResponse.json(
         { message: result.message, sent: result.sent, failed: result.failed },
         { status: 200 },
@@ -71,23 +63,16 @@ export async function POST(
     if (action === "test") {
       const body = await req.json();
       const { testPhone } = body;
-      if (!testPhone)
-        return NextResponse.json(
-          { error: "Test phone required" },
-          { status: 400 },
-        );
+      if (!testPhone) return badRequest("Test phone required");
       const result = await smsMarketingEngine.sendTestSms(id, testPhone);
       if (!result.success)
-        return NextResponse.json({ error: result.message }, { status: 400 });
+        return badRequest(result.message || "Failed to send test SMS");
       return NextResponse.json({ message: result.message }, { status: 200 });
     }
 
     if (action === "pause") {
       if (campaign.status !== "sending")
-        return NextResponse.json(
-          { error: "Campaign is not currently sending" },
-          { status: 400 },
-        );
+        return badRequest("Campaign is not currently sending");
       await SmsCampaign.findByIdAndUpdate(id, { status: "paused" });
       return NextResponse.json(
         { message: "Campaign paused successfully" },
@@ -97,10 +82,7 @@ export async function POST(
 
     if (action === "resume") {
       if (campaign.status !== "paused")
-        return NextResponse.json(
-          { error: "Campaign is not paused" },
-          { status: 400 },
-        );
+        return badRequest("Campaign is not paused");
       await SmsCampaign.findByIdAndUpdate(id, { status: "sending" });
       // Resume sending remaining queue items
       const result = await smsMarketingEngine.sendCampaignImmediate(id);
@@ -114,12 +96,9 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    return badRequest("Invalid action");
   } catch (error) {
     console.error("Error processing SMS campaign action:", error);
-    return NextResponse.json(
-      { error: "Failed to process action" },
-      { status: 500 },
-    );
+    return internalError("Failed to process action");
   }
 }
