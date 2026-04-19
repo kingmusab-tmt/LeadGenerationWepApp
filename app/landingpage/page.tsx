@@ -71,45 +71,45 @@ const callTrackingFeatures = [
   "Scheduled Callbacks",
 ];
 
-const platformStats = [
-  { value: "6,000+", label: "App Integrations via Zapier" },
-  { value: "99.9%", label: "Platform Uptime" },
-  { value: "< 1s", label: "Lead Distribution Speed" },
-  { value: "24/7", label: "Customer Support" },
-];
+// const platformStats = [
+//   { value: "6,000+", label: "App Integrations via Zapier" },
+//   { value: "99.9%", label: "Platform Uptime" },
+//   { value: "< 1s", label: "Lead Distribution Speed" },
+//   { value: "24/7", label: "Customer Support" },
+// ];
 
-const testimonials = [
-  {
-    name: "Sarah Johnson",
-    role: "Real Estate Agency Owner",
-    text: "The AI lead scoring alone increased our conversion by 40%. We no longer waste time on low-quality leads. The call tracking features are a game-changer!",
-  },
-  {
-    name: "Michael Chen",
-    role: "Insurance Broker",
-    text: "Automated lead distribution saves us 20+ hours weekly. The geo-routing ensures leads go to agents in the right territory. Best investment we made.",
-  },
-  {
-    name: "David Wilson",
-    role: "Solar Sales Director",
-    text: "From lead capture to sale, BRIXCOT handles everything. The marketplace feature opened new revenue streams we never knew existed.",
-  },
-  {
-    name: "Jennifer Martinez",
-    role: "Home Services Company",
-    text: "The email and SMS campaigns are incredibly easy to set up. Our re-engagement rate improved by 65% since switching to BRIXCOT.",
-  },
-  {
-    name: "Robert Taylor",
-    role: "Digital Marketing Agency",
-    text: "We manage leads for 50+ clients through BRIXCOT. The Zapier integration connects everything seamlessly. It's the backbone of our operation.",
-  },
-  {
-    name: "Amanda Lee",
-    role: "Mortgage Lead Buyer",
-    text: "As a buyer, I love the marketplace. Preview leads before purchasing, see quality scores, and the wallet system makes transactions instant.",
-  },
-];
+// const testimonials = [
+//   {
+//     name: "Sarah Johnson",
+//     role: "Real Estate Agency Owner",
+//     text: "The AI lead scoring alone increased our conversion by 40%. We no longer waste time on low-quality leads. The call tracking features are a game-changer!",
+//   },
+//   {
+//     name: "Michael Chen",
+//     role: "Insurance Broker",
+//     text: "Automated lead distribution saves us 20+ hours weekly. The geo-routing ensures leads go to agents in the right territory. Best investment we made.",
+//   },
+//   {
+//     name: "David Wilson",
+//     role: "Solar Sales Director",
+//     text: "From lead capture to sale, BRIXCOT handles everything. The marketplace feature opened new revenue streams we never knew existed.",
+//   },
+//   {
+//     name: "Jennifer Martinez",
+//     role: "Home Services Company",
+//     text: "The email and SMS campaigns are incredibly easy to set up. Our re-engagement rate improved by 65% since switching to BRIXCOT.",
+//   },
+//   {
+//     name: "Robert Taylor",
+//     role: "Digital Marketing Agency",
+//     text: "We manage leads for 50+ clients through BRIXCOT. The Zapier integration connects everything seamlessly. It's the backbone of our operation.",
+//   },
+//   {
+//     name: "Amanda Lee",
+//     role: "Mortgage Lead Buyer",
+//     text: "As a buyer, I love the marketplace. Preview leads before purchasing, see quality scores, and the wallet system makes transactions instant.",
+//   },
+// ];
 
 const howItWorks = [
   {
@@ -251,12 +251,12 @@ const faqs = [
 const leftFaqs = faqs.filter((_, index) => index % 2 === 0);
 const rightFaqs = faqs.filter((_, index) => index % 2 !== 0);
 
-const socialProof = [
-  { number: "10,000+", label: "Leads Processed Daily", growth: "+127%" },
-  { number: "2,500+", label: "Active Businesses", growth: "+89%" },
-  { number: "98.7%", label: "Customer Satisfaction", growth: "+12%" },
-  { number: "$2.4M", label: "Leads Sold Monthly", growth: "+156%" },
-];
+// const socialProof = [
+//   { number: "10,000+", label: "Leads Processed Daily", growth: "+127%" },
+//   { number: "2,500+", label: "Active Businesses", growth: "+89%" },
+//   { number: "98.7%", label: "Customer Satisfaction", growth: "+12%" },
+//   { number: "$2.4M", label: "Leads Sold Monthly", growth: "+156%" },
+// ];
 
 const trustBadges = [
   { icon: <Shield />, label: "SOC 2 Compliant" },
@@ -596,22 +596,6 @@ const LandingPage = () => {
                       alignItems: "center",
                     }}
                   >
-                    {/* Animated ring */}
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        width: "110%",
-                        height: "110%",
-                        borderRadius: "50%",
-                        border: "2px solid rgba(255,255,255,0.2)",
-                        animation: "pulse 2s infinite",
-                        "@keyframes pulse": {
-                          "0%": { transform: "scale(1)", opacity: 1 },
-                          "50%": { transform: "scale(1.05)", opacity: 0.5 },
-                          "100%": { transform: "scale(1)", opacity: 1 },
-                        },
-                      }}
-                    />
                     <Paper
                       elevation={20}
                       sx={{
@@ -619,6 +603,13 @@ const LandingPage = () => {
                         p: 2,
                         borderRadius: "50%",
                         display: "inline-block",
+                        animation: "heroLogoPulse 2s infinite",
+                        transformOrigin: "center",
+                        "@keyframes heroLogoPulse": {
+                          "0%": { transform: "scale(1)", opacity: 1 },
+                          "50%": { transform: "scale(1.05)", opacity: 0.5 },
+                          "100%": { transform: "scale(1)", opacity: 1 },
+                        },
                       }}
                     >
                       <Image
@@ -626,7 +617,7 @@ const LandingPage = () => {
                         alt="BRIXCOT - Best Lead Management Software Platform"
                         style={{
                           width: "100%",
-                          maxWidth: 280,
+                          maxWidth: 320,
                           height: "auto",
                           display: "block",
                         }}
