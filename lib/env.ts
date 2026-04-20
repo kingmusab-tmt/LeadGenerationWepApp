@@ -19,10 +19,12 @@ const envSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 
   // Twilio
-  TWILIO_ACCOUNT_SID: z.string(),
-  TWILIO_AUTH_TOKEN: z.string(),
-  TWILIO_PHONE_NUMBER: z.string(),
-  TWILIO_FROM_NUMBER: z.string().optional(),
+  // Keep build-time env parsing resilient for deployments where Twilio is not used.
+  // Runtime SMS helpers validate these before sending.
+  TWILIO_ACCOUNT_SID: z.string().default(""),
+  TWILIO_AUTH_TOKEN: z.string().default(""),
+  TWILIO_PHONE_NUMBER: z.string().default(""),
+  TWILIO_FROM_NUMBER: z.string().default(""),
 
   // Email
   EMAIL_FROM_NAME: z.string().optional(),

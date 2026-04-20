@@ -5,6 +5,14 @@ import { env } from "@/lib/env";
 
 const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
 
+function getTwilioFromNumber() {
+  const from = env.TWILIO_FROM_NUMBER || env.TWILIO_PHONE_NUMBER;
+  if (!from || !env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN) {
+    throw new Error("Twilio notification configuration is incomplete");
+  }
+  return from;
+}
+
 function getEmailTransporter() {
   const host = env.EMAIL_SERVER || env.EMAIL_SERVER_HOST;
   const user = env.EMAIL_SERVER_USER || env.EMAIL_FROM;
@@ -38,7 +46,7 @@ export async function sendEmail(to: string, subject: string, text: string) {
 // Send SMS Notification
 export async function sendSMS(to: string, text: string) {
   await client.messages.create({
-    from: env.TWILIO_PHONE_NUMBER,
+    from: getTwilioFromNumber(),
     to,
     body: text,
   });
