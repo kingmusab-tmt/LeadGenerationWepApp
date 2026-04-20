@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
 
   // Get the current user session
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.role !== "seller") {
+  if (
+    !session ||
+    (session.user?.role !== "seller" && session.user?.role !== "business-admin")
+  ) {
     return unauthorized("Authentication required");
   }
 

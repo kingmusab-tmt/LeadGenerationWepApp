@@ -175,40 +175,43 @@ export function useCSRF() {
 export function useCSRFFetch() {
   const { csrfToken, ensureToken } = useCSRF();
 
-  return async (url: string, options: RequestInit = {}) => {
-    // Read token from cookie to ensure consistency with middleware validation
-    // This prevents stale closure issues where context token differs from cookie
-    const getCookieToken = () => {
-      if (typeof document === "undefined") return null;
-      if (!document.cookie) return null;
-      const match = document.cookie.match(/(?:^|; )csrfToken=([^;]*)/);
-      return match ? decodeURIComponent(match[1]) : null;
-    };
+  return useCallback(
+    async (url: string, options: RequestInit = {}) => {
+      // Read token from cookie to ensure consistency with middleware validation
+      // This prevents stale closure issues where context token differs from cookie
+      const getCookieToken = () => {
+        if (typeof document === "undefined") return null;
+        if (!document.cookie) return null;
+        const match = document.cookie.match(/(?:^|; )csrfToken=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+      };
 
-    let token = getCookieToken() || csrfToken;
+      let token = getCookieToken() || csrfToken;
 
-    // Lazily fetch token if missing for non-GET requests
-    if (
-      (!token || token === "") &&
-      options.method &&
-      options.method !== "GET"
-    ) {
-      token = await ensureToken();
-      // Re-read from cookie after ensureToken sets it
-      token = getCookieToken() || token;
-    }
+      // Lazily fetch token if missing for non-GET requests
+      if (
+        (!token || token === "") &&
+        options.method &&
+        options.method !== "GET"
+      ) {
+        token = await ensureToken();
+        // Re-read from cookie after ensureToken sets it
+        token = getCookieToken() || token;
+      }
 
-    const headers = new Headers(options.headers);
+      const headers = new Headers(options.headers);
 
-    // Add CSRF token to headers for non-GET requests
-    if (token && options.method && options.method !== "GET") {
-      headers.set("X-CSRF-Token", token);
-    }
+      // Add CSRF token to headers for non-GET requests
+      if (token && options.method && options.method !== "GET") {
+        headers.set("X-CSRF-Token", token);
+      }
 
-    return fetch(url, {
-      ...options,
-      headers,
-      credentials: options.credentials ?? "include",
-    });
-  };
+      return fetch(url, {
+        ...options,
+        headers,
+        credentials: options.credentials ?? "include",
+      });
+    },
+    [csrfToken, ensureToken],
+  );
 }

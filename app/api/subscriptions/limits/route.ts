@@ -45,7 +45,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Authorization check
-    if (session.user.id !== sellerId && session.user.role !== "admin") {
+    if (
+      session.user.id !== sellerId &&
+      session.user.role !== "admin" &&
+      session.user.role !== "business-admin"
+    ) {
       return forbidden("You can only access your own data");
     }
 
