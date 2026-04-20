@@ -178,8 +178,8 @@ export default function SmsCampaignEditorPage() {
         `/api/marketing/sms/campaigns/${campaignId}`,
       );
       if (refreshRes.ok) setCampaign(await refreshRes.json());
-    } catch (error: any) {
-      toast.error(error?.message || "Error sending campaign");
+    } catch {
+      toast.error("Error sending campaign");
     } finally {
       setSaving(false);
     }
@@ -203,8 +203,8 @@ export default function SmsCampaignEditorPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send test SMS");
       toast.success("Test SMS sent successfully");
-    } catch (error: any) {
-      toast.error(error?.message || "Error sending test SMS");
+    } catch {
+      toast.error("Error sending test SMS");
     } finally {
       setSaving(false);
     }

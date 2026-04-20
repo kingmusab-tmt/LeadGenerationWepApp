@@ -30,6 +30,7 @@ import {
   Badge,
   MenuItem,
 } from "@mui/material";
+import type { AlertColor } from "@mui/material/Alert";
 import {
   DndContext,
   closestCenter,
@@ -54,7 +55,6 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PreviewIcon from "@mui/icons-material/Preview";
 import PeopleIcon from "@mui/icons-material/People";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
-import { useNotification } from "@/app/hooks";
 
 interface TierLimits {
   // Core Limits
@@ -217,20 +217,18 @@ const defaultTierLimits: TierLimits = {
 
 const TierManagement = () => {
   const csrfFetch = useCSRFFetch();
-  const notify = useNotification();
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [subscriberCounts, setSubscriberCounts] = useState<
     Record<string, number>
   >({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTier, setCurrentTier] = useState<Partial<Tier> | null>(null);
   const [newFeature, setNewFeature] = useState("");
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
-    severity: "success",
+    severity: "success" as AlertColor,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showLimits, setShowLimits] = useState(false);
@@ -270,12 +268,9 @@ const TierManagement = () => {
         setSubscriberCounts(countsData.counts || {});
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "An unknown error occurred",
-      );
       setSnackbar({
         open: true,
-        message: "Failed to load tiers",
+        message: `Failed to load tiers {${err instanceof Error ? err.message : "Unknown error"}}`,
         severity: "error",
       });
     } finally {
@@ -502,7 +497,8 @@ const TierManagement = () => {
     } catch (err) {
       setSnackbar({
         open: true,
-        message: "Failed to update tier order",
+        message:
+          err instanceof Error ? err.message : "Failed to update tier order",
         severity: "error",
       });
       fetchTiers();
@@ -1803,7 +1799,7 @@ const TierManagement = () => {
       >
         <Alert
           onClose={handleCloseSnackbar}
-          severity={snackbar.severity as any}
+          severity={snackbar.severity}
           sx={{ width: "100%" }}
         >
           {snackbar.message}

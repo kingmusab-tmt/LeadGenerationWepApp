@@ -58,7 +58,7 @@ const APISettingsPage = () => {
             setLastSaved(now);
           }
         }
-      } catch (e) {
+      } catch {
         // ignore load error
       }
     })();
@@ -73,7 +73,7 @@ const APISettingsPage = () => {
       toast.success("API settings updated successfully!");
       const now = new Date().toLocaleTimeString();
       setLastSaved(now);
-    } catch (e) {
+    } catch {
       toast.error("Failed to update API settings");
     } finally {
       setSaving(false);

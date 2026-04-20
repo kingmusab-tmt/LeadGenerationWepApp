@@ -109,7 +109,7 @@ const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [searchTerm, roleFilter, statusFilter]);
+  }, [searchTerm, roleFilter, statusFilter, fetchUsers]);
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);

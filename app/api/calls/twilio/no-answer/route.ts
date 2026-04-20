@@ -5,10 +5,7 @@ import Call from "@/models/call";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import { getNextRoundRobinBuyerAtomic, debugLog } from "@/utils/callHandlers";
-import {
-  callSecurityMiddleware,
-  CALL_DEFAULTS,
-} from "@/lib/security/callSecurity";
+import { callSecurityMiddleware } from "@/lib/security/callSecurity";
 import { env } from "@/lib/env";
 
 export async function POST(req: NextRequest) {

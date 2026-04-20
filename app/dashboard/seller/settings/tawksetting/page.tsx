@@ -85,9 +85,11 @@ const TawkSetupForm = () => {
       } else {
         throw new Error(data.message || data.error || "Something went wrong");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setStatus("error");
-      setMessage(error.message);
+      setMessage(
+        error instanceof Error ? error.message : "Something went wrong",
+      );
     } finally {
       setLoading(false);
     }

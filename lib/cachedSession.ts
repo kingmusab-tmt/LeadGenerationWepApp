@@ -8,13 +8,37 @@ import {
 } from "@/lib/memoryCache";
 import memoryCache from "@/lib/memoryCache";
 
+type SessionTokenLike = {
+  role?: string | null;
+  isSubActive?: boolean | null;
+};
+
+type CachedSessionData = {
+  id?: string;
+  email?: string;
+  name?: string;
+  image?: string | null;
+  role?: string;
+  isSubActive?: boolean;
+  subscription?: unknown;
+  cacheVersion?: number;
+};
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
 /**
  * Get user session with Redis caching
  * Reduces database queries by ~99%
  */
-export async function getCachedSession(userEmail: string, token: any) {
+export async function getCachedSession(
+  userEmail: string,
+  token: SessionTokenLike,
+) {
   // Note: getSessionCache adds its own "session:" prefix, so we pass just the email
-  const cachedSession = await getSessionCache(userEmail);
+  const cachedSession =
+    ((await getSessionCache(userEmail)) as CachedSessionData | null) ?? null;
 
   // If cache exists, verify it matches the current token data
   // If token has different role or isSubActive, cache is stale - refetch from DB
@@ -114,7 +138,7 @@ export async function invalidateAllUserSessions(userId: string) {
     let invalidatedCount = 0;
 
     for (const key of sessionKeys) {
-      const sessionData = memoryCache.get<any>(key);
+      const sessionData = memoryCache.get<CachedSessionData>(key);
       if (sessionData?.id === userId) {
         memoryCache.delete(key);
         invalidatedCount++;
@@ -141,9 +165,9 @@ export async function invalidateAllUserSessions(userId: string) {
 export async function forceRefreshUserSession(
   userId: string,
   options?: { maxRetries?: number },
-): Promise<{ success: boolean; session?: any; error?: string }> {
+): Promise<{ success: boolean; session?: CachedSessionData; error?: string }> {
   const maxRetries = options?.maxRetries || 3;
-  let lastError: Error | null = null;
+  let lastError: unknown = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -188,11 +212,11 @@ export async function forceRefreshUserSession(
       );
 
       return { success: true, session: sessionData };
-    } catch (error: any) {
+    } catch (error: unknown) {
       lastError = error;
       console.error(
         `[Cache] Force refresh attempt ${attempt} failed:`,
-        error.message,
+        getErrorMessage(error),
       );
 
       // Wait before retry (exponential backoff)
@@ -206,7 +230,9 @@ export async function forceRefreshUserSession(
 
   return {
     success: false,
-    error: lastError?.message || "Failed to refresh session after retries",
+    error: lastError
+      ? getErrorMessage(lastError)
+      : "Failed to refresh session after retries",
   };
 }
 
@@ -228,7 +254,7 @@ export async function invalidateSessionWithConfirmation(
     // Invalidate all sessions for this user
     const sessionKeys = memoryCache.keys(`session:*`);
     for (const key of sessionKeys) {
-      const sessionData = memoryCache.get<any>(key);
+      const sessionData = memoryCache.get<CachedSessionData>(key);
       if (sessionData?.id === userId) {
         memoryCache.deletePattern(key);
       }
@@ -248,9 +274,9 @@ export async function invalidateSessionWithConfirmation(
       `[Cache] Confirmed session invalidation for: ${userEmail} (${userId})`,
     );
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Cache] Session invalidation confirmation failed:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 
@@ -260,8 +286,8 @@ export async function invalidateSessionWithConfirmation(
  */
 export async function updateSubscriptionAndRefreshSession(
   userId: string,
-  subscriptionUpdate: Record<string, any>,
-): Promise<{ success: boolean; user?: any; error?: string }> {
+  subscriptionUpdate: Record<string, unknown>,
+): Promise<{ success: boolean; user?: unknown; error?: string }> {
   try {
     await dbConnect();
 
@@ -298,9 +324,9 @@ export async function updateSubscriptionAndRefreshSession(
     );
 
     return { success: true, user: updatedUser };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Cache] updateSubscriptionAndRefreshSession failed:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 

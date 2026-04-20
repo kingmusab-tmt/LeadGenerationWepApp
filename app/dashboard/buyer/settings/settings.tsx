@@ -30,7 +30,7 @@ import {
 import { styled } from "@mui/system";
 import { industryNiches } from "@/utils/industryNiches";
 import { industryServices } from "@/utils/industryServices";
-import { LEAD_SOURCES } from "@/utils/leadSources";
+
 import { useInitializeUser, useAppDispatch, normalizeUser } from "@/app/hooks";
 import { setUser, updateUser } from "@/lib/userSlice";
 import { useNotification } from "@/app/hooks";
@@ -71,8 +71,6 @@ const SectionHeader = styled(Typography)(({ theme }) => ({
   marginBottom: theme.spacing(2),
   color: theme.palette.text.primary,
 }));
-
-const preferredDistributionOptions = ["Manual", "Automatic", "Both"];
 
 const notificationPreferencesOptions = ["Email", "SMS", "In-App Notification"];
 
@@ -181,6 +179,12 @@ interface BuyerPreferences {
   priorityByLocation: { location: string; priority: number }[];
 }
 
+interface PreferredZone {
+  city?: string;
+  state?: string;
+  zipCodes?: string[];
+}
+
 interface AccountSettingsProps {
   embeddedOnboarding?: boolean;
   forcedTab?: number;
@@ -219,7 +223,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
   const onboardingStepParam =
     onboardingStep || searchParams.get("onboardingStep");
   const [tabValue, setTabValue] = useState(initialTab);
-  const [darkMode, setDarkMode] = useState(false);
+
   const [leadBuyerDetail, setLeadBuyerDetail] =
     useState<ILeadBuyerDetail | null>(null);
   const [leadBuyerLoading, setLeadBuyerLoading] = useState(true);
@@ -323,15 +327,15 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
 
           // Parse preferred zones
           const preferredCityZones = (buyerDetail.preferredZones || [])
-            .filter((zone: any) => zone.city)
-            .map((zone: any) => zone.city)
+            .filter((zone: PreferredZone) => zone.city)
+            .map((zone: PreferredZone) => zone.city)
             .filter(Boolean);
           const preferredStateZones = (buyerDetail.preferredZones || [])
-            .filter((zone: any) => zone.state)
-            .map((zone: any) => zone.state)
+            .filter((zone: PreferredZone) => zone.state)
+            .map((zone: PreferredZone) => zone.state)
             .filter(Boolean);
           const preferredZipZones = (buyerDetail.preferredZones || [])
-            .flatMap((zone: any) => zone.zipCodes || [])
+            .flatMap((zone: PreferredZone) => zone.zipCodes || [])
             .filter(Boolean);
           setPreferredCitiesInput(preferredCityZones.join(", "));
           setPreferredStatesInput(preferredStateZones.join(", "));
@@ -376,10 +380,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
     router.replace(`?${params.toString()}`, { scroll: false });
   };
 
-  const handleDarkModeToggle = () => {
-    setDarkMode((prev) => !prev);
-  };
-
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     if (name.startsWith("leadBuyer.")) {
@@ -408,7 +408,20 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
       }
     } else {
       if (currentUser) {
-        dispatch(updateUser({ [name]: value } as any));
+        const updates: Partial<
+          Pick<
+            typeof currentUser,
+            | "name"
+            | "email"
+            | "image"
+            | "preferredDistribution"
+            | "tierUserType"
+          >
+        > = {};
+        if (name === "name" || name === "email" || name === "image") {
+          updates[name] = value;
+          dispatch(updateUser(updates));
+        }
       }
     }
   };
@@ -481,7 +494,13 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
       name === "leadTypes" ||
       name === "preferredContactMethods"
     ) {
-      handlePreferencesMultiSelect(name as any, value);
+      handlePreferencesMultiSelect(
+        name as keyof Pick<
+          BuyerPreferences,
+          "industries" | "leadTypes" | "preferredContactMethods"
+        >,
+        value,
+      );
     } else if (
       name === "budgetCapType" ||
       name === "radiusFlexibility" ||
@@ -559,16 +578,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
       setPreferences((prev) => (prev ? { ...prev, [name]: parsed } : prev));
     };
 
-  const handleCommaListChange =
-    (name: keyof BuyerPreferences) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const list = event.target.value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-      setPreferences((prev) => (prev ? { ...prev, [name]: list } : prev));
-    };
-
   const handleWorkingHoursChange = (key: "start" | "end", value: string) => {
     setPreferences((prev) => {
       if (!prev) return prev;
@@ -627,24 +636,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
     );
   };
 
-  const handleWebhookChange =
-    (key: "enabled" | "url" | "authToken") =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value =
-        key === "enabled" ? event.target.checked : event.target.value;
-      setPreferences((prev) =>
-        prev
-          ? {
-              ...prev,
-              webhookConfig: {
-                ...prev.webhookConfig,
-                [key]: value,
-              },
-            }
-          : prev,
-      );
-    };
-
   const handleWeeklyScheduleChange = (
     day: string,
     field: "enabled" | "start" | "end",
@@ -661,52 +652,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 [field]: value,
               },
             },
-          }
-        : prev,
-    );
-  };
-
-  const handleServiceLocationChange = (
-    index: number,
-    field: "city" | "state" | "country" | "radius" | "zipCodes",
-    value: string | number | string[],
-  ) => {
-    setPreferences((prev) => {
-      if (!prev) return prev;
-      const updated = [...prev.serviceLocations];
-      if (field === "zipCodes") {
-        updated[index] = { ...updated[index], zipCodes: value as string[] };
-      } else if (field === "radius") {
-        updated[index] = { ...updated[index], radius: value as number };
-      } else {
-        updated[index] = { ...updated[index], [field]: value as string };
-      }
-      return { ...prev, serviceLocations: updated };
-    });
-  };
-
-  const handleAddServiceLocation = () => {
-    setPreferences((prev) =>
-      prev
-        ? {
-            ...prev,
-            serviceLocations: [
-              ...prev.serviceLocations,
-              { city: "", state: "", country: "USA", zipCodes: [], radius: 25 },
-            ],
-          }
-        : prev,
-    );
-  };
-
-  const handleRemoveServiceLocation = (index: number) => {
-    setPreferences((prev) =>
-      prev
-        ? {
-            ...prev,
-            serviceLocations: prev.serviceLocations.filter(
-              (_, i) => i !== index,
-            ),
           }
         : prev,
     );
@@ -1481,7 +1426,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                           </FormControl>
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
-                          <Tooltip title="Set the minimum quality level for leads you'll receive:\n\n• 100: Only High Quality leads (Clean, Legitimate - spam score 0-40)\n• 60: High + Medium Quality (some red flags - spam score 0-70)\n• 30: Accept any quality level\n\nHigher value = Better leads, Lower value = More volume">
+                          <Tooltip title="Set the minimum quality level for leads you'll receive:\n\n• 100: Only High Quality leads (Clean, Legitimate - spam score 0-40)\n• 60: High + Medium Quality (some red flags - spam score 0-69)\n• 30: Accept any quality level\n\nHigher value = Better leads, Lower value = More volume">
                             <TextField
                               fullWidth
                               label="Quality Score Minimum"

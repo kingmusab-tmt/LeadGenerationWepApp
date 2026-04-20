@@ -17,8 +17,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  useMediaQuery,
-  Theme,
   Skeleton,
   Snackbar,
   Alert,
@@ -49,9 +47,6 @@ const UnitPricingComponent: React.FC = () => {
     message: "",
     severity: "success",
   });
-  const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm"),
-  );
 
   // Fetch unit pricing options on component mount
   useEffect(() => {
@@ -71,7 +66,7 @@ const UnitPricingComponent: React.FC = () => {
             severity: "error",
           });
         }
-      } catch (error) {
+      } catch {
         setSnackbar({
           open: true,
           message: "An error occurred",
@@ -125,7 +120,7 @@ const UnitPricingComponent: React.FC = () => {
           severity: "error",
         });
       }
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "An error occurred",
@@ -153,7 +148,7 @@ const UnitPricingComponent: React.FC = () => {
           severity: "error",
         });
       }
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "An error occurred",

@@ -29,7 +29,6 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
   if (!transaction) return null;
 
@@ -38,8 +37,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
     if (!metadata) return null;
 
-    // Determine grid columns based on screen size
-    const gridItemSize = isMobile ? 12 : isTablet ? 6 : 4;
+    // Determine grid columns based on
 
     return (
       <>
@@ -226,9 +224,6 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
       </>
     );
   };
-
-  // Determine grid columns for main transaction info based on screen size
-  const mainGridItemSize = isMobile ? 12 : 6;
 
   return (
     <Dialog

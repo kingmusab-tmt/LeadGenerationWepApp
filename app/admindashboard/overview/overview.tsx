@@ -24,8 +24,6 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,

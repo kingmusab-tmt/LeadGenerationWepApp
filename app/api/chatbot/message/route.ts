@@ -1,7 +1,6 @@
 import { ChatbotEngine } from "@/lib/chatbot-engine";
 import { QualificationFlow } from "@/types/chatbot";
 import dbConnect from "@/lib/connectdb";
-import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 // Use Web standard Request/Response types for Next.js route handlers
 import { Lead as LeadModel } from "@/models/leads";
 

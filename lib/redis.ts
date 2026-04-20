@@ -74,7 +74,7 @@ export async function closeRedisConnection() {
  */
 export async function getSessionCache(
   sessionToken: string,
-): Promise<any | null> {
+): Promise<unknown | null> {
   try {
     const client = await getRedisClient();
     if (!client) {
@@ -100,7 +100,7 @@ export async function getSessionCache(
  */
 export async function setSessionCache(
   sessionToken: string,
-  sessionData: any,
+  sessionData: unknown,
   ttlSeconds: number = DEFAULT_SESSION_TTL_SECONDS,
 ): Promise<void> {
   try {
@@ -203,7 +203,7 @@ export async function getUserSessionsCount(userId: string): Promise<number> {
  */
 export async function setUserCache(
   userId: string,
-  userData: any,
+  userData: unknown,
   ttlSeconds: number = DEFAULT_USER_CACHE_TTL_SECONDS,
 ): Promise<void> {
   try {
@@ -220,7 +220,7 @@ export async function setUserCache(
 /**
  * Get cached user data
  */
-export async function getUserCache(userId: string): Promise<any> {
+export async function getUserCache(userId: string): Promise<unknown | null> {
   try {
     const client = await getRedisClient();
     if (!client) {

@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest) {
     if (!session) {
       return NextResponse.json(
         { error: "Unauthorized. Please log in to update this lead." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest) {
     if (!leadId) {
       return NextResponse.json(
         { error: "Lead ID is required as a query parameter." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest) {
         {
           error: `Lead with ID ${leadId} not found or you do not have permission.`,
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -49,17 +49,17 @@ export async function PATCH(req: NextRequest) {
       {
         message: `Lead exclusivity successfully updated to ${lead.exclusive}.`,
       },
-      { status: 200 }
+      { status: 200 },
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating exclusive status:", error);
 
     return NextResponse.json(
       {
         error: "Failed to update exclusive status.",
-        details: error.message || "Unknown error occurred.",
+        details: error instanceof Error ? error.message : String(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

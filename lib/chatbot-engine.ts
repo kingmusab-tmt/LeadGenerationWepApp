@@ -2,9 +2,16 @@ import { Lead, QualificationFlow, Question } from "@/types/chatbot";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { analyzeSentiment } from "./sentimentEngine";
 
+type ConversationResponses = Record<string, unknown>;
+
+interface ConditionLike {
+  operator?: string;
+  value?: unknown;
+}
+
 interface ConversationState {
   currentQuestionIndex: number;
-  responses: Record<string, any>;
+  responses: ConversationResponses;
   score: number;
 }
 
@@ -127,7 +134,7 @@ export class ChatbotEngine {
   }
 
   private calculateScore(
-    responses: Record<string, any>,
+    responses: ConversationResponses,
     leadData: Partial<Lead>,
   ): number {
     let score = 0;
@@ -146,7 +153,7 @@ export class ChatbotEngine {
     return Math.min(Math.max(score, 0), 100); // Clamp between 0-100
   }
 
-  private evaluateCondition(value: any, condition: any): boolean {
+  private evaluateCondition(value: unknown, condition: ConditionLike): boolean {
     if (!condition.operator) return false;
 
     switch (condition.operator.toLowerCase()) {
@@ -192,7 +199,7 @@ export class ChatbotEngine {
   private evaluateQuestionCondition(
     condition: string,
     leadData: Partial<Lead>,
-    responses: Record<string, any>,
+    responses: ConversationResponses,
   ): boolean {
     if (!condition) return true;
 

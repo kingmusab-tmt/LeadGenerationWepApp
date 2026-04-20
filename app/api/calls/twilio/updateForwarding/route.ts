@@ -12,6 +12,42 @@ import {
 
 type ResponseEntry = { message: string; digit: string };
 type LeadBuyerEntry = { id: string; name: string; phone?: string };
+type TrackingNumberRecord = {
+  phoneNumber?: string;
+  industry?: string;
+  forwardingType?: string;
+  method?: string;
+  recordCall?: boolean;
+  reconnectCaller?: boolean;
+  passCallerId?: boolean;
+  leadSource?: string;
+  welcomeMessage?: string;
+  callWhisper?: string;
+  requireResponse?: boolean;
+  overflowNumber?: string;
+  enableWorkingHours?: boolean;
+  workingHoursStart?: string;
+  workingHoursEnd?: string;
+  recordingConsent?: boolean;
+  recordingConsentMessage?: string;
+  missedCallTextBack?: boolean;
+  missedCallTextMessage?: string;
+  dncEnabled?: boolean;
+  dncList?: string[];
+  spamFilterEnabled?: boolean;
+  spamFilterAction?: "warn" | "block";
+  scheduledCallbackEnabled?: boolean;
+  scheduledCallbackDigit?: string;
+  multiRingEnabled?: boolean;
+  geoRoutingEnabled?: boolean;
+  concurrentCallLimit?: number;
+  transcriptionEnabled?: boolean;
+  aiSummaryEnabled?: boolean;
+  buyerResponses?: ResponseEntry[];
+  leadResponses?: ResponseEntry[];
+  forwardingNumbers?: string[];
+  leadBuyers?: LeadBuyerEntry[];
+};
 
 function isResponseEntry(value: unknown): value is ResponseEntry {
   return (
@@ -104,8 +140,11 @@ export async function POST(req: NextRequest) {
       return notFound("Seller");
     }
 
+    const trackingNumbers =
+      seller.trackingNumbers as unknown as TrackingNumberRecord[];
+
     // Find the tracking number
-    const number = seller.trackingNumbers.find(
+    const number = trackingNumbers.find(
       (num) => num.phoneNumber === phoneNumber,
     );
     if (!number) {

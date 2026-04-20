@@ -380,7 +380,7 @@ const ContentVerification = () => {
                     </TableCell>
                     <TableCell>
                       <Tooltip
-                        title={`AI Spam Score: ${(lead.qualityScore / 10).toFixed(1)}/10\nQuality Level: ${lead.qualityLevel}\n\nScore Range: 0-100 (Lower = Better Quality)\n\n0-40: High Quality (Clean, Legitimate)\n40-70: Medium Quality (Some Red Flags)\n70-100: Low Quality (Spam/Suspicious)`}
+                        title={`AI Spam Score: ${(lead.qualityScore / 10).toFixed(1)}/10\nQuality Level: ${lead.qualityLevel}\n\nScore Range: 0-100 (Lower = Better Quality)\n\n0-40: High Quality (Clean, Legitimate)\n41-69: Medium Quality (Some Red Flags)\n70-100: Low Quality (Spam/Suspicious)`}
                       >
                         <Chip
                           label={`${(lead.qualityScore / 10).toFixed(1)}/10`}
@@ -651,7 +651,7 @@ const ContentVerification = () => {
                       primary="Quality Score"
                       secondary={
                         <Tooltip
-                          title={`AI Spam Score: ${(selectedLead.qualityScore / 10).toFixed(1)}/10\nQuality Level: ${selectedLead.qualityLevel}\n\nScore Range: 0-100 (Lower = Better Quality)\n\n0-40: High Quality (Clean, Legitimate)\n40-70: Medium Quality (Some Red Flags)\n70-100: Low Quality (Spam/Suspicious)`}
+                          title={`AI Spam Score: ${(selectedLead.qualityScore / 10).toFixed(1)}/10\nQuality Level: ${selectedLead.qualityLevel}\n\nScore Range: 0-100 (Lower = Better Quality)\n\n0-40: High Quality (Clean, Legitimate)\n41-69: Medium Quality (Some Red Flags)\n70-100: Low Quality (Spam/Suspicious)`}
                         >
                           <Chip
                             label={`${(selectedLead.qualityScore / 10).toFixed(1)}/10`}

@@ -8,9 +8,29 @@ import { Lead, ILead } from "@/models/leads";
 import { Buyer, IBuyer, IBuyerCriteriaSet } from "@/models/leadbuyers";
 import { User } from "@/models";
 import { sendNotification } from "@/lib/notificationService";
-import { Transaction, ITransaction } from "@/models/transactions";
+import { Transaction } from "@/models/transactions";
 import dbConnect from "@/lib/connectdb";
 import mongoose from "mongoose";
+
+type DaySchedule = {
+  enabled: boolean;
+  start: string;
+  end: string;
+};
+
+type LocationCriteria = NonNullable<IBuyerCriteriaSet["locations"]>[number];
+
+type SellerSummary = {
+  _id: unknown;
+  name?: string;
+  email?: string;
+};
+
+function toIdString(id: unknown): string {
+  if (typeof id === "string") return id;
+  if (id instanceof mongoose.Types.ObjectId) return id.toString();
+  return String(id);
+}
 
 export interface AutoPurchaseResult {
   leadId: string;
@@ -120,7 +140,9 @@ function checkCriteriaMatch(
         const daySchedule =
           buyer.weeklySchedule instanceof Map
             ? buyer.weeklySchedule.get(dayName)
-            : (buyer.weeklySchedule as any)[dayName];
+            : (buyer.weeklySchedule as Record<string, DaySchedule | undefined>)[
+                dayName
+              ];
 
         if (daySchedule) {
           if (!daySchedule.enabled) return false;
@@ -177,27 +199,29 @@ function checkCriteriaMatch(
     criteriaSet.locations.length > 0 &&
     lead.location
   ) {
-    const locationMatch = criteriaSet.locations.some((loc: any) => {
-      // City match
-      if (
-        loc.city &&
-        loc.city.toLowerCase() === lead.location!.city?.toLowerCase()
-      ) {
-        return true;
-      }
-      // State match
-      if (
-        loc.state &&
-        loc.state.toLowerCase() === lead.location!.state?.toLowerCase()
-      ) {
-        return true;
-      }
-      // Zip code match
-      if (loc.zipCodes && lead.location!.zipCode) {
-        return loc.zipCodes.includes(lead.location!.zipCode);
-      }
-      return false;
-    });
+    const locationMatch = criteriaSet.locations.some(
+      (loc: LocationCriteria) => {
+        // City match
+        if (
+          loc.city &&
+          loc.city.toLowerCase() === lead.location!.city?.toLowerCase()
+        ) {
+          return true;
+        }
+        // State match
+        if (
+          loc.state &&
+          loc.state.toLowerCase() === lead.location!.state?.toLowerCase()
+        ) {
+          return true;
+        }
+        // Zip code match
+        if (loc.zipCodes && lead.location!.zipCode) {
+          return loc.zipCodes.includes(lead.location!.zipCode);
+        }
+        return false;
+      },
+    );
 
     if (!locationMatch) {
       return false;
@@ -226,7 +250,7 @@ function checkCriteriaMatch(
 async function autoPurchaseLead(
   lead: ILead,
   buyer: IBuyer,
-  seller: any,
+  seller: SellerSummary,
 ): Promise<{ success: boolean; error?: string }> {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -403,7 +427,7 @@ export async function processAutoAcceptPurchases(
     for (const buyer of buyersWithAutoAccept) {
       try {
         // Get active criteria set
-        const criteriaSet = buyer.criteriaSets?.find((cs: any) =>
+        const criteriaSet = buyer.criteriaSets?.find((cs: IBuyerCriteriaSet) =>
           cs._id.equals(buyer.activeCriteriaSetId),
         );
 
@@ -495,7 +519,7 @@ export async function processAutoAcceptPurchases(
           // Send notification to seller
           try {
             await sendNotification({
-              userId: (seller as any)._id.toString(),
+              userId: toIdString(seller._id),
               type: "alert",
               title: "Lead Auto-Purchased",
               message: `Lead auto-purchased by ${buyer.name || buyer.email}. Units received: ${lead.unit || 0}`,

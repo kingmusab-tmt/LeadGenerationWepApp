@@ -1,5 +1,5 @@
 // GET /api/invoices/stats - Get invoice statistics and analytics
-import { NextRequest } from "next/server";
+
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { invoiceEngine } from "@/lib/invoiceEngine";
@@ -12,7 +12,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
     const stats = await invoiceEngine.getInvoiceStats(session.user.id);
     const overdueInvoices = await invoiceEngine.getOverdueInvoices(
-      session.user.id
+      session.user.id,
     );
 
     return successResponse({

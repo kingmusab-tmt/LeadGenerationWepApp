@@ -8,6 +8,10 @@ import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 import { sendNotification } from "@/lib/notificationService";
 import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
 import {
+  normalizeAiQualityResult,
+  recordAiScoringMetric,
+} from "@/lib/aiQualityScoring";
+import {
   badRequest,
   internalError,
   methodNotAllowed,
@@ -236,9 +240,24 @@ export async function POST(request: Request) {
     }
 
     // Create a new lead
+    const nameField = data.fields.find((f) => f.label.toLowerCase() === "name");
+    const emailField = data.fields.find(
+      (f) => f.label.toLowerCase() === "email",
+    );
+    const phoneField = data.fields.find(
+      (f) => f.label.toLowerCase() === "phone",
+    );
+    const companyField = data.fields.find(
+      (f) => f.label.toLowerCase() === "company",
+    );
+
     const lead = new Lead({
       formId: formObjectId,
       userId: formOwnerId,
+      name: nameField?.value?.toString() || undefined,
+      email: emailField?.value?.toString() || undefined,
+      phone: phoneField?.value?.toString() || undefined,
+      company: companyField?.value?.toString() || undefined,
       fields: data.fields,
       status: "new",
       isFavorite: false,
@@ -282,55 +301,34 @@ export async function POST(request: Request) {
         );
 
         const filterResult = await filterResponse.json();
-        const normalizedIsValid =
-          typeof filterResult.is_valid === "boolean"
-            ? filterResult.is_valid
-            : typeof filterResult.isValid === "boolean"
-              ? filterResult.isValid
-              : true;
-        const normalizedReason =
-          typeof filterResult.reason === "string"
-            ? filterResult.reason
-            : typeof filterResult.message === "string"
-              ? filterResult.message
-              : "";
-
-        // Map AI spam_score to quality level: High (0-30), Medium (30-70), Low (70-100)
-        let qualityLevel: "High" | "Medium" | "Low" = "Medium";
-        const spamScore =
-          typeof filterResult.spam_score === "number"
-            ? filterResult.spam_score
-            : typeof filterResult.spamScore === "number"
-              ? filterResult.spamScore
-              : 50;
-
-        if (spamScore <= 30) {
-          qualityLevel = "High";
-        } else if (spamScore >= 70) {
-          qualityLevel = "Low";
-        }
+        const normalized = normalizeAiQualityResult(filterResult);
 
         // Update the lead with AI quality assessment
         await Lead.findByIdAndUpdate(lead._id, {
-          aiQualityScore: spamScore,
-          qualityLevel: qualityLevel,
-          aiQualityReason: normalizedReason,
+          aiQualityScore: normalized.spamScore,
+          qualityLevel: normalized.qualityLevel,
+          aiQualityReason: normalized.reason,
           aiQualityAssessment: {
-            isValid: normalizedIsValid,
-            spamScore: spamScore,
-            reason: normalizedReason,
+            isValid: normalized.isValid,
+            spamScore: normalized.spamScore,
+            reason: normalized.reason,
             evaluatedAt: new Date(),
           },
-          exclusive: qualityLevel === "High",
-          shared: qualityLevel !== "High",
+          exclusive: normalized.qualityLevel === "High",
+          shared: normalized.qualityLevel !== "High",
         });
 
         console.log("✅ AI quality assessment completed:", {
           leadId: lead._id,
-          qualityLevel: qualityLevel,
-          spamScore: spamScore,
-          isValid: normalizedIsValid,
-          reason: normalizedReason,
+          qualityLevel: normalized.qualityLevel,
+          spamScore: normalized.spamScore,
+          isValid: normalized.isValid,
+          reason: normalized.reason,
+        });
+        console.log("[AI Scoring][Metric]", {
+          event: "success",
+          context: "form_submit",
+          ...recordAiScoringMetric("success"),
         });
 
         // Apply seller's quality-based lead pricing
@@ -359,25 +357,33 @@ export async function POST(request: Request) {
                   low: 2,
                 };
           const unitPrice =
-            qualityLevel === "High"
+            normalized.qualityLevel === "High"
               ? pricing.high
-              : qualityLevel === "Low"
+              : normalized.qualityLevel === "Low"
                 ? pricing.low
                 : pricing.medium;
           await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
-          console.log("✅ Lead unit price set:", { qualityLevel, unitPrice });
+          console.log("✅ Lead unit price set:", {
+            qualityLevel: normalized.qualityLevel,
+            unitPrice,
+          });
         } catch (pricingError) {
           console.error("⚠️ Error setting lead pricing:", pricingError);
         }
       } catch (aiError) {
         console.error("❌ Error in AI quality assessment:", aiError);
-        // Don't fail the entire request - assign default medium quality
         await Lead.findByIdAndUpdate(lead._id, {
           aiQualityScore: 50,
           qualityLevel: "Medium",
           aiQualityReason: "AI evaluation unavailable - using default",
           exclusive: false,
           shared: true,
+        });
+        console.log("[AI Scoring][Metric]", {
+          event: "fallback",
+          context: "form_submit",
+          reason: "exception",
+          ...recordAiScoringMetric("fallback"),
         });
       }
     } else {

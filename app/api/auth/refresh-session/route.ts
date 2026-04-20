@@ -12,6 +12,21 @@ import { forceRefreshUserSession, getCachedSession } from "@/lib/cachedSession";
 import connectDB from "@/lib/connectdb";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
+type SubscriptionSnapshot = {
+  subscriptionPlan?: string;
+  subscriptionExpiryDate?: string | Date;
+};
+
+function getSubscriptionSnapshot(
+  subscription: unknown,
+): SubscriptionSnapshot | undefined {
+  if (!subscription || typeof subscription !== "object") {
+    return undefined;
+  }
+
+  return subscription as SubscriptionSnapshot;
+}
+
 /**
  * POST /api/auth/refresh-session
  * Force refresh the current user's session cache
@@ -51,6 +66,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const subscription = getSubscriptionSnapshot(result.session?.subscription);
+
     return NextResponse.json({
       success: true,
       message: "Session refreshed successfully",
@@ -59,9 +76,8 @@ export async function POST(req: NextRequest) {
         email: result.session?.email,
         role: result.session?.role,
         isSubActive: result.session?.isSubActive,
-        subscriptionPlan: result.session?.subscription?.subscriptionPlan,
-        subscriptionExpiryDate:
-          result.session?.subscription?.subscriptionExpiryDate,
+        subscriptionPlan: subscription?.subscriptionPlan,
+        subscriptionExpiryDate: subscription?.subscriptionExpiryDate,
       },
     });
   } catch (error) {
@@ -91,7 +107,7 @@ export async function GET() {
     await connectDB();
 
     // Get cached session data
-    const cachedSession = await getCachedSession(session.user.email, null);
+    const cachedSession = await getCachedSession(session.user.email, {});
 
     if (!cachedSession) {
       return NextResponse.json({
@@ -101,6 +117,10 @@ export async function GET() {
       });
     }
 
+    const subscription = getSubscriptionSnapshot(cachedSession.subscription);
+    const cacheVersion =
+      "cacheVersion" in cachedSession ? cachedSession.cacheVersion : undefined;
+
     return NextResponse.json({
       success: true,
       cached: true,
@@ -109,10 +129,9 @@ export async function GET() {
         email: cachedSession.email,
         role: cachedSession.role,
         isSubActive: cachedSession.isSubActive,
-        subscriptionPlan: cachedSession.subscription?.subscriptionPlan,
-        subscriptionExpiryDate:
-          cachedSession.subscription?.subscriptionExpiryDate,
-        cacheVersion: cachedSession.cacheVersion,
+        subscriptionPlan: subscription?.subscriptionPlan,
+        subscriptionExpiryDate: subscription?.subscriptionExpiryDate,
+        cacheVersion,
       },
     });
   } catch (error) {

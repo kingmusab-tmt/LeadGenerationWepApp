@@ -8,6 +8,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import {
   Box,
   Typography,
@@ -24,7 +25,7 @@ import {
   Settings as SettingsIcon,
   Info as InfoIcon,
 } from "@mui/icons-material";
-import { useSession } from "next-auth/react";
+
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import ZapierIntegration from "./components/ZapierIntegration";
 import WebhookStatistics from "./components/WebhookStatistics";
@@ -53,10 +54,10 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function IntegrationsPage() {
-  const { data: session, status } = useSession();
-  const { limits, isTrial, loading: limitsLoading } = useSubscriptionLimits();
+  const { status } = useSession();
+  const { limits, isTrial } = useSubscriptionLimits();
   const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(false);
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",

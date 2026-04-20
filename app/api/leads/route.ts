@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
 import { Lead } from "@/models/leads";
 import dbConnect from "@/lib/connectdb";
-import { ObjectId } from "mongodb";
+
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import {
@@ -25,6 +24,7 @@ import {
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
 import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
+import { NextRequest } from "next/server";
 
 // GET /api/leads - Fetch all leads with pagination
 export async function GET(req: NextRequest) {

@@ -29,6 +29,23 @@ function isTwilioLikeError(error: unknown): error is TwilioLikeError {
   return error instanceof Error;
 }
 
+type TrackingNumberRecord = {
+  phoneNumber?: string;
+  purpose?: string;
+  industry?: string;
+  forwardingType?: string;
+  method?: string;
+  recordCall?: boolean;
+  reconnectCaller?: boolean;
+  passCallerId?: boolean;
+  leadSource?: string;
+  welcomeMessage?: string;
+  callWhisper?: string;
+  requireResponse?: boolean;
+  forwardingNumbers?: unknown[];
+  leadBuyers?: unknown[];
+};
+
 export async function POST(req: NextRequest) {
   try {
     const userSession = await getServerSession(authOptions);
@@ -86,7 +103,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const currentTwilioNumbers = user.trackingNumbers.length;
+    const trackingNumbers: TrackingNumberRecord[] = Array.isArray(
+      user.trackingNumbers,
+    )
+      ? (user.trackingNumbers as unknown as TrackingNumberRecord[])
+      : [];
+
+    const currentTwilioNumbers = trackingNumbers.length;
     const maxAllowed = subscription.subscriptionLimits?.twilioNumbers || 0;
 
     if (currentTwilioNumbers >= maxAllowed) {
@@ -105,7 +128,7 @@ export async function POST(req: NextRequest) {
 
     // Check if the seller already has a number for this industry (only for call tracking, not SMS)
     if (purpose !== "sms") {
-      const hasExistingNumber = user.trackingNumbers.some(
+      const hasExistingNumber = trackingNumbers.some(
         (num) => num.industry === industry,
       );
 
@@ -227,7 +250,7 @@ export async function POST(req: NextRequest) {
     const dbSession = await User.startSession();
     dbSession.startTransaction();
     try {
-      user.trackingNumbers.push({
+      (user.trackingNumbers as unknown as TrackingNumberRecord[]).push({
         phoneNumber: purchasedNumber,
         purpose: purpose || "call",
         industry,

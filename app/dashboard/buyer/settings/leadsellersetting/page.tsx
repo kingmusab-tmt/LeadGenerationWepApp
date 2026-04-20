@@ -1,16 +1,6 @@
 "use client";
 import { useState } from "react";
-import {
-  Container,
-  Typography,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  TextField,
-  Button,
-  Box,
-} from "@mui/material";
+import { Container, Typography, TextField, Button, Box } from "@mui/material";
 import axios from "@/lib/axiosInstance";
 import { styled } from "@mui/system";
 import { toast } from "react-toastify";
@@ -53,7 +43,7 @@ const LeadSettings = () => {
         apiSettings,
       });
       toast.success("Settings updated successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to update settings");
     }
   };

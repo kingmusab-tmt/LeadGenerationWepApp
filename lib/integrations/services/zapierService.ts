@@ -8,7 +8,6 @@
 import { ILead } from "@/models/leads";
 import { IUser } from "@/models/types/user";
 import { WebhookManager } from "@/lib/integrations/webhookHandler";
-import { IWebhookConfig } from "@/models/webhookConfig";
 
 /**
  * Zapier webhook payload structure
@@ -23,7 +22,7 @@ export interface ZapierTriggerPayload {
     buyer?: ZapierBuyerData;
     assignment?: ZapierAssignmentData;
     deal?: ZapierDealData;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   };
 }
 
@@ -50,7 +49,17 @@ export interface ZapierLeadData {
   estimatedValue?: number;
   createdAt: string;
   updatedAt: string;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
+}
+
+interface ZapierBuyerSource extends Partial<IUser> {
+  company?: string;
+  industry?: string[];
+  location?: {
+    city?: string;
+    state?: string;
+    country?: string;
+  };
 }
 
 /**
@@ -162,7 +171,7 @@ export class ZapierIntegrationService {
               acc[field.label] = field.value;
               return acc;
             },
-            {} as Record<string, any>,
+            {} as Record<string, unknown>,
           )
         : undefined,
     };
@@ -172,17 +181,19 @@ export class ZapierIntegrationService {
    * Format buyer data for Zapier
    */
   private formatBuyerData(buyer: Partial<IUser>): ZapierBuyerData {
+    const typedBuyer = buyer as ZapierBuyerSource;
+
     return {
       id: buyer._id?.toString() || "",
       name: buyer.name || "Unknown",
       email: buyer.email || "",
-      company: (buyer as any).company,
-      industry: (buyer as any).industry,
-      location: (buyer as any).location
+      company: typedBuyer.company,
+      industry: typedBuyer.industry,
+      location: typedBuyer.location
         ? {
-            city: (buyer as any).location.city,
-            state: (buyer as any).location.state,
-            country: (buyer as any).location.country,
+            city: typedBuyer.location.city,
+            state: typedBuyer.location.state,
+            country: typedBuyer.location.country,
           }
         : undefined,
     };

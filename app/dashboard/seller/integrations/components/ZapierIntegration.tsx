@@ -23,7 +23,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   IconButton,
   CircularProgress,
   Chip,
@@ -37,8 +36,6 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
   Info as InfoIcon,
   ContentCopy as CopyIcon,
   Visibility as VisibilityIcon,
@@ -198,7 +195,7 @@ export default function ZapierIntegration({ onNotify }: Props) {
         const error = await res.json();
         onNotify(error.error || "Failed to add webhook", "error");
       }
-    } catch (error) {
+    } catch {
       onNotify("Failed to add webhook", "error");
     } finally {
       setLoading(false);
@@ -226,7 +223,7 @@ export default function ZapierIntegration({ onNotify }: Props) {
       } else {
         onNotify("Failed to remove webhook", "error");
       }
-    } catch (error) {
+    } catch {
       onNotify("Failed to remove webhook", "error");
     } finally {
       setLoading(false);
@@ -248,7 +245,7 @@ export default function ZapierIntegration({ onNotify }: Props) {
         const error = await res.json();
         onNotify(error.error || "Test failed", "error");
       }
-    } catch (error) {
+    } catch {
       onNotify("Test failed", "error");
     } finally {
       setLoading(false);
@@ -696,7 +693,7 @@ function ApiKeyManagementTab({ onNotify }: Props) {
       } else {
         onNotify("Failed to generate API key", "error");
       }
-    } catch (error) {
+    } catch {
       onNotify("Failed to generate API key", "error");
     } finally {
       setLoading(false);
@@ -728,7 +725,7 @@ function ApiKeyManagementTab({ onNotify }: Props) {
       } else {
         onNotify("Failed to revoke API key", "error");
       }
-    } catch (error) {
+    } catch {
       onNotify("Failed to revoke API key", "error");
     } finally {
       setLoading(false);
@@ -949,11 +946,9 @@ function ApiKeyManagementTab({ onNotify }: Props) {
 // Code block component with copy button
 function CodeBlock({
   code,
-  language = "json",
   onNotify,
 }: {
   code: string;
-  language?: string;
   onNotify: Props["onNotify"];
 }) {
   const handleCopy = () => {

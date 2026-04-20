@@ -65,6 +65,15 @@ interface SmsCampaign {
   createdAt: string;
 }
 
+interface TwilioTrackingNumber {
+  purpose?: string;
+  phoneNumber?: string;
+}
+
+interface SmsCampaignWithFromNumber extends SmsCampaign {
+  fromPhoneNumber?: string;
+}
+
 export default function SmsCampaignsPage() {
   const { currentUser } = useInitializeUser();
   const { limits, isTrial } = useSubscriptionLimits();
@@ -143,9 +152,9 @@ export default function SmsCampaignsPage() {
             : [];
 
         // Filter to only SMS numbers
-        const smsNumbers = (allNumbers || [])
-          .filter((num: any) => num.purpose === "sms")
-          .map((num: any) => num.phoneNumber);
+        const smsNumbers = (allNumbers as TwilioTrackingNumber[])
+          .filter((num) => num.purpose === "sms" && !!num.phoneNumber)
+          .map((num) => num.phoneNumber as string);
         setSmsPhoneNumbers(smsNumbers);
         setSmsPhoneNumbersCount(smsNumbers.length);
       }
@@ -179,7 +188,8 @@ export default function SmsCampaignsPage() {
           recipientList: (campaign.recipients || [])
             .map((r) => r.phone)
             .join(", "),
-          fromPhoneNumber: (campaign as any).fromPhoneNumber || "",
+          fromPhoneNumber:
+            (campaign as SmsCampaignWithFromNumber).fromPhoneNumber || "",
         });
       }
     } else {
@@ -237,8 +247,10 @@ export default function SmsCampaignsPage() {
       setAiDialogOpen(false);
       setAiDescription("");
       toast.success("Campaign generated successfully! You can edit it now.");
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to generate campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to generate campaign",
+      );
     } finally {
       setAiGenerating(false);
     }
@@ -284,8 +296,10 @@ export default function SmsCampaignsPage() {
       );
       handleCloseDialog();
       fetchCampaigns();
-    } catch (error: any) {
-      toast.error(error?.message || "Error saving campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error saving campaign",
+      );
     } finally {
       setSaving(false);
     }
@@ -338,8 +352,10 @@ export default function SmsCampaignsPage() {
         `Campaign sending started. Sent: ${data.sent}, Failed: ${data.failed}`,
       );
       fetchCampaigns();
-    } catch (error: any) {
-      toast.error(error?.message || "Error sending campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error sending campaign",
+      );
     }
   };
 
@@ -722,8 +738,8 @@ export default function SmsCampaignsPage() {
             </Select>
             {smsPhoneNumbers.length === 0 && (
               <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
-                No phone numbers available. Generate one using the "Generate
-                Phone Number" button at the top.
+                No phone numbers available. Generate one using the
+                &quot;Generate Phone Number&quot; button at the top.
               </Typography>
             )}
           </FormControl>

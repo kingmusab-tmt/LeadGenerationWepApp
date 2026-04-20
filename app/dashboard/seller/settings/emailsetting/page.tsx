@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Typography,
   TextField,
@@ -66,7 +66,7 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
             setIsSaved(true);
           }
         }
-      } catch (e) {
+      } catch {
         // ignore load error
       }
     })();
@@ -80,7 +80,7 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
     setIsSaved(false);
   };
 
-  const handleSave = async (): Promise<boolean> => {
+  const handleSave = useCallback(async (): Promise<boolean> => {
     try {
       setSaving(true);
       await axios.post("/api/settings", {
@@ -97,21 +97,18 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
       const now = new Date().toLocaleTimeString();
       setLastSaved(now);
       return true;
-    } catch (e: any) {
-      notify(
-        e?.response?.data?.message || "Failed to update email settings",
-        "error",
-      );
+    } catch {
+      notify("Failed to update email settings", "error");
       return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [emailSettings, notify]);
 
   useEffect(() => {
     if (!onSaveHandlerReady) return;
     onSaveHandlerReady(handleSave);
-  }, [onSaveHandlerReady, emailSettings]);
+  }, [onSaveHandlerReady, handleSave]);
 
   const handleTestConnection = async () => {
     try {
@@ -122,11 +119,8 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
       } else {
         notify(data.error || "SMTP connection failed", "error");
       }
-    } catch (e: any) {
-      notify(
-        e?.response?.data?.error || "SMTP connection test failed",
-        "error",
-      );
+    } catch {
+      notify("SMTP connection test failed", "error");
     } finally {
       setTesting(false);
     }

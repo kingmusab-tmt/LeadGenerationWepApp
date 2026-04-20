@@ -16,7 +16,6 @@ import {
   DialogActions,
   IconButton,
   Stack,
-  Divider,
 } from "@mui/material";
 import {
   CreditCard as CreditCardIcon,
@@ -170,9 +169,11 @@ function AddPaymentMethodForm({
         notify("Payment method added successfully!", "success");
         onSuccess();
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Add payment method error:", err);
-      setError(err.message || "Failed to add payment method");
+      setError(
+        err instanceof Error ? err.message : "Failed to add payment method",
+      );
     } finally {
       setLoading(false);
     }

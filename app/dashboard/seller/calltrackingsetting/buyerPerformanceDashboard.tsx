@@ -74,24 +74,24 @@ export default function BuyerPerformanceDashboard() {
   const [days, setDays] = useState(30);
 
   useEffect(() => {
+    const fetchPerformance = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(`/api/calls/buyer-performance?days=${days}`);
+        if (!res.ok) throw new Error("Failed to fetch");
+        const data = await res.json();
+        setBuyers(data.buyers || []);
+        setSummary(data.summary || null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchPerformance();
   }, [days]);
-
-  const fetchPerformance = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch(`/api/calls/buyer-performance?days=${days}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setBuyers(data.buyers || []);
-      setSummary(data.summary || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);

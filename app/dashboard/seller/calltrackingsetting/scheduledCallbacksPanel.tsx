@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -62,11 +62,7 @@ export default function ScheduledCallbacksPanel() {
   const [notes, setNotes] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    fetchCallbacks();
-  }, [statusFilter, page]);
-
-  const fetchCallbacks = async () => {
+  const fetchCallbacks = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -82,7 +78,11 @@ export default function ScheduledCallbacksPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter]);
+
+  useEffect(() => {
+    fetchCallbacks();
+  }, [fetchCallbacks]);
 
   const handleAction = async () => {
     if (!actionDialog.callback) return;

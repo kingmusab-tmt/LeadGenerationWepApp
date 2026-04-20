@@ -22,17 +22,13 @@ import {
   addVoicemailToTwiml,
   addOverflowToTwiml,
 } from "@/utils/callHandlers";
-import {
-  callSecurityMiddleware,
-  CALL_DEFAULTS,
-} from "@/lib/security/callSecurity";
+import { callSecurityMiddleware } from "@/lib/security/callSecurity";
 import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
 import { env } from "@/lib/env";
 import {
   checkSpamStatus,
   isOnDncList,
   sendMissedCallTextBack,
-  createScheduledCallback,
   extractGeoData,
   doesBuyerServiceArea,
   isBuyerAtConcurrentLimit,
@@ -40,6 +36,50 @@ import {
   markCallInactive,
 } from "@/utils/callFeatureServices";
 import { processCallAIAnalysis } from "@/lib/callAIAnalysis";
+
+type LeadBuyerRef = {
+  id: string;
+  phone: string;
+};
+
+type BuyerResponse = {
+  message: string;
+  digit: string;
+};
+
+type TrackingNumberConfig = {
+  phoneNumber: string;
+  industry: string;
+  forwardingType: "direct" | "single_multiple" | "specific_lead";
+  forwardingNumbers: string[];
+  leadBuyers: LeadBuyerRef[];
+  recordCall: boolean;
+  welcomeMessage?: string;
+  passCallerId: boolean;
+  callWhisper?: string;
+  requireResponse: boolean;
+  buyerResponses?: BuyerResponse[];
+  overflowNumber?: string;
+  enableWorkingHours: boolean;
+  workingHoursStart?: string;
+  workingHoursEnd?: string;
+  recordingConsent: boolean;
+  recordingConsentMessage?: string;
+  missedCallTextBack: boolean;
+  missedCallTextMessage?: string;
+  dncEnabled: boolean;
+  dncList?: string[];
+  spamFilterEnabled: boolean;
+  spamFilterAction?: "block" | "warn";
+  scheduledCallbackEnabled: boolean;
+  scheduledCallbackDigit?: string;
+  multiRingEnabled: boolean;
+  geoRoutingEnabled: boolean;
+  concurrentCallLimit: number;
+  reconnectCaller: boolean;
+  transcriptionEnabled?: boolean;
+  aiSummaryEnabled?: boolean;
+};
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
@@ -165,10 +205,12 @@ async function handleNewCall(
 ) {
   debugLog("Handling new call");
 
+  const trackingNumbers = ((
+    seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
+  ).trackingNumbers ?? []) as TrackingNumberConfig[];
+
   // Find the tracking number configuration
-  const trackingNumber = seller.trackingNumbers.find(
-    (num) => num.phoneNumber === to,
-  );
+  const trackingNumber = trackingNumbers.find((num) => num.phoneNumber === to);
 
   if (!trackingNumber) {
     const errorMessage = `Industry mapping not found for to: ${to}`;
@@ -176,7 +218,7 @@ async function handleNewCall(
       errorMessage,
       {
         to,
-        availableNumbers: seller.trackingNumbers.map((n) => n.phoneNumber),
+        availableNumbers: trackingNumbers.map((n) => n.phoneNumber),
       },
       "error",
     );
@@ -192,7 +234,7 @@ async function handleNewCall(
     forwardingNumbers,
     leadBuyers,
     recordCall,
-    reconnectCaller,
+
     welcomeMessage,
     passCallerId,
     callWhisper,
@@ -217,8 +259,6 @@ async function handleNewCall(
     multiRingEnabled,
     geoRoutingEnabled,
     concurrentCallLimit,
-    transcriptionEnabled,
-    aiSummaryEnabled,
   } = trackingNumber;
 
   // ─── DNC List Check ───
@@ -385,7 +425,7 @@ async function handleNewCall(
 
   // ─── Helper: check eligibility for a buyer (vacation, hours, balance, geo, concurrent) ───
   async function isBuyerEligible(
-    buyerDoc: any,
+    buyerDoc: unknown,
     buyerId: string,
   ): Promise<boolean> {
     if (buyerDoc && isBuyerOnVacation(buyerDoc)) {
@@ -491,6 +531,10 @@ async function handleNewCall(
         !(await isBuyerEligible(buyerDoc, buyer._id.toString()))
       ) {
         throw new Error("Buyer not eligible after extended checks");
+      }
+
+      if (!buyer.phone) {
+        throw new Error("Buyer has no phone number");
       }
 
       forwardedTo = buyer.phone;
@@ -708,7 +752,10 @@ async function handleNoAnswer(
   const twiml = new twilio.twiml.VoiceResponse();
 
   // Look up tracking number config for overflow + feature flags
-  const trackingConfig = seller.trackingNumbers?.find(
+  const trackingNumbers = ((
+    seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
+  ).trackingNumbers ?? []) as TrackingNumberConfig[];
+  const trackingConfig = trackingNumbers.find(
     (num: { phoneNumber: string }) => num.phoneNumber === to,
   );
   const overflowNumber = trackingConfig?.overflowNumber || "";
@@ -720,7 +767,6 @@ async function handleNoAnswer(
   const scheduledCallbackDigit = trackingConfig?.scheduledCallbackDigit || "1";
   const geoRoutingEnabled = trackingConfig?.geoRoutingEnabled || false;
   const concurrentCallLimit = trackingConfig?.concurrentCallLimit || 0;
-  const multiRingEnabled = trackingConfig?.multiRingEnabled || false;
 
   // Extract geo data for geo-routing in retry
   const geoData = geoRoutingEnabled ? extractGeoData(from) : null;
@@ -806,14 +852,14 @@ async function handleNoAnswer(
         leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
         industry,
       });
-    } catch (error) {
+    } catch {
       handleNoAnswerFallback();
     }
   } else if (
     forwardingType === "single_multiple" &&
     forwardingNumbers?.length
   ) {
-    forwardingNumbers.forEach((num: string | undefined, index: number) => {
+    forwardingNumbers.forEach((num: string, index: number) => {
       const dialParams = getDialParams({
         from,
         sellerId: seller._id as string,
@@ -966,8 +1012,11 @@ async function handleCallAnswered(
     // Trigger AI analysis if configured (non-blocking, fire-and-forget)
     const seller = await User.findById(updatedCall.userId);
     if (seller) {
-      const tn = seller.trackingNumbers?.find(
-        (n: any) => n.industry === updatedCall.industry,
+      const trackingNumbers = ((
+        seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
+      ).trackingNumbers ?? []) as TrackingNumberConfig[];
+      const tn = trackingNumbers.find(
+        (n: { industry?: string }) => n.industry === updatedCall.industry,
       );
       if (tn?.transcriptionEnabled || tn?.aiSummaryEnabled) {
         processCallAIAnalysis(callSid, {

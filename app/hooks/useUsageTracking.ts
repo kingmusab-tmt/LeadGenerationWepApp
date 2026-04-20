@@ -171,7 +171,7 @@ export function useUsageTracking(
         };
       }
     },
-    [],
+    [fetchFn],
   );
 
   /**
@@ -221,7 +221,7 @@ export function useUsageTracking(
         };
       }
     },
-    [fetchUsage],
+    [fetchFn, fetchUsage],
   );
 
   /**

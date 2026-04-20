@@ -8,9 +8,6 @@ import {
   Snackbar,
   Alert,
   TextField,
-  Radio,
-  RadioGroup,
-  FormControlLabel,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -41,7 +38,7 @@ import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import PhoneCallbackIcon from "@mui/icons-material/PhoneCallback";
-import PhoneMissedIcon from "@mui/icons-material/PhoneMissed";
+
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
@@ -164,18 +161,9 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
   const [city, setCity] = useState("");
   const [industry, setIndustry] = useState("");
   const [customIndustry, setCustomIndustry] = useState("");
-  const [method, setMethod] = useState("Automatic");
-  const [manualOption, setManualOption] = useState<
-    "manualEntry" | "systemRequest" | null
-  >(null);
   const [editingNumber, setEditingNumber] = useState<TrackingNumber | null>(
     null,
   );
-  const [twilioData, setTwilioData] = useState({
-    accountSid: "",
-    authToken: "",
-    twilioNumber: "",
-  });
   const areaCode = city ? cityAreaCodes[city] : "";
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -207,7 +195,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     }
   }, []);
 
-  const fetchUpdatedNumbers = async () => {
+  const fetchUpdatedNumbers = useCallback(async () => {
     try {
       const numbersResponse = await fetch(
         `/api/calls/twilio/get_numbers?sellerId=${sellerId}`,
@@ -229,7 +217,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
           severity: "info",
         });
       }
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Failed to fetch tracking numbers.",
@@ -237,9 +225,9 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       });
       setLoading(false);
     }
-  };
+  }, [sellerId]);
 
-  const fetchTwilioStatus = async () => {
+  const fetchTwilioStatus = useCallback(async () => {
     try {
       const twilioStatusResponse = await fetch(
         `/api/calls/twilio/twiliostatus?sellerId=${sellerId}`,
@@ -253,14 +241,14 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
           maxAllowed: twilioStatusData.subscriptionLimits.twilioNumbers || 0,
         });
       }
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Failed to fetch Twilio status.",
         severity: "error",
       });
     }
-  };
+  }, [numbers.length, sellerId]);
 
   const handleEditNumber = (number: TrackingNumber) => {
     setEditingNumber(number);
@@ -275,7 +263,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     fetchUpdatedNumbers();
     fetchTwilioStatus();
     fetchAnalytics();
-  }, [sellerId, fetchAnalytics]);
+  }, [fetchUpdatedNumbers, fetchTwilioStatus, fetchAnalytics]);
 
   const handleTwilioToggle = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -329,7 +317,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       sellerId,
       areaCode,
       industry: selectedIndustry,
-      method,
+      method: "Automatic",
       recordCall: false,
       reconnectCaller: false,
       passCallerId: false,
@@ -364,7 +352,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       const newNumber: TrackingNumber = {
         phoneNumber: data.phoneNumber,
         industry: selectedIndustry,
-        method: method as "Manual" | "Automatic",
+        method: "Automatic",
         forwardingType: "direct",
         recordCall: false,
         reconnectCaller: false,
@@ -395,40 +383,6 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     }
   };
 
-  const addManualNumber = async () => {
-    const selectedIndustry = customIndustry || industry;
-
-    if (!twilioData.twilioNumber || !selectedIndustry) {
-      setSnackbar({
-        open: true,
-        message: "Please enter a Twilio number and select an industry.",
-        severity: "warning",
-      });
-      return;
-    }
-
-    const newNumber: TrackingNumber = {
-      phoneNumber: twilioData.twilioNumber,
-      industry: selectedIndustry,
-      method: "Manual",
-      forwardingType: "direct",
-      recordCall: false,
-      reconnectCaller: false,
-      passCallerId: false,
-      leadSource: "",
-      welcomeMessage: "",
-      callWhisper: "",
-      requireResponse: false,
-    };
-
-    setNumbers((prev) => [...prev, newNumber]);
-    setSnackbar({
-      open: true,
-      message: "Number added successfully.",
-      severity: "success",
-    });
-  };
-
   const removeNumber = async (phoneNumber: string) => {
     try {
       await fetch("/api/calls/twilio/removeNumber", {
@@ -445,7 +399,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
         message: "Number removed successfully.",
         severity: "success",
       });
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Failed to remove number.",
@@ -1264,7 +1218,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                       });
                       fetchUpdatedNumbers();
                       setEditingNumber(null);
-                    } catch (error) {
+                    } catch {
                       setSnackbar({
                         open: true,
                         message: "Failed to update forwarding.",

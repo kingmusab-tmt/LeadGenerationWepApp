@@ -4,12 +4,9 @@
  * Includes concurrent session management, usage tracking, and notifications
  */
 
-import { User, IUser } from "@/models";
+import { User } from "@/models";
 import dbConnect from "@/lib/connectdb";
-import {
-  ISubscriptionLimits,
-  ISubscriptionUsage,
-} from "@/models/types/subscription";
+import { ISubscriptionLimits } from "@/models/types/subscription";
 import { sendNotification } from "@/lib/notificationService";
 
 // Session tracking interface

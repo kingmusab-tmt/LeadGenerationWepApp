@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { checkCacheHealth } from "@/lib/memoryCache";
 import dbConnect from "@/lib/connectdb";
 import { withErrorHandler } from "@/lib/api/async-handler";
@@ -8,7 +7,7 @@ import { successResponse } from "@/lib/api/error-handler";
  * GET /api/health
  * Health check endpoint for Redis and database connectivity
  */
-export const GET = withErrorHandler(async (req: NextRequest) => {
+export const GET = withErrorHandler(async () => {
   // Check cache health
   const cacheHealthy = await checkCacheHealth();
 

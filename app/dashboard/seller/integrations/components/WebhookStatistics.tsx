@@ -7,7 +7,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -25,7 +25,6 @@ import {
   IconButton,
   CircularProgress,
   Alert,
-  TextField,
   Select,
   MenuItem,
   FormControl,
@@ -81,16 +80,7 @@ export default function WebhookStatistics({ onNotify }: Props) {
   const [filter, setFilter] = useState<"all" | "success" | "failed">("all");
   const [eventFilter, setEventFilter] = useState<string>("all");
 
-  useEffect(() => {
-    loadStats();
-    loadLogs();
-  }, []);
-
-  useEffect(() => {
-    loadLogs();
-  }, [filter, eventFilter]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const res = await fetch("/api/integrations/webhooks/stats");
       if (res.ok) {
@@ -100,9 +90,9 @@ export default function WebhookStatistics({ onNotify }: Props) {
     } catch (error) {
       console.error("Failed to load webhook stats:", error);
     }
-  };
+  }, []);
 
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -121,7 +111,15 @@ export default function WebhookStatistics({ onNotify }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, eventFilter]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
   const handleRefresh = () => {
     loadStats();

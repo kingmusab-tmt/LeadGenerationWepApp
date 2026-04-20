@@ -16,8 +16,6 @@ import {
   Pagination,
   Paper,
   Container,
-  useMediaQuery,
-  Theme,
   Typography,
   Dialog,
   DialogTitle,
@@ -38,7 +36,6 @@ import {
 import {
   PlayCircle,
   Close,
-  Download,
   Error as ErrorIcon,
   Search,
   Refresh,
@@ -76,7 +73,6 @@ export default function LeadTracking() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sellerId, setSellerId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<keyof Call>("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -95,15 +91,10 @@ export default function LeadTracking() {
   const [audioFormat, setAudioFormat] = useState<"mp3" | "wav">("mp3");
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm"),
-  );
-
   useEffect(() => {
     async function init() {
       const session = await getSession();
       if (!session?.user) return;
-      setSellerId(session.user.id);
 
       setLoading(true);
       try {
@@ -193,16 +184,6 @@ export default function LeadTracking() {
         err instanceof Error ? err.message : "Failed to submit feedback",
       );
     }
-  };
-
-  const handleDownload = () => {
-    if (!currentAudio) return;
-    window.open(
-      `/api/calls/tracking/recordingproxy?recordingSid=${extractRecordingSid(
-        currentAudio.url,
-      )}&format=${audioFormat}&download=true`,
-      "_blank",
-    );
   };
 
   const handleRefresh = async () => {

@@ -15,16 +15,18 @@ import {
 } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
 
+interface TransactionFilters {
+  type: string;
+  status: string;
+  dateRange: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}
+
 interface TransactionFiltersProps {
-  filters: {
-    type: string;
-    status: string;
-    dateRange: string;
-    startDate?: Date | null;
-    endDate?: Date | null;
-  };
-  onFilterChange: (filters: any) => void;
-  isMobile: any;
+  filters: TransactionFilters;
+  onFilterChange: (filters: TransactionFilters) => void;
+  isMobile?: boolean;
 }
 
 const TransactionFilters: React.FC<TransactionFiltersProps> = ({

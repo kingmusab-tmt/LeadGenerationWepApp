@@ -14,18 +14,21 @@
 
 import { ILead, Lead } from "@/models/leads";
 import { User } from "@/models/userModel";
-import { IUser } from "@/models/types/user";
 import mongoose from "mongoose";
 import { processLeadDistribution } from "@/lib/leadAssignmentService";
 import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
+import {
+  normalizeAiQualityResult,
+  recordAiScoringMetric,
+} from "@/lib/aiQualityScoring";
 
 /**
  * Zapier action result structure
  */
 export interface ZapierActionResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
   message?: string;
 }
@@ -45,7 +48,7 @@ export interface ZapierCreateLeadInput {
   state?: string;
   country?: string;
   zipCode?: string;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
 }
 
 /**
@@ -60,7 +63,7 @@ export interface ZapierUpdateLeadInput {
   industry?: string;
   status?: ILead["status"];
   qualificationScore?: number;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
 }
 
 /**
@@ -137,7 +140,7 @@ export class ZapierActionsService {
       }
 
       // Add custom fields — store ALL lead data in fields[] for dynamic display
-      const customFields: { id: string; label: string; value: any }[] = [];
+      const customFields: { id: string; label: string; value: unknown }[] = [];
 
       // Store all standard fields in the fields array (like Form Builder does)
       if (input.name) {
@@ -261,76 +264,68 @@ export class ZapierActionsService {
               JSON.stringify(filterResult),
             );
 
-            const spamScore =
-              typeof filterResult.spam_score === "number"
-                ? filterResult.spam_score
-                : typeof filterResult.spamScore === "number"
-                  ? filterResult.spamScore
-                  : 50;
-
-            let qualityLevel: "High" | "Medium" | "Low" = "Medium";
-            if (spamScore <= 40) {
-              qualityLevel = "High"; // Low spam = High quality lead
-            } else if (spamScore >= 70) {
-              qualityLevel = "Low"; // High spam = Low quality lead
-            }
-
-            const normalizedReason =
-              typeof filterResult.reason === "string"
-                ? filterResult.reason
-                : typeof filterResult.debug_reason === "string"
-                  ? filterResult.debug_reason
-                  : typeof filterResult.message === "string"
-                    ? filterResult.message
-                    : "";
+            const normalized = normalizeAiQualityResult(filterResult);
 
             console.log(
               "[AI Scoring] Computed: spamScore=%d, qualityLevel=%s, reason=%s",
-              spamScore,
-              qualityLevel,
-              normalizedReason,
+              normalized.spamScore,
+              normalized.qualityLevel,
+              normalized.reason,
             );
 
             await Lead.findByIdAndUpdate(lead._id, {
-              aiQualityScore: spamScore,
-              qualityLevel,
-              aiQualityReason: normalizedReason,
+              aiQualityScore: normalized.spamScore,
+              qualityLevel: normalized.qualityLevel,
+              aiQualityReason: normalized.reason,
               aiQualityAssessment: {
-                isValid: filterResult.is_valid !== false,
-                spamScore,
-                reason: normalizedReason,
+                isValid: normalized.isValid,
+                spamScore: normalized.spamScore,
+                reason: normalized.reason,
                 evaluatedAt: new Date(),
               },
-              exclusive: qualityLevel === "High",
-              shared: qualityLevel !== "High",
+              exclusive: normalized.qualityLevel === "High",
+              shared: normalized.qualityLevel !== "High",
             });
 
             console.log(
               "[AI Scoring] ✅ Lead %s updated with AI score: %d/%s",
               lead._id,
-              spamScore,
-              qualityLevel,
+              normalized.spamScore,
+              normalized.qualityLevel,
             );
+            console.log("[AI Scoring][Metric]", {
+              event: "success",
+              context: "zapier_create_lead",
+              ...recordAiScoringMetric("success"),
+            });
 
             // Apply seller's quality-based lead pricing
             try {
               const seller = await User.findById(this.userId)
                 .select("leadPricing")
                 .lean();
-              const pricing = (seller as any)?.leadPricing || {
+              const pricing = (
+                seller as {
+                  leadPricing?: {
+                    high?: number;
+                    medium?: number;
+                    low?: number;
+                  };
+                } | null
+              )?.leadPricing || {
                 high: 10,
                 medium: 5,
                 low: 2,
               };
               const unitPrice =
-                qualityLevel === "High"
+                normalized.qualityLevel === "High"
                   ? pricing.high
-                  : qualityLevel === "Low"
+                  : normalized.qualityLevel === "Low"
                     ? pricing.low
                     : pricing.medium;
               await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
               console.log("[AI Scoring] ✅ Lead unit price set:", {
-                qualityLevel,
+                qualityLevel: normalized.qualityLevel,
                 unitPrice,
               });
             } catch (pricingError) {
@@ -346,7 +341,6 @@ export class ZapierActionsService {
               filterResponse.status,
               errorBody,
             );
-            // Fallback to default only for truly unexpected errors (500, etc.)
             await Lead.findByIdAndUpdate(lead._id, {
               aiQualityScore: 50,
               qualityLevel: "Medium",
@@ -355,10 +349,16 @@ export class ZapierActionsService {
             console.log(
               "[AI Scoring] ⚠️ Fell back to default (50/Medium) due to unexpected API error",
             );
+            console.log("[AI Scoring][Metric]", {
+              event: "fallback",
+              context: "zapier_create_lead",
+              reason: "http_error",
+              status: filterResponse.status,
+              ...recordAiScoringMetric("fallback"),
+            });
           }
         } catch (aiError) {
           console.error("[AI Scoring] ❌ Exception (non-fatal):", aiError);
-          // Non-fatal: lead is already saved, just with default score
           await Lead.findByIdAndUpdate(lead._id, {
             aiQualityScore: 50,
             qualityLevel: "Medium",
@@ -367,6 +367,12 @@ export class ZapierActionsService {
           console.log(
             "[AI Scoring] ⚠️ Fell back to default (50/Medium) due to exception",
           );
+          console.log("[AI Scoring][Metric]", {
+            event: "fallback",
+            context: "zapier_create_lead",
+            reason: "exception",
+            ...recordAiScoringMetric("fallback"),
+          });
         }
       } else {
         // User doesn't have lead scoring feature - set default values without AI
@@ -574,7 +580,7 @@ export class ZapierActionsService {
   async searchLeads(input: ZapierSearchLeadInput): Promise<ZapierActionResult> {
     try {
       // Build query
-      const query: any = { userId: this.userId };
+      const query: Record<string, unknown> = { userId: this.userId };
 
       if (input.email) {
         query.email = { $regex: new RegExp(input.email, "i") };
@@ -666,7 +672,7 @@ export class ZapierActionsService {
                   acc[field.label] = field.value;
                   return acc;
                 },
-                {} as Record<string, any>,
+                {} as Record<string, unknown>,
               )
             : {},
           createdAt: lead.createdAt,
@@ -730,8 +736,9 @@ export class ZapierActionsService {
       }
 
       // Check if already assigned
+      const buyerId = String(buyer._id);
       const alreadyAssigned = lead.assignedTo?.some(
-        (assignment) => assignment.buyerId === (buyer._id as any).toString(),
+        (assignment) => assignment.buyerId === buyerId,
       );
 
       if (alreadyAssigned) {
@@ -744,7 +751,7 @@ export class ZapierActionsService {
       // Assign lead
       lead.assignedTo = lead.assignedTo || [];
       lead.assignedTo.push({
-        buyerId: (buyer._id as any).toString(),
+        buyerId,
         accepted: false,
         rejected: false,
         assignedAt: new Date(),
@@ -757,7 +764,7 @@ export class ZapierActionsService {
         success: true,
         data: {
           leadId: lead._id.toString(),
-          buyerId: (buyer._id as any).toString(),
+          buyerId,
           buyerName: buyer.name,
           buyerEmail: buyer.email,
           assignedAt: new Date(),
@@ -894,7 +901,7 @@ export class ZapierActionsService {
                   acc[field.label] = field.value;
                   return acc;
                 },
-                {} as Record<string, any>,
+                {} as Record<string, unknown>,
               )
             : {},
           createdAt: lead.createdAt,

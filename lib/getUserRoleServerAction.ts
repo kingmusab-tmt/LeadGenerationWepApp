@@ -1,6 +1,5 @@
 "use server";
 
-import client from "./db"; // Assuming 'client' is a MongoDB client
 import { getServerSession } from "next-auth";
 
 // Get the role from the MongoDB database based on the UUID in the users collection

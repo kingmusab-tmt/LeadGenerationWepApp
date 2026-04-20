@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Typography,
   Box,
@@ -24,7 +24,6 @@ import {
   Card,
   CardContent,
   Grid,
-  Chip,
   FormControl,
   InputLabel,
   Select,
@@ -36,7 +35,6 @@ import {
 import {
   ContentCopy,
   Search as SearchIcon,
-  Add as AddIcon,
   PersonAdd as PersonAddIcon,
   People as PeopleIcon,
   CheckCircle as ActiveIcon,
@@ -102,18 +100,6 @@ function StatsCard({
     </Card>
   );
 }
-
-// ---------- Status Colors ----------
-
-const statusChipColor: Record<
-  string,
-  "success" | "warning" | "error" | "info" | "primary"
-> = {
-  active: "success",
-  new: "primary",
-  inactive: "error",
-  suspended: "warning",
-};
 
 const BuyersPage: React.FC = () => {
   const { currentUser } = useInitializeUser();
@@ -212,7 +198,7 @@ const BuyersPage: React.FC = () => {
     return [];
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -252,7 +238,7 @@ const BuyersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [csrfFetch, sellerId]);
 
   useEffect(() => {
     if (sellerId) {
@@ -262,7 +248,7 @@ const BuyersPage: React.FC = () => {
       setRegistrationLink(link);
       setIframeCode(code);
     }
-  }, [sellerId]);
+  }, [fetchData, sellerId]);
 
   // ---------- Handlers ----------
 
@@ -330,7 +316,7 @@ const BuyersPage: React.FC = () => {
           severity: "success",
         });
       }
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Error saving buyer.",
@@ -366,7 +352,7 @@ const BuyersPage: React.FC = () => {
         message: "Buyer deleted!",
         severity: "success",
       });
-    } catch (err) {
+    } catch {
       setSnackbar({
         open: true,
         message: "Failed to delete buyer.",

@@ -17,7 +17,6 @@ import {
   ListItemText,
   Paper,
   Button,
-  IconButton,
   Chip,
   Dialog,
   DialogTitle,
@@ -369,7 +368,7 @@ const HelpSection = () => {
       {/* Tawk Chat Widget - only show for users with liveSupport */}
       {limits?.liveSupport && (
         <TawkChatWidget
-          open={true}
+          open={showChatWidget}
           propertyId={propertyId}
           widgetId={widgetId}
         />

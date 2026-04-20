@@ -24,16 +24,13 @@ import {
   Share as ShareIcon,
   AttachMoney as MoneyIcon,
   Email as EmailIcon,
-  Code as CodeIcon,
   AccountBalance as StripeIcon,
   CreditCard as SubscriptionIcon,
 } from "@mui/icons-material";
 import UnitPricingComponent from "./unitsetting/page";
-import { useRouter } from "next/navigation";
 import StripeOnboardingPage from "./stripeonboarding/page";
 import LeadDistributionSettings from "./leadsellersetting/page";
 import EmailSettingsPage from "./emailsetting/page";
-import APISettingsPage from "./apisetting/page";
 import SubscriptionManagement from "./subscription/SubscriptionManagement";
 import ChangePlanModal from "./subscription/ChangePlanModal";
 import dynamic from "next/dynamic";
@@ -97,6 +94,16 @@ interface UpdateUserPayload {
   };
 }
 
+const TAB_MAP = [
+  "general",
+  "lead-distribution",
+  "units-settings",
+  "email-settings",
+  // "api-settings",
+  "stripe-onboarding",
+  "subscription",
+];
+
 const AccountSettings = () => {
   const dispatch = useAppDispatch();
   const notify = useNotification();
@@ -106,7 +113,6 @@ const AccountSettings = () => {
     refreshUser,
   } = useInitializeUser();
   const [tabValue, setTabValue] = useState(0);
-  const [darkMode, setDarkMode] = useState(false);
   const [editableUser, setEditableUser] = useState<BasicUserInfo | null>(null);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -122,17 +128,6 @@ const AccountSettings = () => {
   }>({});
   const [changePlanModalOpen, setChangePlanModalOpen] = useState(false);
 
-  const router = useRouter();
-  const tabMap = [
-    "general",
-    "lead-distribution",
-    "units-settings",
-    "email-settings",
-    // "api-settings",
-    "stripe-onboarding",
-    "subscription",
-  ];
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -147,7 +142,7 @@ const AccountSettings = () => {
         tabParam = "stripe-onboarding";
       }
 
-      const index = tabMap.indexOf(tabParam || "general");
+      const index = TAB_MAP.indexOf(tabParam || "general");
       setTabValue(index >= 0 ? index : 0);
 
       if (
@@ -204,17 +199,13 @@ const AccountSettings = () => {
     notify(message, severity);
   };
 
-  const handleCloseSnackbar = () => {
-    // Notifications are auto-managed by NotificationManager
-  };
-
   const clearFieldErrors = () => {
     setFieldErrors({});
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-    const tabKey = tabMap[newValue];
+    const tabKey = TAB_MAP[newValue];
     const url = new URL(window.location.href);
     url.searchParams.set("tab", tabKey);
     window.history.pushState({}, "", url);
@@ -394,11 +385,19 @@ const AccountSettings = () => {
           setFieldErrors(fieldSpecificErrors);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating profile", error);
 
-      if (error.response?.data) {
-        const errorData: ApiError = error.response.data;
+      const maybeError =
+        typeof error === "object" && error !== null
+          ? (error as {
+              response?: { data?: ApiError };
+              code?: string;
+            })
+          : null;
+
+      if (maybeError?.response?.data) {
+        const errorData: ApiError = maybeError.response.data;
 
         // Show main error message
         showSnackbar(
@@ -416,7 +415,7 @@ const AccountSettings = () => {
             showSnackbar(errorData.errors[0], "error");
           }
         }
-      } else if (error.code === "NETWORK_ERROR") {
+      } else if (maybeError?.code === "NETWORK_ERROR") {
         showSnackbar(
           "Network error. Please check your connection and try again.",
           "error",

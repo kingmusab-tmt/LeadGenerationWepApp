@@ -35,7 +35,7 @@ export interface IUser extends Document {
   tawkPropertyId: string;
   tawkWidgetId: string;
   pushToken: string;
-  trackingNumbers: any[]; // ITrackingNumber[] - imported from tracking.ts
+  trackingNumbers: []; // ITrackingNumber[] - imported from tracking.ts
   preferences?: Record<string, unknown>;
   status: "active" | "suspended";
   buyers?: mongoose.Types.ObjectId[];

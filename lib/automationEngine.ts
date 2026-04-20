@@ -3,7 +3,6 @@ import {
   AutomationWorkflow,
   WorkflowExecution,
   IAction,
-  IAutomationWorkflow,
   ICondition,
   IWorkflowExecution,
   TriggerType,

@@ -57,16 +57,6 @@ interface ApiKeyMetadata {
 }
 
 /**
- * Encrypted API Key Storage
- */
-interface EncryptedApiKey {
-  keyId: string;
-  encryptedValue: string; // For keys that need retrieval (e.g., third-party integrations)
-  hashedValue?: string; // For authentication keys (Zapier)
-  metadata: ApiKeyMetadata;
-}
-
-/**
  * Audit Log Entry
  */
 interface ApiKeyAuditLog {
@@ -78,7 +68,7 @@ interface ApiKeyAuditLog {
   userAgent?: string;
   success: boolean;
   errorMessage?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -465,7 +455,9 @@ export class ApiKeySecurityService {
    * @param metadata Raw metadata
    * @returns Sanitized metadata
    */
-  static sanitizeMetadata(metadata: Record<string, any>): Record<string, any> {
+  static sanitizeMetadata(
+    metadata: Record<string, unknown>,
+  ): Record<string, unknown> {
     const sanitized = { ...metadata };
 
     // Remove sensitive fields

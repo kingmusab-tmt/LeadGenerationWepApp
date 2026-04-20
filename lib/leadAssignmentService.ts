@@ -12,10 +12,7 @@ import Form from "@/models/form";
 import { User } from "@/models";
 import { sendNotification } from "@/lib/notificationService";
 
-import {
-  makeLeadAvailableInMarketplace,
-  MarketplaceNotificationResult,
-} from "@/lib/marketplaceNotificationService";
+import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
 import dbConnect from "@/lib/connectdb";
 
 export interface AssignmentResult {
@@ -853,7 +850,7 @@ export async function processLeadDistribution(
           "autoAssignLeads maxAutoAssignPerDay currentAutoAssignedToday distributionMode aiQualityThreshold industryRoundRobinIndex lastAssignedIndex",
         )
         .lean()) as SellerAssignmentSettings | null;
-    } catch (error) {
+    } catch {
       result.errors.push({
         step: "fetch_seller_preferences",
         error: "Failed to fetch seller preferences",
@@ -971,7 +968,7 @@ export async function processLeadDistribution(
           await User.findByIdAndUpdate(sellerId, {
             $inc: { currentAutoAssignedToday: 1 },
           });
-        } catch (error) {
+        } catch {
           result.errors.push({
             step: "update_seller_count",
             error: "Failed to update seller auto-assignment count",

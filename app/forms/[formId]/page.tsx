@@ -7,12 +7,10 @@ import {
   Typography,
   Paper,
   Container,
-  Backdrop,
   Alert,
   Snackbar,
   Box,
   Card,
-  CardContent,
   Button,
   Fade,
   Skeleton,
@@ -49,17 +47,6 @@ interface StyleConfig {
   formBackgroundColor?: string;
 }
 
-interface FormData {
-  userId: string;
-  message: string;
-  fields: Field[];
-  leadSource?: string;
-  formName?: string;
-  description?: string;
-  styleConfig?: StyleConfig;
-  recaptchaEnabled?: boolean;
-}
-
 export default function FormPage() {
   const params = useParams();
   const csrfFetch = useCSRFFetch();
@@ -69,9 +56,6 @@ export default function FormPage() {
       : (params.formId?.[0] ?? "");
   const [formStructure, setFormStructure] = useState<Field[]>([]);
   const [userId, setUserId] = useState<string>("");
-  const [leadSource, setLeadSource] = useState<string>("");
-  const [formTitle, setFormTitle] = useState<string>("Lead Capture Form");
-  const [formDescription, setFormDescription] = useState<string>("");
   const [styleConfig, setStyleConfig] = useState<StyleConfig | undefined>(
     undefined,
   );
@@ -104,9 +88,6 @@ export default function FormPage() {
           const formData = result.data;
           setFormStructure(formData.fields || []);
           setUserId(formData.userId || "");
-          setLeadSource(formData.leadSource || formData.description || "");
-          setFormTitle(formData.formName || "Lead Capture Form");
-          setFormDescription(formData.description || "");
           setStyleConfig(formData.styleConfig);
           setRecaptchaEnabled(Boolean(formData.recaptchaEnabled));
           setBrandColor(formData.styleConfig?.primaryColor || "#1976d2");
@@ -330,8 +311,8 @@ export default function FormPage() {
                       px: { xs: 2, sm: 0 },
                     }}
                   >
-                    Your information has been submitted successfully. We'll be
-                    in touch soon!
+                    Your information has been submitted successfully. We&apos;ll
+                    be in touch soon!
                   </Typography>
                   <Button
                     variant="outlined"

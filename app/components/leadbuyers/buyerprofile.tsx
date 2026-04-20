@@ -423,7 +423,7 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
               </Box>
             )}
 
-            <Tooltip title="Minimum quality threshold for auto-assignment:\n• 100: Only High Quality (0-40 spam score)\n• 60: High + Medium Quality (0-70 spam score)\n• 30 or less: Accept any quality level">
+            <Tooltip title="Minimum quality threshold for auto-assignment:\n• 100: Only High Quality (0-40 spam score)\n• 60: High + Medium Quality (0-69 spam score)\n• 30 or less: Accept any quality level">
               <Typography>
                 <strong>Min Qualification Score:</strong>{" "}
                 {buyer.qualificationScoreMinimum ?? 0}

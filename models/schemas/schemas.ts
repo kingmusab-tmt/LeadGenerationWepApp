@@ -1,5 +1,4 @@
-import mongoose, { Schema } from "mongoose";
-import { ITrackingNumber } from "../types/tracking";
+import mongoose from "mongoose";
 
 /**
  * Tracking Numbers Schema

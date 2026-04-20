@@ -25,6 +25,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
 });
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
 // Types for subscription management
 export interface SubscriptionResult {
   success: boolean;
@@ -62,7 +66,7 @@ export async function getOrCreateStripeCustomer(
       if (!customer.deleted) {
         return { success: true, customerId: user.stripeCustomerId };
       }
-    } catch (error) {
+    } catch {
       // Customer doesn't exist, create new one
       console.log(
         "[StripeSubscription] Customer not found in Stripe, creating new one",
@@ -87,9 +91,9 @@ export async function getOrCreateStripeCustomer(
     });
 
     return { success: true, customerId: customer.id };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[StripeSubscription] Failed to create customer:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -283,12 +287,12 @@ export async function createSubscriptionCheckout(
       sessionId: session.id,
       sessionUrl: session.url || undefined,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       "[StripeSubscription] Failed to create checkout session:",
       error,
     );
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -338,9 +342,9 @@ export async function cancelSubscription(
       subscriptionId: stripeSubscriptionId,
       status: subscription.status,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[StripeSubscription] Failed to cancel subscription:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -422,12 +426,12 @@ export async function reactivateSubscription(
       subscriptionId: stripeSubscriptionId,
       status: subscription.status,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       "[StripeSubscription] Failed to reactivate subscription:",
       error,
     );
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -609,9 +613,9 @@ export async function cancelSubscriptionWithFeedback(
       accessEndsAt,
       feedbackRecorded,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[StripeSubscription] Failed to cancel subscription:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -827,10 +831,13 @@ export async function getProrationPreview(
       amountDue: preview.amount_due,
       currency: preview.currency,
       lineItemsCount: preview.lines.data.length,
-      lines: preview.lines.data.map((line: any) => ({
+      lines: preview.lines.data.map((line: Stripe.InvoiceLineItem) => ({
         description: line.description,
         amount: line.amount / 100,
-        proration: line.proration,
+        proration:
+          "proration" in line
+            ? (line as { proration?: boolean }).proration
+            : undefined,
         period: line.period
           ? {
               start: new Date(line.period.start * 1000).toLocaleDateString(),
@@ -914,9 +921,9 @@ export async function getProrationPreview(
     console.log("[StripeSubscription] Preview result:", result);
 
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[StripeSubscription] Failed to preview proration:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -1027,7 +1034,7 @@ export async function changeSubscriptionPlan(
         ? Math.floor(user.subscription.subscriptionExpiryDate.getTime() / 1000)
         : Math.floor((Date.now() + 14 * 24 * 60 * 60 * 1000) / 1000);
 
-      const subscriptionParams: any = {
+      const subscriptionParams: Stripe.SubscriptionCreateParams = {
         customer: customerResult.customerId,
         items: [{ price: newPriceId }],
         metadata: {
@@ -1078,7 +1085,7 @@ export async function changeSubscriptionPlan(
 
     // Update the subscription with new price
     // Use "always_invoice" to create an immediate invoice and avoid accumulating prorations
-    const updateParams: any = {
+    const updateParams: Stripe.SubscriptionUpdateParams = {
       items: [
         {
           id: subscriptionItemId,
@@ -1116,9 +1123,9 @@ export async function changeSubscriptionPlan(
       subscriptionId: stripeSubscriptionId,
       status: updatedSubscription.status,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[StripeSubscription] Failed to change subscription:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -1150,12 +1157,12 @@ export async function createBillingPortalSession(
     });
 
     return { success: true, url: session.url };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       "[StripeSubscription] Failed to create billing portal:",
       error,
     );
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -1228,9 +1235,9 @@ export async function getPaymentMethods(userId: string): Promise<{
       paymentMethods: formattedMethods,
       defaultPaymentMethodId,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[StripeSubscription] Failed to get payment methods:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -1271,9 +1278,9 @@ export async function createSetupIntent(userId: string): Promise<{
       success: true,
       clientSecret: setupIntent.client_secret || undefined,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[StripeSubscription] Failed to create setup intent:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -1312,12 +1319,12 @@ export async function setDefaultPaymentMethod(
     }
 
     return { success: true, message: "Default payment method updated" };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       "[StripeSubscription] Failed to set default payment method:",
       error,
     );
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -1369,12 +1376,12 @@ export async function removePaymentMethod(
     await stripe.paymentMethods.detach(paymentMethodId);
 
     return { success: true, message: "Payment method removed" };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       "[StripeSubscription] Failed to remove payment method:",
       error,
     );
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -1422,12 +1429,12 @@ export async function attachPaymentMethod(
     }
 
     return { success: true, message: "Payment method added successfully" };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       "[StripeSubscription] Failed to attach payment method:",
       error,
     );
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -1501,12 +1508,12 @@ export async function getSubscriptionDetails(userId: string): Promise<{
     );
 
     return { success: true, subscription };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       "[StripeSubscription] Failed to get subscription details:",
       error,
     );
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 

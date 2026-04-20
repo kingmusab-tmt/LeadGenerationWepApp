@@ -21,7 +21,6 @@ import {
 } from "@mui/material";
 import {
   Share as ShareIcon,
-  EmojiEvents as QualityIcon,
   AttachMoney as MoneyIcon,
   Store as MarketplaceIcon,
   TrendingUp as VolumeIcon,
@@ -55,6 +54,26 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
+  const clampedThreshold = Math.min(100, Math.max(0, aiQualityThreshold));
+  const thresholdGuidance =
+    clampedThreshold <= 40
+      ? {
+          severity: "success" as const,
+          title: "High quality focus",
+          text: "Only High-quality leads (spam 0-40) can auto-assign in Smart Distribution mode.",
+        }
+      : clampedThreshold <= 69
+        ? {
+            severity: "info" as const,
+            title: "Balanced quality + volume",
+            text: "High leads and part of Medium leads (spam 41-69 up to your threshold) can auto-assign.",
+          }
+        : {
+            severity: "warning" as const,
+            title: "High volume mode",
+            text: "High, Medium, and some Low-quality leads (spam >= 70) can auto-assign. Review buyer fit carefully.",
+          };
+
   // Load current settings
   useEffect(() => {
     (async () => {
@@ -75,7 +94,7 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
             });
           }
         }
-      } catch (e) {
+      } catch {
         // ignore load error for now
       }
     })();
@@ -113,7 +132,7 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
         window.location.reload();
       }
       return true;
-    } catch (error) {
+    } catch {
       toast.error("Failed to update settings");
       return false;
     } finally {
@@ -216,6 +235,69 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
                 </MenuItem>
               </Select>
             </FormControl>
+
+            <Divider sx={{ my: 1 }} />
+
+            <Box>
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                AI Quality Threshold (Smart Distribution)
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1.5 }}
+              >
+                Rule applied in <strong>Both (Smart Distribution)</strong> mode:
+                auto-assign when AI spam score is less than or equal to your
+                threshold.
+              </Typography>
+
+              <TextField
+                label="Auto-Assign Threshold"
+                type="number"
+                value={aiQualityThreshold}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value || "0", 10);
+                  setAiQualityThreshold(
+                    Number.isNaN(value) ? 0 : Math.min(100, Math.max(0, value)),
+                  );
+                }}
+                inputProps={{ min: 0, max: 100 }}
+                fullWidth
+                helperText={`Current rule: Auto-assign if spam score <= ${clampedThreshold}`}
+                sx={{ mb: 1.5 }}
+              />
+
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1.5 }}>
+                {[40, 50, 69, 70].map((preset) => (
+                  <Chip
+                    key={preset}
+                    label={`Set ${preset}`}
+                    size="small"
+                    variant={
+                      clampedThreshold === preset ? "filled" : "outlined"
+                    }
+                    color={clampedThreshold === preset ? "primary" : "default"}
+                    onClick={() => setAiQualityThreshold(preset)}
+                  />
+                ))}
+              </Box>
+
+              <Alert severity={thresholdGuidance.severity}>
+                <Typography variant="body2" fontWeight={600}>
+                  {thresholdGuidance.title}
+                </Typography>
+                <Typography variant="body2">
+                  {thresholdGuidance.text}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ display: "block", mt: 0.5 }}
+                >
+                  Quality bands: High 0-40, Medium 41-69, Low 70-100.
+                </Typography>
+              </Alert>
+            </Box>
           </Box>
         </CardContent>
       </Card>
@@ -246,7 +328,7 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
               <br />
               🟢 <strong>High Quality (0-40):</strong> Clean, legitimate leads
               <br />
-              🟡 <strong>Medium Quality (40-70):</strong> Some red flags but
+              🟡 <strong>Medium Quality (41-69):</strong> Some red flags but
               still viable
               <br />
               🔴 <strong>Low Quality (70-100):</strong> Spam or suspicious leads
@@ -276,7 +358,7 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
                 helperText="Spam score 0–40 (Best leads)"
               />
             </Tooltip>
-            <Tooltip title="Medium Quality leads have some minor red flags but are still worth pursuing (AI spam score 40-70). Price these moderately to attract buyers while maintaining reasonable earnings.">
+            <Tooltip title="Medium Quality leads have some minor red flags but are still worth pursuing (AI spam score 41-69). Price these moderately to attract buyers while maintaining reasonable earnings.">
               <TextField
                 label="🟡 Medium Quality"
                 type="number"
@@ -289,7 +371,7 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
                 }
                 inputProps={{ min: 0 }}
                 fullWidth
-                helperText="Spam score 40–70 (Mixed signals)"
+                helperText="Spam score 41–69 (Mixed signals)"
               />
             </Tooltip>
             <Tooltip title="Low Quality leads are likely spam or suspicious (AI spam score 70-100). Price these very low, or even give them away to clear inventory and maintain marketplace reputation.">
@@ -344,8 +426,8 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
             variant="caption"
             sx={{ display: "block", mt: 1, color: "text.secondary" }}
           >
-            Leads that don't auto-assign will be available in the marketplace
-            for manual purchase
+            Leads that don&apos;t auto-assign will be available in the
+            marketplace for manual purchase
           </Typography>
         </CardContent>
       </Card>

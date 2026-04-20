@@ -1,16 +1,11 @@
 import Stripe from "stripe";
 import dbConnect from "@/lib/connectdb";
-import { User } from "@/models";
-import { Buyer } from "@/models/leadbuyers";
+
 import { NextRequest } from "next/server";
-import {
-  createPaymentSchema,
-  mongoIdParamSchema,
-} from "@/lib/validation/schemas";
+import { createPaymentSchema } from "@/lib/validation/schemas";
 import {
   successResponse,
   unauthorized,
-  notFound,
   internalError,
   handleValidationError,
   badRequest,

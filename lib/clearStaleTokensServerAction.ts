@@ -7,11 +7,11 @@ export const clearStaleTokens = async () => {
     const verificationTokenCollection = db.collection("verification_token");
 
     // Delete all tokens where the expiration date is in the past
-    const result = await verificationTokenCollection.deleteMany({
+    await verificationTokenCollection.deleteMany({
       expires: { $lt: new Date() },
     });
 
-    //(`${result.deletedCount} stale tokens cleared.`);
+    // stale tokens cleared
   } catch (error) {
     console.error("Failed to clear stale tokens:", error);
     throw error;

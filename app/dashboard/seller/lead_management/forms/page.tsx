@@ -45,7 +45,6 @@ export default function SellerForms() {
     severity: "success",
   });
   const {
-    confirm,
     confirmState,
     handleConfirm: onConfirm,
     handleCancel: onCancel,
@@ -125,36 +124,6 @@ export default function SellerForms() {
       message: "",
       severity: "info",
     });
-  };
-
-  const handleDelete = async (formId: string) => {
-    const confirmed = await confirm({
-      title: "Delete Form",
-      message: "Are you sure you want to delete this form?",
-      confirmText: "Delete",
-      confirmColor: "error",
-    });
-    if (!confirmed) return;
-
-    try {
-      const response = await csrfFetch(`/api/form/delete?id=${formId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete form");
-      setForms(forms.filter((form) => form.formId !== formId));
-      setSnackbar({
-        open: true,
-        message: "Form deleted successfully",
-        severity: "success",
-      });
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message:
-          error instanceof Error ? error.message : "An unknown error occurred",
-        severity: "error",
-      });
-    }
   };
 
   const handleClone = async (formId: string) => {

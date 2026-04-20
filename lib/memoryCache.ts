@@ -18,6 +18,20 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+type SessionCacheValue = {
+  id?: string;
+  user?: {
+    id?: string;
+  };
+};
+
+function extractSessionUserId(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+
+  const maybeSession = value as SessionCacheValue;
+  return maybeSession.user?.id || maybeSession.id;
+}
+
 const MAX_CACHE_ENTRIES = Math.max(
   100,
   Number(process.env.MEMORY_CACHE_MAX_ENTRIES || 5000),
@@ -29,7 +43,7 @@ function wildcardToRegExp(pattern: string): RegExp {
 }
 
 class MemoryCache {
-  private cache = new Map<string, CacheEntry<any>>();
+  private cache = new Map<string, CacheEntry<unknown>>();
   private cleanupInterval: NodeJS.Timeout;
 
   constructor() {
@@ -196,13 +210,13 @@ export default memoryCache;
 // Session-specific helpers
 export async function getSessionCache(
   sessionToken: string,
-): Promise<any | null> {
+): Promise<unknown | null> {
   return memoryCache.get(`session:${sessionToken}`);
 }
 
 export async function setSessionCache(
   sessionToken: string,
-  sessionData: any,
+  sessionData: unknown,
   ttlSeconds: number = 86400,
 ): Promise<void> {
   memoryCache.set(`session:${sessionToken}`, sessionData, ttlSeconds);
@@ -217,8 +231,8 @@ export async function invalidateUserSessions(userId: string): Promise<void> {
   const sessionKeys = memoryCache.keys(`session:*`);
 
   for (const key of sessionKeys) {
-    const sessionData = memoryCache.get<any>(key);
-    if (sessionData?.user?.id === userId || sessionData?.id === userId) {
+    const sessionData = memoryCache.get<unknown>(key);
+    if (extractSessionUserId(sessionData) === userId) {
       memoryCache.delete(key);
     }
   }
@@ -230,13 +244,13 @@ export async function invalidateUserCache(userId: string): Promise<void> {
 
 export async function setUserCache(
   userId: string,
-  userData: any,
+  userData: unknown,
   ttlSeconds: number = 3600,
 ): Promise<void> {
   memoryCache.set(`user:${userId}`, userData, ttlSeconds);
 }
 
-export async function getUserCache(userId: string): Promise<any | null> {
+export async function getUserCache(userId: string): Promise<unknown | null> {
   return memoryCache.get(`user:${userId}`);
 }
 

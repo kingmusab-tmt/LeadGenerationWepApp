@@ -8,13 +8,10 @@ import {
   CardContent,
   Chip,
   Container,
-  Divider,
-  Grid,
   IconButton,
   Menu,
   MenuItem,
   Paper,
-  Select,
   Skeleton,
   Stack,
   Table,
@@ -141,7 +138,7 @@ const TransactionHistory = () => {
         setTransactions(response.data.data);
         setFilteredTransactions(response.data.data);
       })
-      .catch((err) => {
+      .catch(() => {
         setError("Failed to refresh transactions");
       })
       .finally(() => setLoading(false));

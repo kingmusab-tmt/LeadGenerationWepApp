@@ -25,12 +25,9 @@ import {
   Settings,
   HelpOutline,
   Menu as MenuIcon,
-  Receipt,
   Storefront,
-  SettingsPhone,
   ReceiptLong,
   LocalAtm,
-  CallMade,
   CallReceivedRounded,
   People,
   Notifications,
@@ -54,16 +51,12 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const { status } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [subMenuAnchorEl, setSubMenuAnchorEl] = useState<null | HTMLElement>(
-    null,
-  );
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(false);
-  const [subMenuVisible, setSubMenuVisible] = useState(false);
-  let subMenuTimeout: NodeJS.Timeout;
 
   useEffect(() => {
     if (status === "loading" || userLoading) return;
@@ -134,19 +127,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-  };
-
-  const handleSubMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    clearTimeout(subMenuTimeout);
-    setSubMenuAnchorEl(event.currentTarget);
-    setSubMenuVisible(true);
-  };
-
-  const handleSubMenuClose = () => {
-    subMenuTimeout = setTimeout(() => {
-      setSubMenuVisible(false);
-      setSubMenuAnchorEl(null);
-    }, 300); // Adjust the delay as needed
   };
 
   // const subMenuOpen = Boolean(subMenuAnchorEl);

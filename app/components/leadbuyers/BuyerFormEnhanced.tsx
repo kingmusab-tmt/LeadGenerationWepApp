@@ -733,7 +733,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <Tooltip title="Set the minimum quality level for leads you'll receive:\n\n• 100: Only High Quality leads (Clean, Legitimate - spam score 0-40)\n• 60: High + Medium Quality (some red flags - spam score 0-70)\n• 30: Accept any quality level\n\nHigher = Better leads, Lower = More volume">
+                    <Tooltip title="Set the minimum quality level for leads you'll receive:\n\n• 100: Only High Quality leads (Clean, Legitimate - spam score 0-40)\n• 60: High + Medium Quality (some red flags - spam score 0-69)\n• 30: Accept any quality level\n\nHigher = Better leads, Lower = More volume">
                       <TextField
                         label="Minimum Qualification Score"
                         name="qualificationScoreMinimum"

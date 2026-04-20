@@ -162,7 +162,6 @@ class ErrorLogger {
    */
   private consoleLog(entry: ErrorLogEntry): void {
     const prefix = this.getLevelPrefix(entry.level);
-    const color = this.getLevelColor(entry.level);
 
     const logMessage = [
       `${prefix} [${entry.code}]`,

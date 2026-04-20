@@ -21,10 +21,6 @@ import {
   ListItem,
   ListItemText,
   Divider,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   CircularProgress,
   Chip,
 } from "@mui/material";
@@ -111,7 +107,7 @@ export default function ApiKeyManagement({ onNotify }: Props) {
         const error = await res.json();
         onNotify(error.error || "Failed to generate API key", "error");
       }
-    } catch (error) {
+    } catch {
       onNotify("Failed to generate API key", "error");
     } finally {
       setLoading(false);
@@ -143,7 +139,7 @@ export default function ApiKeyManagement({ onNotify }: Props) {
       } else {
         onNotify("Failed to revoke API key", "error");
       }
-    } catch (error) {
+    } catch {
       onNotify("Failed to revoke API key", "error");
     } finally {
       setLoading(false);

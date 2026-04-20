@@ -10,7 +10,7 @@
  */
 
 import Stripe from "stripe";
-import { Tier, ITier } from "@/models/tier";
+import { Tier } from "@/models/tier";
 import connectDB from "./connectdb";
 import { sendNotification } from "./notificationService";
 
@@ -337,11 +337,6 @@ export async function createStripePriceForTier(
     console.error("Failed to create Stripe price:", error);
     return { success: false, error: "Failed to create Stripe price" };
   }
-}
-
-// Helper to get tier ID safely
-function getTierId(tier: ITier): string {
-  return (tier as unknown as { _id: { toString(): string } })._id.toString();
 }
 
 /**

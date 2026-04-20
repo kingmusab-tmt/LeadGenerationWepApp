@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { Lead } from "@/models/leads";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { NextResponse } from "next/server";
 
 /**
  * POST /api/maintenance/fix-marketplace-leads
@@ -12,7 +12,7 @@ import { authOptions } from "@/auth";
  *
  * Only accessible by sellers/admins for their own leads.
  */
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     await dbConnect();
 
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
  *
  * Check which leads are affected (available but missing distributionMethod).
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
 

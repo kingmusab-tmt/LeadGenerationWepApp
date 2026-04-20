@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json();
     } catch (error) {
-      return badRequest("Invalid JSON in request body");
+      return badRequest(
+        `Invalid JSON in request body {${error instanceof Error ? error.message : "Unknown error"}}`,
+      );
     }
 
     const { userId } = body;

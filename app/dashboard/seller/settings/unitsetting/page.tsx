@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -16,8 +16,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  useMediaQuery,
-  Theme,
   Skeleton,
   Snackbar,
   Alert,
@@ -73,9 +71,6 @@ const UnitPricingComponent: React.FC<UnitPricingComponentProps> = ({
     message: "",
     severity: "success",
   });
-  const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm"),
-  );
 
   // Fetch settings on component mount
   useEffect(() => {
@@ -98,7 +93,7 @@ const UnitPricingComponent: React.FC<UnitPricingComponentProps> = ({
             severity: "error",
           });
         }
-      } catch (error) {
+      } catch {
         setSnackbar({
           open: true,
           message: "An error occurred",
@@ -161,7 +156,7 @@ const UnitPricingComponent: React.FC<UnitPricingComponentProps> = ({
             severity: "error",
           });
         }
-      } catch (error) {
+      } catch {
         setSnackbar({
           open: true,
           message: "An error occurred",
@@ -219,7 +214,7 @@ const UnitPricingComponent: React.FC<UnitPricingComponentProps> = ({
             severity: "error",
           });
         }
-      } catch (error) {
+      } catch {
         setSnackbar({
           open: true,
           message: "An error occurred",
@@ -260,7 +255,7 @@ const UnitPricingComponent: React.FC<UnitPricingComponentProps> = ({
           severity: "error",
         });
       }
-    } catch (error) {
+    } catch {
       setSnackbar({
         open: true,
         message: "An error occurred",
@@ -296,7 +291,7 @@ const UnitPricingComponent: React.FC<UnitPricingComponentProps> = ({
     setOpenDialog(true);
   };
 
-  const handleNextValidation = async (): Promise<boolean> => {
+  const handleNextValidation = useCallback(async (): Promise<boolean> => {
     if (isSaving) {
       setSnackbar({
         open: true,
@@ -317,12 +312,12 @@ const UnitPricingComponent: React.FC<UnitPricingComponentProps> = ({
     }
 
     return true;
-  };
+  }, [isSaving, openDialog]);
 
   useEffect(() => {
     if (!onSaveHandlerReady) return;
     onSaveHandlerReady(handleNextValidation);
-  }, [onSaveHandlerReady, openDialog, isSaving]);
+  }, [onSaveHandlerReady, handleNextValidation]);
 
   return (
     <Paper sx={{ p: 2 }}>

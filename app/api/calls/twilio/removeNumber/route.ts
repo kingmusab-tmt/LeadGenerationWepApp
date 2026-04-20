@@ -12,6 +12,11 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+type TrackingNumberRecord = {
+  phoneNumber?: string;
+  method?: "Manual" | "Automatic" | string;
+};
+
 export async function POST(req: NextRequest) {
   try {
     await dbConnect();
@@ -40,8 +45,11 @@ export async function POST(req: NextRequest) {
       return notFound("User");
     }
 
+    const trackingNumbers =
+      user.trackingNumbers as unknown as TrackingNumberRecord[];
+
     // Find the tracking number in the user's trackingNumbers array
-    const trackingNumber = user.trackingNumbers.find(
+    const trackingNumber = trackingNumbers.find(
       (num) => num.phoneNumber === phoneNumber,
     );
 
@@ -82,9 +90,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Remove the number from the user's trackingNumbers array
-    user.trackingNumbers = user.trackingNumbers.filter(
+    const updatedTrackingNumbers = trackingNumbers.filter(
       (num) => num.phoneNumber !== phoneNumber,
     );
+    user.trackingNumbers = updatedTrackingNumbers as [];
     await user.save();
 
     return NextResponse.json(

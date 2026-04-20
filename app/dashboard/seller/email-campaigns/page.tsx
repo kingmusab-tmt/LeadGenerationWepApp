@@ -214,8 +214,10 @@ export default function EmailCampaigns() {
       setAiDialogOpen(false);
       setAiDescription("");
       toast.success("Campaign generated successfully! You can edit it now.");
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to generate campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to generate campaign",
+      );
     } finally {
       setAiGenerating(false);
     }
@@ -262,9 +264,10 @@ export default function EmailCampaigns() {
       );
       handleCloseDialog();
       fetchCampaigns();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_error: any) {
-      toast.error(_error?.message || "Error saving campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error saving campaign",
+      );
     } finally {
       setSaving(false);
     }
@@ -296,9 +299,10 @@ export default function EmailCampaigns() {
 
       toast.success("Campaign deleted");
       fetchCampaigns();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_error: any) {
-      toast.error(_error?.message || "Error deleting campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error deleting campaign",
+      );
     } finally {
       setActionLoading({ campaignId: "", action: null });
     }
@@ -330,9 +334,10 @@ export default function EmailCampaigns() {
       const data = await response.json();
       toast.success(`Campaign sent to ${data.sent} recipients`);
       fetchCampaigns();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_error: any) {
-      toast.error(_error?.message || "Error sending campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error sending campaign",
+      );
     } finally {
       setActionLoading({ campaignId: "", action: null });
     }
@@ -351,8 +356,10 @@ export default function EmailCampaigns() {
       }
       toast.success("Campaign paused");
       fetchCampaigns();
-    } catch (error: any) {
-      toast.error(error?.message || "Error pausing campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error pausing campaign",
+      );
     } finally {
       setActionLoading({ campaignId: "", action: null });
     }
@@ -372,8 +379,10 @@ export default function EmailCampaigns() {
       const data = await response.json();
       toast.success(data.message || "Campaign resumed");
       fetchCampaigns();
-    } catch (error: any) {
-      toast.error(error?.message || "Error resuming campaign");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Error resuming campaign",
+      );
     } finally {
       setActionLoading({ campaignId: "", action: null });
     }
