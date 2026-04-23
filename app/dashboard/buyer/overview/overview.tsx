@@ -127,8 +127,16 @@ const Overview: React.FC = () => {
       try {
         const response = await fetch("/api/buyers/buyeroverview");
         if (response.ok) {
-          const data = await response.json();
-          setOverviewData(data);
+          const payload = await response.json();
+          const data = payload?.data ?? payload;
+          setOverviewData({
+            ...initialOverviewData,
+            ...data,
+            sellerInfo: {
+              ...initialOverviewData.sellerInfo,
+              ...(data?.sellerInfo || {}),
+            },
+          });
         } else {
           router.push("/auth/sign-in");
         }
@@ -140,7 +148,7 @@ const Overview: React.FC = () => {
     };
 
     fetchOverviewData();
-  }, []);
+  }, [router]);
 
   if (loading) {
     return (
@@ -164,6 +172,11 @@ const Overview: React.FC = () => {
       </Typography>
     );
   }
+
+  const sellerInfo = {
+    ...initialOverviewData.sellerInfo,
+    ...(overviewData?.sellerInfo || {}),
+  };
 
   // Stats data for mapping
   const stats: { id: StatId; label: string; value: number }[] = [
@@ -229,12 +242,12 @@ const Overview: React.FC = () => {
                   mb: 2,
                   bgcolor: theme.palette.primary.main,
                 }}
-                src={overviewData.sellerInfo.image}
+                src={sellerInfo.image}
               >
-                {overviewData.sellerInfo.name.charAt(0)}
+                {(sellerInfo.name || "S").charAt(0)}
               </Avatar>
               <Typography variant="h5" gutterBottom>
-                {overviewData.sellerInfo.name}
+                {sellerInfo.name}
               </Typography>
               <Chip
                 label="Lead Seller"
@@ -253,9 +266,7 @@ const Overview: React.FC = () => {
                   }}
                 >
                   <Email color="action" />
-                  <Typography variant="body1">
-                    {overviewData.sellerInfo.email}
-                  </Typography>
+                  <Typography variant="body1">{sellerInfo.email}</Typography>
                 </Box>
                 <Box
                   sx={{
@@ -267,7 +278,7 @@ const Overview: React.FC = () => {
                 >
                   <Phone color="action" />
                   <Typography variant="body1">
-                    {overviewData.sellerInfo.mobileNumber}
+                    {sellerInfo.mobileNumber}
                   </Typography>
                 </Box>
               </Box>

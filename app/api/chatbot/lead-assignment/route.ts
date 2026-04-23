@@ -216,8 +216,8 @@ export async function POST(req: Request) {
     }
 
     // In production, save assignment to database
-    console.log("Lead assigned:", result.assignment);
-    console.log("Assigned to buyer:", result.buyer);
+    // console.log("Lead assigned:", result.assignment);
+    // console.log("Assigned to buyer:", result.buyer);
 
     // Send notification to buyer (implement email/SMS service)
     // await this.notifyBuyer(result.buyer, lead, result.assignment);

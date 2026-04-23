@@ -86,9 +86,9 @@ class InvoiceEmailService {
     if (invoice.status === "paid") return;
     if (!invoice.buyerEmail) return;
 
-    console.log(
-      `Sending payment reminder for invoice ${invoice.invoiceNumber}`,
-    );
+    // console.log(
+    //   `Sending payment reminder for invoice ${invoice.invoiceNumber}`,
+    // );
 
     await Invoice.findByIdAndUpdate(invoice._id, {
       remindersSent: invoice.remindersSent + 1,

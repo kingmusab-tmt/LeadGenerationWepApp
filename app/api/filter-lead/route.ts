@@ -9,10 +9,10 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const fieldNames = Object.keys(body || {});
-    console.log("[filter-lead] Received lead data for AI scoring", {
-      fieldCount: fieldNames.length,
-      fieldNames,
-    });
+    // console.log("[filter-lead] Received lead data for AI scoring", {
+    //   fieldCount: fieldNames.length,
+    //   fieldNames,
+    // });
 
     // 1. Select the Flash model (Fastest for real-time)
     // We enforce JSON output for easy parsing
@@ -78,19 +78,19 @@ export async function POST(req: Request) {
       }
     `;
 
-    console.log("[filter-lead] Prompt prepared", {
-      fieldCount: fieldNames.length,
-    });
+    // console.log("[filter-lead] Prompt prepared", {
+    //   fieldCount: fieldNames.length,
+    // });
 
     // 3. Get the Verdict
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     const validation = JSON.parse(responseText);
 
-    console.log("[filter-lead] Gemini AI verdict", {
-      is_valid: validation?.is_valid,
-      spam_score: validation?.spam_score,
-    });
+    // console.log("[filter-lead] Gemini AI verdict", {
+    //   is_valid: validation?.is_valid,
+    //   spam_score: validation?.spam_score,
+    // });
 
     // 4. Return the AI scoring result — always 200
     // This endpoint is for internal scoring only, NEVER blocks form submissions

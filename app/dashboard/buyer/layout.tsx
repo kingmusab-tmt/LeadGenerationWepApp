@@ -89,8 +89,12 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       currentUser.email,
     );
 
-    if (!onboardingFlowComplete) {
-      router.replace("/buyer-onboarding");
+    // Always enforce onboarding for buyer dashboard pages unless onboarding is complete
+    // Skip this check only for the onboarding page itself to prevent redirect loops
+    const isOnOnboardingPage = pathname === "/buyer/onboarding";
+
+    if (!isOnOnboardingPage && !onboardingFlowComplete) {
+      router.replace("/buyer/onboarding");
     }
   }, [status, userLoading, currentUser, pathname, router]);
 

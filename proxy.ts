@@ -42,8 +42,18 @@ const publicRoutes = [
 
 // ✅ Define role-based protected routes
 const adminRoutes = ["/admindashboard", /^\/admindashboard\/.*$/];
-const buyerRoutes = ["/dashboard/buyer", /^\/dashboard\/buyer\/.*$/];
-const sellerRoutes = ["/dashboard/seller", /^\/dashboard\/seller\/.*$/];
+const buyerRoutes = [
+  "/dashboard/buyer",
+  /^\/dashboard\/buyer\/.*$/,
+  "/buyer/onboarding",
+  /^\/buyer\/onboarding\/.*$/,
+];
+const sellerRoutes = [
+  "/dashboard/seller",
+  /^\/dashboard\/seller\/.*$/,
+  "/seller-onboarding",
+  /^\/seller-onboarding\/.*$/,
+];
 
 const roleBasedRoutes = {
   admin: adminRoutes,
@@ -73,8 +83,8 @@ export async function proxy(request: NextRequest) {
   // Authentication and authorization for pages
   const token = await getToken({ req: request });
 
-  console.log("Proxy running on:", pathname);
-  console.log("Token:", token ? "Authenticated" : "Unauthenticated");
+  // console.log("Proxy running on:", pathname);
+  // console.log("Token:", token ? "Authenticated" : "Unauthenticated");
 
   // ✅ Skip public routes
   const isPublicRoute = publicRoutes.some((route) => {
@@ -92,7 +102,7 @@ export async function proxy(request: NextRequest) {
   if (!token) {
     const signInUrl = new URL("/auth/sign-in", request.url);
     signInUrl.searchParams.set("callbackUrl", pathname);
-    console.log("Redirecting to sign-in...");
+    // console.log("Redirecting to sign-in...");
     return NextResponse.redirect(signInUrl);
   }
 
@@ -123,12 +133,12 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
     // Redirect "user" role to complete registration
-    console.log("User role detected, redirecting to complete registration");
-    return NextResponse.redirect(new URL("/completeregistration", request.url));
+    // console.log("User role detected, redirecting to complete registration");
+    // return NextResponse.redirect(new URL("/completeregistration", request.url));
   }
 
   if (!hasAccess) {
-    console.log(`Role ${token.role} does not have access to ${pathname}`);
+    // console.log(`Role ${token.role} does not have access to ${pathname}`);
     const fallbackPath =
       token.role === "admin"
         ? "/admindashboard/overview"

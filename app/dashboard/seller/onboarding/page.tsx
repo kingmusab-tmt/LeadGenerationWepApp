@@ -1,5 +1,1 @@
-import { redirect } from "next/navigation";
-
-export default function LegacySellerOnboardingRedirectPage() {
-  redirect("/seller-onboarding");
-}
+export { default } from "@/app/seller-onboarding/page";

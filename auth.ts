@@ -182,11 +182,11 @@ export const authOptions = {
                 { $set: { role: "buyer" } },
               );
               dbUser.role = "buyer";
-              console.log(
-                "[JWT] Auto-assigned buyer role to:",
-                token.email,
-                "- found in Buyer collection",
-              );
+              // console.log(
+              //   "[JWT] Auto-assigned buyer role to:",
+              //   token.email,
+              //   "- found in Buyer collection",
+              // );
             }
           }
 
@@ -194,11 +194,11 @@ export const authOptions = {
           token.role = dbUser.role;
           token.isSubActive =
             dbUser.subscription?.isSubscriptionActive || false;
-          console.log("[JWT] Fetched fresh data from DB:", {
-            email: token.email,
-            role: dbUser.role,
-            isSubActive: dbUser.subscription?.isSubscriptionActive || false,
-          });
+          // console.log("[JWT] Fetched fresh data from DB:", {
+          //   email: token.email,
+          //   role: dbUser.role,
+          //   isSubActive: dbUser.subscription?.isSubscriptionActive || false,
+          // });
         }
       }
       return token;

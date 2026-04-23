@@ -73,7 +73,7 @@ export async function getCachedSession(
       // Invalidate stale cache
       await deleteSessionCache(userEmail);
     } else {
-      console.log("[Cache] Session cache HIT for:", userEmail);
+      // console.log("[Cache] Session cache HIT for:", userEmail);
       return cachedSession;
     }
   } else {

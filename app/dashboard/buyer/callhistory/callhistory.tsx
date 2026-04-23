@@ -93,13 +93,23 @@ const CallHistory: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const filtered = calls.filter(
-      (call) =>
-        call.industry.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        call.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (call.feedback !== null &&
-          (call.feedback ? "good" : "bad").includes(searchTerm.toLowerCase())),
-    );
+    const search = searchTerm.toLowerCase();
+    const filtered = calls.filter((call) => {
+      const industry = String(call.industry || "").toLowerCase();
+      const status = String(call.status || "").toLowerCase();
+      const feedbackLabel =
+        call.feedback !== null && call.feedback !== undefined
+          ? call.feedback
+            ? "good"
+            : "bad"
+          : "";
+
+      return (
+        industry.includes(search) ||
+        status.includes(search) ||
+        feedbackLabel.includes(search)
+      );
+    });
     setFilteredCalls(filtered);
     setCurrentPage(1);
   }, [searchTerm, calls]);
@@ -110,8 +120,9 @@ const CallHistory: React.FC = () => {
       setError(null);
       const response = await fetch("/api/buyers/buyerCallleads");
       if (!response.ok) throw new Error("Failed to fetch calls");
-      const data = await response.json();
-      setCalls(data);
+      const payload = await response.json();
+      const data = payload?.data ?? payload;
+      setCalls(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load calls");
       setSnackbarOpen(true);

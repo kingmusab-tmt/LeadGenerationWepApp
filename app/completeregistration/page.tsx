@@ -108,11 +108,11 @@ const RoleSelectionPage: React.FC = () => {
         (role === "seller" || role === "business-admin") &&
         isSubActive
       ) {
-        router.replace("/seller-onboarding");
+        router.replace("/dashboard/seller/onboarding");
       } else if (role === "seller" || role === "business-admin") {
         router.replace("/plan");
       } else if (role === "buyer" || role === "staff") {
-        router.replace("/buyer-onboarding");
+        router.replace("/buyer/onboarding");
       }
     }
   }, [session, status, router, isRedirecting]);
@@ -156,7 +156,7 @@ const RoleSelectionPage: React.FC = () => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             // Redirect to onboarding page before dashboard access
-            router.push("/seller-onboarding");
+            router.push("/dashboard/seller/onboarding");
             return;
           } else {
             const trialError = await trialResponse.json().catch(() => null);
@@ -191,7 +191,7 @@ const RoleSelectionPage: React.FC = () => {
 
     // Redirect other roles to their dashboards
     const dashboardPaths: Record<string, string> = {
-      buyer: "/buyer-onboarding",
+      buyer: "/buyer/onboarding",
       staff: "/dashboard/staff/overview",
     };
 

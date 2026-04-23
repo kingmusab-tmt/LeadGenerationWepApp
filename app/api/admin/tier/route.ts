@@ -42,12 +42,12 @@ async function createStripeCouponForTier(
 
     const coupon = await stripe.coupons.create(couponParams);
 
-    console.log(`[Tier Admin] Created Stripe coupon for ${tierName}:`, {
-      couponId: coupon.id,
-      discountPercentage,
-      duration: discountDuration,
-      durationMonths: discountDurationMonths,
-    });
+    // console.log(`[Tier Admin] Created Stripe coupon for ${tierName}:`, {
+    //   couponId: coupon.id,
+    //   discountPercentage,
+    //   duration: discountDuration,
+    //   durationMonths: discountDurationMonths,
+    // });
 
     return { stripeCouponId: coupon.id };
   } catch (error) {
@@ -106,10 +106,10 @@ async function createStripePricesForTier(
       },
     });
 
-    console.log(`[Tier Admin] Created Stripe prices for ${tierName}:`, {
-      monthlyPriceId: monthlyPriceObj.id,
-      annualPriceId: annualPriceObj.id,
-    });
+    // console.log(`[Tier Admin] Created Stripe prices for ${tierName}:`, {
+    //   monthlyPriceId: monthlyPriceObj.id,
+    //   annualPriceId: annualPriceObj.id,
+    // });
 
     return {
       stripeMonthlyPriceId: monthlyPriceObj.id,

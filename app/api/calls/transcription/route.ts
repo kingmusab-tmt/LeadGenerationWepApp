@@ -36,9 +36,9 @@ export async function POST(req: NextRequest) {
 
     if (transcriptionStatus !== "completed" || !transcriptionText) {
       // Transcription failed or is empty, just log
-      console.log(
-        `Transcription ${transcriptionSid} for call ${callSid}: status=${transcriptionStatus}`,
-      );
+      // console.log(
+      //   `Transcription ${transcriptionSid} for call ${callSid}: status=${transcriptionStatus}`,
+      // );
       return NextResponse.json({
         success: true,
         data: { status: "skipped" },

@@ -6,11 +6,8 @@ import { User } from "@/models/userModel";
 import { processLeadDistribution } from "@/lib/leadAssignmentService";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 import { sendNotification } from "@/lib/notificationService";
-import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
-import {
-  normalizeAiQualityResult,
-  recordAiScoringMetric,
-} from "@/lib/aiQualityScoring";
+
+import { normalizeAiQualityResult } from "@/lib/aiQualityScoring";
 import {
   badRequest,
   internalError,
@@ -137,11 +134,11 @@ export async function POST(request: Request) {
 
     // Honeypot check (if honeypot field has value, it's likely a bot)
     if (data.honeypot && data.honeypot.trim() !== "") {
-      console.log("Honeypot triggered - possible spam");
-      return NextResponse.json(
-        { success: true, message: "Lead captured successfully!" }, // Return success to fool bots
-        { status: 200 },
-      );
+      // console.log("Honeypot triggered - possible spam");
+      // return NextResponse.json(
+      //   { success: true, message: "Lead captured successfully!" }, // Return success to fool bots
+      //   { status: 200 },
+      // );
     }
 
     // Timing check (form submitted too quickly might be a bot)
@@ -151,7 +148,7 @@ export async function POST(request: Request) {
 
       if (timeDiff < 3000) {
         // Submitted in less than 3 seconds
-        console.log("Form submitted too quickly - possible spam");
+        // console.log("Form submitted too quickly - possible spam");
         return badRequest("Please take your time filling out the form.");
       }
     }
@@ -318,18 +315,18 @@ export async function POST(request: Request) {
           shared: normalized.qualityLevel !== "High",
         });
 
-        console.log("✅ AI quality assessment completed:", {
-          leadId: lead._id,
-          qualityLevel: normalized.qualityLevel,
-          spamScore: normalized.spamScore,
-          isValid: normalized.isValid,
-          reason: normalized.reason,
-        });
-        console.log("[AI Scoring][Metric]", {
-          event: "success",
-          context: "form_submit",
-          ...recordAiScoringMetric("success"),
-        });
+        // console.log("✅ AI quality assessment completed:", {
+        //   leadId: lead._id,
+        //   qualityLevel: normalized.qualityLevel,
+        //   spamScore: normalized.spamScore,
+        //   isValid: normalized.isValid,
+        //   reason: normalized.reason,
+        // });
+        // console.log("[AI Scoring][Metric]", {
+        //   event: "success",
+        //   context: "form_submit",
+        //   ...recordAiScoringMetric("success"),
+        // });
 
         // Apply seller's quality-based lead pricing
         try {
@@ -363,10 +360,10 @@ export async function POST(request: Request) {
                 ? pricing.low
                 : pricing.medium;
           await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
-          console.log("✅ Lead unit price set:", {
-            qualityLevel: normalized.qualityLevel,
-            unitPrice,
-          });
+          // console.log("✅ Lead unit price set:", {
+          //   qualityLevel: normalized.qualityLevel,
+          //   unitPrice,
+          // });
         } catch (pricingError) {
           console.error("⚠️ Error setting lead pricing:", pricingError);
         }
@@ -379,19 +376,19 @@ export async function POST(request: Request) {
           exclusive: false,
           shared: true,
         });
-        console.log("[AI Scoring][Metric]", {
-          event: "fallback",
-          context: "form_submit",
-          reason: "exception",
-          ...recordAiScoringMetric("fallback"),
-        });
+        // console.log("[AI Scoring][Metric]", {
+        //   event: "fallback",
+        //   context: "form_submit",
+        //   reason: "exception",
+        //   ...recordAiScoringMetric("fallback"),
+        // });
       }
     } else {
       // User doesn't have lead scoring feature - set default values without AI
-      console.log(
-        "⏭️ AI lead scoring skipped - feature not enabled for user:",
-        formOwnerId,
-      );
+      // console.log(
+      //   "⏭️ AI lead scoring skipped - feature not enabled for user:",
+      //   formOwnerId,
+      // );
       await Lead.findByIdAndUpdate(lead._id, {
         aiQualityScore: 50,
         qualityLevel: "Medium",
@@ -410,10 +407,10 @@ export async function POST(request: Request) {
           $push: { submittedLeads: lead._id },
         });
 
-        console.log("✅ Form submittedLeads updated:", {
-          formId: formObjectId,
-          leadId: lead._id,
-        });
+        // console.log("✅ Form submittedLeads updated:", {
+        //   formId: formObjectId,
+        //   leadId: lead._id,
+        // });
       }
     } catch (formError) {
       console.error("❌ Error updating form's submittedLeads:", formError);
@@ -432,12 +429,12 @@ export async function POST(request: Request) {
 
       const distributionResult = await processLeadDistribution(scoredLead);
 
-      console.log("✅ Lead distribution processed:", {
-        leadId: lead._id,
-        assignedBuyers: distributionResult.assignedBuyers.length,
-        notified: distributionResult.notified.length,
-        errors: distributionResult.errors.length,
-      });
+      // console.log("✅ Lead distribution processed:", {
+      //   leadId: lead._id,
+      //   assignedBuyers: distributionResult.assignedBuyers.length,
+      //   notified: distributionResult.notified.length,
+      //   errors: distributionResult.errors.length,
+      // });
 
       if (distributionResult.errors.length > 0) {
         console.warn("⚠️ Distribution errors:", distributionResult.errors);
@@ -458,16 +455,16 @@ export async function POST(request: Request) {
         updatedLead.qualityLevel === "Low"
       ) {
         try {
-          console.log(
-            `📢 Low quality lead ${lead._id} - making available in marketplace`,
-          );
-          const marketplaceResult = await makeLeadAvailableInMarketplace(
-            updatedLead,
-            "low_quality",
-          );
-          console.log(
-            `✅ Marketplace notifications sent to ${marketplaceResult.notificationResult?.notifiedBuyers.length || 0} buyers`,
-          );
+          // console.log(
+          //   `📢 Low quality lead ${lead._id} - making available in marketplace`,
+          // );
+          // const marketplaceResult = await makeLeadAvailableInMarketplace(
+          //   updatedLead,
+          //   "low_quality",
+          // );
+          // console.log(
+          //   `✅ Marketplace notifications sent to ${marketplaceResult.notificationResult?.notifiedBuyers.length || 0} buyers`,
+          // );
         } catch (marketplaceError) {
           console.error(
             "⚠️ Error making lead available in marketplace:",

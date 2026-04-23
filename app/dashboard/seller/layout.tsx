@@ -196,10 +196,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
 
     // Always enforce onboarding for seller dashboard pages unless onboarding is complete
     // Skip this check only for the onboarding page itself to prevent redirect loops
-    const isOnOnboardingPage = pathname === "/seller-onboarding";
+    const isOnOnboardingPage = pathname === "/dashboard/seller/onboarding";
 
     if (!isOnOnboardingPage && !onboardingFlowComplete) {
-      router.replace("/seller-onboarding");
+      router.replace("/dashboard/seller/onboarding");
     }
   }, [status, userLoading, limitsLoading, currentUser, pathname, router]);
 
