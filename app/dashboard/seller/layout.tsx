@@ -194,24 +194,14 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       currentUser.email,
     );
 
-    // Only enforce onboarding from the seller dashboard root.
-    // Do not interrupt navigation to nested dashboard pages.
-    if (
-      pathname === "/dashboard/seller" &&
-      !isTrial &&
-      !onboardingFlowComplete
-    ) {
+    // Always enforce onboarding for seller dashboard pages unless onboarding is complete
+    // Skip this check only for the onboarding page itself to prevent redirect loops
+    const isOnOnboardingPage = pathname === "/seller-onboarding";
+
+    if (!isOnOnboardingPage && !onboardingFlowComplete) {
       router.replace("/seller-onboarding");
     }
-  }, [
-    status,
-    userLoading,
-    limitsLoading,
-    currentUser,
-    pathname,
-    isTrial,
-    router,
-  ]);
+  }, [status, userLoading, limitsLoading, currentUser, pathname, router]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
