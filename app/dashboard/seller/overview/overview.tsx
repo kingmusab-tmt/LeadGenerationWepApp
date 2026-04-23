@@ -327,6 +327,10 @@ const Overview: React.FC = () => {
   const leadSourcesData = overviewData.leadSources || [];
   const salesPerformanceData = overviewData.salesPerformance?.[timeframe] || [];
   const topLeadBuyersData = overviewData.topLeadBuyers || [];
+  const hasLeadSourcesData = leadSourcesData.length > 0;
+  const hasSalesPerformanceData = salesPerformanceData.length > 0;
+  const hasTopLeadBuyersData = topLeadBuyersData.length > 0;
+  const hasLeadTrendsData = barChartData.length > 0 || pieChartData.length > 0;
 
   // Show loading while auth is loading or data is loading
   if (loading || status === "loading" || userLoading) {
@@ -643,197 +647,208 @@ const Overview: React.FC = () => {
           </StyledPaper>
         </Grid>
 
-        {/* Lead Sources */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <StyledPaper>
-            <Typography
-              variant="h6"
-              gutterBottom
-              sx={{ display: "flex", alignItems: "center" }}
-            >
-              <Assessment sx={{ mr: 1 }} /> Lead Sources
-            </Typography>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={leadSourcesData}
-                  dataKey="count"
-                  nameKey="source"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={isMobile ? 60 : 80}
-                  fill="#8884d8"
-                  label={({ name, percent }) =>
-                    `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
-                  }
-                >
-                  {leadSourcesData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value, name, props) => [
-                    `${props.payload.source}: ${value} leads (${props.payload.conversionRate}% conversion)`,
-                  ]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </StyledPaper>
-        </Grid>
-
-        {/* Top Lead Buyers */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <StyledPaper sx={{ textAlign: "left" }}>
-            <Typography
-              variant="h6"
-              gutterBottom
-              sx={{ display: "flex", alignItems: "center" }}
-            >
-              <Star sx={{ mr: 1 }} /> Top Lead Buyers
-            </Typography>
-            <Stack spacing={1}>
-              {topLeadBuyersData.map((buyer, index) => (
-                <Box key={buyer.id}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography variant="subtitle1">
-                      #{index + 1} {buyer.name}
-                    </Typography>
-                    <Chip
-                      label={`${buyer.leadsPurchased} leads`}
-                      size="small"
-                      color="primary"
-                    />
-                  </Box>
-                  <Typography variant="body2">
-                    Total spend: ${buyer.totalSpend.toLocaleString()}
-                  </Typography>
-                  <Divider sx={{ my: 1 }} />
-                </Box>
-              ))}
-            </Stack>
-          </StyledPaper>
-        </Grid>
-
-        {/* Sales Performance */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="subtitle1" gutterBottom>
-                Sales Performance
+        {hasLeadSourcesData && (
+          <Grid size={{ xs: 12, md: 4 }}>
+            <StyledPaper>
+              <Typography
+                variant="h6"
+                gutterBottom
+                sx={{ display: "flex", alignItems: "center" }}
+              >
+                <Assessment sx={{ mr: 1 }} /> Lead Sources
               </Typography>
-              <Select
-                value={timeframe}
-                onChange={handleTimeframeChange}
-                size="small"
-                sx={{ minWidth: 120 }}
-              >
-                <MenuItem value="daily">Daily</MenuItem>
-                <MenuItem value="weekly">Weekly</MenuItem>
-                <MenuItem value="monthly">Monthly</MenuItem>
-              </Select>
-            </Box>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={salesPerformanceData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey={
-                    timeframe === "daily"
-                      ? "day"
-                      : timeframe === "weekly"
-                        ? "week"
-                        : "month"
-                  }
-                />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="sales"
-                  stroke="#8884d8"
-                  activeDot={{ r: 8 }}
-                  name="Sales ($)"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </StyledPaper>
-        </Grid>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={leadSourcesData}
+                    dataKey="count"
+                    nameKey="source"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={isMobile ? 60 : 80}
+                    fill="#8884d8"
+                    label={({ name, percent }) =>
+                      `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                    }
+                  >
+                    {leadSourcesData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, name, props) => [
+                      `${props.payload.source}: ${value} leads (${props.payload.conversionRate}% conversion)`,
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </StyledPaper>
+          </Grid>
+        )}
 
-        {/* Charts Section */}
-        <Grid size={{ xs: 12 }}>
-          <Typography
-            variant="h6"
-            gutterBottom
-            sx={{ display: "flex", alignItems: "center" }}
-          >
-            <BarChartIcon sx={{ mr: 1 }} /> Lead Trends
-          </Typography>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6 }} mb={4}>
-          <StyledPaper>
-            <Typography variant="subtitle1" gutterBottom>
-              Monthly Lead Volume
-            </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={barChartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+        {hasTopLeadBuyersData && (
+          <Grid size={{ xs: 12, md: 4 }}>
+            <StyledPaper sx={{ textAlign: "left" }}>
+              <Typography
+                variant="h6"
+                gutterBottom
+                sx={{ display: "flex", alignItems: "center" }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="leads" fill="#8884d8" name="Leads Generated" />
-                <Bar dataKey="conversions" fill="#82ca9d" name="Conversions" />
-              </BarChart>
-            </ResponsiveContainer>
-          </StyledPaper>
-        </Grid>
+                <Star sx={{ mr: 1 }} /> Top Lead Buyers
+              </Typography>
+              <Stack spacing={1}>
+                {topLeadBuyersData.map((buyer, index) => (
+                  <Box key={buyer.id}>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="subtitle1">
+                        #{index + 1} {buyer.name}
+                      </Typography>
+                      <Chip
+                        label={`${buyer.leadsPurchased} leads`}
+                        size="small"
+                        color="primary"
+                      />
+                    </Box>
+                    <Typography variant="body2">
+                      Total spend: ${buyer.totalSpend.toLocaleString()}
+                    </Typography>
+                    <Divider sx={{ my: 1 }} />
+                  </Box>
+                ))}
+              </Stack>
+            </StyledPaper>
+          </Grid>
+        )}
 
-        {/* Lead Status Distribution */}
-        <Grid size={{ xs: 12, md: 6 }} mb={4}>
-          <StyledPaper>
-            <Typography variant="subtitle1" gutterBottom>
-              Lead Status Distribution
-            </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pieChartData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={isMobile ? 80 : 120}
-                  fill="#8884d8"
-                  label={({ name, percent }) =>
-                    `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
-                  }
+        {hasSalesPerformanceData && (
+          <Grid size={{ xs: 12, md: 4 }}>
+            <StyledPaper>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <Typography variant="subtitle1" gutterBottom>
+                  Sales Performance
+                </Typography>
+                <Select
+                  value={timeframe}
+                  onChange={handleTimeframeChange}
+                  size="small"
+                  sx={{ minWidth: 120 }}
                 >
-                  {pieChartData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </StyledPaper>
-        </Grid>
+                  <MenuItem value="daily">Daily</MenuItem>
+                  <MenuItem value="weekly">Weekly</MenuItem>
+                  <MenuItem value="monthly">Monthly</MenuItem>
+                </Select>
+              </Box>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart
+                  data={salesPerformanceData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey={
+                      timeframe === "daily"
+                        ? "day"
+                        : timeframe === "weekly"
+                          ? "week"
+                          : "month"
+                    }
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="#8884d8"
+                    activeDot={{ r: 8 }}
+                    name="Sales ($)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </StyledPaper>
+          </Grid>
+        )}
+
+        {hasLeadTrendsData && (
+          <Grid size={{ xs: 12 }}>
+            <Typography
+              variant="h6"
+              gutterBottom
+              sx={{ display: "flex", alignItems: "center" }}
+            >
+              <BarChartIcon sx={{ mr: 1 }} /> Lead Trends
+            </Typography>
+          </Grid>
+        )}
+
+        {barChartData.length > 0 && (
+          <Grid size={{ xs: 12, md: 6 }} mb={4}>
+            <StyledPaper>
+              <Typography variant="subtitle1" gutterBottom>
+                Monthly Lead Volume
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={barChartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="leads" fill="#8884d8" name="Leads Generated" />
+                  <Bar
+                    dataKey="conversions"
+                    fill="#82ca9d"
+                    name="Conversions"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </StyledPaper>
+          </Grid>
+        )}
+
+        {pieChartData.length > 0 && (
+          <Grid size={{ xs: 12, md: 6 }} mb={4}>
+            <StyledPaper>
+              <Typography variant="subtitle1" gutterBottom>
+                Lead Status Distribution
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={pieChartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={isMobile ? 80 : 120}
+                    fill="#8884d8"
+                    label={({ name, percent }) =>
+                      `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                    }
+                  >
+                    {pieChartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </StyledPaper>
+          </Grid>
+        )}
       </Grid>
     </Box>
   );

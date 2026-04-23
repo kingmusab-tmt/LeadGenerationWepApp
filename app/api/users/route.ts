@@ -53,9 +53,7 @@ export async function GET(req: NextRequest) {
     if (user.role === "buyer") {
       const leadbuyerDetail = await Buyer.findOne({
         email: user.email,
-      })
-        .select("name email walletBalance autoAccept preferences")
-        .lean();
+      }).lean();
       return NextResponse.json(
         { user, leadbuyerDetail },
         { status: 200, headers: cacheHeaders },

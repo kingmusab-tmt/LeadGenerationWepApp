@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useInitializeUser } from "@/app/hooks";
 import {
   Box,
@@ -62,6 +63,7 @@ interface Campaign {
 }
 
 export default function EmailCampaigns() {
+  const router = useRouter();
   const fetchWithCSRF = useCSRFFetch();
   const { currentUser } = useInitializeUser();
   const { limits, isTrial } = useSubscriptionLimits();
@@ -95,6 +97,8 @@ export default function EmailCampaigns() {
     campaignId: string;
     action: "send" | "pause" | "resume" | "delete" | null;
   }>({ campaignId: "", action: null });
+  const [emailSettingsRequiredOpen, setEmailSettingsRequiredOpen] =
+    useState(false);
 
   // Fetch campaigns
   useEffect(() => {
@@ -328,7 +332,21 @@ export default function EmailCampaigns() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to send campaign");
+        const errorMessage =
+          typeof data.error === "string"
+            ? data.error
+            : "Failed to send campaign";
+        const emailSettingsMissing =
+          response.status === 400 &&
+          (data.code === "BAD_REQUEST" ||
+            /email settings not configured/i.test(errorMessage));
+
+        if (emailSettingsMissing) {
+          setEmailSettingsRequiredOpen(true);
+          return;
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -406,6 +424,11 @@ export default function EmailCampaigns() {
     filterStatus === "all"
       ? campaigns
       : campaigns.filter((c) => c.status === filterStatus);
+
+  const handleGoToEmailSettings = () => {
+    setEmailSettingsRequiredOpen(false);
+    router.push("/dashboard/seller/settings/emailsetting");
+  };
 
   // Check if user has access to email campaigns
   if (limits && !isTrial && !limits.emailCampaignsEnabled) {
@@ -917,6 +940,33 @@ export default function EmailCampaigns() {
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />
+
+      <Dialog
+        open={emailSettingsRequiredOpen}
+        onClose={() => setEmailSettingsRequiredOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Email Settings Required</DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Your email settings are not configured yet, so this campaign cannot
+            be sent.
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            Go to your email settings page and configure your SMTP details, then
+            try sending the campaign again.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEmailSettingsRequiredOpen(false)}>
+            Close
+          </Button>
+          <Button variant="contained" onClick={handleGoToEmailSettings}>
+            Go to Email Settings
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
