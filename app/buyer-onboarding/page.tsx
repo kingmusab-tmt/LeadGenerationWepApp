@@ -112,7 +112,7 @@ const BuyerOnboardingPage = () => {
       return;
     }
 
-    if (currentUser.role !== "buyer") {
+    if (currentUser.role !== "buyer" && currentUser.role !== "staff") {
       if (currentUser.role === "admin") {
         router.replace("/admindashboard/overview");
       } else if (

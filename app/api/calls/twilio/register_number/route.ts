@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
         const purchased = await userClient.incomingPhoneNumbers.create({
           phoneNumber: numbers[0].phoneNumber,
           friendlyName: `Seller ${userId} - ${industry}`,
-          voiceUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${userId}`,
+          voiceUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/calls?sellerId=${userId}`,
           voiceMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
         const purchased = await clientToUse.incomingPhoneNumbers.create({
           phoneNumber: numbers[0].phoneNumber,
           friendlyName: `Seller ${userId} - ${industry}`,
-          voiceUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/call_twilio/calls?sellerId=${userId}`,
+          voiceUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/calls?sellerId=${userId}`,
           voiceMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
