@@ -112,7 +112,7 @@ const RoleSelectionPage: React.FC = () => {
       } else if (role === "seller" || role === "business-admin") {
         router.replace("/plan");
       } else if (role === "buyer" || role === "staff") {
-        router.replace("/buyer/onboarding");
+        router.replace("/buyer-onboarding");
       }
     }
   }, [session, status, router, isRedirecting]);
@@ -191,7 +191,7 @@ const RoleSelectionPage: React.FC = () => {
 
     // Redirect other roles to their dashboards
     const dashboardPaths: Record<string, string> = {
-      buyer: "/buyer/onboarding",
+      buyer: "/buyer-onboarding",
       staff: "/dashboard/staff/overview",
     };
 

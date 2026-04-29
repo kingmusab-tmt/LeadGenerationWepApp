@@ -45,7 +45,7 @@ const adminRoutes = ["/admindashboard", /^\/admindashboard\/.*$/];
 const buyerRoutes = [
   "/dashboard/buyer",
   /^\/dashboard\/buyer\/.*$/,
-  "/buyer/onboarding",
+  "/buyer-onboarding",
   /^\/buyer\/onboarding\/.*$/,
 ];
 const sellerRoutes = [
