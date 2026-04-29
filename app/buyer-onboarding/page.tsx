@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+} from "react";
 import {
   Alert,
   Box,
@@ -83,25 +89,20 @@ const BuyerOnboardingPage = () => {
   const { currentUser, loading: userLoading } = useInitializeUser();
 
   const [tabValue, setTabValue] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<BuyerOnboardingStep[]>(
-    [],
-  );
-  const [skippedSteps, setSkippedSteps] = useState<BuyerOnboardingStep[]>([]);
   const [saving, setSaving] = useState(false);
   const [stepSaveHandler, setStepSaveHandler] = useState<
     null | (() => Promise<boolean>)
   >(null);
+  const [, bumpOnboardingStateRevision] = useReducer(
+    (revision: number) => revision + 1,
+    0,
+  );
 
   const activeStep = BUYER_ONBOARDING_STEPS[tabValue];
 
-  useEffect(() => {
-    const email = currentUser?.email;
-    if (!email) return;
+  const onboardingState = getBuyerOnboardingState(currentUser?.email);
 
-    const state = getBuyerOnboardingState(email);
-    setCompletedSteps(state.completedSteps);
-    setSkippedSteps(state.skippedSteps);
-  }, [currentUser?.email]);
+  const { completedSteps, skippedSteps } = onboardingState;
 
   useEffect(() => {
     if (userLoading) return;
@@ -151,8 +152,7 @@ const BuyerOnboardingPage = () => {
     if (!currentUser?.email) return;
 
     markBuyerOnboardingStepCompleted(currentUser.email, step);
-    setCompletedSteps((prev) => (prev.includes(step) ? prev : [...prev, step]));
-    setSkippedSteps((prev) => prev.filter((item) => item !== step));
+    bumpOnboardingStateRevision();
   };
 
   const handleNext = async () => {
@@ -192,9 +192,7 @@ const BuyerOnboardingPage = () => {
     if (!currentUser?.email) return;
 
     markBuyerOnboardingStepSkipped(currentUser.email, activeStep);
-    setSkippedSteps((prev) =>
-      prev.includes(activeStep) ? prev : [...prev, activeStep],
-    );
+    bumpOnboardingStateRevision();
 
     if (tabValue < BUYER_ONBOARDING_STEPS.length - 1) {
       goToStep(tabValue + 1);
@@ -227,8 +225,7 @@ const BuyerOnboardingPage = () => {
   };
 
   const handleStepSaved = (step: BuyerOnboardingStep) => {
-    setCompletedSteps((prev) => (prev.includes(step) ? prev : [...prev, step]));
-    setSkippedSteps((prev) => prev.filter((item) => item !== step));
+    markStepCompleted(step);
   };
 
   if (userLoading || !currentUser) {

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function LegacyBuyerOnboardingRedirectPage() {
-  redirect("/buyer/onboarding");
+  redirect("/buyer-onboarding");
 }

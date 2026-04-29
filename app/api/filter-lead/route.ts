@@ -8,11 +8,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const fieldNames = Object.keys(body || {});
-    // console.log("[filter-lead] Received lead data for AI scoring", {
-    //   fieldCount: fieldNames.length,
-    //   fieldNames,
-    // });
+    // const fieldNames = Object.keys(body || {});
+    // // console.log("[filter-lead] Received lead data for AI scoring", {
+    // //   fieldCount: fieldNames.length,
+    // //   fieldNames,
+    // // });
 
     // 1. Select the Flash model (Fastest for real-time)
     // We enforce JSON output for easy parsing
