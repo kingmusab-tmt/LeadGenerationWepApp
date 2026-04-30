@@ -85,18 +85,97 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
   debugLog("Incoming call request received");
 
+  // Gracefully handle client aborts (Twilio may reset the connection on long cold starts)
+  let abortedByClient = false;
+  try {
+    const signal = "signal" in req ? req.signal : undefined;
+    if (signal) {
+      signal.addEventListener("abort", () => {
+        abortedByClient = true;
+        debugLog("Request aborted by client", null, "warn");
+      });
+    }
+  } catch {
+    // ignore if signal isn't available
+  }
+
+  const checkAbort = () => {
+    if (abortedByClient || ("signal" in req && req.signal?.aborted)) {
+      debugLog("Stopping processing because request was aborted", null, "warn");
+      return true;
+    }
+    return false;
+  };
+
+  let processingStage = "start";
+
   try {
     // Security checks: rate limiting + webhook signature validation
-    const securityResponse = await callSecurityMiddleware(req, {
-      rateLimit: true,
-      validateWebhook: true,
-    });
+    processingStage = "security";
+    if (checkAbort()) {
+      debugLog(
+        "Request aborted before security checks",
+        { stage: processingStage },
+        "warn",
+      );
+      return new NextResponse(null, { status: 200 });
+    }
+
+    let securityResponse;
+    try {
+      securityResponse = await callSecurityMiddleware(req, {
+        rateLimit: true,
+        validateWebhook: true,
+      });
+    } catch (err: unknown) {
+      const errorLike = err as { message?: string; code?: string };
+      // If the request was aborted while running validation, stop gracefully.
+      const isAbortError =
+        (typeof errorLike.message === "string" &&
+          errorLike.message.includes("aborted")) ||
+        errorLike.code === "ECONNRESET" ||
+        ("signal" in req && req.signal?.aborted);
+
+      if (isAbortError) {
+        debugLog(
+          "Webhook validation error: request aborted during security checks",
+          err,
+          "warn",
+        );
+        return new NextResponse(null, { status: 200 });
+      }
+
+      // Otherwise rethrow to be handled by outer catch
+      throw err;
+    }
+
     if (securityResponse) return securityResponse;
+
+    processingStage = "dbConnect";
+
+    if (checkAbort()) {
+      debugLog(
+        "Request aborted before DB connect",
+        { stage: processingStage },
+        "warn",
+      );
+      return new NextResponse(null, { status: 200 });
+    }
 
     await dbConnect();
     debugLog("Database connection established");
 
     // Parse form data
+    processingStage = "parseFormData";
+    if (checkAbort()) {
+      debugLog(
+        "Request aborted before parsing form data",
+        { stage: processingStage },
+        "warn",
+      );
+      return new NextResponse(null, { status: 200 });
+    }
+
     const formData = await req.formData();
     const formDataObj = Object.fromEntries(formData.entries());
     debugLog("Form data parsed", formDataObj);
@@ -108,6 +187,7 @@ export async function POST(req: NextRequest) {
     const to = formData.get("To") as string;
 
     // Extract query parameters
+    processingStage = "extractParams";
     const { searchParams } = new URL(req.url);
     const sellerId = searchParams.get("sellerId");
     const buyerId = searchParams.get("buyerId");
@@ -122,6 +202,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Validate required parameters
+    processingStage = "validateParams";
     if (!callSid || !sellerId) {
       const errorMessage = "Missing required parameters (callSid or sellerId)";
       debugLog(errorMessage, null, "error");
@@ -131,7 +212,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Find the seller
-    const seller = await User.findOne({ sellerId });
+    // Most app paths use the authenticated user's Mongo _id as sellerId.
+    // Keep a legacy fallback for any older records that may still store a sellerId field.
+    processingStage = "findSeller";
+    const seller =
+      (await User.findById(sellerId)) ?? (await User.findOne({ sellerId }));
     if (!seller) {
       const errorMessage = `Seller not found for sellerId: ${sellerId}`;
       debugLog(errorMessage, null, "error");
@@ -144,6 +229,7 @@ export async function POST(req: NextRequest) {
     const callRate = seller.callChargeOptions[0] || { units: 1, seconds: 60 }; // Default rate if not set
 
     // Handle different call scenarios
+    processingStage = "decideCallScenario";
     if (callStatus === "no-answer") {
       return handleNoAnswer(
         formData,
@@ -179,6 +265,12 @@ export async function POST(req: NextRequest) {
         error: errorMessage,
         stack: errorStack,
         duration: `${duration}ms`,
+        stage: processingStage,
+        name: error instanceof Error ? (error as Error).name : undefined,
+        code:
+          error instanceof Error
+            ? (error as Error & { code?: string }).code
+            : undefined,
       },
       "error",
     );
@@ -209,24 +301,47 @@ async function handleNewCall(
     seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
   ).trackingNumbers ?? []) as TrackingNumberConfig[];
 
-  // Find the tracking number configuration
-  const trackingNumber = trackingNumbers.find((num) => num.phoneNumber === to);
+  // Resolve a routing config. Direct / single_multiple can work without a lead-buyer industry mapping,
+  // so prefer an exact phone-number match, then fall back to a manual forwarding config.
+  const exactTrackingNumber = trackingNumbers.find(
+    (num) => num.phoneNumber === to,
+  );
+  const manualForwardingFallback = trackingNumbers.find(
+    (num) =>
+      num.forwardingType === "direct" ||
+      num.forwardingType === "single_multiple",
+  );
+  const trackingNumber = exactTrackingNumber ?? manualForwardingFallback;
 
   if (!trackingNumber) {
-    const errorMessage = `Industry mapping not found for to: ${to}`;
+    const errorMessage = `Routing configuration not found for to: ${to}`;
     debugLog(
       errorMessage,
       {
         to,
         availableNumbers: trackingNumbers.map((n) => n.phoneNumber),
+        trackingNumberCount: trackingNumbers.length,
       },
-      "error",
+      "warn",
     );
-    return new NextResponse(
-      JSON.stringify({ error: "Industry mapping not found" }),
-      { status: 404 },
+
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say(
+      "We are unable to route this call because no forwarding configuration has been set up yet.",
     );
+    twiml.hangup();
+    return new NextResponse(twiml.toString(), {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    });
   }
+
+  debugLog("Using routing configuration", {
+    to,
+    matchedBy: exactTrackingNumber ? "phoneNumber" : "manualForwardingFallback",
+    forwardingType: trackingNumber.forwardingType,
+    industry: trackingNumber.industry,
+  });
 
   const {
     industry,
@@ -716,255 +831,280 @@ async function handleNoAnswer(
   buyerId?: string,
   callRate?: { units: number; seconds: number },
 ) {
-  debugLog("Handling no-answer scenario", { callSid, buyerId });
+  try {
+    debugLog("Handling no-answer scenario", { callSid, buyerId });
 
-  // Mark buyer call inactive for concurrent tracking
-  if (buyerId) {
-    markCallInactive(buyerId, callSid);
-  }
-
-  // Find the original call record
-  const originalCall = await Call.findOne({ callSid });
-  if (!originalCall) {
-    const errorMessage = `Call record not found for CallSid: ${callSid}`;
-    debugLog(errorMessage, null, "error");
-    return new NextResponse(
-      JSON.stringify({ error: "Call record not found" }),
-      {
-        status: 404,
-      },
-    );
-  }
-
-  // Update original call status
-  originalCall.status = "no-answer";
-  await originalCall.save();
-
-  const {
-    forwardingType,
-    forwardingNumbers,
-    leadBuyers,
-    industry,
-    callRecorded,
-    passCallerId,
-  } = originalCall;
-
-  const twiml = new twilio.twiml.VoiceResponse();
-
-  // Look up tracking number config for overflow + feature flags
-  const trackingNumbers = ((
-    seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
-  ).trackingNumbers ?? []) as TrackingNumberConfig[];
-  const trackingConfig = trackingNumbers.find(
-    (num: { phoneNumber: string }) => num.phoneNumber === to,
-  );
-  const overflowNumber = trackingConfig?.overflowNumber || "";
-  const reconnectEnabled = trackingConfig?.reconnectCaller || false;
-  const missedCallTextBack = trackingConfig?.missedCallTextBack || false;
-  const missedCallTextMessage = trackingConfig?.missedCallTextMessage || "";
-  const scheduledCallbackEnabled =
-    trackingConfig?.scheduledCallbackEnabled || false;
-  const scheduledCallbackDigit = trackingConfig?.scheduledCallbackDigit || "1";
-  const geoRoutingEnabled = trackingConfig?.geoRoutingEnabled || false;
-  const concurrentCallLimit = trackingConfig?.concurrentCallLimit || 0;
-
-  // Extract geo data for geo-routing in retry
-  const geoData = geoRoutingEnabled ? extractGeoData(from) : null;
-
-  // Helper: no-answer fallback (overflow → callback IVR → voicemail + text-back)
-  const handleNoAnswerFallback = () => {
-    if (overflowNumber) {
-      addOverflowToTwiml(twiml, {
-        overflowNumber,
-        sellerId: seller._id as string,
-        callSid,
-        from,
-        passCallerId,
-        recordCall: callRecorded,
-      });
-      debugLog("No-answer fallback: overflow", { overflowNumber });
-    } else if (scheduledCallbackEnabled) {
-      const baseUrl = env.NEXTAUTH_URL || "";
-      twiml.say("All of our representatives are currently unavailable.");
-      const gather = twiml.gather({
-        numDigits: 1,
-        timeout: 5,
-        action: `${baseUrl}/api/calls/twilio/callback-request?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&sellerId=${seller._id}&industry=${industry || ""}`,
-        method: "POST",
-      });
-      gather.say(`Press ${scheduledCallbackDigit} to request a callback.`);
-      addVoicemailToTwiml(twiml, {
-        sellerId: seller._id as string,
-        callSid,
-      });
-      debugLog("No-answer fallback: callback IVR offered");
-    } else {
-      addVoicemailToTwiml(twiml, {
-        sellerId: seller._id as string,
-        callSid,
-      });
-      debugLog("No-answer fallback: voicemail");
-    }
-    // Send missed call text-back (non-blocking)
-    if (missedCallTextBack && missedCallTextMessage) {
-      sendMissedCallTextBack(from, missedCallTextMessage, callSid);
-    }
-  };
-
-  // Handle different forwarding types for retry
-  // Only attempt reconnection if Auto-Reconnect is enabled
-  if (!reconnectEnabled) {
-    debugLog("Auto-Reconnect disabled — going straight to fallback", {
-      callSid,
-    });
-    handleNoAnswerFallback();
-  } else if (forwardingType === "direct") {
-    try {
-      // Use atomic round-robin for retry as well (Issue #1 fix)
-      const { buyer } = await getNextRoundRobinBuyerAtomic(
-        seller,
-        industry,
-        callRate || { units: 1, seconds: 60 },
-      );
-      const newCallSid = `${callSid}-retry-${Date.now()}`;
-
-      const dialParams = getDialParams({
-        from,
-        sellerId: seller._id as string,
-        callSid: newCallSid,
-        buyerId: buyer._id.toString(),
-        passCallerId,
-        recordCall: callRecorded,
-      });
-      twiml.dial(dialParams, buyer.phone);
-
-      // Create new call record for retry
-      await createCallRecord({
-        callSid: newCallSid,
-        userId: String(seller._id),
-        buyerId: buyer._id.toString(),
-        from,
-        to: buyer.phone,
-        status: "forwarded",
-        callRecorded,
-        forwardingType,
-        forwardingNumbers,
-        leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
-        industry,
-      });
-    } catch {
-      handleNoAnswerFallback();
-    }
-  } else if (
-    forwardingType === "single_multiple" &&
-    forwardingNumbers?.length
-  ) {
-    forwardingNumbers.forEach((num: string, index: number) => {
-      const dialParams = getDialParams({
-        from,
-        sellerId: seller._id as string,
-        callSid: `${callSid}-retry-${index}`,
-        passCallerId,
-        recordCall: callRecorded,
-      });
-      twiml.dial(dialParams, num);
-      if (index < forwardingNumbers.length - 1) {
-        twiml.pause({ length: 1 });
-      }
-    });
-  } else if (forwardingType === "specific_lead" && leadBuyers?.length) {
-    // Look up full buyer documents for availability checks
-    const retryBuyerIds = leadBuyers.map((b: { id: string }) => b.id);
-    const retryBuyerDocs = await Buyer.find({ _id: { $in: retryBuyerIds } });
-    const retryBuyerDocMap = new Map(
-      retryBuyerDocs.map((b) => [b._id.toString(), b]),
-    );
-
-    // Filter lead buyers by availability, business hours, geo, concurrent, and balance
-    const eligibleBuyers = [];
-    for (const buyer of leadBuyers) {
-      const buyerDoc = retryBuyerDocMap.get(buyer.id.toString());
-
-      if (buyerDoc && isBuyerOnVacation(buyerDoc)) {
-        debugLog("Skipping retry buyer on vacation", { buyerId: buyer.id });
-        continue;
-      }
-      if (buyerDoc && !isBuyerInBusinessHours(buyerDoc)) {
-        debugLog("Skipping retry buyer outside business hours", {
-          buyerId: buyer.id,
-        });
-        continue;
-      }
-      // Geo-routing check
-      if (
-        geoRoutingEnabled &&
-        geoData &&
-        buyerDoc &&
-        !doesBuyerServiceArea(buyerDoc, geoData)
-      ) {
-        debugLog("Skipping retry buyer (geo mismatch)", { buyerId: buyer.id });
-        continue;
-      }
-      // Concurrent call limit check
-      if (
-        concurrentCallLimit > 0 &&
-        (await isBuyerAtConcurrentLimit(
-          buyer.id.toString(),
-          concurrentCallLimit,
-        ))
-      ) {
-        debugLog("Skipping retry buyer (concurrent limit)", {
-          buyerId: buyer.id,
-        });
-        continue;
-      }
-
-      try {
-        const { hasSufficientBalance } = await checkBuyerUnitBalance(
-          buyer.id.toString(),
-          callRate?.units || 1,
-        );
-        if (hasSufficientBalance) {
-          eligibleBuyers.push(buyer);
-        }
-      } catch (error) {
-        debugLog(
-          "Error checking buyer balance",
-          { buyerId: buyer.id, error },
-          "warn",
-        );
-      }
+    // Mark buyer call inactive for concurrent tracking
+    if (buyerId) {
+      markCallInactive(buyerId, callSid);
     }
 
-    if (eligibleBuyers.length === 0) {
-      handleNoAnswerFallback();
-    } else {
-      eligibleBuyers.forEach(
-        (buyer: { id: string; phone: string | undefined }, index: number) => {
-          const dialParams = getDialParams({
-            from,
-            sellerId: seller._id as string,
-            callSid: `${callSid}-retry-${index}`,
-            buyerId: buyer.id.toString(),
-            passCallerId,
-            recordCall: callRecorded,
-          });
-          twiml.dial(dialParams, buyer.phone);
-          if (index < eligibleBuyers.length - 1) {
-            twiml.pause({ length: 1 });
-          }
+    // Find the original call record
+    const originalCall = await Call.findOne({ callSid });
+    if (!originalCall) {
+      const errorMessage = `Call record not found for CallSid: ${callSid}`;
+      debugLog(errorMessage, null, "error");
+      return new NextResponse(
+        JSON.stringify({ error: "Call record not found" }),
+        {
+          status: 404,
         },
       );
     }
-  } else {
-    twiml.say("No forwarding rules configured. Ending call.");
-    debugLog("No forwarding rules configured. Call ended.", null, "warn");
-  }
 
-  return new NextResponse(twiml.toString(), {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
-  });
+    // Update original call status
+    originalCall.status = "no-answer";
+    await originalCall.save();
+
+    const {
+      forwardingType,
+      forwardingNumbers,
+      leadBuyers,
+      industry,
+      callRecorded,
+      passCallerId,
+    } = originalCall;
+
+    const twiml = new twilio.twiml.VoiceResponse();
+
+    // Look up tracking number config for overflow + feature flags
+    const trackingNumbers = ((
+      seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
+    ).trackingNumbers ?? []) as TrackingNumberConfig[];
+    const trackingConfig = trackingNumbers.find(
+      (num: { phoneNumber: string }) => num.phoneNumber === to,
+    );
+    const overflowNumber = trackingConfig?.overflowNumber || "";
+    const reconnectEnabled = trackingConfig?.reconnectCaller || false;
+    const missedCallTextBack = trackingConfig?.missedCallTextBack || false;
+    const missedCallTextMessage = trackingConfig?.missedCallTextMessage || "";
+    const scheduledCallbackEnabled =
+      trackingConfig?.scheduledCallbackEnabled || false;
+    const scheduledCallbackDigit =
+      trackingConfig?.scheduledCallbackDigit || "1";
+    const geoRoutingEnabled = trackingConfig?.geoRoutingEnabled || false;
+    const concurrentCallLimit = trackingConfig?.concurrentCallLimit || 0;
+
+    // Extract geo data for geo-routing in retry
+    const geoData = geoRoutingEnabled ? extractGeoData(from) : null;
+
+    // Helper: no-answer fallback (overflow → callback IVR → voicemail + text-back)
+    const handleNoAnswerFallback = () => {
+      if (overflowNumber) {
+        addOverflowToTwiml(twiml, {
+          overflowNumber,
+          sellerId: seller._id as string,
+          callSid,
+          from,
+          passCallerId,
+          recordCall: callRecorded,
+        });
+        debugLog("No-answer fallback: overflow", { overflowNumber });
+      } else if (scheduledCallbackEnabled) {
+        const baseUrl = env.NEXTAUTH_URL || "";
+        twiml.say("All of our representatives are currently unavailable.");
+        const gather = twiml.gather({
+          numDigits: 1,
+          timeout: 5,
+          action: `${baseUrl}/api/calls/twilio/callback-request?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&sellerId=${seller._id}&industry=${industry || ""}`,
+          method: "POST",
+        });
+        gather.say(`Press ${scheduledCallbackDigit} to request a callback.`);
+        addVoicemailToTwiml(twiml, {
+          sellerId: seller._id as string,
+          callSid,
+        });
+        debugLog("No-answer fallback: callback IVR offered");
+      } else {
+        addVoicemailToTwiml(twiml, {
+          sellerId: seller._id as string,
+          callSid,
+        });
+        debugLog("No-answer fallback: voicemail");
+      }
+      // Send missed call text-back (non-blocking)
+      if (missedCallTextBack && missedCallTextMessage) {
+        sendMissedCallTextBack(from, missedCallTextMessage, callSid);
+      }
+    };
+
+    // Handle different forwarding types for retry
+    // Only attempt reconnection if Auto-Reconnect is enabled
+    if (!reconnectEnabled) {
+      debugLog("Auto-Reconnect disabled — going straight to fallback", {
+        callSid,
+      });
+      handleNoAnswerFallback();
+    } else if (forwardingType === "direct") {
+      try {
+        // Use atomic round-robin for retry as well (Issue #1 fix)
+        const { buyer } = await getNextRoundRobinBuyerAtomic(
+          seller,
+          industry,
+          callRate || { units: 1, seconds: 60 },
+        );
+        const newCallSid = `${callSid}-retry-${Date.now()}`;
+
+        const dialParams = getDialParams({
+          from,
+          sellerId: seller._id as string,
+          callSid: newCallSid,
+          buyerId: buyer._id.toString(),
+          passCallerId,
+          recordCall: callRecorded,
+        });
+        twiml.dial(dialParams, buyer.phone);
+
+        // Create new call record for retry
+        await createCallRecord({
+          callSid: newCallSid,
+          userId: String(seller._id),
+          buyerId: buyer._id.toString(),
+          from,
+          to: buyer.phone,
+          status: "forwarded",
+          callRecorded,
+          forwardingType,
+          forwardingNumbers,
+          leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
+          industry,
+        });
+      } catch (e) {
+        debugLog(
+          "Error during direct retry in handleNoAnswer",
+          {
+            callSid,
+            error: e instanceof Error ? e.message : e,
+            stack: e instanceof Error ? e.stack : undefined,
+          },
+          "warn",
+        );
+        handleNoAnswerFallback();
+      }
+    } else if (
+      forwardingType === "single_multiple" &&
+      forwardingNumbers?.length
+    ) {
+      forwardingNumbers.forEach((num: string, index: number) => {
+        const dialParams = getDialParams({
+          from,
+          sellerId: seller._id as string,
+          callSid: `${callSid}-retry-${index}`,
+          passCallerId,
+          recordCall: callRecorded,
+        });
+        twiml.dial(dialParams, num);
+        if (index < forwardingNumbers.length - 1) {
+          twiml.pause({ length: 1 });
+        }
+      });
+    } else if (forwardingType === "specific_lead" && leadBuyers?.length) {
+      // Look up full buyer documents for availability checks
+      const retryBuyerIds = leadBuyers.map((b: { id: string }) => b.id);
+      const retryBuyerDocs = await Buyer.find({ _id: { $in: retryBuyerIds } });
+      const retryBuyerDocMap = new Map(
+        retryBuyerDocs.map((b) => [b._id.toString(), b]),
+      );
+
+      // Filter lead buyers by availability, business hours, geo, concurrent, and balance
+      const eligibleBuyers = [];
+      for (const buyer of leadBuyers) {
+        const buyerDoc = retryBuyerDocMap.get(buyer.id.toString());
+
+        if (buyerDoc && isBuyerOnVacation(buyerDoc)) {
+          debugLog("Skipping retry buyer on vacation", { buyerId: buyer.id });
+          continue;
+        }
+        if (buyerDoc && !isBuyerInBusinessHours(buyerDoc)) {
+          debugLog("Skipping retry buyer outside business hours", {
+            buyerId: buyer.id,
+          });
+          continue;
+        }
+        // Geo-routing check
+        if (
+          geoRoutingEnabled &&
+          geoData &&
+          buyerDoc &&
+          !doesBuyerServiceArea(buyerDoc, geoData)
+        ) {
+          debugLog("Skipping retry buyer (geo mismatch)", {
+            buyerId: buyer.id,
+          });
+          continue;
+        }
+        // Concurrent call limit check
+        if (
+          concurrentCallLimit > 0 &&
+          (await isBuyerAtConcurrentLimit(
+            buyer.id.toString(),
+            concurrentCallLimit,
+          ))
+        ) {
+          debugLog("Skipping retry buyer (concurrent limit)", {
+            buyerId: buyer.id,
+          });
+          continue;
+        }
+
+        try {
+          const { hasSufficientBalance } = await checkBuyerUnitBalance(
+            buyer.id.toString(),
+            callRate?.units || 1,
+          );
+          if (hasSufficientBalance) {
+            eligibleBuyers.push(buyer);
+          }
+        } catch (error) {
+          debugLog(
+            "Error checking buyer balance",
+            { buyerId: buyer.id, error },
+            "warn",
+          );
+        }
+      }
+
+      if (eligibleBuyers.length === 0) {
+        handleNoAnswerFallback();
+      } else {
+        eligibleBuyers.forEach(
+          (buyer: { id: string; phone: string | undefined }, index: number) => {
+            const dialParams = getDialParams({
+              from,
+              sellerId: seller._id as string,
+              callSid: `${callSid}-retry-${index}`,
+              buyerId: buyer.id.toString(),
+              passCallerId,
+              recordCall: callRecorded,
+            });
+            twiml.dial(dialParams, buyer.phone);
+            if (index < eligibleBuyers.length - 1) {
+              twiml.pause({ length: 1 });
+            }
+          },
+        );
+      }
+    } else {
+      twiml.say("No forwarding rules configured. Ending call.");
+      debugLog("No forwarding rules configured. Call ended.", null, "warn");
+    }
+
+    return new NextResponse(twiml.toString(), {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    });
+  } catch (err) {
+    debugLog(
+      "Unhandled error in handleNoAnswer",
+      {
+        callSid,
+        error: err instanceof Error ? err.message : err,
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+      "error",
+    );
+    throw err;
+  }
 }
 
 async function handleCallAnswered(
@@ -972,70 +1112,83 @@ async function handleCallAnswered(
   callSid: string,
   callRate: { units: number; seconds: number },
 ) {
-  debugLog("Handling answered call", { callSid });
+  try {
+    debugLog("Handling answered call", { callSid });
 
-  const recordingUrl = formData.get("RecordingUrl") as string;
-  const callDuration = formData.get("CallDuration") as string;
-  const answeredBy = (formData.get("AnsweredBy") as string) || "Unknown";
+    const recordingUrl = formData.get("RecordingUrl") as string;
+    const callDuration = formData.get("CallDuration") as string;
+    const answeredBy = (formData.get("AnsweredBy") as string) || "Unknown";
 
-  const updatedCall = await updateAnsweredCall(
-    callSid,
-    {
-      status: "completed",
-      recordingUrl,
-      callDuration: callDuration ? parseInt(callDuration, 10) : undefined,
-      answeredBy,
-    },
-    callRate,
-  );
-
-  // Fire call completed webhook (non-blocking)
-  if (updatedCall) {
-    // Mark call inactive for concurrent tracking
-    if (updatedCall.buyerId) {
-      markCallInactive(updatedCall.buyerId, callSid);
-    }
-
-    dispatchCallWebhook(updatedCall.userId, "callCompleted", {
+    const updatedCall = await updateAnsweredCall(
       callSid,
-      from: updatedCall.from,
-      to: updatedCall.to,
-      status: "completed",
-      industry: updatedCall.industry,
-      buyerId: updatedCall.buyerId,
-      callDuration: updatedCall.callDuration,
-      unitsCharged: updatedCall.unitsCharged,
-      recordingUrl: updatedCall.recordingUrl,
-      paymentStatus: updatedCall.paymentStatus,
-    });
+      {
+        status: "completed",
+        recordingUrl,
+        callDuration: callDuration ? parseInt(callDuration, 10) : undefined,
+        answeredBy,
+      },
+      callRate,
+    );
 
-    // Trigger AI analysis if configured (non-blocking, fire-and-forget)
-    const seller = await User.findById(updatedCall.userId);
-    if (seller) {
-      const trackingNumbers = ((
-        seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
-      ).trackingNumbers ?? []) as TrackingNumberConfig[];
-      const tn = trackingNumbers.find(
-        (n: { industry?: string }) => n.industry === updatedCall.industry,
-      );
-      if (tn?.transcriptionEnabled || tn?.aiSummaryEnabled) {
-        processCallAIAnalysis(callSid, {
-          transcriptionEnabled: !!tn.transcriptionEnabled,
-          aiSummaryEnabled: !!tn.aiSummaryEnabled,
-          industry: updatedCall.industry,
-        }).catch(() => {});
+    // Fire call completed webhook (non-blocking)
+    if (updatedCall) {
+      // Mark call inactive for concurrent tracking
+      if (updatedCall.buyerId) {
+        markCallInactive(updatedCall.buyerId, callSid);
+      }
+
+      dispatchCallWebhook(updatedCall.userId, "callCompleted", {
+        callSid,
+        from: updatedCall.from,
+        to: updatedCall.to,
+        status: "completed",
+        industry: updatedCall.industry,
+        buyerId: updatedCall.buyerId,
+        callDuration: updatedCall.callDuration,
+        unitsCharged: updatedCall.unitsCharged,
+        recordingUrl: updatedCall.recordingUrl,
+        paymentStatus: updatedCall.paymentStatus,
+      });
+
+      // Trigger AI analysis if configured (non-blocking, fire-and-forget)
+      const seller = await User.findById(updatedCall.userId);
+      if (seller) {
+        const trackingNumbers = ((
+          seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
+        ).trackingNumbers ?? []) as TrackingNumberConfig[];
+        const tn = trackingNumbers.find(
+          (n: { industry?: string }) => n.industry === updatedCall.industry,
+        );
+        if (tn?.transcriptionEnabled || tn?.aiSummaryEnabled) {
+          processCallAIAnalysis(callSid, {
+            transcriptionEnabled: !!tn.transcriptionEnabled,
+            aiSummaryEnabled: !!tn.aiSummaryEnabled,
+            industry: updatedCall.industry,
+          }).catch(() => {});
+        }
       }
     }
-  }
 
-  return new NextResponse(
-    JSON.stringify({
-      success: true,
-      updatedCall,
-      unitsCharged: updatedCall?.unitsCharged || 0,
-    }),
-    {
-      status: 200,
-    },
-  );
+    return new NextResponse(
+      JSON.stringify({
+        success: true,
+        updatedCall,
+        unitsCharged: updatedCall?.unitsCharged || 0,
+      }),
+      {
+        status: 200,
+      },
+    );
+  } catch (err) {
+    debugLog(
+      "Unhandled error in handleCallAnswered",
+      {
+        callSid,
+        error: err instanceof Error ? err.message : err,
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+      "error",
+    );
+    throw err;
+  }
 }

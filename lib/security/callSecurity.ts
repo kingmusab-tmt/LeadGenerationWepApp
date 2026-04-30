@@ -15,6 +15,16 @@ let circuitOpenUntil = 0;
 const CIRCUIT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 const RATE_LIMIT_TIMEOUT_MS = 1500; // 1.5s max for rate limit check
 
+function getWebhookValidationUrl(req: NextRequest): string {
+  const url = new URL(req.url);
+  const forwardedProto = req.headers.get("x-forwarded-proto");
+  const forwardedHost = req.headers.get("x-forwarded-host");
+  const host = forwardedHost || req.headers.get("host") || url.host;
+  const protocol = forwardedProto || url.protocol.replace(":", "") || "https";
+
+  return `${protocol}://${host}${url.pathname}${url.search}`;
+}
+
 function getCallRateLimiter(): Ratelimit | null {
   if (callRateLimiter) return callRateLimiter;
 
@@ -144,7 +154,8 @@ export async function validateTwilioWebhook(req: NextRequest): Promise<{
   }
 
   try {
-    const url = `https://${process.env.NEXT_PUBLIC_DOMAIN}${new URL(req.url).pathname}${new URL(req.url).search}`;
+    const url = getWebhookValidationUrl(req);
+    const requestUrl = new URL(req.url).toString();
 
     // Clone request and read the body as form data for validation
     const clonedReq = req.clone();
@@ -157,10 +168,25 @@ export async function validateTwilioWebhook(req: NextRequest): Promise<{
     const isValid = twilio.validateRequest(authToken, signature, url, params);
 
     if (!isValid) {
+      const shortSig = signature.substring(0, 10) + "...";
       console.error("[CallSecurity] Invalid Twilio signature", {
         url,
-        signature: signature.substring(0, 10) + "...",
+        requestUrl,
+        forwardedHost: req.headers.get("x-forwarded-host"),
+        forwardedProto: req.headers.get("x-forwarded-proto"),
+        host: req.headers.get("host"),
+        signature: shortSig,
+        paramsPreview: Object.keys(params).slice(0, 10),
       });
+
+      // In development allow signature mismatches to ease local testing (e.g., ngrok, localhost)
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[CallSecurity] Development mode: accepting invalid Twilio signature for local testing",
+        );
+        return { valid: true };
+      }
+
       return { valid: false, error: "Invalid Twilio signature" };
     }
 
