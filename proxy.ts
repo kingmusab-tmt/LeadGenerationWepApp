@@ -53,6 +53,8 @@ const sellerRoutes = [
   /^\/dashboard\/seller\/.*$/,
   "/seller-onboarding",
   /^\/seller-onboarding\/.*$/,
+  "/checkout",
+  /^\/checkout\/.*$/,
 ];
 
 const roleBasedRoutes = {
@@ -145,7 +147,7 @@ export async function proxy(request: NextRequest) {
         : token.role === "buyer" || token.role === "staff"
           ? "/dashboard/buyer/overview"
           : token.role === "seller" || token.role === "business-admin"
-            ? "/dashboard/seller/overview"
+            ? "/plan"
             : "/completeregistration";
 
     return NextResponse.redirect(new URL(fallbackPath, request.url));

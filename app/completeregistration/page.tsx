@@ -79,7 +79,13 @@ const RoleSelectionPage: React.FC = () => {
   // Check for trial intent on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const trialIntentStored = sessionStorage.getItem("trialIntent");
+      let trialIntentStored = sessionStorage.getItem("trialIntent");
+      if (!trialIntentStored && typeof window !== "undefined") {
+        const match = document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("trialIntent="));
+        trialIntentStored = match ? match.split("=")[1] : null;
+      }
       if (trialIntentStored === "true") {
         setTrialIntent(true);
       }
@@ -122,7 +128,7 @@ const RoleSelectionPage: React.FC = () => {
 
     // Handle sellers and business-admins
     if (role === "seller" || role === "business-admin") {
-      // If trial intent is set, start the trial automatically
+      // Only start trial if trialIntent flag is set in sessionStorage
       if (trialIntent) {
         try {
           setSnackbar({
@@ -131,16 +137,25 @@ const RoleSelectionPage: React.FC = () => {
             severity: "info",
           });
 
-          const trialResponse = await fetch("/api/subscriptions/trial/start", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
+          const trialResponse = await fetchWithCSRF(
+            "/api/subscriptions/trial/start",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
             },
-          });
+          );
 
           if (trialResponse.ok) {
-            // Clear trial intent from sessionStorage
+            // Clear trial intent from sessionStorage and cookie fallback
             sessionStorage.removeItem("trialIntent");
+            try {
+              // best-effort delete via document.cookie
+              document.cookie = "trialIntent=; Max-Age=0; path=/";
+            } catch {
+              // ignore
+            }
 
             // Update session to reflect new subscription status
             await updateSession();
@@ -165,6 +180,7 @@ const RoleSelectionPage: React.FC = () => {
               "Your free trial could not be started. Please review the available plans.";
 
             // Expected rejections such as an already-used trial should not be treated as errors.
+            // Remove sessionStorage flag but keep cookie to allow retries where appropriate
             sessionStorage.removeItem("trialIntent");
 
             setSnackbar({

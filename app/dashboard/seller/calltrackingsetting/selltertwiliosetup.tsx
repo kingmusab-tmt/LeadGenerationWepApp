@@ -157,6 +157,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
   const [activeTab, setActiveTab] = useState(0);
   const [numbers, setNumbers] = useState<TrackingNumber[]>([]);
   const [twilioActivated, setTwilioActivated] = useState(false);
+  const [twilioToggleLoading, setTwilioToggleLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [city, setCity] = useState("");
   const [industry, setIndustry] = useState("");
@@ -171,6 +172,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     severity: "success" | "error" | "info" | "warning";
   }>({ open: false, message: "", severity: "info" });
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [requestNumberLoading, setRequestNumberLoading] = useState(false);
   const [subscriptionLimits, setSubscriptionLimits] = useState({
     currentCount: 0,
     maxAllowed: 0,
@@ -233,7 +235,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
         `/api/calls/twilio/twiliostatus?sellerId=${sellerId}`,
       );
       const twilioStatusData = await twilioStatusResponse.json();
-      setTwilioActivated(twilioStatusData.twilioActivated);
+      setTwilioActivated(twilioStatusData.twilioActivated ?? false);
 
       if (twilioStatusData.subscriptionLimits) {
         setSubscriptionLimits({
@@ -271,6 +273,10 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     const newStatus = event.target.checked;
     const action = newStatus ? "activate" : "deactivate";
 
+    // Optimistic UI: move switch immediately for responsive feedback.
+    setTwilioActivated(newStatus);
+    setTwilioToggleLoading(true);
+
     try {
       const response = await fetch("/api/calls/twilio/activateTwilio", {
         method: "POST",
@@ -283,7 +289,9 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       }
 
       const data = await response.json();
-      setTwilioActivated(data.twilioActivated);
+      const confirmedStatus =
+        data?.data?.twilioActivated ?? data?.twilioActivated ?? newStatus;
+      setTwilioActivated(Boolean(confirmedStatus));
       setSnackbar({
         open: true,
         message: `Twilio ${action}d successfully.`,
@@ -298,6 +306,10 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
         severity: "error",
       });
       setTwilioActivated(!newStatus);
+    } finally {
+      // Keep component state in sync with backend after every toggle attempt.
+      await Promise.all([fetchTwilioStatus(), fetchUpdatedNumbers()]);
+      setTwilioToggleLoading(false);
     }
   };
 
@@ -312,6 +324,8 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       });
       return;
     }
+
+    setRequestNumberLoading(true);
 
     const payload = {
       sellerId,
@@ -380,6 +394,8 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
           error instanceof Error ? error.message : "Failed to request number.",
         severity: "error",
       });
+    } finally {
+      setRequestNumberLoading(false);
     }
   };
 
@@ -830,6 +846,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                       checked={twilioActivated}
                       onChange={handleTwilioToggle}
                       color="success"
+                      disabled={twilioToggleLoading}
                     />
                     <Box>
                       <Typography variant="body1" fontWeight={600}>
@@ -1097,8 +1114,8 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                   color="text.secondary"
                   sx={{ mb: 2 }}
                 >
-                  Automatically provision a new Twilio number by selecting a
-                  city and industry.
+                  Automatically provision additional Twilio numbers for the same
+                  city and industry combination.
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
 
@@ -1149,11 +1166,19 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                   variant="contained"
                   onClick={requestNumber}
                   disabled={
-                    !twilioActivated || !city || (!industry && !customIndustry)
+                    requestNumberLoading ||
+                    !twilioActivated ||
+                    !city ||
+                    (!industry && !customIndustry)
+                  }
+                  startIcon={
+                    requestNumberLoading ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : undefined
                   }
                   sx={{ mt: 2 }}
                 >
-                  Request Number
+                  {requestNumberLoading ? "Requesting..." : "Request Number"}
                 </Button>
               </CardContent>
             </Card>
@@ -1169,8 +1194,8 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                   color="text.secondary"
                   sx={{ mb: 2 }}
                 >
-                  Manage your provisioned numbers. Use the actions menu to edit
-                  forwarding or remove a number.
+                  Automatically provision additional Twilio numbers for the same
+                  city and industry combination.
                 </Typography>
                 <Box sx={{ overflowX: "auto" }}>
                   <TrackingNumbersTable

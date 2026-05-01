@@ -627,46 +627,123 @@ async function handleNewCall(
     }
   }
 
+  const dialNumbersSimultaneously = (
+    phoneTargets: string[],
+    options: { buyerIds?: string[]; buyerIdForAction?: string },
+  ) => {
+    const dialParams = getDialParams({
+      from,
+      sellerId,
+      callSid,
+      buyerId: options.buyerIdForAction,
+      passCallerId,
+      trackingNumber: to,
+      recordCall,
+    });
+    const dial = twiml.dial(dialParams);
+    phoneTargets.forEach((phone) => {
+      const numAttrs: Record<string, string> = {};
+      if (effectiveWhisperUrl) {
+        numAttrs.url = effectiveWhisperUrl;
+        numAttrs.method = "POST";
+      }
+      dial.number(numAttrs, phone);
+    });
+
+    if (options.buyerIds?.length) {
+      options.buyerIds.forEach((id) => markCallActive(id, callSid));
+    }
+  };
+
   // Handle different forwarding types
   if (forwardingType === "direct") {
     try {
-      // Use atomic round-robin to prevent race conditions (Issue #1 fix)
-      const { buyer } = await getNextRoundRobinBuyerAtomic(
-        seller,
-        industry,
-        callRate,
-      );
+      if (multiRingEnabled) {
+        const sellerBuyerIds = (
+          seller as unknown as { buyers?: Array<{ toString(): string }> }
+        ).buyers;
+        const candidateBuyers = await Buyer.find({
+          _id: { $in: sellerBuyerIds ?? [] },
+          "leadPreferences.industries": industry,
+        }).sort({ _id: 1 });
 
-      // Additional eligibility checks (geo, concurrent)
-      const buyerDoc = await Buyer.findById(buyer._id);
-      if (
-        (geoRoutingEnabled ||
-          (concurrentCallLimit && concurrentCallLimit > 0)) &&
-        buyerDoc &&
-        !(await isBuyerEligible(buyerDoc, buyer._id.toString()))
-      ) {
-        throw new Error("Buyer not eligible after extended checks");
+        const eligibleBuyers = [];
+        for (const buyerDoc of candidateBuyers) {
+          const buyerId = buyerDoc._id.toString();
+          if (!(await isBuyerEligible(buyerDoc, buyerId))) {
+            continue;
+          }
+          if (!buyerDoc.phone) {
+            continue;
+          }
+          eligibleBuyers.push({ id: buyerId, phone: buyerDoc.phone });
+        }
+
+        if (eligibleBuyers.length > 0) {
+          const phones = eligibleBuyers.map((b) => b.phone);
+          const buyerIds = eligibleBuyers.map((b) => b.id);
+
+          dialNumbersSimultaneously(phones, {
+            buyerIds,
+            buyerIdForAction: buyerIds[0],
+          });
+
+          forwardedTo = phones.join(", ");
+          newBuyerId = buyerIds[0];
+
+          debugLog("Direct multi-ring initiated", {
+            buyerCount: eligibleBuyers.length,
+            numbers: forwardedTo,
+            industry,
+          });
+        } else {
+          handleNoBuyersFallback();
+          debugLog(
+            "No buyers available for direct multi-ring",
+            { industry },
+            "warn",
+          );
+        }
+      } else {
+        // Use atomic round-robin to prevent race conditions (Issue #1 fix)
+        const { buyer } = await getNextRoundRobinBuyerAtomic(
+          seller,
+          industry,
+          callRate,
+        );
+
+        // Additional eligibility checks (geo, concurrent)
+        const buyerDoc = await Buyer.findById(buyer._id);
+        if (
+          (geoRoutingEnabled ||
+            (concurrentCallLimit && concurrentCallLimit > 0)) &&
+          buyerDoc &&
+          !(await isBuyerEligible(buyerDoc, buyer._id.toString()))
+        ) {
+          throw new Error("Buyer not eligible after extended checks");
+        }
+
+        if (!buyer.phone) {
+          throw new Error("Buyer has no phone number");
+        }
+
+        forwardedTo = buyer.phone;
+        newBuyerId = buyer._id.toString();
+
+        // Mark call as active for concurrent tracking
+        markCallActive(newBuyerId, callSid);
+
+        const dialParams = getDialParams({
+          from,
+          sellerId,
+          callSid,
+          buyerId: newBuyerId,
+          passCallerId,
+          trackingNumber: to,
+          recordCall,
+        });
+        dialWithWhisper(twiml, forwardedTo, dialParams, effectiveWhisperUrl);
       }
-
-      if (!buyer.phone) {
-        throw new Error("Buyer has no phone number");
-      }
-
-      forwardedTo = buyer.phone;
-      newBuyerId = buyer._id.toString();
-
-      // Mark call as active for concurrent tracking
-      markCallActive(newBuyerId, callSid);
-
-      const dialParams = getDialParams({
-        from,
-        sellerId,
-        callSid,
-        buyerId: newBuyerId,
-        passCallerId,
-        recordCall,
-      });
-      dialWithWhisper(twiml, forwardedTo, dialParams, effectiveWhisperUrl);
     } catch (error) {
       handleNoBuyersFallback();
       debugLog(
@@ -679,19 +756,28 @@ async function handleNewCall(
     forwardingType === "single_multiple" &&
     forwardingNumbers?.length
   ) {
-    forwardingNumbers.forEach((num: string, index: number) => {
-      const dialParams = getDialParams({
-        from,
-        sellerId,
-        callSid,
-        passCallerId,
-        recordCall,
+    if (multiRingEnabled && forwardingNumbers.length > 1) {
+      dialNumbersSimultaneously(forwardingNumbers, {});
+      debugLog("Single/multiple multi-ring initiated", {
+        numberCount: forwardingNumbers.length,
+        numbers: forwardingNumbers,
       });
-      dialWithWhisper(twiml, num, dialParams, effectiveWhisperUrl);
-      if (index < forwardingNumbers.length - 1) {
-        twiml.pause({ length: 1 });
-      }
-    });
+    } else {
+      forwardingNumbers.forEach((num: string, index: number) => {
+        const dialParams = getDialParams({
+          from,
+          sellerId,
+          callSid,
+          passCallerId,
+          trackingNumber: to,
+          recordCall,
+        });
+        dialWithWhisper(twiml, num, dialParams, effectiveWhisperUrl);
+        if (index < forwardingNumbers.length - 1) {
+          twiml.pause({ length: 1 });
+        }
+      });
+    }
     forwardedTo = forwardingNumbers.join(", ");
   } else if (forwardingType === "specific_lead" && leadBuyers?.length) {
     // Look up full buyer documents to check availability
@@ -719,6 +805,7 @@ async function handleNewCall(
         callSid,
         buyerId: eligibleBuyers[0].id.toString(),
         passCallerId,
+        trackingNumber: to,
         recordCall,
       });
       const dial = twiml.dial(dialParams);
@@ -746,6 +833,7 @@ async function handleNewCall(
           callSid,
           buyerId: buyer.id.toString(),
           passCallerId,
+          trackingNumber: to,
           recordCall,
         });
         dialWithWhisper(twiml, buyer.phone, dialParams, effectiveWhisperUrl);
@@ -882,8 +970,16 @@ async function handleNoAnswer(
       trackingConfig?.scheduledCallbackEnabled || false;
     const scheduledCallbackDigit =
       trackingConfig?.scheduledCallbackDigit || "1";
+    const multiRingEnabled = trackingConfig?.multiRingEnabled || false;
     const geoRoutingEnabled = trackingConfig?.geoRoutingEnabled || false;
     const concurrentCallLimit = trackingConfig?.concurrentCallLimit || 0;
+    const retryWhisperUrl = getWhisperUrl({
+      callWhisper: trackingConfig?.callWhisper,
+      requireResponse: trackingConfig?.requireResponse,
+      buyerResponses: trackingConfig?.buyerResponses,
+      sellerId: String(seller._id),
+      callSid,
+    });
 
     // Extract geo data for geo-routing in retry
     const geoData = geoRoutingEnabled ? extractGeoData(from) : null;
@@ -937,38 +1033,124 @@ async function handleNoAnswer(
       handleNoAnswerFallback();
     } else if (forwardingType === "direct") {
       try {
-        // Use atomic round-robin for retry as well (Issue #1 fix)
-        const { buyer } = await getNextRoundRobinBuyerAtomic(
-          seller,
-          industry,
-          callRate || { units: 1, seconds: 60 },
-        );
-        const newCallSid = `${callSid}-retry-${Date.now()}`;
+        if (multiRingEnabled) {
+          const sellerBuyerIds = (
+            seller as unknown as { buyers?: Array<{ toString(): string }> }
+          ).buyers;
+          const retryCandidates = await Buyer.find({
+            _id: { $in: sellerBuyerIds ?? [] },
+            "leadPreferences.industries": industry,
+          }).sort({ _id: 1 });
 
-        const dialParams = getDialParams({
-          from,
-          sellerId: seller._id as string,
-          callSid: newCallSid,
-          buyerId: buyer._id.toString(),
-          passCallerId,
-          recordCall: callRecorded,
-        });
-        twiml.dial(dialParams, buyer.phone);
+          const eligibleRetryBuyers = [];
+          for (const buyerDoc of retryCandidates) {
+            const buyerIdStr = buyerDoc._id.toString();
 
-        // Create new call record for retry
-        await createCallRecord({
-          callSid: newCallSid,
-          userId: String(seller._id),
-          buyerId: buyer._id.toString(),
-          from,
-          to: buyer.phone,
-          status: "forwarded",
-          callRecorded,
-          forwardingType,
-          forwardingNumbers,
-          leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
-          industry,
-        });
+            if (isBuyerOnVacation(buyerDoc)) {
+              continue;
+            }
+            if (!isBuyerInBusinessHours(buyerDoc)) {
+              continue;
+            }
+            if (
+              geoRoutingEnabled &&
+              geoData &&
+              !doesBuyerServiceArea(buyerDoc, geoData)
+            ) {
+              continue;
+            }
+            if (
+              concurrentCallLimit > 0 &&
+              (await isBuyerAtConcurrentLimit(buyerIdStr, concurrentCallLimit))
+            ) {
+              continue;
+            }
+
+            const { hasSufficientBalance } = await checkBuyerUnitBalance(
+              buyerIdStr,
+              callRate?.units || 1,
+            );
+            if (!hasSufficientBalance || !buyerDoc.phone) {
+              continue;
+            }
+
+            eligibleRetryBuyers.push({ id: buyerIdStr, phone: buyerDoc.phone });
+          }
+
+          if (eligibleRetryBuyers.length === 0) {
+            handleNoAnswerFallback();
+          } else {
+            const retryActionCallSid = `${callSid}-retry-${Date.now()}`;
+            const dialParams = getDialParams({
+              from,
+              sellerId: seller._id as string,
+              callSid: retryActionCallSid,
+              buyerId: eligibleRetryBuyers[0].id,
+              passCallerId,
+              trackingNumber: to,
+              recordCall: callRecorded,
+            });
+            const dial = twiml.dial(dialParams);
+
+            eligibleRetryBuyers.forEach((buyer) => {
+              const numberAttrs: Record<string, string> = {};
+              if (retryWhisperUrl) {
+                numberAttrs.url = retryWhisperUrl;
+                numberAttrs.method = "POST";
+              }
+              dial.number(numberAttrs, buyer.phone);
+              markCallActive(buyer.id, retryActionCallSid);
+            });
+
+            await createCallRecord({
+              callSid: retryActionCallSid,
+              userId: String(seller._id),
+              buyerId: eligibleRetryBuyers[0].id,
+              from,
+              to: eligibleRetryBuyers.map((b) => b.phone).join(", "),
+              status: "forwarded",
+              callRecorded,
+              forwardingType,
+              forwardingNumbers,
+              leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
+              industry,
+            });
+          }
+        } else {
+          // Use atomic round-robin for retry as well (Issue #1 fix)
+          const { buyer } = await getNextRoundRobinBuyerAtomic(
+            seller,
+            industry,
+            callRate || { units: 1, seconds: 60 },
+          );
+          const newCallSid = `${callSid}-retry-${Date.now()}`;
+
+          const dialParams = getDialParams({
+            from,
+            sellerId: seller._id as string,
+            callSid: newCallSid,
+            buyerId: buyer._id.toString(),
+            passCallerId,
+            trackingNumber: to,
+            recordCall: callRecorded,
+          });
+          dialWithWhisper(twiml, buyer.phone, dialParams, retryWhisperUrl);
+
+          // Create new call record for retry
+          await createCallRecord({
+            callSid: newCallSid,
+            userId: String(seller._id),
+            buyerId: buyer._id.toString(),
+            from,
+            to: buyer.phone,
+            status: "forwarded",
+            callRecorded,
+            forwardingType,
+            forwardingNumbers,
+            leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
+            industry,
+          });
+        }
       } catch (e) {
         debugLog(
           "Error during direct retry in handleNoAnswer",
@@ -985,19 +1167,41 @@ async function handleNoAnswer(
       forwardingType === "single_multiple" &&
       forwardingNumbers?.length
     ) {
-      forwardingNumbers.forEach((num: string, index: number) => {
+      if (multiRingEnabled && forwardingNumbers.length > 1) {
+        const retryActionCallSid = `${callSid}-retry-${Date.now()}`;
         const dialParams = getDialParams({
           from,
           sellerId: seller._id as string,
-          callSid: `${callSid}-retry-${index}`,
+          callSid: retryActionCallSid,
           passCallerId,
+          trackingNumber: to,
           recordCall: callRecorded,
         });
-        twiml.dial(dialParams, num);
-        if (index < forwardingNumbers.length - 1) {
-          twiml.pause({ length: 1 });
-        }
-      });
+        const dial = twiml.dial(dialParams);
+        forwardingNumbers.forEach((num: string) => {
+          const numberAttrs: Record<string, string> = {};
+          if (retryWhisperUrl) {
+            numberAttrs.url = retryWhisperUrl;
+            numberAttrs.method = "POST";
+          }
+          dial.number(numberAttrs, num);
+        });
+      } else {
+        forwardingNumbers.forEach((num: string, index: number) => {
+          const dialParams = getDialParams({
+            from,
+            sellerId: seller._id as string,
+            callSid: `${callSid}-retry-${index}`,
+            passCallerId,
+            trackingNumber: to,
+            recordCall: callRecorded,
+          });
+          dialWithWhisper(twiml, num, dialParams, retryWhisperUrl);
+          if (index < forwardingNumbers.length - 1) {
+            twiml.pause({ length: 1 });
+          }
+        });
+      }
     } else if (forwardingType === "specific_lead" && leadBuyers?.length) {
       // Look up full buyer documents for availability checks
       const retryBuyerIds = leadBuyers.map((b: { id: string }) => b.id);
@@ -1066,6 +1270,28 @@ async function handleNoAnswer(
 
       if (eligibleBuyers.length === 0) {
         handleNoAnswerFallback();
+      } else if (multiRingEnabled && eligibleBuyers.length > 1) {
+        const retryActionCallSid = `${callSid}-retry-${Date.now()}`;
+        const dialParams = getDialParams({
+          from,
+          sellerId: seller._id as string,
+          callSid: retryActionCallSid,
+          buyerId: eligibleBuyers[0].id.toString(),
+          passCallerId,
+          trackingNumber: to,
+          recordCall: callRecorded,
+        });
+        const dial = twiml.dial(dialParams);
+
+        eligibleBuyers.forEach((buyer: { id: string; phone: string }) => {
+          const numberAttrs: Record<string, string> = {};
+          if (retryWhisperUrl) {
+            numberAttrs.url = retryWhisperUrl;
+            numberAttrs.method = "POST";
+          }
+          dial.number(numberAttrs, buyer.phone);
+          markCallActive(buyer.id.toString(), retryActionCallSid);
+        });
       } else {
         eligibleBuyers.forEach(
           (buyer: { id: string; phone: string | undefined }, index: number) => {
@@ -1075,9 +1301,13 @@ async function handleNoAnswer(
               callSid: `${callSid}-retry-${index}`,
               buyerId: buyer.id.toString(),
               passCallerId,
+              trackingNumber: to,
               recordCall: callRecorded,
             });
-            twiml.dial(dialParams, buyer.phone);
+            if (!buyer.phone) {
+              return;
+            }
+            dialWithWhisper(twiml, buyer.phone, dialParams, retryWhisperUrl);
             if (index < eligibleBuyers.length - 1) {
               twiml.pause({ length: 1 });
             }

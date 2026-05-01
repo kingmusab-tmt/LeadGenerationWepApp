@@ -126,17 +126,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if the seller already has a number for this industry (only for call tracking, not SMS)
-    if (purpose !== "sms") {
-      const hasExistingNumber = trackingNumbers.some(
-        (num) => num.industry === industry,
-      );
-
-      if (hasExistingNumber) {
-        return badRequest("You already have a number for this industry.");
-      }
-    }
-
     let purchasedNumber: string;
 
     if (method === "Manual") {

@@ -23,6 +23,7 @@ import {
   Paper,
   ToggleButton,
   ToggleButtonGroup,
+  CircularProgress,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningIcon from "@mui/icons-material/Warning";
@@ -114,6 +115,11 @@ export default function PricingSection() {
 
         // Only check subscription status if user is authenticated
         if (currentUser) {
+          console.log(
+            "[Plan Page] Checking subscription status for user:",
+            currentUser.id,
+          );
+
           // Check if user has an active subscription
           const subscriptionCheck = await fetch("/api/subscriptions/check", {
             method: "GET",
@@ -125,6 +131,13 @@ export default function PricingSection() {
           if (subscriptionCheck.ok) {
             const subscriptionData: SubscriptionCheckResponse =
               await subscriptionCheck.json();
+
+            console.log("[Plan Page] Subscription check response:", {
+              isActive: subscriptionData.isActive,
+              expiryDate: subscriptionData.expiryDate,
+              usedTrial: subscriptionData.usedTrial,
+            });
+
             setSubscriptionInfo(subscriptionData);
 
             // Calculate days remaining if expiry date exists
@@ -140,6 +153,7 @@ export default function PricingSection() {
               isActive: subscriptionData.isActive,
               expiryDate: subscriptionData.expiryDate,
               daysRemaining,
+              usedTrial: subscriptionData.usedTrial,
             });
 
             // If user has active subscription, redirect to dashboard
@@ -151,7 +165,20 @@ export default function PricingSection() {
               return; // Don't fetch tiers if user is subscribed
             }
 
-            // If subscription is inactive, allow access to pricing
+            // If subscription is inactive (trial expired), allow access to pricing
+            console.log(
+              "[Plan Page] User has expired subscription or trial, allowing plan selection",
+            );
+          } else {
+            // Even if subscription check fails, continue to show pricing tiers
+            console.warn(
+              "[Plan Page] Subscription check returned non-OK status, assuming no active subscription",
+            );
+            setSubscriptionInfo({
+              isActive: false,
+              expiryDate: null,
+              usedTrial: false,
+            });
           }
         }
 
@@ -174,9 +201,10 @@ export default function PricingSection() {
             ? tiersPayload.data.tiers
             : [];
 
+        console.log("[Plan Page] Loaded tiers:", tiersData.length);
         setTiers(tiersData);
       } catch (err) {
-        console.error("Error:", err);
+        console.error("[Plan Page] Error:", err);
         setError("Failed to load pricing information. Please try again later.");
       } finally {
         setLoading(false);
@@ -205,12 +233,22 @@ export default function PricingSection() {
   }, [shouldRedirect, session, currentUser, router, isRedirecting]);
 
   const handleSelectPlan = async (tier: Tier) => {
-    if (isProcessing) return;
+    console.log(
+      `[Plan Page] handleSelectPlan called for tier: ${tier.name}, usedTrial: ${subscriptionInfo?.usedTrial}`,
+    );
+
+    if (isProcessing) {
+      console.log("[Plan Page] Already processing, ignoring duplicate click");
+      return;
+    }
+
     setIsProcessing(true);
     setApiError(null); // Clear previous errors
 
     try {
       if (tier.tierType === "free") {
+        console.log("[Plan Page] Starting free trial...");
+
         // Call dedicated API to start 14-day free trial
         const response = await csrfFetch("/api/subscriptions/trial/start", {
           method: "POST",
@@ -225,6 +263,7 @@ export default function PricingSection() {
         if (!response.ok) {
           // Handle specific error for used trial
           if (response.status === 400 && responseData.error) {
+            console.error("[Plan Page] Trial error:", responseData.error);
             setApiError(responseData.error);
             setShowErrorSnackbar(true);
             return; // Don't proceed with redirect
@@ -250,10 +289,28 @@ export default function PricingSection() {
         router.push(`/dashboard/${currentUser?.role}/overview`);
       } else {
         // Redirect to checkout for paid tiers
+        console.log(
+          `[Plan Page] Redirecting to checkout with plan: ${tier._id}`,
+        );
+
+        // Ensure we have tier ID before redirecting
+        if (!tier._id) {
+          console.error("[Plan Page] Tier ID is missing!");
+          throw new Error("Invalid tier configuration");
+        }
+
+        // Check if user is authenticated before redirecting to checkout
+        if (!currentUser?.id) {
+          console.error("[Plan Page] User not authenticated");
+          throw new Error("User authentication required");
+        }
+
+        console.log("[Plan Page] User authenticated, proceeding to checkout");
+
         router.push(`/checkout?plan=${tier._id}`);
       }
     } catch (err: unknown) {
-      console.error("Error processing subscription:", err);
+      console.error("[Plan Page] Error processing subscription:", err);
       // Only set generic error if it's not the specific trial error
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (!errorMessage.includes("already used your free trial")) {
@@ -670,7 +727,12 @@ export default function PricingSection() {
                       variant={tier.highlight ? "contained" : "outlined"}
                       color={tier.highlight ? "primary" : "inherit"}
                       size="large"
-                      onClick={() => handleSelectPlan(tier)}
+                      onClick={() => {
+                        console.log(
+                          `[Plan Page] Button clicked for tier: ${tier.name}, usedTrial: ${subscriptionInfo?.usedTrial}, isProcessing: ${isProcessing}`,
+                        );
+                        handleSelectPlan(tier);
+                      }}
                       disabled={
                         isProcessing ||
                         (subscriptionInfo?.usedTrial &&
@@ -680,19 +742,43 @@ export default function PricingSection() {
                         py: 1.5,
                         fontWeight: 600,
                         borderRadius: 1,
+                        position: "relative",
                       }}
                     >
-                      {isProcessing
-                        ? "Processing..."
-                        : subscriptionInfo?.usedTrial &&
-                            tier.tierType === "free"
-                          ? "Trial Used"
-                          : isRenewing
-                            ? tier.tierType === "free"
-                              ? "Switch to Free"
-                              : "Renew Plan"
-                            : tier.ctaText ||
-                              (tier.isFree ? "Start Free Trial" : "Subscribe")}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 1,
+                          width: "100%",
+                        }}
+                      >
+                        {isProcessing && (
+                          <CircularProgress
+                            size={20}
+                            color={tier.highlight ? "inherit" : "primary"}
+                            sx={{
+                              color: tier.highlight ? "inherit" : undefined,
+                            }}
+                          />
+                        )}
+                        <span>
+                          {isProcessing
+                            ? "Processing..."
+                            : subscriptionInfo?.usedTrial &&
+                                tier.tierType === "free"
+                              ? "Trial Used"
+                              : isRenewing
+                                ? tier.tierType === "free"
+                                  ? "Switch to Free"
+                                  : "Renew Plan"
+                                : tier.ctaText ||
+                                  (tier.isFree
+                                    ? "Start Free Trial"
+                                    : "Subscribe")}
+                        </span>
+                      </Box>
                     </Button>
                   </CardActions>
                 </Card>

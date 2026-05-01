@@ -41,6 +41,10 @@ export const SignInPage: React.FC<SignInPageProps> = () => {
     const trialParam = searchParams.get("trial");
     if (trialParam === "true") {
       sessionStorage.setItem("trialIntent", "true");
+      // dynamic import to avoid SSR issues; ignore failures
+      import("@/lib/cookieUtils")
+        .then((cu) => cu.setCookie("trialIntent", "true", 10))
+        .catch(() => {});
       return true;
     }
 

@@ -16,7 +16,6 @@ import {
   CardActions,
   Chip,
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   CircularProgress,
@@ -48,8 +47,6 @@ interface UnitOption {
 const UnitPurchase: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
-
   const [selectedOption, setSelectedOption] = useState<UnitOption | null>(null);
   const [loading, setLoading] = useState(false);
   const csrfFetch = useCSRFFetch();

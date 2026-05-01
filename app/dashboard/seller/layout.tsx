@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -51,6 +51,7 @@ import { useSession } from "next-auth/react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import { isSellerOnboardingFlowComplete } from "@/lib/sellerOnboarding";
 import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
+import SubscriptionExpiryModal from "./components/SubscriptionExpiryModal";
 
 interface UserDashboardProps {
   children?: React.ReactNode;
@@ -145,6 +146,15 @@ const bottomNavItems: NavItem[] = [
   },
 ];
 
+const DAY_IN_MS = 1000 * 60 * 60 * 24;
+
+const getLocalDateKey = (date: Date) =>
+  [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+
 const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   useDashboardReducers();
   const { currentUser, loading: userLoading } = useInitializeUser();
@@ -156,6 +166,14 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   ]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [loading, setLoading] = useState(false);
+  const [expiryReminderOpen, setExpiryReminderOpen] = useState(false);
+  const [expiryReminder, setExpiryReminder] = useState<{
+    daysRemaining: number;
+    expiryDate: string;
+    planName: string | null;
+    isFreeTrial: boolean;
+  } | null>(null);
+  const expiryReminderCheckedForUserRef = useRef<string | null>(null);
 
   const theme = useTheme();
   const router = useRouter();
@@ -202,6 +220,94 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       router.replace("/dashboard/seller/onboarding");
     }
   }, [status, userLoading, limitsLoading, currentUser, pathname, router]);
+
+  useEffect(() => {
+    if (status === "loading" || userLoading || limitsLoading) {
+      return;
+    }
+
+    if (!currentUser?.id) {
+      expiryReminderCheckedForUserRef.current = null;
+      setExpiryReminderOpen(false);
+      setExpiryReminder(null);
+      return;
+    }
+
+    const isSellerRole =
+      currentUser.role === "seller" || currentUser.role === "business-admin";
+
+    if (!isSellerRole) {
+      expiryReminderCheckedForUserRef.current = null;
+      setExpiryReminderOpen(false);
+      setExpiryReminder(null);
+      return;
+    }
+
+    if (expiryReminderCheckedForUserRef.current === currentUser.id) {
+      return;
+    }
+
+    expiryReminderCheckedForUserRef.current = currentUser.id;
+
+    const checkExpiryReminder = async () => {
+      try {
+        const response = await fetch("/api/subscriptions/manage");
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        const subscription = data?.subscription;
+        const expirySource =
+          subscription?.subscriptionExpiryDate ??
+          subscription?.stripeDetails?.currentPeriodEnd;
+
+        if (!expirySource) {
+          return;
+        }
+
+        const expiryDate = new Date(expirySource);
+        if (Number.isNaN(expiryDate.getTime())) {
+          return;
+        }
+
+        const now = new Date();
+        const daysRemaining = Math.ceil(
+          (expiryDate.getTime() - now.getTime()) / DAY_IN_MS,
+        );
+
+        if (daysRemaining < 1 || daysRemaining > 7) {
+          return;
+        }
+
+        const storageKey = `brixcot:subscription-expiry-modal:last-shown:${currentUser.id}`;
+        const todayKey = getLocalDateKey(now);
+
+        if (window.localStorage.getItem(storageKey) === todayKey) {
+          return;
+        }
+
+        window.localStorage.setItem(storageKey, todayKey);
+        setExpiryReminder({
+          daysRemaining,
+          expiryDate: expiryDate.toISOString(),
+          planName:
+            subscription?.subscriptionPlan ||
+            subscription?.tierDetails?.name ||
+            null,
+          isFreeTrial:
+            subscription?.isTrial === true ||
+            subscription?.subscriptionTierType === "free" ||
+            subscription?.subscriptionPlan === "14-Day Free Trial",
+        });
+        setExpiryReminderOpen(true);
+      } catch (error) {
+        console.error("Failed to check subscription expiry reminder:", error);
+      }
+    };
+
+    void checkExpiryReminder();
+  }, [currentUser, limitsLoading, status, userLoading]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -482,6 +588,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f5f7fa" }}>
       <CssBaseline />
       <InactivityLogout />
+      <SubscriptionExpiryModal
+        open={expiryReminderOpen}
+        daysRemaining={expiryReminder?.daysRemaining || 0}
+        expiryDate={expiryReminder?.expiryDate || ""}
+        planName={expiryReminder?.planName || null}
+        isFreeTrial={expiryReminder?.isFreeTrial || false}
+        onClose={() => setExpiryReminderOpen(false)}
+        onRenewNow={() => {
+          setExpiryReminderOpen(false);
+          router.push("/dashboard/seller/settings/subscription");
+        }}
+        onUpgradePlan={() => {
+          setExpiryReminderOpen(false);
+          router.push("/plan");
+        }}
+      />
 
       {/* Top AppBar */}
       <AppBar

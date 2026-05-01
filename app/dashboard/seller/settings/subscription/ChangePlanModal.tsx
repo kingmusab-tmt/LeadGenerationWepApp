@@ -487,6 +487,7 @@ export default function ChangePlanModal({
                           color="secondary"
                           size="small"
                           sx={{
+                            mt: 2,
                             position: "absolute",
                             top: -12,
                             left: "50%",

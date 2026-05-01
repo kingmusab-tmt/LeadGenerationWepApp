@@ -541,6 +541,10 @@ const LandingPage = () => {
                     onClick={() => {
                       if (typeof window !== "undefined") {
                         sessionStorage.setItem("trialIntent", "true");
+                        // dynamic import to avoid SSR issues; swallow failures
+                        import("@/lib/cookieUtils")
+                          .then((cu) => cu.setCookie("trialIntent", "true", 10))
+                          .catch(() => {});
                       }
                     }}
                     sx={{

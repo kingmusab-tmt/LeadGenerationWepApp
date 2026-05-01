@@ -189,11 +189,15 @@ export const getDialParams = (options: {
   callSid: string;
   buyerId?: string;
   passCallerId: boolean;
+  trackingNumber?: string;
   recordCall: boolean;
   timeout?: number;
 }): DialParams => {
   const dialParams: DialParams = {
-    callerId: options.passCallerId ? options.from : options.from,
+    callerId:
+      options.passCallerId === true
+        ? options.from
+        : options.trackingNumber || options.from,
     timeout: options.timeout || CALL_DEFAULTS.dialTimeout,
     action: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/calls?sellerId=${options.sellerId}&callSid=${options.callSid}&buyerId=${options.buyerId || ""}`,
   };

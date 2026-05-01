@@ -68,11 +68,17 @@ const Header = React.memo(function Header() {
   const [userMenuAnchor, setUserMenuAnchor] =
     React.useState<null | HTMLElement>(null);
   const [hoveredItem, setHoveredItem] = React.useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = React.useState(false);
 
   // Session management
   const dispatch = useAppDispatch();
   const { currentUser, loading: userLoading } = useInitializeUser();
   const isAuthenticated = !!currentUser;
+
+  // Mark component as hydrated after first mount
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -140,7 +146,9 @@ const Header = React.memo(function Header() {
     },
   ];
 
-  const displayItems = isAuthenticated ? navItems : publicNavItems;
+  // Only show authenticated nav items after hydration to prevent hydration mismatch
+  const displayItems =
+    isHydrated && isAuthenticated ? navItems : publicNavItems;
 
   return (
     <>
@@ -367,13 +375,8 @@ const Header = React.memo(function Header() {
 
             {/* User Actions Section */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              {userLoading ? (
-                // Loading state
-                <Button variant="outlined" disabled>
-                  Loading...
-                </Button>
-              ) : isAuthenticated ? (
-                // Authenticated user
+              {isHydrated && isAuthenticated ? (
+                // Authenticated user (only after hydration confirms authentication)
                 <>
                   {!isMobile && (
                     <>
@@ -482,7 +485,7 @@ const Header = React.memo(function Header() {
                   </Menu>
                 </>
               ) : (
-                // Unauthenticated user
+                // Unauthenticated or not hydrated yet - show login/trial buttons
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Button
                     variant="outlined"
@@ -506,6 +509,9 @@ const Header = React.memo(function Header() {
                     onClick={() => {
                       if (typeof window !== "undefined") {
                         sessionStorage.setItem("trialIntent", "true");
+                        import("@/lib/cookieUtils")
+                          .then((cu) => cu.setCookie("trialIntent", "true", 10))
+                          .catch(() => {});
                       }
                     }}
                     sx={{
@@ -657,6 +663,9 @@ const Header = React.memo(function Header() {
                     onClick={() => {
                       if (typeof window !== "undefined") {
                         sessionStorage.setItem("trialIntent", "true");
+                        import("@/lib/cookieUtils")
+                          .then((cu) => cu.setCookie("trialIntent", "true", 10))
+                          .catch(() => {});
                       }
                       handleMenuClose();
                     }}

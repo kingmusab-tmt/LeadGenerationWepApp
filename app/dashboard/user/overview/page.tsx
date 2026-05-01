@@ -24,6 +24,12 @@ export default async function OverviewRedirect() {
 
   const userRole = dbUser.role;
   const isSubActive = dbUser.subscription?.isSubscriptionActive || false;
+  const expirySource = dbUser.subscription?.subscriptionExpiryDate;
+  const daysRemaining = expirySource
+    ? Math.ceil(
+        (new Date(expirySource).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+      )
+    : null;
 
   // Role-based redirection with subscription check
   switch (userRole) {
@@ -36,7 +42,7 @@ export default async function OverviewRedirect() {
 
     case "seller":
     case "business-admin":
-      if (isSubActive) {
+      if (isSubActive && (daysRemaining === null || daysRemaining > 7)) {
         redirect("/dashboard/seller/overview");
       } else {
         redirect("/plan");

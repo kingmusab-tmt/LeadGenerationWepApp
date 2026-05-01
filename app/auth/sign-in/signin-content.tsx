@@ -16,6 +16,47 @@ const SignInContent: React.FC = () => {
   const searchParams = useSearchParams();
   const [startingTrial, setStartingTrial] = useState(false);
 
+  const routeSellerBasedOnSubscription = async (fallbackPath: string) => {
+    try {
+      const response = await fetch("/api/subscriptions/manage");
+      if (!response.ok) {
+        router.replace(fallbackPath);
+        return;
+      }
+
+      const data = await response.json();
+      const subscription = data?.subscription;
+      const expirySource =
+        subscription?.subscriptionExpiryDate ??
+        subscription?.stripeDetails?.currentPeriodEnd;
+
+      if (!expirySource) {
+        router.replace(fallbackPath);
+        return;
+      }
+
+      const expiryDate = new Date(expirySource);
+      if (Number.isNaN(expiryDate.getTime())) {
+        router.replace(fallbackPath);
+        return;
+      }
+
+      const daysRemaining = Math.ceil(
+        (expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+      );
+
+      if (daysRemaining <= 7) {
+        router.replace("/plan");
+        return;
+      }
+
+      router.replace("/dashboard/seller/overview");
+    } catch (error) {
+      console.error("[SignIn] Failed to check subscription expiry:", error);
+      router.replace(fallbackPath);
+    }
+  };
+
   const startTrialForExistingUser = async () => {
     if (startingTrial) return false;
     setStartingTrial(true);
@@ -38,9 +79,7 @@ const SignInContent: React.FC = () => {
     } catch (error) {
       console.error("[SignIn] Error starting trial:", error);
     }
-
-    // Clear trial intent even on failure
-    sessionStorage.removeItem("trialIntent");
+    // Do NOT clear trialIntent on failure — allow other flows (e.g. complete registration) to handle it
     setStartingTrial(false);
     return false;
   };
@@ -57,8 +96,19 @@ const SignInContent: React.FC = () => {
 
     // Check for trial intent
     const trialParam = searchParams.get("trial");
-    const trialIntent =
+    let trialIntent =
       trialParam === "true" || sessionStorage.getItem("trialIntent") === "true";
+    // fallback to cookie if sessionStorage was cleared during redirects
+    if (!trialIntent && typeof window !== "undefined") {
+      // read cookie directly to keep this synchronous in the effect
+      const match = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("trialIntent="));
+      if (match) {
+        const val = match.split("=")[1];
+        if (val === "true") trialIntent = true;
+      }
+    }
 
     // Use session data for faster redirect (JWT token is already available)
     const role = session?.user?.role || currentUser?.role;
@@ -80,7 +130,7 @@ const SignInContent: React.FC = () => {
       ) {
         // User already has active subscription, clear trial intent and go to dashboard
         sessionStorage.removeItem("trialIntent");
-        router.replace("/dashboard/seller/overview");
+        void routeSellerBasedOnSubscription("/dashboard/seller/overview");
       } else if (role === "buyer" || role === "staff") {
         router.replace("/dashboard/buyer/overview");
       } else if (role === "seller" || role === "business-admin") {
@@ -89,7 +139,7 @@ const SignInContent: React.FC = () => {
           // Start trial for existing user
           startTrialForExistingUser().then((success) => {
             if (success) {
-              router.replace("/dashboard/seller/overview");
+              void routeSellerBasedOnSubscription("/plan");
             } else {
               router.replace("/plan");
             }
