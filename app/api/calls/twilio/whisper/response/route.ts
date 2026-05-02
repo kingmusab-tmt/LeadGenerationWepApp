@@ -11,14 +11,34 @@ import { callSecurityMiddleware } from "@/lib/security/callSecurity";
  */
 export async function POST(req: NextRequest) {
   try {
+    const shouldValidateWebhook = process.env.NODE_ENV === "production";
+    if (!shouldValidateWebhook) {
+      debugLog("Skipping Twilio webhook validation in non-production", {
+        nodeEnv: process.env.NODE_ENV,
+      });
+    }
+
     const securityResponse = await callSecurityMiddleware(req, {
       rateLimit: true,
-      validateWebhook: true,
+      validateWebhook: shouldValidateWebhook,
     });
     if (securityResponse) return securityResponse;
 
+    // Log incoming headers (first-level) to help diagnose POST failures
+    const headersObj: Record<string, string | null> = {};
+    for (const [k, v] of req.headers) {
+      headersObj[k] = v;
+    }
+
     const formData = await req.formData();
-    const digits = formData.get("Digits") as string;
+    // Capture all form fields for debugging (Twilio sends application/x-www-form-urlencoded)
+    const formObj: Record<string, string> = {};
+    formData.forEach((value, key) => {
+      formObj[key] = String(value);
+    });
+
+    const digits =
+      (formObj["Digits"] as string) || (formData.get("Digits") as string);
 
     const { searchParams } = new URL(req.url);
     const validDigits = searchParams.get("validDigits") || "";
@@ -26,6 +46,8 @@ export async function POST(req: NextRequest) {
     const callSid = searchParams.get("callSid") || "";
 
     debugLog("Whisper response received", {
+      headers: headersObj,
+      form: formObj,
       digits,
       validDigits,
       sellerId,

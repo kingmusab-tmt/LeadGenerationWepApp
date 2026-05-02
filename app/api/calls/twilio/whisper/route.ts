@@ -59,9 +59,14 @@ export async function POST(req: NextRequest) {
           ? `${whisperMessage}. ${screeningMessage}`
           : `You have an incoming lead call. ${screeningMessage}`;
 
+        const baseUrl =
+          process.env.NEXT_PUBLIC_BASE_URL ||
+          process.env.NEXTAUTH_URL ||
+          `https://${env.NEXT_PUBLIC_DOMAIN}`;
+
         const gather = twiml.gather({
           numDigits: 1,
-          action: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}`,
+          action: `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}`,
           method: "POST",
           timeout: 10,
         });

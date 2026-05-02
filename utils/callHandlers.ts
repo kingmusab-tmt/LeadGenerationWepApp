@@ -36,6 +36,15 @@ type BuyerAvailability = {
 
 type BuyerResponse = { message: string; digit: string };
 
+const getPublicBaseUrl = (): string => {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXTAUTH_URL ||
+    `https://${env.NEXT_PUBLIC_DOMAIN}`;
+
+  return baseUrl.replace(/\/$/, "");
+};
+
 type SellerLike = InstanceType<typeof User> & {
   buyers?: Array<{ toString(): string }>;
   lastAssignedIndex?: number;
@@ -231,7 +240,7 @@ export const getWhisperUrl = (options: {
   params.set("sellerId", sellerId);
   params.set("callSid", callSid);
 
-  return `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/whisper?${params.toString()}`;
+  return `${getPublicBaseUrl()}/api/calls/twilio/whisper?${params.toString()}`;
 };
 
 export const dialWithWhisper = (
@@ -242,6 +251,12 @@ export const dialWithWhisper = (
 ) => {
   const dial = twiml.dial(dialParams as never);
   if (whisperUrl) {
+    debugLog("Call whisper attached to dial leg", {
+      phoneNumber,
+      whisperUrl,
+      buyerId: (dialParams as { buyerId?: string }).buyerId,
+      callSid: (dialParams as { callSid?: string }).callSid,
+    });
     dial.number({ url: whisperUrl, method: "POST" }, phoneNumber);
     return;
   }

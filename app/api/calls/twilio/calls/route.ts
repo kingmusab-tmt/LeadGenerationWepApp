@@ -191,6 +191,11 @@ export async function POST(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const sellerId = searchParams.get("sellerId");
     const buyerId = searchParams.get("buyerId");
+    const singleMultipleIndexParam = searchParams.get("singleMultipleIndex");
+    const singleMultipleIndex =
+      singleMultipleIndexParam !== null
+        ? Number.parseInt(singleMultipleIndexParam, 10)
+        : undefined;
 
     debugLog("Extracted parameters", {
       callSid,
@@ -238,6 +243,7 @@ export async function POST(req: NextRequest) {
         from,
         to,
         buyerId || undefined,
+        singleMultipleIndex,
         callRate,
       );
     } else if (callStatus && callStatus !== "ringing") {
@@ -627,9 +633,22 @@ async function handleNewCall(
     }
   }
 
+  const appendSingleMultipleIndex = (
+    actionUrl: string,
+    index?: number,
+  ): string => {
+    if (!Number.isInteger(index)) {
+      return actionUrl;
+    }
+
+    const separator = actionUrl.includes("?") ? "&" : "?";
+    return `${actionUrl}${separator}singleMultipleIndex=${index}`;
+  };
+
   const dialNumbersSimultaneously = (
     phoneTargets: string[],
     options: { buyerIds?: string[]; buyerIdForAction?: string },
+    whisperUrl?: string,
   ) => {
     const dialParams = getDialParams({
       from,
@@ -641,10 +660,18 @@ async function handleNewCall(
       recordCall,
     });
     const dial = twiml.dial(dialParams);
+    if (whisperUrl) {
+      debugLog("Call whisper attached to multi-ring dial leg", {
+        callSid,
+        buyerId: options.buyerIdForAction,
+        whisperUrl,
+        targetCount: phoneTargets.length,
+      });
+    }
     phoneTargets.forEach((phone) => {
       const numAttrs: Record<string, string> = {};
-      if (effectiveWhisperUrl) {
-        numAttrs.url = effectiveWhisperUrl;
+      if (whisperUrl) {
+        numAttrs.url = whisperUrl;
         numAttrs.method = "POST";
       }
       dial.number(numAttrs, phone);
@@ -757,7 +784,7 @@ async function handleNewCall(
     forwardingNumbers?.length
   ) {
     if (multiRingEnabled && forwardingNumbers.length > 1) {
-      dialNumbersSimultaneously(forwardingNumbers, {});
+      dialNumbersSimultaneously(forwardingNumbers, {}, effectiveWhisperUrl);
       debugLog("Single/multiple multi-ring initiated", {
         numberCount: forwardingNumbers.length,
         numbers: forwardingNumbers,
@@ -772,6 +799,7 @@ async function handleNewCall(
           trackingNumber: to,
           recordCall,
         });
+        dialParams.action = appendSingleMultipleIndex(dialParams.action, index);
         dialWithWhisper(twiml, num, dialParams, effectiveWhisperUrl);
         if (index < forwardingNumbers.length - 1) {
           twiml.pause({ length: 1 });
@@ -910,6 +938,15 @@ async function handleNewCall(
   });
 }
 
+function appendSingleMultipleIndex(actionUrl: string, index?: number): string {
+  if (typeof index !== "number" || !Number.isInteger(index)) {
+    return actionUrl;
+  }
+
+  const separator = actionUrl.includes("?") ? "&" : "?";
+  return `${actionUrl}${separator}singleMultipleIndex=${index}`;
+}
+
 async function handleNoAnswer(
   formData: FormData,
   seller: InstanceType<typeof User>,
@@ -917,6 +954,7 @@ async function handleNoAnswer(
   from: string,
   to: string,
   buyerId?: string,
+  singleMultipleIndex?: number,
   callRate?: { units: number; seconds: number },
 ) {
   try {
@@ -1167,6 +1205,24 @@ async function handleNoAnswer(
       forwardingType === "single_multiple" &&
       forwardingNumbers?.length
     ) {
+      const currentForwardingIndex =
+        typeof singleMultipleIndex === "number" &&
+        Number.isInteger(singleMultipleIndex) &&
+        singleMultipleIndex >= 0
+          ? singleMultipleIndex
+          : undefined;
+      const nextForwardingIndex =
+        typeof currentForwardingIndex === "number"
+          ? currentForwardingIndex + 1
+          : 0;
+      const remainingForwardingNumbers =
+        forwardingNumbers.slice(nextForwardingIndex);
+
+      if (remainingForwardingNumbers.length === 0) {
+        handleNoAnswerFallback();
+        return;
+      }
+
       if (multiRingEnabled && forwardingNumbers.length > 1) {
         const retryActionCallSid = `${callSid}-retry-${Date.now()}`;
         const dialParams = getDialParams({
@@ -1178,7 +1234,7 @@ async function handleNoAnswer(
           recordCall: callRecorded,
         });
         const dial = twiml.dial(dialParams);
-        forwardingNumbers.forEach((num: string) => {
+        remainingForwardingNumbers.forEach((num: string) => {
           const numberAttrs: Record<string, string> = {};
           if (retryWhisperUrl) {
             numberAttrs.url = retryWhisperUrl;
@@ -1187,17 +1243,22 @@ async function handleNoAnswer(
           dial.number(numberAttrs, num);
         });
       } else {
-        forwardingNumbers.forEach((num: string, index: number) => {
+        remainingForwardingNumbers.forEach((num: string, index: number) => {
+          const forwardingIndex = nextForwardingIndex + index;
           const dialParams = getDialParams({
             from,
             sellerId: seller._id as string,
-            callSid: `${callSid}-retry-${index}`,
+            callSid: `${callSid}-retry-${forwardingIndex}`,
             passCallerId,
             trackingNumber: to,
             recordCall: callRecorded,
           });
+          dialParams.action = appendSingleMultipleIndex(
+            dialParams.action,
+            forwardingIndex,
+          );
           dialWithWhisper(twiml, num, dialParams, retryWhisperUrl);
-          if (index < forwardingNumbers.length - 1) {
+          if (index < remainingForwardingNumbers.length - 1) {
             twiml.pause({ length: 1 });
           }
         });
