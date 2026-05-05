@@ -51,6 +51,14 @@ export async function POST(req: NextRequest) {
       if (buyerResponses.length > 0) {
         // Build the screening prompt
         const validDigits = buyerResponses.map((r) => r.digit).join("");
+        // Accept digits are inferred from the response label so reject actions
+        // (for example: "Reject Lead") do not accidentally connect the call.
+        const inferredAcceptDigits = buyerResponses
+          .filter((r) => /accept|connect|approve|yes/i.test(r.message))
+          .map((r) => r.digit)
+          .join("");
+        const acceptDigits =
+          inferredAcceptDigits || buyerResponses[0]?.digit || "";
         const screeningMessage = buyerResponses
           .map((r) => `Press ${r.digit} to ${r.message}.`)
           .join(" ");
@@ -66,7 +74,7 @@ export async function POST(req: NextRequest) {
 
         const gather = twiml.gather({
           numDigits: 1,
-          action: `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}`,
+          action: `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}&acceptDigits=${acceptDigits}`,
           method: "POST",
           timeout: 10,
         });

@@ -325,16 +325,28 @@ export default function CallMethodForm({
 
   const addForwardingNumber = () =>
     setForwardingNumbers([...forwardingNumbers, ""]);
-  const addBuyerResponse = () =>
-    setBuyerResponses([...buyerResponses, { message: "", digit: "" }]);
-  const addLeadResponse = () =>
-    setLeadResponses([...leadResponses, { message: "", digit: "" }]);
-  const removeBuyerResponse = (index: number) => {
-    setBuyerResponses((prev) => prev.filter((_, i) => i !== index));
+  // const addBuyerResponse = () =>
+  //   setBuyerResponses([...buyerResponses, { message: "", digit: "" }]);
+  const toggleRequireResponse = () => {
+    const next = !requireResponse;
+    setRequireResponse(next);
+    if (next) {
+      setBuyerResponses([
+        { message: "Accept Lead", digit: "1" },
+        { message: "Reject Lead", digit: "2" },
+      ]);
+    } else {
+      setBuyerResponses([]);
+    }
   };
-  const removeLeadResponse = (index: number) => {
-    setLeadResponses((prev) => prev.filter((_, i) => i !== index));
-  };
+  // const addLeadResponse = () =>
+  //   setLeadResponses([...leadResponses, { message: "", digit: "" }]);
+  // const removeBuyerResponse = (index: number) => {
+  //   setBuyerResponses((prev) => prev.filter((_, i) => i !== index));
+  // };
+  // const removeLeadResponse = (index: number) => {
+  //   setLeadResponses((prev) => prev.filter((_, i) => i !== index));
+  // };
   const removeForwardingNumber = (index: number) => {
     setForwardingNumbers((prev) => prev.filter((_, i) => i !== index));
   };
@@ -730,7 +742,7 @@ export default function CallMethodForm({
           control={
             <Switch
               checked={requireResponse}
-              onChange={() => setRequireResponse(!requireResponse)}
+              onChange={toggleRequireResponse}
             />
           }
           label="Require Response?"
@@ -751,14 +763,7 @@ export default function CallMethodForm({
           <Typography variant="subtitle1" sx={{ mb: 1 }}>
             Buyer Response Options
           </Typography>
-          <Button
-            onClick={addBuyerResponse}
-            variant="outlined"
-            size="small"
-            sx={{ mb: 2 }}
-          >
-            Add Message for Buyer
-          </Button>
+          {/* Buyer responses are fixed: Accept (1) and Reject (2) when enabled */}
 
           {buyerResponses.map((response, index) => (
             <Box
@@ -797,20 +802,14 @@ export default function CallMethodForm({
                 error={!!errors[`buyerDigit_${index}`]}
                 helperText={errors[`buyerDigit_${index}`]}
               />
-              <IconButton
-                onClick={() => removeBuyerResponse(index)}
-                size="small"
-                color="error"
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
+              {/* Deletion disabled for fixed buyer responses */}
             </Box>
           ))}
         </Box>
       )}
 
       {/* Lead Responses */}
-      {requireResponse && (
+      {/* {requireResponse && (
         <Box
           sx={{ mb: 3, pl: 2, borderLeft: 3, borderColor: "secondary.main" }}
         >
@@ -873,7 +872,7 @@ export default function CallMethodForm({
             </Box>
           ))}
         </Box>
-      )}
+      )} */}
 
       <Divider sx={{ my: 2 }} />
 
