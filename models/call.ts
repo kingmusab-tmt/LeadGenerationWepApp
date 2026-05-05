@@ -1,7 +1,7 @@
 // description: This file defines the Call model for MongoDB using Mongoose.
 import mongoose, { Schema, Document } from "mongoose";
 
-interface ICall extends Document {
+export interface ICall extends Document {
   userId: string; // Lead seller ID
   buyerId?: string; // Lead buyer ID
   leadId?: mongoose.Types.ObjectId; // PHASE 3: Reference to Lead

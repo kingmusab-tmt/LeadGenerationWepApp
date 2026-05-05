@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     const buyerResponsesRaw = searchParams.get("buyerResponses") || "";
     const sellerId = searchParams.get("sellerId") || "";
     const callSid = searchParams.get("callSid") || "";
+    const trackingNumber = searchParams.get("trackingNumber") || "";
 
     debugLog("Whisper/screening endpoint hit", {
       whisperMessage: !!whisperMessage,
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
 
         const gather = twiml.gather({
           numDigits: 1,
-          action: `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}&acceptDigits=${acceptDigits}`,
+          action: `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}&acceptDigits=${acceptDigits}&trackingNumber=${encodeURIComponent(trackingNumber)}`,
           method: "POST",
           timeout: 10,
         });

@@ -81,6 +81,20 @@ type TrackingNumberConfig = {
   aiSummaryEnabled?: boolean;
 };
 
+function buildBusyFallbackTwiml(callSid: string) {
+  const twiml = new twilio.twiml.VoiceResponse();
+  twiml.say(
+    "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+  );
+  addVoicemailToTwiml(twiml, {
+    sellerId: "",
+    callSid,
+    message:
+      "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+  });
+  return twiml;
+}
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   debugLog("Incoming call request received");
@@ -182,7 +196,10 @@ export async function POST(req: NextRequest) {
 
     // Extract common parameters
     const callSid = formData.get("CallSid") as string;
-    const callStatus = formData.get("CallStatus") as string;
+    const callStatus =
+      (formData.get("CallStatus") as string) ||
+      (formData.get("DialCallStatus") as string) ||
+      "";
     const from = formData.get("From") as string;
     const to = formData.get("To") as string;
 
@@ -225,8 +242,10 @@ export async function POST(req: NextRequest) {
     if (!seller) {
       const errorMessage = `Seller not found for sellerId: ${sellerId}`;
       debugLog(errorMessage, null, "error");
-      return new NextResponse(JSON.stringify({ error: "Seller not found" }), {
-        status: 404,
+      const twiml = buildBusyFallbackTwiml(callSid);
+      return new NextResponse(twiml.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
       });
     }
 
@@ -235,7 +254,14 @@ export async function POST(req: NextRequest) {
 
     // Handle different call scenarios
     processingStage = "decideCallScenario";
-    if (callStatus === "no-answer") {
+    const rejectedOrUnavailableStatuses = new Set([
+      "no-answer",
+      "busy",
+      "failed",
+      "canceled",
+    ]);
+
+    if (rejectedOrUnavailableStatuses.has(callStatus)) {
       return handleNoAnswer(
         formData,
         seller,
@@ -281,14 +307,11 @@ export async function POST(req: NextRequest) {
       "error",
     );
 
-    return new NextResponse(
-      JSON.stringify({
-        error: "Call handling failed",
-        details: errorMessage,
-        stack: process.env.NODE_ENV === "development" ? errorStack : null,
-      }),
-      { status: 500 },
-    );
+    const twiml = buildBusyFallbackTwiml("");
+    return new NextResponse(twiml.toString(), {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    });
   }
 }
 
@@ -506,6 +529,7 @@ async function handleNewCall(
     buyerResponses,
     sellerId,
     callSid,
+    trackingNumber: to,
   });
 
   // Add spam warning to whisper if configured
@@ -520,6 +544,7 @@ async function handleNewCall(
           buyerResponses,
           sellerId,
           callSid,
+          trackingNumber: to,
         })
       : whisperUrl;
 
@@ -970,12 +995,11 @@ async function handleNoAnswer(
     if (!originalCall) {
       const errorMessage = `Call record not found for CallSid: ${callSid}`;
       debugLog(errorMessage, null, "error");
-      return new NextResponse(
-        JSON.stringify({ error: "Call record not found" }),
-        {
-          status: 404,
-        },
-      );
+      const twiml = buildBusyFallbackTwiml(callSid);
+      return new NextResponse(twiml.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
     }
 
     // Update original call status
@@ -1017,6 +1041,7 @@ async function handleNoAnswer(
       buyerResponses: trackingConfig?.buyerResponses,
       sellerId: String(seller._id),
       callSid,
+      trackingNumber: to,
     });
 
     // Extract geo data for geo-routing in retry

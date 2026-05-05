@@ -2,11 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
+import type { ICall } from "@/models/call";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
-import { getNextRoundRobinBuyerAtomic, debugLog } from "@/utils/callHandlers";
+import {
+  getNextRoundRobinBuyerAtomic,
+  debugLog,
+  addOverflowToTwiml,
+  addVoicemailToTwiml,
+  sendMissedCallTextBack,
+} from "@/utils/callHandlers";
 import { callSecurityMiddleware } from "@/lib/security/callSecurity";
 import { env } from "@/lib/env";
+
+function buildUnavailableTwiml(message: string, callSid: string) {
+  const twiml = new twilio.twiml.VoiceResponse();
+  twiml.say(message);
+  addVoicemailToTwiml(twiml, {
+    sellerId: "",
+    callSid,
+    message:
+      "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+  });
+  return twiml;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,19 +38,36 @@ export async function POST(req: NextRequest) {
 
     await dbConnect();
     const formData = await req.formData();
-    const callSid = formData.get("CallSid") as string; // New CallSid for this forwarded leg
+    const childCallSid = (formData.get("CallSid") as string) || ""; // New CallSid for this forwarded leg
     const callStatus = formData.get("CallStatus") as string; // Call status (e.g., "no-answer")
 
     // Extract query parameters
     const { searchParams } = new URL(req.url);
     const sellerId = searchParams.get("sellerId");
+    const originalCallSid = searchParams.get("callSid") || undefined; // original parent callSid passed in the dial action
 
-    if (!callSid || !callStatus || !sellerId) {
+    const parentCallSid = originalCallSid;
+
+    debugLog("No-answer webhook called", {
+      requestUrl: req.url,
+      sellerId,
+      childCallSid,
+      parentCallSid,
+      callStatus,
+      from: formData.get("From") || "",
+      to: formData.get("To") || "",
+    });
+
+    if ((!childCallSid && !parentCallSid) || !callStatus || !sellerId) {
       console.error("Missing required parameters");
-      return new NextResponse(
-        JSON.stringify({ error: "Missing required parameters" }),
-        { status: 400 },
+      const twiml = buildUnavailableTwiml(
+        "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+        childCallSid || parentCallSid || "",
       );
+      return new NextResponse(twiml.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
     }
 
     // Find the seller associated with the call
@@ -39,27 +75,94 @@ export async function POST(req: NextRequest) {
 
     if (!seller) {
       console.error(`Seller not found for sellerId: ${sellerId}`);
-      return new NextResponse(JSON.stringify({ error: "Seller not found" }), {
-        status: 404,
+      const twiml = buildUnavailableTwiml(
+        "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+        childCallSid || parentCallSid || "",
+      );
+      return new NextResponse(twiml.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
       });
     }
 
-    // Find the call record by CallSid
-    const call = await Call.findOne({ callSid });
-
-    if (!call) {
-      console.error(`Call record not found for CallSid: ${callSid}`);
-      return new NextResponse(
-        JSON.stringify({ error: "Call record not found" }),
-        {
-          status: 404,
-        },
-      );
+    // Find the call record by the forwarded leg CallSid first, then fall back
+    // to the original parent CallSid (if provided in the action URL).
+    let call: ICall | null = null;
+    if (childCallSid) {
+      call = await Call.findOne({ callSid: childCallSid });
+    }
+    if (!call && originalCallSid) {
+      call = await Call.findOne({ callSid: originalCallSid });
     }
 
-    // Check if the call was unanswered
-    if (callStatus === "no-answer") {
-      //(`Call ${callSid} was unanswered. Retrying next buyer...`);
+    // If we still couldn't find a call record, gracefully route to overflow/voicemail
+    if (!call) {
+      debugLog(
+        `Call record not found for CallSid (child: ${childCallSid} parent: ${originalCallSid})`,
+        null,
+        "warn",
+      );
+      const twiml = new twilio.twiml.VoiceResponse();
+
+      const to = (formData.get("To") as string) || "";
+      const from = (formData.get("From") as string) || "";
+
+      // Try to lookup tracking config from seller's trackingNumbers
+      const trackingNumbers =
+        (seller as unknown as { trackingNumbers?: unknown[] })
+          .trackingNumbers ?? [];
+      type TrackingNumber = {
+        phoneNumber?: string;
+        overflowNumber?: string;
+        missedCallTextBack?: boolean;
+        missedCallTextMessage?: string;
+        reconnectCaller?: boolean;
+      };
+      const trackingConfig = (trackingNumbers as TrackingNumber[]).find(
+        (num) => num.phoneNumber === to,
+      );
+      const overflowNumber = trackingConfig?.overflowNumber || "";
+      const missedCallTextBack = trackingConfig?.missedCallTextBack || false;
+      const missedCallTextMessage = trackingConfig?.missedCallTextMessage || "";
+
+      if (overflowNumber) {
+        addOverflowToTwiml(twiml, {
+          overflowNumber,
+          sellerId: seller._id as string,
+          callSid: childCallSid || originalCallSid || "",
+          from,
+          passCallerId: true,
+          recordCall: false,
+        });
+        debugLog("No DB call found — using overflow fallback", {
+          overflowNumber,
+        });
+      } else {
+        twiml.say("All of our representatives are currently unavailable.");
+        addVoicemailToTwiml(twiml, {
+          sellerId: seller._id as string,
+          callSid: childCallSid || originalCallSid || "",
+        });
+        debugLog("No DB call found — playing voicemail fallback");
+      }
+
+      if (missedCallTextBack && missedCallTextMessage) {
+        sendMissedCallTextBack(
+          from,
+          missedCallTextMessage,
+          childCallSid || originalCallSid || "",
+        );
+      }
+
+      return new NextResponse(twiml.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    // Check if the call was unanswered or explicitly rejected by Twilio
+    if (["no-answer", "busy", "failed", "canceled"].includes(callStatus)) {
+      //(`Call ${parentCallSid || childCallSid} was not accepted. Retrying next buyer...`);
 
       // Update the call status to "no-answer"
       call.status = "no-answer";
@@ -78,12 +181,14 @@ export async function POST(req: NextRequest) {
 
         if (buyers.length === 0) {
           console.error(`No buyers available for industry: ${industry}`);
-          return new NextResponse(
-            JSON.stringify({
-              error: `No buyers available for industry: ${industry}`,
-            }),
-            { status: 404 },
+          const twiml = buildUnavailableTwiml(
+            "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+            childCallSid || parentCallSid || "",
           );
+          return new NextResponse(twiml.toString(), {
+            status: 200,
+            headers: { "Content-Type": "text/xml" },
+          });
         }
 
         // Use atomic round-robin for no-answer retry (Issue #1 & #2 fix)
@@ -99,7 +204,7 @@ export async function POST(req: NextRequest) {
           );
 
           debugLog("No-answer retry assigned to buyer", {
-            originalCallSid: callSid,
+            originalCallSid: parentCallSid,
             nextBuyerId: nextBuyer._id,
             nextBuyerPhone: nextBuyer.phone,
             industry,
@@ -112,14 +217,14 @@ export async function POST(req: NextRequest) {
             {
               callerId: call.from,
               timeout: 20, // 20 seconds before retrying
-              action: `https://${env.NEXTAUTH_URL}/api/call_twillo/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+              action: `https://${env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${parentCallSid}`, // Webhook for no-answer handling
             },
             nextBuyer.phone,
           );
 
           // Create a new call record for the next buyer
           const newCall = new Call({
-            callSid: `${callSid}-${nextIndex}`, // New CallSid for this forwarded leg (using nextIndex)
+            callSid: `${parentCallSid || childCallSid}-${nextIndex}`, // New CallSid for this forwarded leg (using nextIndex)
             userId: seller._id,
             buyerId: nextBuyer._id.toString(),
             from: call.from,
@@ -137,7 +242,7 @@ export async function POST(req: NextRequest) {
             "Error during no-answer retry with atomic RR",
             {
               error: error instanceof Error ? error.message : "Unknown error",
-              originalCallSid: callSid,
+              originalCallSid: parentCallSid,
               industry,
             },
             "error",
@@ -156,7 +261,7 @@ export async function POST(req: NextRequest) {
             {
               callerId: call.from,
               timeout: 20, // 20 seconds before retrying
-              action: `https://${env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+              action: `https://${env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${parentCallSid}`, // Webhook for no-answer handling
             },
             num,
           );
@@ -166,25 +271,37 @@ export async function POST(req: NextRequest) {
         });
       } else if (forwardingType === "specific_lead" && leadBuyers?.length) {
         // Forward to specific lead buyers sequentially
-        leadBuyers.forEach(
-          (buyer: { phone: string | undefined }, index: number) => {
+        (leadBuyers as Array<string | { phone?: string }>).forEach(
+          (buyer: string | { phone?: string }, index: number) => {
+            const buyerPhone = typeof buyer === "string" ? buyer : buyer?.phone;
+            if (!buyerPhone) return;
             twiml.dial(
               {
                 callerId: call.from,
                 timeout: 20, // 20 seconds before retrying
-                action: `https://${env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${callSid}`, // Webhook for no-answer handling
+                action: `https://${env.NEXTAUTH_URL}/api/calls/twilio/no-answer?sellerId=${sellerId}&callSid=${parentCallSid}`, // Webhook for no-answer handling
               },
-              buyer.phone,
+              buyerPhone,
             );
-            if (index < leadBuyers.length - 1) {
+            if (
+              index <
+              (leadBuyers as Array<string | { phone?: string }>).length - 1
+            ) {
               twiml.pause({ length: 1 }); // Add a small pause between forwarding attempts
             }
           },
         );
       } else {
         // No forwarding rules configured
-        twiml.say("No forwarding rules configured. Ending call.");
-        //("No forwarding rules configured. Call ended.");
+        twiml.say(
+          "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+        );
+        addVoicemailToTwiml(twiml, {
+          sellerId: seller._id as string,
+          callSid: childCallSid || parentCallSid || "",
+          message:
+            "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+        });
       }
 
       return new NextResponse(twiml.toString(), {
@@ -199,7 +316,7 @@ export async function POST(req: NextRequest) {
     const answeredBy = (formData.get("AnsweredBy") as string) || "Unknown";
 
     const updatedCall = await Call.findOneAndUpdate(
-      { callSid },
+      { callSid: call.callSid },
       {
         status: callStatus,
         recordingUrl: recordingUrl || "No Record",
@@ -222,13 +339,15 @@ export async function POST(req: NextRequest) {
     // Log the full error for debugging
     console.error("Full error details:", error);
 
-    return new NextResponse(
-      JSON.stringify({
-        error: "No-answer handling failed",
-        details:
-          process.env.NODE_ENV === "development" ? errorMessage : undefined,
-      }),
-      { status: 500 },
+    const twiml = buildUnavailableTwiml(
+      process.env.NODE_ENV === "development"
+        ? `Our agents are currently busy. Please try again later or leave a voicemail after the beep. (${errorMessage})`
+        : "Our agents are currently busy. Please try again later or leave a voicemail after the beep.",
+      "",
     );
+    return new NextResponse(twiml.toString(), {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    });
   }
 }

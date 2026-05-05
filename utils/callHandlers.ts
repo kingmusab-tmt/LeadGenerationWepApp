@@ -225,9 +225,16 @@ export const getWhisperUrl = (options: {
   buyerResponses?: BuyerResponse[];
   sellerId: string;
   callSid: string;
+  trackingNumber?: string;
 }): string | undefined => {
-  const { callWhisper, requireResponse, buyerResponses, sellerId, callSid } =
-    options;
+  const {
+    callWhisper,
+    requireResponse,
+    buyerResponses,
+    sellerId,
+    callSid,
+    trackingNumber,
+  } = options;
 
   if (!callWhisper && !requireResponse) return undefined;
 
@@ -237,10 +244,29 @@ export const getWhisperUrl = (options: {
   if (buyerResponses?.length) {
     params.set("buyerResponses", JSON.stringify(buyerResponses));
   }
+  if (trackingNumber) params.set("trackingNumber", trackingNumber);
   params.set("sellerId", sellerId);
   params.set("callSid", callSid);
 
   return `${getPublicBaseUrl()}/api/calls/twilio/whisper?${params.toString()}`;
+};
+
+export const sendMissedCallTextBack = async (
+  to: string,
+  message: string,
+  callSid?: string,
+) => {
+  try {
+    if (!to || !message) return;
+    await sendSMS(to, message);
+    debugLog("Sent missed-call text-back", { to, callSid });
+  } catch (err) {
+    debugLog(
+      "Failed to send missed-call text-back",
+      { err, to, callSid },
+      "error",
+    );
+  }
 };
 
 export const dialWithWhisper = (

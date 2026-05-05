@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 import { debugLog } from "@/utils/callHandlers";
 import { callSecurityMiddleware } from "@/lib/security/callSecurity";
+import { env } from "@/lib/env";
 
 /**
  * POST /api/calls/twilio/whisper/response
@@ -45,6 +46,8 @@ export async function POST(req: NextRequest) {
     const acceptDigits = searchParams.get("acceptDigits") || "";
     const sellerId = searchParams.get("sellerId") || "";
     const callSid = searchParams.get("callSid") || "";
+    const buyerNumber = (formObj["Called"] as string) || "";
+    const trackingNumber = searchParams.get("trackingNumber") || "";
 
     debugLog("Whisper response received", {
       headers: headersObj,
@@ -66,17 +69,72 @@ export async function POST(req: NextRequest) {
       debugLog("Buyer accepted call via screening", { digit: digits });
       twiml.say("Connecting you now.");
     } else if (isValidDigit) {
-      // Buyer explicitly declined.
+      // Buyer explicitly declined — instruct backend to redirect the parent call
       debugLog("Buyer rejected call via screening", { digit: digits });
+      const baseUrl =
+        process.env.NEXT_PUBLIC_BASE_URL ||
+        process.env.NEXTAUTH_URL ||
+        `https://${env.NEXT_PUBLIC_DOMAIN}`;
+      const fallbackUrl = `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/fallback?sellerId=${sellerId}&callSid=${callSid}&trackingNumber=${encodeURIComponent(
+        trackingNumber,
+      )}&tryOverflow=true&buyerNumber=${encodeURIComponent(buyerNumber)}`;
+
+      try {
+        const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+        // Update the parent call to fetch fallback TwiML which will dial overflow
+        await client
+          .calls(callSid)
+          .update({ url: fallbackUrl, method: "POST" });
+        debugLog("Parent call redirected to fallback via REST API", {
+          callSid,
+          fallbackUrl: fallbackUrl.replace(buyerNumber, "[hidden]"),
+        });
+      } catch (err) {
+        debugLog(
+          "Failed to redirect parent call via REST API",
+          { err },
+          "error",
+        );
+      }
+
+      // End this buyer leg
       twiml.say("Call declined.");
       twiml.hangup();
     } else {
-      // Buyer pressed an invalid digit (or no digit).
+      // Buyer pressed an invalid digit (or no digit) — redirect to fallback.
       debugLog("Buyer rejected or invalid digit", {
         digits,
         validDigits,
         acceptDigits,
       });
+      const baseUrl =
+        process.env.NEXT_PUBLIC_BASE_URL ||
+        process.env.NEXTAUTH_URL ||
+        `https://${env.NEXT_PUBLIC_DOMAIN}`;
+      const fallbackUrl = `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/fallback?sellerId=${sellerId}&callSid=${callSid}&trackingNumber=${encodeURIComponent(
+        trackingNumber,
+      )}&tryOverflow=true&buyerNumber=${encodeURIComponent(buyerNumber)}`;
+
+      try {
+        const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+        await client
+          .calls(callSid)
+          .update({ url: fallbackUrl, method: "POST" });
+        debugLog(
+          "Parent call redirected to fallback via REST API (invalid digit)",
+          {
+            callSid,
+            fallbackUrl: fallbackUrl.replace(buyerNumber, "[hidden]"),
+          },
+        );
+      } catch (err) {
+        debugLog(
+          "Failed to redirect parent call via REST API (invalid digit)",
+          { err },
+          "error",
+        );
+      }
+
       twiml.say("Call declined.");
       twiml.hangup();
     }

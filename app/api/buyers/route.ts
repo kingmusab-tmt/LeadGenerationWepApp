@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       email,
       phone,
       status = "new",
-      leadPreferences = { location: "", industry: "" },
+      leadPreferences = { location: [], industries: [] },
       preferredDistribution = "automatic",
       notificationPreferences = ["email"],
       workingHours = { start: "09:00", end: "17:00" },
@@ -264,8 +264,18 @@ export async function PUT(req: NextRequest) {
       phone: body.phone,
       status: body.status,
       leadPreferences: {
-        location: body.leadPreferences?.location,
-        industry: body.leadPreferences?.industry,
+        location: Array.isArray(body.leadPreferences?.location)
+          ? body.leadPreferences.location
+          : body.leadPreferences?.location
+            ? [body.leadPreferences.location]
+            : [],
+        industries: Array.isArray(body.leadPreferences?.industries)
+          ? body.leadPreferences.industries
+          : body.leadPreferences?.industry
+            ? [body.leadPreferences.industry]
+            : [],
+        industryServicePairs:
+          body.leadPreferences?.industryServicePairs || [],
       },
       preferredDistribution: body.preferredDistribution,
       notificationPreferences: body.notificationPreferences,

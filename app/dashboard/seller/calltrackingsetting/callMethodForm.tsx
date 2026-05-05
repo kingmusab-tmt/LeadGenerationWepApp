@@ -339,14 +339,7 @@ export default function CallMethodForm({
       setBuyerResponses([]);
     }
   };
-  // const addLeadResponse = () =>
-  //   setLeadResponses([...leadResponses, { message: "", digit: "" }]);
-  // const removeBuyerResponse = (index: number) => {
-  //   setBuyerResponses((prev) => prev.filter((_, i) => i !== index));
-  // };
-  // const removeLeadResponse = (index: number) => {
-  //   setLeadResponses((prev) => prev.filter((_, i) => i !== index));
-  // };
+
   const removeForwardingNumber = (index: number) => {
     setForwardingNumbers((prev) => prev.filter((_, i) => i !== index));
   };
