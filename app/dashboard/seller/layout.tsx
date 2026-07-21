@@ -46,6 +46,8 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import InactivityLogout from "@/app/components/generalComponent/InactivityLogout";
+import DarkModeToggle from "@/app/components/generalComponent/darkmodetoggle";
+import NotificationBell from "@/app/components/generalComponent/NotificationBell";
 import { useInitializeUser } from "@/app/hooks";
 import { useSession } from "next-auth/react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
@@ -405,7 +407,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
           borderColor: "divider",
         }}
       >
-        <IconButton onClick={handleDrawerToggle} edge="end">
+        <IconButton
+          onClick={handleDrawerToggle}
+          edge="end"
+          aria-label="Close navigation menu"
+        >
           <Close />
         </IconButton>
       </Box>
@@ -619,6 +625,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
           <IconButton
             edge="start"
             onClick={handleDrawerToggle}
+            aria-label="Open navigation menu"
             sx={{ mr: 2, display: { md: "none" } }}
           >
             <MenuIcon />
@@ -638,8 +645,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
 
           {/* Right side icons */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <DarkModeToggle
+              sx={{
+                display: { xs: "none", sm: "flex" },
+                color: "common.white",
+              }}
+            />
+            <NotificationBell
+              onClick={() => handleNavigation("notifications")}
+              sx={{
+                display: { xs: "none", sm: "flex" },
+                color: "common.white",
+              }}
+            />
             <IconButton
               onClick={() => handleNavigation("help")}
+              aria-label="Help and support"
               sx={{
                 display: { xs: "none", sm: "flex" },
                 color: "common.white",
@@ -649,6 +670,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
             </IconButton>
             <IconButton
               onClick={() => handleNavigation("settings")}
+              aria-label="Settings"
               sx={{
                 display: { xs: "none", sm: "flex" },
                 color: "common.white",
@@ -660,6 +682,17 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
               src={avatarSrc}
               alt={displayName}
               onClick={handleMenuOpen}
+              role="button"
+              tabIndex={0}
+              aria-label="Account menu"
+              aria-haspopup="true"
+              aria-expanded={Boolean(anchorEl)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.currentTarget.click();
+                }
+              }}
               sx={{
                 width: 36,
                 height: 36,

@@ -24,6 +24,8 @@ export interface IUser extends Document {
   };
   loginlink: string;
   role: "admin" | "seller" | "buyer" | "user" | "business-admin" | "staff";
+  adminLevel?: "standard" | "super";
+  billingCurrency?: "usd" | "gbp" | "cad";
   image?: string;
   walletBalance: number;
   provider: string;

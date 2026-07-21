@@ -39,9 +39,6 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useInitializeUser } from "@/app/hooks";
 import {
-  ArrowUpward,
-  ArrowDownward,
-  Equalizer,
   MonetizationOn,
   People,
   Timeline,
@@ -51,40 +48,16 @@ import {
   Star,
   Warning,
 } from "@mui/icons-material";
+import StatCard from "@/app/components/generalComponent/StatCard";
+import ProfileCompletionCard from "@/app/components/generalComponent/ProfileCompletionCard";
 
-// Styled components
-const StyledPaper = styled(Paper)(({ theme }) => ({
+// Padded panel used to house charts/lists below the KPI row.
+const ChartPanel = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
   textAlign: "center",
   color: theme.palette.text.secondary,
-  background: theme.palette.background.paper,
-  boxShadow: theme.shadows[3],
   height: "100%",
 }));
-
-const TrendIndicator = ({ value }: { value: number }) => {
-  if (value > 0) {
-    return (
-      <Box display="flex" alignItems="center" color="success.main">
-        <ArrowUpward fontSize="small" />
-        <Typography variant="caption">{value}%</Typography>
-      </Box>
-    );
-  } else if (value < 0) {
-    return (
-      <Box display="flex" alignItems="center" color="error.main">
-        <ArrowDownward fontSize="small" />
-        <Typography variant="caption">{Math.abs(value)}%</Typography>
-      </Box>
-    );
-  }
-  return (
-    <Box display="flex" alignItems="center" color="text.secondary">
-      <Equalizer fontSize="small" />
-      <Typography variant="caption">0%</Typography>
-    </Box>
-  );
-};
 
 // Initial default values for the overview data
 const initialOverviewData = {
@@ -401,6 +374,8 @@ const Overview: React.FC = () => {
           Seller Dashboard Overview
         </Typography> */}
 
+      <ProfileCompletionCard user={currentUser} />
+
       <Grid container spacing={3}>
         {/* Key Metrics Row */}
         <Grid size={{ xs: 12 }}>
@@ -415,241 +390,130 @@ const Overview: React.FC = () => {
 
         {/* New Leads */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6" color="primary">
-                New Leads
-              </Typography>
-              <People color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.newLeads}
-            </Typography>
-            <TrendIndicator
-              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-            />
-          </StyledPaper>
+          <StatCard
+            label="New Leads"
+            value={overviewData.newLeads}
+            icon={<People color="primary" />}
+            trend={overviewData.kpiTrends?.leadVolumeTrend || 0}
+          />
         </Grid>
         {/* Purchased Leads */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6" color="primary">
-                Purchased Leads
-              </Typography>
-              <People color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.purchasedLeads}
-            </Typography>
-            <TrendIndicator
-              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-            />
-          </StyledPaper>
+          <StatCard
+            label="Purchased Leads"
+            value={overviewData.purchasedLeads}
+            icon={<People color="primary" />}
+            trend={overviewData.kpiTrends?.leadVolumeTrend || 0}
+          />
         </Grid>
         {/* Total Leads */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6" color="primary">
-                Total Leads
-              </Typography>
-              <People color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.totalLeads}
-            </Typography>
-            <TrendIndicator
-              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-            />
-          </StyledPaper>
+          <StatCard
+            label="Total Leads"
+            value={overviewData.totalLeads}
+            icon={<People color="primary" />}
+            trend={overviewData.kpiTrends?.leadVolumeTrend || 0}
+          />
         </Grid>
         {/* Total Lead Buyers */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6" color="primary">
-                Total Leads Buyers
-              </Typography>
-              <People color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.totalLeadBuyers}
-            </Typography>
-            <TrendIndicator
-              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-            />
-          </StyledPaper>
+          <StatCard
+            label="Total Leads Buyers"
+            value={overviewData.totalLeadBuyers}
+            icon={<People color="primary" />}
+            trend={overviewData.kpiTrends?.leadVolumeTrend || 0}
+          />
         </Grid>
         {/* New Lead Buyers */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6" color="primary">
-                New Leads Buyers
-              </Typography>
-              <People color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.newLeadBuyers}
-            </Typography>
-            <TrendIndicator
-              value={overviewData.kpiTrends?.leadVolumeTrend || 0}
-            />
-          </StyledPaper>
+          <StatCard
+            label="New Leads Buyers"
+            value={overviewData.newLeadBuyers}
+            icon={<People color="primary" />}
+            trend={overviewData.kpiTrends?.leadVolumeTrend || 0}
+          />
         </Grid>
 
         {/* Conversion Rate */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6" color="primary">
-                Conversion Rate
-              </Typography>
-              <Timeline color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.conversionRate}%
-            </Typography>
-            <TrendIndicator
-              value={overviewData.kpiTrends?.conversionRateTrend || 0}
-            />
-          </StyledPaper>
+          <StatCard
+            label="Conversion Rate"
+            value={`${overviewData.conversionRate}%`}
+            icon={<Timeline color="primary" />}
+            trend={overviewData.kpiTrends?.conversionRateTrend || 0}
+          />
         </Grid>
 
         {/* Total Revenue */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6" color="primary">
-                Total Revenue
-              </Typography>
-              <MonetizationOn color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              ${overviewData.totalRevenue.toLocaleString()}
-            </Typography>
-            <TrendIndicator value={overviewData.kpiTrends?.revenueTrend || 0} />
-          </StyledPaper>
+          <StatCard
+            label="Total Revenue"
+            value={`$${overviewData.totalRevenue.toLocaleString()}`}
+            icon={<MonetizationOn color="primary" />}
+            trend={overviewData.kpiTrends?.revenueTrend || 0}
+          />
         </Grid>
 
         {/* Lead Buyer Credits */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6" color="primary">
-                Lead Buyer Credits
-              </Typography>
-              <LocalAtm color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "info.main", fontWeight: "bold" }}
-            >
-              {(overviewData.totalLeadBuyerUsedCredits || 0) +
-                (overviewData.totalLeadBuyerRemainingCredits || 0)}
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 2,
-                mt: 1,
-              }}
-            >
-              <Box>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
-                  Used Credit
-                </Typography>
-                <Typography
-                  variant="caption"
-                  fontWeight={600}
-                  color="text.primary"
-                >
-                  {overviewData.totalLeadBuyerUsedCredits || 0}
-                </Typography>
+          <StatCard
+            label="Lead Buyer Credits"
+            value={
+              (overviewData.totalLeadBuyerUsedCredits || 0) +
+              (overviewData.totalLeadBuyerRemainingCredits || 0)
+            }
+            icon={<LocalAtm color="primary" />}
+            valueColor="info.main"
+            footer={
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 2,
+                  mt: 1,
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                  >
+                    Used Credit
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    fontWeight={600}
+                    color="text.primary"
+                  >
+                    {overviewData.totalLeadBuyerUsedCredits || 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: "right" }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                  >
+                    Remaining Credit
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    fontWeight={600}
+                    color="text.primary"
+                  >
+                    {overviewData.totalLeadBuyerRemainingCredits || 0}
+                  </Typography>
+                </Box>
               </Box>
-              <Box sx={{ textAlign: "right" }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
-                  Remaining Credit
-                </Typography>
-                <Typography
-                  variant="caption"
-                  fontWeight={600}
-                  color="text.primary"
-                >
-                  {overviewData.totalLeadBuyerRemainingCredits || 0}
-                </Typography>
-              </Box>
-            </Box>
-          </StyledPaper>
+            }
+          />
         </Grid>
 
         {hasLeadSourcesData && (
           <Grid size={{ xs: 12, md: 4 }}>
-            <StyledPaper>
+            <ChartPanel>
               <Typography
                 variant="h6"
                 gutterBottom
@@ -685,13 +549,13 @@ const Overview: React.FC = () => {
                   />
                 </PieChart>
               </ResponsiveContainer>
-            </StyledPaper>
+            </ChartPanel>
           </Grid>
         )}
 
         {hasTopLeadBuyersData && (
           <Grid size={{ xs: 12, md: 4 }}>
-            <StyledPaper sx={{ textAlign: "left" }}>
+            <ChartPanel sx={{ textAlign: "left" }}>
               <Typography
                 variant="h6"
                 gutterBottom
@@ -719,13 +583,13 @@ const Overview: React.FC = () => {
                   </Box>
                 ))}
               </Stack>
-            </StyledPaper>
+            </ChartPanel>
           </Grid>
         )}
 
         {hasSalesPerformanceData && (
           <Grid size={{ xs: 12, md: 4 }}>
-            <StyledPaper>
+            <ChartPanel>
               <Box
                 display="flex"
                 justifyContent="space-between"
@@ -772,7 +636,7 @@ const Overview: React.FC = () => {
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </StyledPaper>
+            </ChartPanel>
           </Grid>
         )}
 
@@ -790,7 +654,7 @@ const Overview: React.FC = () => {
 
         {barChartData.length > 0 && (
           <Grid size={{ xs: 12, md: 6 }} mb={4}>
-            <StyledPaper>
+            <ChartPanel>
               <Typography variant="subtitle1" gutterBottom>
                 Monthly Lead Volume
               </Typography>
@@ -812,13 +676,13 @@ const Overview: React.FC = () => {
                   />
                 </BarChart>
               </ResponsiveContainer>
-            </StyledPaper>
+            </ChartPanel>
           </Grid>
         )}
 
         {pieChartData.length > 0 && (
           <Grid size={{ xs: 12, md: 6 }} mb={4}>
-            <StyledPaper>
+            <ChartPanel>
               <Typography variant="subtitle1" gutterBottom>
                 Lead Status Distribution
               </Typography>
@@ -846,7 +710,7 @@ const Overview: React.FC = () => {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
-            </StyledPaper>
+            </ChartPanel>
           </Grid>
         )}
       </Grid>

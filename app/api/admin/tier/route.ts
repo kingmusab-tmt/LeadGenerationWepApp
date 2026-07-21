@@ -11,6 +11,9 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { requireSuperAdmin } from "@/lib/api/adminAuth";
+import { recordAuditLog } from "@/lib/auditLog";
+import { resolveTierPrice } from "@/lib/currency";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
@@ -60,17 +63,35 @@ async function createStripeCouponForTier(
 }
 
 /**
- * Create Stripe prices for a tier (monthly and annual)
+ * Create Stripe prices for a tier (monthly and annual) in USD, plus GBP/CAD
+ * equivalents so a seller or buyer billing in those currencies has a real
+ * price to check out against. GBP/CAD amounts use the tier's explicit
+ * override if the admin set one, else a computed conversion (lib/currency.ts).
  */
 async function createStripePricesForTier(
   tierName: string,
   monthlyPrice: number,
   annualPrice: number,
+  tierForCurrency?: {
+    price?: string;
+    annualPrice?: string;
+    priceGBP?: string;
+    priceCAD?: string;
+    annualPriceGBP?: string;
+    annualPriceCAD?: string;
+  },
 ) {
   try {
     // Only create prices for paid tiers (not free/trial)
     if (monthlyPrice === 0 || annualPrice === 0) {
-      return { stripeMonthlyPriceId: null, stripeAnnualPriceId: null };
+      return {
+        stripeMonthlyPriceId: null,
+        stripeAnnualPriceId: null,
+        stripeMonthlyPriceIdGBP: null,
+        stripeMonthlyPriceIdCAD: null,
+        stripeAnnualPriceIdGBP: null,
+        stripeAnnualPriceIdCAD: null,
+      };
     }
 
     // Create or get product
@@ -106,15 +127,60 @@ async function createStripePricesForTier(
       },
     });
 
-    // console.log(`[Tier Admin] Created Stripe prices for ${tierName}:`, {
-    //   monthlyPriceId: monthlyPriceObj.id,
-    //   annualPriceId: annualPriceObj.id,
-    // });
-
-    return {
+    const result: {
+      stripeMonthlyPriceId: string;
+      stripeAnnualPriceId: string;
+      stripeMonthlyPriceIdGBP: string | null;
+      stripeMonthlyPriceIdCAD: string | null;
+      stripeAnnualPriceIdGBP: string | null;
+      stripeAnnualPriceIdCAD: string | null;
+    } = {
       stripeMonthlyPriceId: monthlyPriceObj.id,
       stripeAnnualPriceId: annualPriceObj.id,
+      stripeMonthlyPriceIdGBP: null,
+      stripeMonthlyPriceIdCAD: null,
+      stripeAnnualPriceIdGBP: null,
+      stripeAnnualPriceIdCAD: null,
     };
+
+    if (tierForCurrency) {
+      for (const currency of ["gbp", "cad"] as const) {
+        for (const interval of ["month", "year"] as const) {
+          try {
+            const amount = resolveTierPrice(
+              tierForCurrency,
+              currency,
+              interval,
+            );
+            if (!amount || amount <= 0) continue;
+
+            const priceObj = await stripe.prices.create({
+              product: product.id,
+              unit_amount: Math.round(amount * 100),
+              currency,
+              recurring: { interval, interval_count: 1 },
+            });
+
+            if (currency === "gbp" && interval === "month") {
+              result.stripeMonthlyPriceIdGBP = priceObj.id;
+            } else if (currency === "gbp" && interval === "year") {
+              result.stripeAnnualPriceIdGBP = priceObj.id;
+            } else if (currency === "cad" && interval === "month") {
+              result.stripeMonthlyPriceIdCAD = priceObj.id;
+            } else {
+              result.stripeAnnualPriceIdCAD = priceObj.id;
+            }
+          } catch (currencyError) {
+            console.error(
+              `[Tier Admin] Failed to create ${currency} ${interval}ly price for ${tierName}:`,
+              currencyError,
+            );
+          }
+        }
+      }
+    }
+
+    return result;
   } catch (error) {
     console.error(
       `[Tier Admin] Error creating Stripe prices for ${tierName}:`,
@@ -188,10 +254,15 @@ export async function POST(req: NextRequest) {
         data.name,
         monthlyPrice,
         annualPrice,
+        data,
       );
 
       data.stripeMonthlyPriceId = stripePrices.stripeMonthlyPriceId;
       data.stripeAnnualPriceId = stripePrices.stripeAnnualPriceId;
+      data.stripeMonthlyPriceIdGBP = stripePrices.stripeMonthlyPriceIdGBP;
+      data.stripeMonthlyPriceIdCAD = stripePrices.stripeMonthlyPriceIdCAD;
+      data.stripeAnnualPriceIdGBP = stripePrices.stripeAnnualPriceIdGBP;
+      data.stripeAnnualPriceIdCAD = stripePrices.stripeAnnualPriceIdCAD;
 
       // Create Stripe coupon if discount exists
       if (data.discountPercentage && data.discountPercentage > 0) {
@@ -208,6 +279,21 @@ export async function POST(req: NextRequest) {
 
     // Create the tier
     const tier = await Tier.create(data);
+
+    await recordAuditLog({
+      actor: {
+        email: session.user.email,
+        name: session.user.name,
+        role: session.user.role,
+      },
+      action: "tier.create",
+      targetType: "Tier",
+      targetId: String(tier._id),
+      summary: `Created tier "${tier.name}" ($${tier.price})`,
+      metadata: { name: tier.name, price: tier.price },
+      req,
+    });
+
     return NextResponse.json(tier, { status: 201 });
   } catch (error) {
     console.error("Error creating tier:", error);
@@ -256,10 +342,19 @@ export async function PUT(req: NextRequest) {
           updateData.name || existingTier.name,
           monthlyPrice,
           annualPrice,
+          { ...existingTier.toObject(), ...updateData },
         );
 
         updateData.stripeMonthlyPriceId = stripePrices.stripeMonthlyPriceId;
         updateData.stripeAnnualPriceId = stripePrices.stripeAnnualPriceId;
+        updateData.stripeMonthlyPriceIdGBP =
+          stripePrices.stripeMonthlyPriceIdGBP;
+        updateData.stripeMonthlyPriceIdCAD =
+          stripePrices.stripeMonthlyPriceIdCAD;
+        updateData.stripeAnnualPriceIdGBP =
+          stripePrices.stripeAnnualPriceIdGBP;
+        updateData.stripeAnnualPriceIdCAD =
+          stripePrices.stripeAnnualPriceIdCAD;
       }
     }
 
@@ -302,6 +397,20 @@ export async function PUT(req: NextRequest) {
       return notFound("Tier");
     }
 
+    await recordAuditLog({
+      actor: {
+        email: session.user.email,
+        name: session.user.name,
+        role: session.user.role,
+      },
+      action: "tier.update",
+      targetType: "Tier",
+      targetId: id,
+      summary: `Updated tier "${updatedTier.name}" (fields: ${Object.keys(updateData).join(", ")})`,
+      metadata: { changedFields: Object.keys(updateData) },
+      req,
+    });
+
     return NextResponse.json(updatedTier);
   } catch (error) {
     console.error("Error updating tier:", error);
@@ -309,14 +418,13 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-// Delete tier
+// Delete tier — irreversible and affects anyone subscribed to it, so this
+// requires super-admin rather than the standard admin check used above.
 export async function DELETE(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "admin") {
-      return unauthorized("Authentication required");
-    }
+  const { error, actor } = await requireSuperAdmin();
+  if (error) return error;
 
+  try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
@@ -337,6 +445,16 @@ export async function DELETE(req: NextRequest) {
     for (let i = 0; i < remainingTiers.length; i++) {
       await Tier.findByIdAndUpdate(remainingTiers[i]._id, { order: i + 1 });
     }
+
+    await recordAuditLog({
+      actor: actor!,
+      action: "tier.delete",
+      targetType: "Tier",
+      targetId: id,
+      summary: `Deleted tier "${deletedTier.name}"`,
+      metadata: { name: deletedTier.name, price: deletedTier.price },
+      req,
+    });
 
     return NextResponse.json({ message: "Tier deleted successfully" });
   } catch (error) {

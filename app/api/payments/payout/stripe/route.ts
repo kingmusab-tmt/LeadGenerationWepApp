@@ -13,6 +13,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 import { env } from "@/lib/env";
+import { isSupportedCurrency } from "@/lib/currency";
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
@@ -41,6 +42,10 @@ export async function POST(req: Request) {
     if (!body.amount || !body.currency) {
       return badRequest("Missing required fields");
     }
+    const currency = body.currency.toLowerCase();
+    if (!isSupportedCurrency(currency)) {
+      return badRequest(`Unsupported currency: ${body.currency}`);
+    }
     await dbConnect();
     const seller = await User.findOne({
       email: session.user.email,
@@ -66,7 +71,7 @@ export async function POST(req: Request) {
     //("Available:", balance.available);
 
     const availableBalance = balance.available.find(
-      (bal) => bal.currency.toLowerCase() === body.currency.toLowerCase(),
+      (bal) => bal.currency.toLowerCase() === currency,
     );
 
     if (!availableBalance || availableBalance.amount < amountInCents) {
@@ -77,7 +82,7 @@ export async function POST(req: Request) {
     // Create transfer to the connected account
     const transfer = await stripe.transfers.create({
       amount: amountInCents,
-      currency: "usd",
+      currency,
       destination: seller.stripeAccountId,
       transfer_group: `SELLER_WITHDRAWAL_${session.user.id}_${Date.now()}`,
     });
@@ -93,7 +98,7 @@ export async function POST(req: Request) {
       type: "seller_payout",
       userId: session.user.id,
       amount: body.amount,
-      currency: "usd",
+      currency,
       previousBalance: (updatedSeller?.walletBalance || 0) + body.amount,
       currentBalance: updatedSeller?.walletBalance || 0,
       status: "pending",
@@ -115,11 +120,11 @@ export async function POST(req: Request) {
       stripeAccount: seller.stripeAccountId,
     });
 
-    const availableUsd = userbalance.available.find(
-      (b) => b.currency === "usd",
+    const availableInCurrency = userbalance.available.find(
+      (b) => b.currency === currency,
     );
 
-    if (!availableUsd || availableUsd.amount < amountInCents) {
+    if (!availableInCurrency || availableInCurrency.amount < amountInCents) {
       return NextResponse.json(
         {
           success: false,
@@ -133,7 +138,7 @@ export async function POST(req: Request) {
     const payout = await stripe.payouts.create(
       {
         amount: amountInCents,
-        currency: "usd",
+        currency,
         // Optional: specify destination bank account
       },
       {

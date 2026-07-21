@@ -1,15 +1,14 @@
-import { Container, Typography } from "@mui/material";
+"use client";
+
+import { Container } from "@mui/material";
 import React from "react";
-import UserDashboard from "../layout";
+import NotificationInbox from "@/app/components/generalComponent/NotificationInbox";
 
 const NotificationPage = () => {
   return (
-    <UserDashboard>
-      <Container>
-        <Typography variant="h4">Notifications</Typography>
-        {/* Add Notifications Details */}
-      </Container>
-    </UserDashboard>
+    <Container sx={{ py: { xs: 3, sm: 4 } }}>
+      <NotificationInbox />
+    </Container>
   );
 };
 

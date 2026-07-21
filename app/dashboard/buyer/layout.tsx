@@ -38,6 +38,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import { useInitializeUser } from "@/app/hooks";
+import DarkModeToggle from "@/app/components/generalComponent/darkmodetoggle";
+import NotificationBell from "@/app/components/generalComponent/NotificationBell";
 import { isBuyerOnboardingFlowComplete } from "@/lib/buyerOnboarding";
 import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
 
@@ -167,11 +169,26 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             {currentUser?.role === "staff" ? "Sales Team" : "Buyer"} Dashboard
           </Typography>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <DarkModeToggle />
+            <NotificationBell
+              onClick={() => handleNavigation("notifications")}
+            />
             <Avatar
               src={avatarSrc}
               alt={`${displayName}'s profile picture`}
               onClick={handleMenuOpen}
+              role="button"
+              tabIndex={0}
+              aria-label="Account menu"
+              aria-haspopup="true"
+              aria-expanded={Boolean(anchorEl)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.currentTarget.click();
+                }
+              }}
               sx={{ cursor: "pointer" }}
             />
             <Menu

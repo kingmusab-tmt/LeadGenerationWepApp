@@ -2,14 +2,17 @@ import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { Transaction } from "@/models/transactions";
 import dbConnect from "@/lib/connectdb";
-import { requireAdmin } from "@/lib/api/adminAuth";
+import { requireSuperAdmin } from "@/lib/api/adminAuth";
+import { recordAuditLog } from "@/lib/auditLog";
 import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 
+// Refunds are irreversible and move real money, so this requires
+// super-admin rather than the standard admin check.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await requireAdmin();
+  const { error, actor } = await requireSuperAdmin();
   if (error) return error;
 
   const { id } = await params;
@@ -50,6 +53,21 @@ export async function POST(
         refundReason: "Admin-initiated refund",
         refundedTransactionId: transaction._id,
       },
+    });
+
+    await recordAuditLog({
+      actor: actor!,
+      action: "transaction.refund",
+      targetType: "Transaction",
+      targetId: id,
+      summary: `Refunded ${transaction.currency || "USD"} ${transaction.amount} transaction for user ${transaction.userId}`,
+      metadata: {
+        amount: transaction.amount,
+        currency: transaction.currency,
+        originalType: transaction.type,
+        userId: String(transaction.userId),
+      },
+      req,
     });
 
     return NextResponse.json({

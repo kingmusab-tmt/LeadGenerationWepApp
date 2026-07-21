@@ -81,6 +81,50 @@ type TrackingNumberConfig = {
   aiSummaryEnabled?: boolean;
 };
 
+function appendSingleMultipleIndex(actionUrl: string, index?: number): string {
+  if (typeof index !== "number" || !Number.isInteger(index)) {
+    return actionUrl;
+  }
+
+  const separator = actionUrl.includes("?") ? "&" : "?";
+  return `${actionUrl}${separator}singleMultipleIndex=${index}`;
+}
+
+/**
+ * Mark a whisper/screening URL as belonging to a multi-ring dial so the
+ * screening response handler only hangs up the rejecting leg instead of
+ * tearing down the parent call (which would cancel the other ringing legs).
+ * legCount lets the response handler trigger fallback once every leg rejects.
+ */
+function withMultiRingScreening(
+  whisperUrl: string | undefined,
+  legCount: number,
+): string | undefined {
+  if (!whisperUrl) return whisperUrl;
+  const separator = whisperUrl.includes("?") ? "&" : "?";
+  return `${whisperUrl}${separator}multiRing=true&legCount=${legCount}`;
+}
+
+/**
+ * Clear concurrent-call tracking for every buyer leg associated with a call.
+ * Multi-ring dials mark several buyers active under one CallSid, so clearing
+ * only the primary buyerId would leak the sibling legs until their Redis TTL.
+ */
+function markAllLegsInactive(
+  call: { buyerId?: string; leadBuyers?: string[] } | null,
+  callSid: string,
+) {
+  if (!call) return;
+  const ids = new Set<string>();
+  if (call.buyerId) ids.add(call.buyerId.toString());
+  for (const id of call.leadBuyers ?? []) {
+    if (id) ids.add(id.toString());
+  }
+  for (const id of ids) {
+    markCallInactive(id, callSid);
+  }
+}
+
 function buildBusyFallbackTwiml(callSid: string) {
   const twiml = new twilio.twiml.VoiceResponse();
   twiml.say(
@@ -453,15 +497,51 @@ async function handleNewCall(
     });
   }
 
-  // ─── Seller Working Hours Check ───
+  // ─── Working Hours Check ───
+  // The configured working-hours window is interpreted in the timezone(s) of
+  // the buyers registered under this seller for the industry (the buyers the
+  // call would be forwarded to) — buyers own their timezone, not the seller.
+  // The call is treated as within hours if it falls inside the window for at
+  // least one of those buyers' timezones.
   if (enableWorkingHours && workingHoursStart && workingHoursEnd) {
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    if (currentTime < workingHoursStart || currentTime >= workingHoursEnd) {
-      debugLog("Call outside seller working hours", {
-        currentTime,
+    const sellerBuyerIds = (
+      seller as unknown as { buyers?: Array<{ toString(): string }> }
+    ).buyers;
+    let workingHoursBuyers: Array<{ timezone?: string }> = await Buyer.find({
+      _id: { $in: sellerBuyerIds ?? [] },
+      "leadPreferences.industries": industry,
+    }).select("timezone");
+    if (workingHoursBuyers.length === 0) {
+      workingHoursBuyers = await Buyer.find({
+        registeredWith: seller._id,
+        "leadPreferences.industries": industry,
+      }).select("timezone");
+    }
+
+    const buyerTimezones = Array.from(
+      new Set(
+        workingHoursBuyers
+          .map((b) => (b as unknown as { timezone?: string }).timezone)
+          .filter((tz): tz is string => !!tz),
+      ),
+    );
+    // Default to a single timezone when no buyer timezone is available.
+    const timezonesToCheck =
+      buyerTimezones.length > 0 ? buyerTimezones : ["America/New_York"];
+
+    const withinWorkingHours = timezonesToCheck.some((tz) =>
+      isBuyerInBusinessHours({
+        acceptOnlyDuringBusinessHours: true,
+        workingHours: { start: workingHoursStart, end: workingHoursEnd },
+        timezone: tz,
+      }),
+    );
+
+    if (!withinWorkingHours) {
+      debugLog("Call outside working hours (buyer timezones)", {
         workingHoursStart,
         workingHoursEnd,
+        timezones: timezonesToCheck,
       });
       const afterHoursTwiml = new twilio.twiml.VoiceResponse();
       // Try overflow number first, then voicemail
@@ -553,6 +633,9 @@ async function handleNewCall(
   let forwardedTo = "";
   let newBuyerId = "";
   let insufficientBalance = false;
+  // Every buyer leg dialed for this call (used to clear concurrent-call
+  // tracking for all multi-ring legs when the call completes or goes no-answer).
+  const dialedBuyerIds: string[] = [];
 
   // Play recording consent announcement if enabled
   if (recordingConsent && recordCall) {
@@ -703,7 +786,10 @@ async function handleNewCall(
     });
 
     if (options.buyerIds?.length) {
-      options.buyerIds.forEach((id) => markCallActive(id, callSid));
+      options.buyerIds.forEach((id) => {
+        markCallActive(id, callSid);
+        dialedBuyerIds.push(id);
+      });
     }
   };
 
@@ -714,10 +800,17 @@ async function handleNewCall(
         const sellerBuyerIds = (
           seller as unknown as { buyers?: Array<{ toString(): string }> }
         ).buyers;
-        const candidateBuyers = await Buyer.find({
+        let candidateBuyers = await Buyer.find({
           _id: { $in: sellerBuyerIds ?? [] },
           "leadPreferences.industries": industry,
         }).sort({ _id: 1 });
+
+        if (candidateBuyers.length === 0) {
+          candidateBuyers = await Buyer.find({
+            registeredWith: seller._id,
+            "leadPreferences.industries": industry,
+          }).sort({ _id: 1 });
+        }
 
         const eligibleBuyers = [];
         for (const buyerDoc of candidateBuyers) {
@@ -735,10 +828,14 @@ async function handleNewCall(
           const phones = eligibleBuyers.map((b) => b.phone);
           const buyerIds = eligibleBuyers.map((b) => b.id);
 
-          dialNumbersSimultaneously(phones, {
-            buyerIds,
-            buyerIdForAction: buyerIds[0],
-          });
+          dialNumbersSimultaneously(
+            phones,
+            {
+              buyerIds,
+              buyerIdForAction: buyerIds[0],
+            },
+            withMultiRingScreening(effectiveWhisperUrl, phones.length),
+          );
 
           forwardedTo = phones.join(", ");
           newBuyerId = buyerIds[0];
@@ -784,6 +881,7 @@ async function handleNewCall(
 
         // Mark call as active for concurrent tracking
         markCallActive(newBuyerId, callSid);
+        dialedBuyerIds.push(newBuyerId);
 
         const dialParams = getDialParams({
           from,
@@ -809,7 +907,11 @@ async function handleNewCall(
     forwardingNumbers?.length
   ) {
     if (multiRingEnabled && forwardingNumbers.length > 1) {
-      dialNumbersSimultaneously(forwardingNumbers, {}, effectiveWhisperUrl);
+      dialNumbersSimultaneously(
+        forwardingNumbers,
+        {},
+        withMultiRingScreening(effectiveWhisperUrl, forwardingNumbers.length),
+      );
       debugLog("Single/multiple multi-ring initiated", {
         numberCount: forwardingNumbers.length,
         numbers: forwardingNumbers,
@@ -851,26 +953,15 @@ async function handleNewCall(
       handleNoBuyersFallback();
       debugLog("No eligible buyers — filtered by all criteria", null, "warn");
     } else if (multiRingEnabled && eligibleBuyers.length > 1) {
-      // ─── Multi-Ring: ring all eligible buyers simultaneously ───
-      const dialParams = getDialParams({
-        from,
-        sellerId,
-        callSid,
-        buyerId: eligibleBuyers[0].id.toString(),
-        passCallerId,
-        trackingNumber: to,
-        recordCall,
-      });
-      const dial = twiml.dial(dialParams);
-      eligibleBuyers.forEach((buyer) => {
-        const numAttrs: Record<string, string> = {};
-        if (effectiveWhisperUrl) {
-          numAttrs.url = effectiveWhisperUrl;
-          numAttrs.method = "POST";
-        }
-        dial.number(numAttrs, buyer.phone);
-        markCallActive(buyer.id.toString(), callSid);
-      });
+      // Use the shared multi-ring helper so screening/whisper behavior matches single_multiple.
+      dialNumbersSimultaneously(
+        eligibleBuyers.map((buyer) => buyer.phone),
+        {
+          buyerIds: eligibleBuyers.map((buyer) => buyer.id.toString()),
+          buyerIdForAction: eligibleBuyers[0].id.toString(),
+        },
+        withMultiRingScreening(effectiveWhisperUrl, eligibleBuyers.length),
+      );
       forwardedTo = eligibleBuyers.map((b) => b.phone).join(", ");
       newBuyerId = eligibleBuyers[0]?.id;
       debugLog("Multi-ring initiated", {
@@ -891,6 +982,7 @@ async function handleNewCall(
         });
         dialWithWhisper(twiml, buyer.phone, dialParams, effectiveWhisperUrl);
         markCallActive(buyer.id.toString(), callSid);
+        dialedBuyerIds.push(buyer.id.toString());
         if (index < eligibleBuyers.length - 1) {
           twiml.pause({ length: 1 });
         }
@@ -904,6 +996,12 @@ async function handleNewCall(
   }
 
   // Create call record with all new fields
+  const recordLeadBuyers = Array.from(
+    new Set([
+      ...(leadBuyers?.map((b: { id: string }) => b.id) ?? []),
+      ...dialedBuyerIds,
+    ]),
+  );
   const newCall = await createCallRecord({
     callSid,
     userId: String(seller._id),
@@ -914,7 +1012,7 @@ async function handleNewCall(
     callRecorded: recordCall,
     forwardingType,
     forwardingNumbers,
-    leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
+    leadBuyers: recordLeadBuyers,
     industry,
     insufficientBalance,
   });
@@ -963,15 +1061,6 @@ async function handleNewCall(
   });
 }
 
-function appendSingleMultipleIndex(actionUrl: string, index?: number): string {
-  if (typeof index !== "number" || !Number.isInteger(index)) {
-    return actionUrl;
-  }
-
-  const separator = actionUrl.includes("?") ? "&" : "?";
-  return `${actionUrl}${separator}singleMultipleIndex=${index}`;
-}
-
 async function handleNoAnswer(
   formData: FormData,
   seller: InstanceType<typeof User>,
@@ -985,7 +1074,9 @@ async function handleNoAnswer(
   try {
     debugLog("Handling no-answer scenario", { callSid, buyerId });
 
-    // Mark buyer call inactive for concurrent tracking
+    // Mark buyer call inactive for concurrent tracking. The action callback
+    // only carries the primary buyerId, so also clear every dialed leg below
+    // once we've loaded the call record (covers multi-ring siblings).
     if (buyerId) {
       markCallInactive(buyerId, callSid);
     }
@@ -1001,6 +1092,9 @@ async function handleNoAnswer(
         headers: { "Content-Type": "text/xml" },
       });
     }
+
+    // Clear concurrent-call tracking for all dialed legs of this call.
+    markAllLegsInactive(originalCall, callSid);
 
     // Update original call status
     originalCall.status = "no-answer";
@@ -1155,10 +1249,14 @@ async function handleNoAnswer(
             });
             const dial = twiml.dial(dialParams);
 
+            const retryMultiRingWhisper = withMultiRingScreening(
+              retryWhisperUrl,
+              eligibleRetryBuyers.length,
+            );
             eligibleRetryBuyers.forEach((buyer) => {
               const numberAttrs: Record<string, string> = {};
-              if (retryWhisperUrl) {
-                numberAttrs.url = retryWhisperUrl;
+              if (retryMultiRingWhisper) {
+                numberAttrs.url = retryMultiRingWhisper;
                 numberAttrs.method = "POST";
               }
               dial.number(numberAttrs, buyer.phone);
@@ -1175,7 +1273,9 @@ async function handleNoAnswer(
               callRecorded,
               forwardingType,
               forwardingNumbers,
-              leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
+              // Store all dialed legs so concurrent-call tracking can be cleared
+              // for every ringing buyer when this retry leg completes/no-answers.
+              leadBuyers: eligibleRetryBuyers.map((b) => b.id),
               industry,
             });
           }
@@ -1245,7 +1345,10 @@ async function handleNoAnswer(
 
       if (remainingForwardingNumbers.length === 0) {
         handleNoAnswerFallback();
-        return;
+        return new NextResponse(twiml.toString(), {
+          status: 200,
+          headers: { "Content-Type": "text/xml" },
+        });
       }
 
       if (multiRingEnabled && forwardingNumbers.length > 1) {
@@ -1259,10 +1362,14 @@ async function handleNoAnswer(
           recordCall: callRecorded,
         });
         const dial = twiml.dial(dialParams);
+        const retryMultiRingWhisper = withMultiRingScreening(
+          retryWhisperUrl,
+          remainingForwardingNumbers.length,
+        );
         remainingForwardingNumbers.forEach((num: string) => {
           const numberAttrs: Record<string, string> = {};
-          if (retryWhisperUrl) {
-            numberAttrs.url = retryWhisperUrl;
+          if (retryMultiRingWhisper) {
+            numberAttrs.url = retryMultiRingWhisper;
             numberAttrs.method = "POST";
           }
           dial.number(numberAttrs, num);
@@ -1369,14 +1476,39 @@ async function handleNoAnswer(
         });
         const dial = twiml.dial(dialParams);
 
+        const retryMultiRingWhisper = withMultiRingScreening(
+          retryWhisperUrl,
+          eligibleBuyers.length,
+        );
         eligibleBuyers.forEach((buyer: { id: string; phone: string }) => {
           const numberAttrs: Record<string, string> = {};
-          if (retryWhisperUrl) {
-            numberAttrs.url = retryWhisperUrl;
+          if (retryMultiRingWhisper) {
+            numberAttrs.url = retryMultiRingWhisper;
             numberAttrs.method = "POST";
           }
           dial.number(numberAttrs, buyer.phone);
           markCallActive(buyer.id.toString(), retryActionCallSid);
+        });
+
+        // Persist the retry leg so the answered/no-answer webhook can find it
+        // and clear concurrent-call tracking for every ringing buyer (the
+        // markCallActive calls above would otherwise leak until their TTL).
+        await createCallRecord({
+          callSid: retryActionCallSid,
+          userId: String(seller._id),
+          buyerId: eligibleBuyers[0].id.toString(),
+          from,
+          to: eligibleBuyers
+            .map((b: { phone: string }) => b.phone)
+            .join(", "),
+          status: "forwarded",
+          callRecorded,
+          forwardingType,
+          forwardingNumbers,
+          leadBuyers: eligibleBuyers.map((b: { id: string }) =>
+            b.id.toString(),
+          ),
+          industry,
         });
       } else {
         eligibleBuyers.forEach(
@@ -1448,10 +1580,8 @@ async function handleCallAnswered(
 
     // Fire call completed webhook (non-blocking)
     if (updatedCall) {
-      // Mark call inactive for concurrent tracking
-      if (updatedCall.buyerId) {
-        markCallInactive(updatedCall.buyerId, callSid);
-      }
+      // Mark call inactive for concurrent tracking (all multi-ring legs)
+      markAllLegsInactive(updatedCall, callSid);
 
       dispatchCallWebhook(updatedCall.userId, "callCompleted", {
         callSid,

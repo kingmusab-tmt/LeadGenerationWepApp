@@ -30,6 +30,7 @@ import {
   People,
   Layers,
   Article,
+  History,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
@@ -37,6 +38,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
+import DarkModeToggle from "@/app/components/generalComponent/darkmodetoggle";
 
 const navItems = [
   { label: "Overview", path: "overview", icon: <Dashboard /> },
@@ -53,6 +55,7 @@ const navItems = [
     path: "content_management",
     icon: <Article />,
   },
+  { label: "Audit Log", path: "audit-log", icon: <History /> },
 ];
 
 interface AdminDashboardProps {
@@ -156,11 +159,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Dashboard
           </Typography>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <DarkModeToggle />
             <Avatar
               src={avatarSrc}
               alt={`${displayName}'s profile picture`}
               onClick={handleMenuOpen}
+              role="button"
+              tabIndex={0}
+              aria-label="Account menu"
+              aria-haspopup="true"
+              aria-expanded={Boolean(anchorEl)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.currentTarget.click();
+                }
+              }}
               sx={{ cursor: "pointer" }}
             />
             <Menu

@@ -51,6 +51,13 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().min(1),
   STRIPE_SECRET_KEY: z.string().min(1),
+  // Off by default — flip to "true" only after Stripe Tax is enabled and tax
+  // registrations are added in the Stripe dashboard (Settings -> Tax).
+  // Enabling this before that setup is done will error at checkout.
+  STRIPE_AUTOMATIC_TAX_ENABLED: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
 
   // AI/integrations
   GEMINI_API_KEY: z.string().optional(),

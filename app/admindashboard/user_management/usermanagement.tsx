@@ -52,6 +52,7 @@ interface User {
   name: string;
   email: string;
   role: "admin" | "seller" | "buyer" | "user" | "business-admin" | "staff";
+  adminLevel?: "standard" | "super";
   status: "active" | "suspended";
   image?: string;
   createdAt: string;
@@ -392,19 +393,25 @@ const UserManagement = () => {
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={user.role}
-                      size="small"
-                      color={
-                        user.role === "admin"
-                          ? "error"
-                          : user.role === "seller"
-                            ? "primary"
-                            : user.role === "buyer"
-                              ? "success"
-                              : "default"
-                      }
-                    />
+                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                      <Chip
+                        label={user.role}
+                        size="small"
+                        color={
+                          user.role === "admin"
+                            ? "error"
+                            : user.role === "seller"
+                              ? "primary"
+                              : user.role === "buyer"
+                                ? "success"
+                                : "default"
+                        }
+                      />
+                      {user.role === "admin" &&
+                        user.adminLevel === "standard" && (
+                          <Chip label="standard" size="small" variant="outlined" />
+                        )}
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -724,6 +731,28 @@ const UserManagement = () => {
                   <MenuItem value="staff">Staff</MenuItem>
                 </Select>
               </FormControl>
+              {editingUser.role === "admin" && (
+                <FormControl fullWidth margin="normal">
+                  <InputLabel>Admin Level</InputLabel>
+                  <Select
+                    value={editingUser.adminLevel || "super"}
+                    label="Admin Level"
+                    onChange={(e) =>
+                      setEditingUser({
+                        ...editingUser,
+                        adminLevel: e.target.value as User["adminLevel"],
+                      })
+                    }
+                  >
+                    <MenuItem value="super">
+                      Super admin (full access, incl. refunds &amp; tier deletion)
+                    </MenuItem>
+                    <MenuItem value="standard">
+                      Standard admin (no refunds or tier/user deletion)
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+              )}
               <FormControl fullWidth margin="normal">
                 <InputLabel>Status</InputLabel>
                 <Select

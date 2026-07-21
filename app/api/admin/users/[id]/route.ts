@@ -3,7 +3,8 @@ import { NextRequest } from "next/server";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
-import { requireAdmin } from "@/lib/api/adminAuth";
+import { requireAdmin, requireSuperAdmin } from "@/lib/api/adminAuth";
+import { recordAuditLog } from "@/lib/auditLog";
 import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 
 const toIsoDateOrNull = (value: unknown): string | null => {
@@ -17,24 +18,36 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await requireAdmin();
+  const { error, session } = await requireAdmin();
   if (error) return error;
 
   try {
     await dbConnect();
     const { id } = await params;
-    const { status, role } = await req.json();
+    const { status, role, adminLevel } = await req.json();
 
-    if (!status && !role) {
-      return badRequest("Either status or role must be provided");
+    if (!status && !role && !adminLevel) {
+      return badRequest("Either status, role, or adminLevel must be provided");
+    }
+
+    // Changing another admin's level is itself a super-admin-only action —
+    // otherwise a standard admin could just promote themselves back.
+    if (adminLevel) {
+      const { error: superError } = await requireSuperAdmin();
+      if (superError) return superError;
+      if (adminLevel !== "standard" && adminLevel !== "super") {
+        return badRequest('adminLevel must be "standard" or "super"');
+      }
     }
 
     // First find the user to check their current role
     const user = await User.findById(id).lean();
 
-    const updateData: { status?: string; role?: string } = {};
+    const updateData: { status?: string; role?: string; adminLevel?: string } =
+      {};
     if (status) updateData.status = status;
     if (role) updateData.role = role;
+    if (adminLevel) updateData.adminLevel = adminLevel;
 
     let updatedRecord;
 
@@ -78,6 +91,20 @@ export async function PUT(
       return notFound("User");
     }
 
+    await recordAuditLog({
+      actor: {
+        email: session!.user.email,
+        name: session!.user.name,
+        role: session!.user.role,
+      },
+      action: "user.update",
+      targetType: "User",
+      targetId: id,
+      summary: `Updated ${Object.keys(updateData).join(", ")} for ${(updatedRecord as { email?: string }).email || id}`,
+      metadata: updateData,
+      req,
+    });
+
     let userSchemaDates: {
       createdAt: string | null;
       lastLogin: string | null;
@@ -120,11 +147,13 @@ export async function PUT(
   }
 }
 
+// Permanent deletion — requires super-admin rather than the standard
+// admin check used for status/role updates above.
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await requireAdmin();
+  const { error, actor } = await requireSuperAdmin();
   if (error) return error;
 
   try {
@@ -155,6 +184,16 @@ export async function DELETE(
     if (!deletedRecord) {
       return notFound("User");
     }
+
+    await recordAuditLog({
+      actor: actor!,
+      action: "user.delete",
+      targetType: isBuyer ? "Buyer" : "User",
+      targetId: id,
+      summary: `Deleted ${isBuyer ? "buyer" : "user"} ${(deletedRecord as { email?: string }).email || id}`,
+      metadata: { email: (deletedRecord as { email?: string }).email },
+      req,
+    });
 
     return NextResponse.json({
       message: `${isBuyer ? "Buyer" : "User"} deleted successfully`,

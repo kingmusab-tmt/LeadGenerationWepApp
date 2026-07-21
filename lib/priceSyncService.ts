@@ -10,9 +10,10 @@
  */
 
 import Stripe from "stripe";
-import { Tier } from "@/models/tier";
+import { Tier, ITier } from "@/models/tier";
 import connectDB from "./connectdb";
 import { sendNotification } from "./notificationService";
+import { resolveTierPrice, type SupportedCurrency } from "./currency";
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -332,11 +333,71 @@ export async function createStripePriceForTier(
       resolved: true,
     });
 
+    // Also create/refresh the GBP and CAD equivalents so a seller/buyer
+    // billing in one of those currencies always has a matching Stripe price.
+    await createNonUsdStripePricesForTier(tier, productId, billingInterval);
+
     return { success: true, priceId: price.id };
   } catch (error) {
     console.error("Failed to create Stripe price:", error);
     return { success: false, error: "Failed to create Stripe price" };
   }
+}
+
+const PRICE_ID_FIELD: Record<
+  Exclude<SupportedCurrency, "usd">,
+  Record<"month" | "year", "stripeMonthlyPriceIdGBP" | "stripeAnnualPriceIdGBP" | "stripeMonthlyPriceIdCAD" | "stripeAnnualPriceIdCAD">
+> = {
+  gbp: { month: "stripeMonthlyPriceIdGBP", year: "stripeAnnualPriceIdGBP" },
+  cad: { month: "stripeMonthlyPriceIdCAD", year: "stripeAnnualPriceIdCAD" },
+};
+
+/**
+ * Creates (or re-creates) the GBP and CAD Stripe prices for a tier, mirroring
+ * whatever the USD price already represents. Stripe prices are immutable
+ * once created, so "syncing" a changed amount means creating a new Price and
+ * swapping the stored ID — same pattern the USD path already uses.
+ */
+async function createNonUsdStripePricesForTier(
+  tier: ITier,
+  productId: string,
+  billingInterval: "month" | "year",
+): Promise<void> {
+  const currencies: Exclude<SupportedCurrency, "usd">[] = ["gbp", "cad"];
+
+  for (const currency of currencies) {
+    try {
+      const amount = resolveTierPrice(tier, currency, billingInterval);
+      if (!amount || amount <= 0) continue;
+
+      const price = await stripe.prices.create({
+        product: productId,
+        unit_amount: Math.round(amount * 100),
+        currency,
+        recurring: {
+          interval: billingInterval,
+          interval_count: 1,
+        },
+        metadata: {
+          tierId: String(tier._id),
+          tierName: tier.name,
+          billingInterval,
+          currency,
+        },
+      });
+
+      tier.set(PRICE_ID_FIELD[currency][billingInterval], price.id);
+    } catch (error) {
+      // Non-fatal: USD checkout must keep working even if a secondary
+      // currency price fails to sync (e.g. transient Stripe API issue).
+      console.error(
+        `[PriceSync] Failed to create ${currency} price for tier ${tier.name}:`,
+        error,
+      );
+    }
+  }
+
+  await tier.save();
 }
 
 /**

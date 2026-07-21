@@ -20,9 +20,11 @@ export { default as Form } from "./form";
 export { Campaign } from "./campaign";
 export { Invoice } from "./invoice";
 export { AutomationWorkflow, WorkflowExecution } from "./automationWorkflow";
+export { AuditLog } from "./auditLog";
 
 // Re-export types
 export type { IUser } from "./types/user";
+export type { IAuditLog } from "./auditLog";
 export type { ISubscription } from "./types/subscription";
 export type { ITrackingNumber } from "./types/tracking";
 export type { INotification } from "./types/notification";

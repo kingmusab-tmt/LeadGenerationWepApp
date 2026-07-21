@@ -39,9 +39,23 @@ export async function POST(req: NextRequest) {
     if (securityResponse) return securityResponse;
 
     const { searchParams } = new URL(req.url);
+
+    // Twilio's voiceFallbackUrl POSTs standard call params in the body but not
+    // our custom query params, so read from the form body as a fallback.
+    let formParams: Record<string, string> = {};
+    try {
+      const form = await req.formData();
+      form.forEach((value, key) => {
+        formParams[key] = String(value);
+      });
+    } catch {
+      formParams = {};
+    }
+
     const sellerId = searchParams.get("sellerId") || "";
-    const callSid = searchParams.get("callSid") || "";
-    const trackingNumber = searchParams.get("trackingNumber") || "";
+    const callSid = searchParams.get("callSid") || formParams["CallSid"] || "";
+    const trackingNumber =
+      searchParams.get("trackingNumber") || formParams["To"] || "";
     const tryOverflow = searchParams.get("tryOverflow") !== "false";
     const buyerNumber = searchParams.get("buyerNumber") || "";
 
@@ -51,33 +65,31 @@ export async function POST(req: NextRequest) {
       trackingNumber,
       tryOverflow,
       buyerNumber,
+      errorCode: formParams["ErrorCode"],
     });
 
     await dbConnect();
 
-    // Find the call record to get config
+    // Find the call record to get config. It may be missing when this handler
+    // is hit via Twilio's voiceFallbackUrl (the primary handler errored before
+    // creating a record), so we degrade gracefully instead of dead-ending.
     const callRecord = (await Call.findOne({ callSid }).lean()) as {
       from?: string;
       to?: string;
     } | null;
-    if (!callRecord) {
-      debugLog("Call record not found for fallback", { callSid }, "warn");
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("Call failed. Please try again later.");
-      twiml.hangup();
-      return new NextResponse(twiml.toString(), {
-        status: 200,
-        headers: { "Content-Type": "text/xml" },
-      });
-    }
+    const callerFrom = callRecord?.from || formParams["From"] || "";
 
     // Find seller and tracking config
     const seller = await User.findById(sellerId).lean();
     if (!seller) {
-      debugLog("Seller not found for fallback", { sellerId }, "warn");
+      debugLog("Seller not found for fallback — routing to voicemail", {
+        sellerId,
+      });
       const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("Call routing failed. Please try again later.");
-      twiml.hangup();
+      twiml.say(
+        "Our agents are currently not available. Please leave a message after the tone.",
+      );
+      addVoicemailToTwiml(twiml, { sellerId, callSid });
       return new NextResponse(twiml.toString(), {
         status: 200,
         headers: { "Content-Type": "text/xml" },
@@ -90,40 +102,22 @@ export async function POST(req: NextRequest) {
       | { phoneNumber: string; overflowNumber?: string; [key: string]: unknown }
       | undefined;
 
-    if (!trackingNumberConfig) {
-      debugLog(
-        "Tracking number config not found for fallback",
-        {
-          sellerId,
-          trackingNumber,
-        },
-        "warn",
-      );
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("Call routing failed. Please try again later.");
-      twiml.hangup();
-      return new NextResponse(twiml.toString(), {
-        status: 200,
-        headers: { "Content-Type": "text/xml" },
-      });
-    }
-
     const twiml = new twilio.twiml.VoiceResponse();
 
     debugLog("Building fallback response", {
-      hasOverflow: !!trackingNumberConfig.overflowNumber,
+      hasOverflow: !!trackingNumberConfig?.overflowNumber,
       tryOverflow,
     });
 
     // Attempt overflow if configured
-    if (tryOverflow && trackingNumberConfig.overflowNumber) {
+    if (tryOverflow && trackingNumberConfig?.overflowNumber) {
       debugLog("Attempting overflow number", {
         overflow: trackingNumberConfig.overflowNumber,
       });
 
       twiml.say("Please hold while we connect you.");
       const dial = twiml.dial({
-        callerId: callRecord?.from,
+        callerId: callerFrom || undefined,
         timeout: 20,
         timeLimit: 3600,
       });
@@ -131,7 +125,7 @@ export async function POST(req: NextRequest) {
     } else {
       // No overflow or already tried — inform caller
       debugLog("No overflow available or already attempted fallback", {
-        hasOverflow: !!trackingNumberConfig.overflowNumber,
+        hasOverflow: !!trackingNumberConfig?.overflowNumber,
       });
 
       twiml.say(

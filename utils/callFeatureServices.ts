@@ -71,9 +71,17 @@ export function isOnDncList(
   dncList: string[] | undefined,
 ): boolean {
   if (!dncList || dncList.length === 0) return false;
-  // Normalize numbers for comparison (strip non-digit chars except +)
-  const normalize = (num: string) => num.replace(/[^+\d]/g, "");
+  // Normalize numbers for comparison: keep only digits and drop the US/Canada
+  // country code so "+15551234567", "15551234567" and "5551234567" all match.
+  const normalize = (num: string) => {
+    const digits = (num || "").replace(/\D/g, "");
+    if (digits.length === 11 && digits.startsWith("1")) {
+      return digits.slice(1);
+    }
+    return digits;
+  };
   const normalizedPhone = normalize(phoneNumber);
+  if (!normalizedPhone) return false;
   return dncList.some((blocked) => normalize(blocked) === normalizedPhone);
 }
 

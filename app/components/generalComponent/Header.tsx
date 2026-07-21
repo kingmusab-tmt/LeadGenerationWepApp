@@ -16,10 +16,8 @@ import {
   keyframes,
   Avatar,
   Typography,
-  Badge,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import NotificationsIcon from "@mui/icons-material/Notifications";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import AnalyticsIcon from "@mui/icons-material/Analytics";
@@ -49,6 +47,7 @@ import {
 } from "react-icons/fa";
 import { useInitializeUser, useAppDispatch } from "@/app/hooks";
 import { clearUser } from "@/lib/userSlice";
+import DarkModeToggle from "./darkmodetoggle";
 
 // Animation keyframes
 const zoomIn = keyframes`
@@ -193,6 +192,7 @@ const Header = React.memo(function Header() {
                 target="_blank"
                 rel="noopener noreferrer"
                 size="small"
+                aria-label="BRIXCOT on Facebook"
                 sx={{
                   color: "white",
                   "&:hover": { color: "rgba(255,255,255,0.8)" },
@@ -206,6 +206,7 @@ const Header = React.memo(function Header() {
                 target="_blank"
                 rel="noopener noreferrer"
                 size="small"
+                aria-label="BRIXCOT on Twitter"
                 sx={{
                   color: "white",
                   "&:hover": { color: "rgba(255,255,255,0.8)" },
@@ -219,6 +220,7 @@ const Header = React.memo(function Header() {
                 target="_blank"
                 rel="noopener noreferrer"
                 size="small"
+                aria-label="BRIXCOT on LinkedIn"
                 sx={{
                   color: "white",
                   "&:hover": { color: "rgba(255,255,255,0.8)" },
@@ -232,6 +234,7 @@ const Header = React.memo(function Header() {
                 target="_blank"
                 rel="noopener noreferrer"
                 size="small"
+                aria-label="BRIXCOT on Instagram"
                 sx={{
                   color: "white",
                   "&:hover": { color: "rgba(255,255,255,0.8)" },
@@ -245,6 +248,7 @@ const Header = React.memo(function Header() {
                 target="_blank"
                 rel="noopener noreferrer"
                 size="small"
+                aria-label="BRIXCOT on YouTube"
                 sx={{
                   color: "white",
                   "&:hover": { color: "rgba(255,255,255,0.8)" },
@@ -380,14 +384,6 @@ const Header = React.memo(function Header() {
                 <>
                   {!isMobile && (
                     <>
-                      {/* <IconButton
-                        color="inherit"
-                        sx={{ color: theme.palette.text.primary }}
-                      >
-                        <Badge badgeContent={4} color="error">
-                          <NotificationsIcon />
-                        </Badge>
-                      </IconButton> */}
                       <Button
                         variant="contained"
                         startIcon={<DashboardIcon />}
@@ -405,9 +401,14 @@ const Header = React.memo(function Header() {
                     </>
                   )}
 
+                  <DarkModeToggle />
+
                   {/* User Avatar Menu */}
                   <IconButton
                     onClick={handleUserMenuOpen}
+                    aria-label="Account menu"
+                    aria-haspopup="true"
+                    aria-expanded={Boolean(userMenuAnchor)}
                     sx={{
                       border: `2px solid ${theme.palette.primary.main}30`,
                       "&:hover": {

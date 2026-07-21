@@ -15,6 +15,8 @@ import {
   forceRefreshUserSession,
   invalidateSessionWithConfirmation,
 } from "@/lib/cachedSession";
+import { resolveTierPrice, type SupportedCurrency } from "@/lib/currency";
+import { env } from "@/lib/env";
 import {
   validateTierPrice,
   getCouponForTierDiscount,
@@ -143,17 +145,36 @@ export async function createSubscriptionCheckout(
     };
   }
 
-  // Get the appropriate Stripe Price ID
+  // Which currency this user bills in — defaults to USD, matching every
+  // existing account until a seller/buyer explicitly sets otherwise.
+  const currency: SupportedCurrency =
+    (user.billingCurrency as SupportedCurrency) || "usd";
+
+  // Get the appropriate Stripe Price ID for that currency + interval
   let stripePriceId: string | undefined;
 
-  if (billingInterval === "year") {
-    stripePriceId = tier.stripeAnnualPriceId || tier.stripePriceId;
+  if (currency === "usd") {
+    if (billingInterval === "year") {
+      stripePriceId = tier.stripeAnnualPriceId || tier.stripePriceId;
+    } else {
+      stripePriceId = tier.stripeMonthlyPriceId || tier.stripePriceId;
+    }
+  } else if (currency === "gbp") {
+    stripePriceId =
+      billingInterval === "year"
+        ? tier.stripeAnnualPriceIdGBP
+        : tier.stripeMonthlyPriceIdGBP;
   } else {
-    stripePriceId = tier.stripeMonthlyPriceId || tier.stripePriceId;
+    stripePriceId =
+      billingInterval === "year"
+        ? tier.stripeAnnualPriceIdCAD
+        : tier.stripeMonthlyPriceIdCAD;
   }
 
-  // Validate price sync before checkout
-  if (stripePriceId) {
+  // The validate/repair flow below is USD-specific (it compares against
+  // tier.price, the USD base) — only run it for USD checkouts. A missing
+  // GBP/CAD price ID just falls through to dynamic pricing below.
+  if (stripePriceId && currency === "usd") {
     const priceValidation = await validateTierPrice(tierId, billingInterval);
     if (!priceValidation.valid && priceValidation.stripePrice !== null) {
       console.warn(
@@ -213,14 +234,13 @@ export async function createSubscriptionCheckout(
     };
   } else {
     // Create dynamic recurring price using BASE price (discounts applied via coupon)
-    const unitAmount =
-      billingInterval === "year"
-        ? Math.round(parseFloat(tier.annualPrice || tier.price) * 100)
-        : Math.round(parseFloat(tier.price) * 100);
+    const unitAmount = Math.round(
+      resolveTierPrice(tier, currency, billingInterval) * 100,
+    );
 
     priceData = {
       price_data: {
-        currency: "usd",
+        currency,
         product_data: {
           name: `${tier.name} Subscription`,
           description: tier.description,
@@ -268,8 +288,14 @@ export async function createSubscriptionCheckout(
           ...(couponId && { appliedCoupon: couponId }),
         },
       },
-      // Collect billing address
-      billing_address_collection: "auto",
+      // Automatic tax needs a real billing address to calculate against.
+      billing_address_collection: env.STRIPE_AUTOMATIC_TAX_ENABLED
+        ? "required"
+        : "auto",
+      ...(env.STRIPE_AUTOMATIC_TAX_ENABLED && {
+        automatic_tax: { enabled: true },
+        customer_update: { address: "auto", name: "auto" },
+      }),
     };
 
     // Apply tier discount coupon (takes precedence over promotion codes)

@@ -13,8 +13,6 @@ import {
   Chip,
   Divider,
   Skeleton,
-  Card,
-  CardContent,
   CircularProgress,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
@@ -35,27 +33,7 @@ import {
   MonetizationOn,
 } from "@mui/icons-material";
 import { JSX } from "react/jsx-runtime";
-
-// Styled Card component for better visual appeal
-const StatCard = styled(Card)(({ theme }) => ({
-  height: "100%",
-  display: "flex",
-  flexDirection: "column",
-  transition: "transform 0.3s, box-shadow 0.3s",
-  "&:hover": {
-    transform: "translateY(-5px)",
-    boxShadow: theme.shadows[8],
-  },
-}));
-
-const StatCardContent = styled(CardContent)(({ theme }) => ({
-  flexGrow: 1,
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  textAlign: "center",
-  padding: theme.spacing(3),
-}));
+import StatCard from "@/app/components/generalComponent/StatCard";
 
 const ProfileCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -290,24 +268,12 @@ const Overview: React.FC = () => {
             <Grid container spacing={3}>
               {stats.slice(0, 4).map((stat) => (
                 <Grid size={{ xs: 6, sm: 3 }} key={stat.id}>
-                  <StatCard>
-                    <StatCardContent>
-                      {statIcons[stat.id]}
-                      <Typography
-                        variant="h4"
-                        sx={{
-                          color: "primary.main",
-                          fontWeight: "bold",
-                          mt: 1,
-                        }}
-                      >
-                        {stat.value}
-                      </Typography>
-                      <Typography variant="subtitle2" color="textSecondary">
-                        {stat.label}
-                      </Typography>
-                    </StatCardContent>
-                  </StatCard>
+                  <StatCard
+                    variant="centered"
+                    icon={statIcons[stat.id]}
+                    value={stat.value}
+                    label={stat.label}
+                  />
                 </Grid>
               ))}
             </Grid>
@@ -384,24 +350,12 @@ const Overview: React.FC = () => {
         <Grid container spacing={3}>
           {stats.slice(4).map((stat) => (
             <Grid size={{ xs: 6, sm: 4, md: 3 }} key={stat.id} sx={{ mb: 6 }}>
-              <StatCard>
-                <StatCardContent>
-                  {statIcons[stat.id]}
-                  <Typography
-                    variant="h5"
-                    sx={{
-                      color: "primary.main",
-                      fontWeight: "bold",
-                      mt: 1,
-                    }}
-                  >
-                    {stat.value}
-                  </Typography>
-                  <Typography variant="subtitle2" color="textSecondary">
-                    {stat.label}
-                  </Typography>
-                </StatCardContent>
-              </StatCard>
+              <StatCard
+                variant="centered"
+                icon={statIcons[stat.id]}
+                value={stat.value}
+                label={stat.label}
+              />
             </Grid>
           ))}
         </Grid>

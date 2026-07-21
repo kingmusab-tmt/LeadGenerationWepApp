@@ -23,6 +23,10 @@ import {
   FormControl,
   InputLabel,
   SelectChangeEvent,
+  Stack,
+  Card,
+  CardContent,
+  Box,
 } from "@mui/material";
 import { Download, MoreVert, Visibility } from "@mui/icons-material";
 import { Container } from "@mui/material";
@@ -459,41 +463,91 @@ const TransactionHistory: React.FC = () => {
           <MenuItem value="admin_adjustment">Admin Adjustment</MenuItem>
         </Select>
       </FormControl>
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Date</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Previous Balance</TableCell>
-              <TableCell>Current Balance</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Action</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredTransactions.map((transaction) => (
-              <TableRow key={transaction._id}>
-                <TableCell>
-                  {new Date(transaction.createdAt).toLocaleString()}
-                </TableCell>
-                <TableCell>{transaction.type}</TableCell>
-                <TableCell>{transaction.previousBalance}</TableCell>
-                <TableCell>{transaction.currentBalance}</TableCell>
-                <TableCell>{transaction.status}</TableCell>
-                <TableCell>
+      {isMobile ? (
+        <Stack spacing={1.5}>
+          {filteredTransactions.map((transaction) => (
+            <Card key={transaction._id} variant="outlined">
+              <CardContent sx={{ "&:last-child": { pb: 2 } }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      {transaction.type.replace(/_/g, " ")}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(transaction.createdAt).toLocaleString()}
+                    </Typography>
+                  </Box>
                   <IconButton
                     onClick={(e) => handleMenuClick(e, transaction)}
                     aria-label="actions"
+                    size="small"
                   >
                     <MoreVert />
                   </IconButton>
-                </TableCell>
+                </Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mt: 1.5,
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    {transaction.previousBalance} &rarr;{" "}
+                    {transaction.currentBalance}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {transaction.status}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Date</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Previous Balance</TableCell>
+                <TableCell>Current Balance</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Action</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {filteredTransactions.map((transaction) => (
+                <TableRow key={transaction._id}>
+                  <TableCell>
+                    {new Date(transaction.createdAt).toLocaleString()}
+                  </TableCell>
+                  <TableCell>{transaction.type}</TableCell>
+                  <TableCell>{transaction.previousBalance}</TableCell>
+                  <TableCell>{transaction.currentBalance}</TableCell>
+                  <TableCell>{transaction.status}</TableCell>
+                  <TableCell>
+                    <IconButton
+                      onClick={(e) => handleMenuClick(e, transaction)}
+                      aria-label="actions"
+                    >
+                      <MoreVert />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
       {/* Three-Dot Menu */}
       <Menu

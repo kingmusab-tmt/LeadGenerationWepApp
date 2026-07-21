@@ -75,6 +75,10 @@ const updateUserProfileSchema = z.object({
       postCode: z.string().max(20).optional(),
     })
     .optional(),
+  // Only affects the currency used for the *next* checkout — Stripe
+  // subscriptions are immutable in currency once created, so this does not
+  // retroactively change an already-active subscription.
+  billingCurrency: z.enum(["usd", "gbp", "cad"]).optional(),
 });
 
 /**
@@ -121,7 +125,8 @@ export async function PUT(req: NextRequest) {
       validatedData.businessWebsite ||
       validatedData.companyDescription ||
       validatedData.industryNiche ||
-      validatedData.businessAddress;
+      validatedData.businessAddress ||
+      validatedData.billingCurrency;
     if (!hasFieldsToUpdate) {
       return badRequest("At least one field must be provided for update");
     }
@@ -180,6 +185,9 @@ export async function PUT(req: NextRequest) {
     }
     if (validatedData.businessAddress) {
       updateData.businessAddress = validatedData.businessAddress;
+    }
+    if (validatedData.billingCurrency) {
+      updateData.billingCurrency = validatedData.billingCurrency;
     }
 
     // Update the user
@@ -243,7 +251,8 @@ export async function PATCH(req: NextRequest) {
       validatedData.businessWebsite ||
       validatedData.companyDescription ||
       validatedData.industryNiche ||
-      validatedData.businessAddress;
+      validatedData.businessAddress ||
+      validatedData.billingCurrency;
     if (!hasFieldsToUpdate) {
       return badRequest("At least one field must be provided for update");
     }
@@ -300,6 +309,9 @@ export async function PATCH(req: NextRequest) {
     }
     if (validatedData.businessAddress) {
       updateData.businessAddress = validatedData.businessAddress;
+    }
+    if (validatedData.billingCurrency) {
+      updateData.billingCurrency = validatedData.billingCurrency;
     }
 
     // Update the user

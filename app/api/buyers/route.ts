@@ -274,8 +274,7 @@ export async function PUT(req: NextRequest) {
           : body.leadPreferences?.industry
             ? [body.leadPreferences.industry]
             : [],
-        industryServicePairs:
-          body.leadPreferences?.industryServicePairs || [],
+        industryServicePairs: body.leadPreferences?.industryServicePairs || [],
       },
       preferredDistribution: body.preferredDistribution,
       notificationPreferences: body.notificationPreferences,

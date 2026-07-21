@@ -45,7 +45,9 @@ export async function GET(req: NextRequest) {
 
     // Fetch users with conditions
     const users = await User.find(conditions)
-      .select("name email role status image createdAt lastLogin verified")
+      .select(
+        "name email role adminLevel status image createdAt lastLogin verified",
+      )
       .sort({ createdAt: -1 })
       .lean();
 

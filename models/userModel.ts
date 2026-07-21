@@ -90,6 +90,29 @@ const UserSchema: Schema = new Schema<IUser>(
       },
       default: "user",
     },
+    // Only meaningful when role === "admin". Defaults to "super" so every
+    // existing admin keeps today's full access — this is an opt-in
+    // restriction a super-admin can apply to another admin, not a
+    // retroactive lockout.
+    adminLevel: {
+      type: String,
+      enum: {
+        values: ["standard", "super"],
+        message: "Invalid admin level",
+      },
+      default: "super",
+    },
+    // Currency this account bills/gets paid in. Sellers set this from their
+    // business country; buyers inherit it for credit purchases from their
+    // seller. See lib/currency.ts for the supported set (usd/gbp/cad).
+    billingCurrency: {
+      type: String,
+      enum: {
+        values: ["usd", "gbp", "cad"],
+        message: "Invalid billing currency",
+      },
+      default: "usd",
+    },
     notificationPreferences: {
       type: [String],
       enum: ["Email", "SMS", "In-App Notification"],

@@ -12,6 +12,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 import { env } from "@/lib/env";
+import { resolveTwilioCountryCode, countryUsesAreaCode } from "@/lib/twilioCountry";
 
 // Initialize Twilio client with system credentials
 const SYSTEM_TWILIO_ACCOUNT_SID = env.TWILIO_ACCOUNT_SID;
@@ -95,6 +96,13 @@ export async function POST(req: NextRequest) {
       return notFound("Seller");
     }
 
+    // Search Twilio numbers in the seller's own country instead of always
+    // assuming US — UK/Canada sellers can now provision a local number.
+    const twilioCountryCode = resolveTwilioCountryCode(
+      user.businessAddress?.country,
+    );
+    const useAreaCode = countryUsesAreaCode(twilioCountryCode);
+
     // Check subscription limits
     const subscription = user.subscription;
     if (!subscription || !subscription.isSubscriptionActive) {
@@ -140,9 +148,9 @@ export async function POST(req: NextRequest) {
 
         const userClient = twilio(user.twilioAccountSid, user.twilioAuthToken);
         const numbers = await userClient
-          .availablePhoneNumbers("US")
+          .availablePhoneNumbers(twilioCountryCode)
           .local.list({
-            areaCode: finalAreaCode,
+            ...(useAreaCode && { areaCode: finalAreaCode }),
             limit: 1,
             smsEnabled: true,
             voiceEnabled: true,
@@ -159,6 +167,10 @@ export async function POST(req: NextRequest) {
           friendlyName: `Seller ${userId} - ${industry}`,
           voiceUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/calls?sellerId=${userId}`,
           voiceMethod: "POST",
+          voiceFallbackUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/fallback?sellerId=${userId}`,
+          voiceFallbackMethod: "POST",
+          statusCallback: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/savecallrecord`,
+          statusCallbackMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
       } else {
@@ -180,9 +192,9 @@ export async function POST(req: NextRequest) {
         }
 
         const numbers = await systemClient
-          .availablePhoneNumbers("US")
+          .availablePhoneNumbers(twilioCountryCode)
           .local.list({
-            areaCode: finalAreaCode,
+            ...(useAreaCode && { areaCode: finalAreaCode }),
             limit: 1,
             smsEnabled: true,
             voiceEnabled: true,
@@ -209,9 +221,9 @@ export async function POST(req: NextRequest) {
         }
 
         const numbers = await clientToUse
-          .availablePhoneNumbers("US")
+          .availablePhoneNumbers(twilioCountryCode)
           .local.list({
-            areaCode: finalAreaCode,
+            ...(useAreaCode && { areaCode: finalAreaCode }),
             limit: 1,
             smsEnabled: true,
             voiceEnabled: true,
@@ -228,6 +240,10 @@ export async function POST(req: NextRequest) {
           friendlyName: `Seller ${userId} - ${industry}`,
           voiceUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/calls?sellerId=${userId}`,
           voiceMethod: "POST",
+          voiceFallbackUrl: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/fallback?sellerId=${userId}`,
+          voiceFallbackMethod: "POST",
+          statusCallback: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/savecallrecord`,
+          statusCallbackMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
       }

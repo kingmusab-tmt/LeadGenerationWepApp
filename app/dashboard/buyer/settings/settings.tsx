@@ -36,6 +36,7 @@ import { setUser, updateUser } from "@/lib/userSlice";
 import { useNotification } from "@/app/hooks";
 import GooglePlacesAutocomplete from "@/app/components/GooglePlacesAutocomplete";
 import GoogleTimezoneAutocomplete from "@/app/components/GoogleTimezoneAutocomplete";
+import { useColorMode } from "@/lib/theme/MuiThemeProvider";
 import {
   BUYER_ONBOARDING_STEPS,
   BuyerOnboardingStep,
@@ -209,6 +210,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
     loading: userLoading,
     refreshUser,
   } = useInitializeUser();
+  const { mode: colorMode, toggleTheme: toggleColorMode } = useColorMode();
 
   // Initialize tab from URL search params, default to 0
   const tabParam = searchParams.get("tab");
@@ -1048,14 +1050,16 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                         mt: 3,
                       }}
                     >
-                      {/* <Box>
-                    <Typography component="span">Dark Mode</Typography>
-                    <Switch
-                      checked={darkMode}
-                      onChange={handleDarkModeToggle}
-                      color="primary"
-                    />
-                  </Box> */}
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography component="span">Dark Mode</Typography>
+                        <Switch
+                          checked={colorMode === "dark"}
+                          onChange={toggleColorMode}
+                          color="primary"
+                        />
+                      </Box>
                       <Button
                         variant="contained"
                         color="primary"

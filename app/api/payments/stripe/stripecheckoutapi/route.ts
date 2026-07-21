@@ -126,12 +126,16 @@ export async function POST(req: NextRequest) {
           )
           .digest("hex");
 
+      // Charge in the seller's billing currency — they're the one receiving
+      // the funds via transfer_data.destination below.
+      const sellerCurrency = seller.billingCurrency || "usd";
+
       sessionParams = {
         payment_method_types: ["card"],
         line_items: [
           {
             price_data: {
-              currency: "usd",
+              currency: sellerCurrency,
               product_data: {
                 name: `${units} Lead Credits`,
                 // Include seller information if needed
@@ -161,6 +165,11 @@ export async function POST(req: NextRequest) {
           sellerId: sellerId.toString(),
           purchaseType: "credits",
         },
+        ...(env.STRIPE_AUTOMATIC_TAX_ENABLED && {
+          automatic_tax: { enabled: true },
+          customer_update: { address: "auto", name: "auto" },
+          billing_address_collection: "required" as const,
+        }),
       };
 
       const session = await stripe.checkout.sessions.create(sessionParams, {

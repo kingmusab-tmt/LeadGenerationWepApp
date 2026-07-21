@@ -3,13 +3,23 @@ import { ISubscriptionLimits } from "./types/subscription";
 
 export interface ITier extends Document {
   name: string;
-  price: string;
+  price: string; // Base price in USD
   description: string;
   stripePriceId?: string; // Legacy - monthly price ID
   stripeProductId?: string;
-  stripeMonthlyPriceId?: string; // Stripe Price ID for monthly billing
-  stripeAnnualPriceId?: string; // Stripe Price ID for annual billing
+  stripeMonthlyPriceId?: string; // Stripe Price ID for monthly billing (USD)
+  stripeAnnualPriceId?: string; // Stripe Price ID for annual billing (USD)
   stripeCouponId?: string; // Stripe Coupon ID for discount
+  // GBP/CAD prices: explicit admin override if set, else computed from the
+  // USD price via lib/currency.ts at sync time. See resolveTierPrice().
+  priceGBP?: string;
+  priceCAD?: string;
+  annualPriceGBP?: string;
+  annualPriceCAD?: string;
+  stripeMonthlyPriceIdGBP?: string;
+  stripeMonthlyPriceIdCAD?: string;
+  stripeAnnualPriceIdGBP?: string;
+  stripeAnnualPriceIdCAD?: string;
   features: string[];
   ctaText: string;
   highlight: boolean;
@@ -38,6 +48,14 @@ const TierSchema = new Schema<ITier>(
     stripeMonthlyPriceId: { type: String }, // Stripe Price ID for monthly billing
     stripeAnnualPriceId: { type: String }, // Stripe Price ID for annual billing
     stripeCouponId: { type: String }, // Stripe Coupon ID for discount
+    priceGBP: { type: String },
+    priceCAD: { type: String },
+    annualPriceGBP: { type: String },
+    annualPriceCAD: { type: String },
+    stripeMonthlyPriceIdGBP: { type: String },
+    stripeMonthlyPriceIdCAD: { type: String },
+    stripeAnnualPriceIdGBP: { type: String },
+    stripeAnnualPriceIdCAD: { type: String },
     billingInterval: {
       type: String,
       enum: ["month", "year"],

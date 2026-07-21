@@ -70,8 +70,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Find the seller associated with the call
-    const seller = await User.findOne({ sellerId });
+    // Find the seller associated with the call.
+    // sellerId is the authenticated user's Mongo _id in current flows; keep a
+    // legacy fallback for older records that stored a separate sellerId field.
+    const seller =
+      (await User.findById(sellerId)) ?? (await User.findOne({ sellerId }));
 
     if (!seller) {
       console.error(`Seller not found for sellerId: ${sellerId}`);
@@ -174,10 +177,17 @@ export async function POST(req: NextRequest) {
       const twiml = new twilio.twiml.VoiceResponse();
 
       if (forwardingType === "direct") {
-        const buyers = await Buyer.find({
+        let buyers = await Buyer.find({
           _id: { $in: seller.buyers },
           "leadPreferences.industries": industry,
         });
+
+        if (buyers.length === 0) {
+          buyers = await Buyer.find({
+            registeredWith: seller._id,
+            "leadPreferences.industries": industry,
+          });
+        }
 
         if (buyers.length === 0) {
           console.error(`No buyers available for industry: ${industry}`);

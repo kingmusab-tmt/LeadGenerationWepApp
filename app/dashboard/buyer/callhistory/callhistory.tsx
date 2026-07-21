@@ -29,6 +29,12 @@ import {
   Switch,
   DialogActions,
   CircularProgress,
+  Stack,
+  Card,
+  CardContent,
+  Divider,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import {
   PlayCircle,
@@ -68,6 +74,8 @@ const PAGE_SIZE = 10;
 
 const CallHistory: React.FC = () => {
   const fetchWithCSRF = useCSRFFetch();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [calls, setCalls] = useState<Call[]>([]);
   const [filteredCalls, setFilteredCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
@@ -297,56 +305,46 @@ const CallHistory: React.FC = () => {
         </Box>
       ) : (
         <>
-          <TableContainer
-            component={Paper}
-            elevation={3}
-            sx={{
-              mb: 2,
-              maxHeight: "calc(100vh - 300px)",
-              overflow: "auto",
-            }}
-          >
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  {[
-                    "Status",
-                    "Date",
-                    "Duration",
-                    "Recording",
-                    "Industry",
-                    "Payment",
-                    "Disposition",
-                    "Quality",
-                    "Feedback",
-                  ].map((header) => (
-                    <TableCell key={header} sx={{ fontWeight: "bold" }}>
-                      {header}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedCalls.length > 0 ? (
-                  paginatedCalls.map((call) => (
-                    <TableRow key={call._id} hover>
-                      <TableCell>
+          {isMobile ? (
+            paginatedCalls.length > 0 ? (
+              <Stack spacing={1.5} sx={{ mb: 2 }}>
+                {paginatedCalls.map((call) => (
+                  <Card key={call._id} variant="outlined">
+                    <CardContent sx={{ "&:last-child": { pb: 2 } }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          mb: 1,
+                        }}
+                      >
                         <StatusChip status={call.status} />
-                      </TableCell>
-                      <TableCell>{formatDate(call.createdAt)}</TableCell>
-                      <TableCell>{formatDuration(call.callDuration)}</TableCell>
-                      <TableCell>
-                        <RecordingButton
-                          recordingUrl={call.recordingUrl}
-                          callSid={call.callSid}
-                          onPlay={handlePlayRecording}
-                        />
-                      </TableCell>
-                      <TableCell>{call.industry}</TableCell>
-                      <TableCell>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDate(call.createdAt)}
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          mb: 1,
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          {call.industry} &middot;{" "}
+                          {formatDuration(call.callDuration)}
+                        </Typography>
                         <PaymentChip status={call.paymentStatus} />
-                      </TableCell>
-                      <TableCell>
+                      </Box>
+                      <RecordingButton
+                        recordingUrl={call.recordingUrl}
+                        callSid={call.callSid}
+                        onPlay={handlePlayRecording}
+                      />
+                      <Divider sx={{ my: 1.5 }} />
+                      <Box sx={{ mb: 1.5 }}>
                         <DispositionSelect
                           callId={call._id}
                           currentDisposition={call.disposition || ""}
@@ -358,11 +356,15 @@ const CallHistory: React.FC = () => {
                             );
                           }}
                         />
-                      </TableCell>
-                      <TableCell>
+                      </Box>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
                         <QualityChip feedback={call.feedback} />
-                      </TableCell>
-                      <TableCell>
                         <Button
                           variant="outlined"
                           size="small"
@@ -371,21 +373,118 @@ const CallHistory: React.FC = () => {
                         >
                           Rate
                         </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            ) : (
+              <Paper sx={{ py: 4, textAlign: "center", mb: 2 }}>
+                <Typography color="text.secondary">
+                  {searchTerm
+                    ? "No matching calls found"
+                    : "No call history available"}
+                </Typography>
+              </Paper>
+            )
+          ) : (
+            <TableContainer
+              component={Paper}
+              elevation={3}
+              sx={{
+                mb: 2,
+                maxHeight: "calc(100vh - 300px)",
+                overflow: "auto",
+              }}
+            >
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    {[
+                      "Status",
+                      "Date",
+                      "Duration",
+                      "Recording",
+                      "Industry",
+                      "Payment",
+                      "Disposition",
+                      "Quality",
+                      "Feedback",
+                    ].map((header) => (
+                      <TableCell key={header} sx={{ fontWeight: "bold" }}>
+                        {header}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paginatedCalls.length > 0 ? (
+                    paginatedCalls.map((call) => (
+                      <TableRow key={call._id} hover>
+                        <TableCell>
+                          <StatusChip status={call.status} />
+                        </TableCell>
+                        <TableCell>{formatDate(call.createdAt)}</TableCell>
+                        <TableCell>
+                          {formatDuration(call.callDuration)}
+                        </TableCell>
+                        <TableCell>
+                          <RecordingButton
+                            recordingUrl={call.recordingUrl}
+                            callSid={call.callSid}
+                            onPlay={handlePlayRecording}
+                          />
+                        </TableCell>
+                        <TableCell>{call.industry}</TableCell>
+                        <TableCell>
+                          <PaymentChip status={call.paymentStatus} />
+                        </TableCell>
+                        <TableCell>
+                          <DispositionSelect
+                            callId={call._id}
+                            currentDisposition={call.disposition || ""}
+                            onUpdate={(disposition) => {
+                              setCalls(
+                                calls.map((c) =>
+                                  c._id === call._id
+                                    ? { ...c, disposition }
+                                    : c,
+                                ),
+                              );
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <QualityChip feedback={call.feedback} />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<Feedback />}
+                            onClick={() => handleOpenFeedback(call)}
+                          >
+                            Rate
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={9}
+                        sx={{ textAlign: "center", py: 4 }}
+                      >
+                        {searchTerm
+                          ? "No matching calls found"
+                          : "No call history available"}
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={9} sx={{ textAlign: "center", py: 4 }}>
-                      {searchTerm
-                        ? "No matching calls found"
-                        : "No call history available"}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
 
           {filteredCalls.length > PAGE_SIZE && (
             <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>

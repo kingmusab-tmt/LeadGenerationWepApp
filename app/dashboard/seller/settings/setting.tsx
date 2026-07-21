@@ -17,6 +17,7 @@ import {
   Divider,
   Chip,
   Container,
+  MenuItem,
 } from "@mui/material";
 import {
   Settings as SettingsIcon,
@@ -63,6 +64,7 @@ interface BasicUserInfo {
     country?: string;
     postCode?: string;
   };
+  billingCurrency?: "usd" | "gbp" | "cad";
   image?: string;
 }
 
@@ -92,6 +94,7 @@ interface UpdateUserPayload {
     country?: string;
     postCode?: string;
   };
+  billingCurrency?: "usd" | "gbp" | "cad";
 }
 
 const TAB_MAP = [
@@ -180,6 +183,7 @@ const AccountSettings = () => {
           country: currentUser.businessAddress?.country || "",
           postCode: currentUser.businessAddress?.postCode || "",
         },
+        billingCurrency: currentUser.billingCurrency || "usd",
         image: currentUser.image || "",
       };
       setEditableUser(basicUserInfo);
@@ -309,6 +313,7 @@ const AccountSettings = () => {
         companyDescription: toOptional(editableUser.companyDescription),
         industryNiche: toOptional(editableUser.industryNiche),
         businessAddress: hasAddressValues ? sanitizedAddress : undefined,
+        billingCurrency: editableUser.billingCurrency,
       };
 
       // Remove undefined keys
@@ -371,6 +376,7 @@ const AccountSettings = () => {
               country: latest.businessAddress?.country || "",
               postCode: latest.businessAddress?.postCode || "",
             },
+            billingCurrency: latest.billingCurrency || "usd",
             image: latest.image || "",
           });
         }
@@ -726,6 +732,22 @@ const AccountSettings = () => {
                               onChange={handleInputChange}
                               disabled={saving}
                             />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              select
+                              fullWidth
+                              label="Billing Currency"
+                              name="billingCurrency"
+                              value={editableUser?.billingCurrency || "usd"}
+                              onChange={handleInputChange}
+                              disabled={saving}
+                              helperText="Applies to your next checkout — does not change an already-active subscription's currency."
+                            >
+                              <MenuItem value="usd">USD ($)</MenuItem>
+                              <MenuItem value="gbp">GBP (£)</MenuItem>
+                              <MenuItem value="cad">CAD (C$)</MenuItem>
+                            </TextField>
                           </Grid>
                           <Grid size={{ xs: 12 }}>
                             <TextField

@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
     const sellerId = searchParams.get("sellerId") || "";
     const callSid = searchParams.get("callSid") || "";
     const trackingNumber = searchParams.get("trackingNumber") || "";
+    const multiRing = searchParams.get("multiRing") === "true";
+    const legCount = searchParams.get("legCount") || "";
 
     debugLog("Whisper/screening endpoint hit", {
       whisperMessage: !!whisperMessage,
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
 
         const gather = twiml.gather({
           numDigits: 1,
-          action: `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}&acceptDigits=${acceptDigits}&trackingNumber=${encodeURIComponent(trackingNumber)}`,
+          action: `${baseUrl.replace(/\/$/, "")}/api/calls/twilio/whisper/response?sellerId=${sellerId}&callSid=${callSid}&validDigits=${validDigits}&acceptDigits=${acceptDigits}&trackingNumber=${encodeURIComponent(trackingNumber)}${multiRing ? `&multiRing=true&legCount=${encodeURIComponent(legCount)}` : ""}`,
           method: "POST",
           timeout: 10,
         });

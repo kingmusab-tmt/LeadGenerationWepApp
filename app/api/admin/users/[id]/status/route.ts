@@ -4,6 +4,7 @@ import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import dbConnect from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { recordAuditLog } from "@/lib/auditLog";
 import { internalError, notFound } from "@/lib/api/error-handler";
 
 const toIsoDateOrNull = (value: unknown): string | null => {
@@ -17,7 +18,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await requireAdmin();
+  const { error, session } = await requireAdmin();
   if (error) return error;
 
   try {
@@ -71,6 +72,20 @@ export async function PUT(
         };
       }
     }
+
+    await recordAuditLog({
+      actor: {
+        email: session!.user.email,
+        name: session!.user.name,
+        role: session!.user.role,
+      },
+      action: "user.status.update",
+      targetType: updatedUser ? "User" : "Buyer",
+      targetId: id,
+      summary: `Set status to "${status}" for ${userResult.email || id}`,
+      metadata: { status },
+      req,
+    });
 
     return NextResponse.json({
       user: {

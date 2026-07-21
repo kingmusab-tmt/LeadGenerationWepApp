@@ -33,6 +33,7 @@ export interface User {
   isSubActive?: boolean;
   preferredDistribution?: "Automatic" | "Manual" | "Both" | string;
   tierUserType?: "seller" | "business";
+  billingCurrency?: "usd" | "gbp" | "cad";
 }
 
 interface UserState {

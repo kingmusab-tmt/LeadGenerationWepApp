@@ -226,6 +226,8 @@ export const getWhisperUrl = (options: {
   sellerId: string;
   callSid: string;
   trackingNumber?: string;
+  multiRing?: boolean;
+  legCount?: number;
 }): string | undefined => {
   const {
     callWhisper,
@@ -234,6 +236,8 @@ export const getWhisperUrl = (options: {
     sellerId,
     callSid,
     trackingNumber,
+    multiRing,
+    legCount,
   } = options;
 
   if (!callWhisper && !requireResponse) return undefined;
@@ -245,6 +249,10 @@ export const getWhisperUrl = (options: {
     params.set("buyerResponses", JSON.stringify(buyerResponses));
   }
   if (trackingNumber) params.set("trackingNumber", trackingNumber);
+  if (multiRing) params.set("multiRing", "true");
+  if (typeof legCount === "number" && legCount > 0) {
+    params.set("legCount", String(legCount));
+  }
   params.set("sellerId", sellerId);
   params.set("callSid", callSid);
 
@@ -358,11 +366,18 @@ export const getNextRoundRobinBuyer = async (
   callRate: { units: number; seconds: number },
 ) => {
   const sellerBuyerIds = seller.buyers ?? [];
-
-  const allBuyers = await Buyer.find({
+  let allBuyers = await Buyer.find({
     _id: { $in: sellerBuyerIds },
     "leadPreferences.industries": industry,
   }).sort({ walletUnit: -1 });
+
+  // Fallback for stale/missing seller.buyers linkage
+  if (allBuyers.length === 0) {
+    allBuyers = await Buyer.find({
+      registeredWith: seller._id,
+      "leadPreferences.industries": industry,
+    }).sort({ walletUnit: -1 });
+  }
 
   const buyers = allBuyers.filter((buyer) => {
     if (isBuyerOnVacation(buyer)) {
@@ -434,11 +449,18 @@ export const getNextRoundRobinBuyerAtomic = async (
   callRate: { units: number; seconds: number },
 ) => {
   const sellerBuyerIds = seller.buyers ?? [];
-
-  const allBuyers = await Buyer.find({
+  let allBuyers = await Buyer.find({
     _id: { $in: sellerBuyerIds },
     "leadPreferences.industries": industry,
   }).sort({ _id: 1 });
+
+  // Fallback for stale/missing seller.buyers linkage
+  if (allBuyers.length === 0) {
+    allBuyers = await Buyer.find({
+      registeredWith: seller._id,
+      "leadPreferences.industries": industry,
+    }).sort({ _id: 1 });
+  }
 
   const buyers = allBuyers.filter((buyer) => {
     if (isBuyerOnVacation(buyer)) {

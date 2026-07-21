@@ -32,9 +32,6 @@ import {
   Area,
 } from "recharts";
 import {
-  ArrowUpward,
-  ArrowDownward,
-  Equalizer,
   MonetizationOn,
   People,
   Assessment,
@@ -50,40 +47,15 @@ import {
   Cancel,
   Refresh,
 } from "@mui/icons-material";
+import StatCard from "@/app/components/generalComponent/StatCard";
 
-// Styled components
-const StyledPaper = styled(Paper)(({ theme }) => ({
+// Padded panel used to house charts/lists below the KPI row.
+const ChartPanel = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
   textAlign: "center",
   color: theme.palette.text.secondary,
-  background: theme.palette.background.paper,
-  boxShadow: theme.shadows[3],
   height: "100%",
 }));
-
-const TrendIndicator = ({ value }: { value: number }) => {
-  if (value > 0) {
-    return (
-      <Box display="flex" alignItems="center" color="success.main">
-        <ArrowUpward fontSize="small" />
-        <Typography variant="caption">{value}%</Typography>
-      </Box>
-    );
-  } else if (value < 0) {
-    return (
-      <Box display="flex" alignItems="center" color="error.main">
-        <ArrowDownward fontSize="small" />
-        <Typography variant="caption">{Math.abs(value)}%</Typography>
-      </Box>
-    );
-  }
-  return (
-    <Box display="flex" alignItems="center" color="text.secondary">
-      <Equalizer fontSize="small" />
-      <Typography variant="caption">0%</Typography>
-    </Box>
-  );
-};
 
 // Initial default values for the overview data
 const initialOverviewData = {
@@ -228,207 +200,100 @@ const AdminOverview: React.FC = () => {
 
         {/* Total Users */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Total Users</Typography>
-              <Group color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.totalUsers.toLocaleString()}
-            </Typography>
-            <Typography variant="caption">
-              {overviewData.activeUsers} active, {overviewData.suspendedUsers}{" "}
-              suspended
-            </Typography>
-          </StyledPaper>
+          <StatCard
+            label="Total Users"
+            value={overviewData.totalUsers.toLocaleString()}
+            icon={<Group color="primary" />}
+            caption={`${overviewData.activeUsers} active, ${overviewData.suspendedUsers} suspended`}
+          />
         </Box>
 
         {/* Total Sellers */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Total Sellers</Typography>
-              <VerifiedUser color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.totalSellers.toLocaleString()}
-            </Typography>
-            <Typography variant="caption">
-              {overviewData.verifiedSellers} verified
-            </Typography>
-          </StyledPaper>
+          <StatCard
+            label="Total Sellers"
+            value={overviewData.totalSellers.toLocaleString()}
+            icon={<VerifiedUser color="primary" />}
+            caption={`${overviewData.verifiedSellers} verified`}
+          />
         </Box>
 
         {/* Total Buyers */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Total Buyers</Typography>
-              <People color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.totalBuyers.toLocaleString()}
-            </Typography>
-            <Typography variant="caption">
-              {overviewData.activeBuyers} active
-            </Typography>
-          </StyledPaper>
+          <StatCard
+            label="Total Buyers"
+            value={overviewData.totalBuyers.toLocaleString()}
+            icon={<People color="primary" />}
+            caption={`${overviewData.activeBuyers} active`}
+          />
         </Box>
 
         {/* Pending Verifications */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Pending Verifications</Typography>
-              <Description color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "warning.main", fontWeight: "bold" }}
-            >
-              {overviewData.pendingVerifications}
-            </Typography>
-            <Typography variant="caption">Seller applications</Typography>
-          </StyledPaper>
+          <StatCard
+            label="Pending Verifications"
+            value={overviewData.pendingVerifications}
+            icon={<Description color="primary" />}
+            valueColor="warning.main"
+            caption="Seller applications"
+          />
         </Box>
 
         {/* Total Revenue */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Total Revenue</Typography>
-              <AttachMoney color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              ${overviewData.totalRevenue.toLocaleString()}
-            </Typography>
-            <TrendIndicator value={revenueTrend} />
-          </StyledPaper>
+          <StatCard
+            label="Total Revenue"
+            value={`$${overviewData.totalRevenue.toLocaleString()}`}
+            icon={<AttachMoney color="primary" />}
+            trend={revenueTrend}
+          />
         </Box>
 
         {/* Monthly Revenue */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Monthly Revenue</Typography>
-              <MonetizationOn color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "success.main", fontWeight: "bold" }}
-            >
-              ${overviewData.monthlyRevenue.toLocaleString()}
-            </Typography>
-            <TrendIndicator value={userGrowthTrend} />
-          </StyledPaper>
+          <StatCard
+            label="Monthly Revenue"
+            value={`$${overviewData.monthlyRevenue.toLocaleString()}`}
+            icon={<MonetizationOn color="primary" />}
+            valueColor="success.main"
+            trend={userGrowthTrend}
+          />
         </Box>
 
         {/* Total Transactions */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Total Transactions</Typography>
-              <Receipt color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "info.main", fontWeight: "bold" }}
-            >
-              {overviewData.totalTransactions.toLocaleString()}
-            </Typography>
-            <Typography variant="caption">All time</Typography>
-          </StyledPaper>
+          <StatCard
+            label="Total Transactions"
+            value={overviewData.totalTransactions.toLocaleString()}
+            icon={<Receipt color="primary" />}
+            valueColor="info.main"
+            caption="All time"
+          />
         </Box>
 
         {/* Total Leads */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Total Leads</Typography>
-              <Description color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.totalLeads.toLocaleString()}
-            </Typography>
-            <Typography variant="caption">
-              {overviewData.soldLeads} sold
-            </Typography>
-          </StyledPaper>
+          <StatCard
+            label="Total Leads"
+            value={overviewData.totalLeads.toLocaleString()}
+            icon={<Description color="primary" />}
+            caption={`${overviewData.soldLeads} sold`}
+          />
         </Box>
 
         {/* Total Calls */}
         <Box gridColumn={{ xs: "span 6", sm: "span 6", md: "span 3" }}>
-          <StyledPaper>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography variant="h6">Total Calls</Typography>
-              <Call color="primary" />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ color: "primary.main", fontWeight: "bold" }}
-            >
-              {overviewData.totalCalls.toLocaleString()}
-            </Typography>
-            <Typography variant="caption">
-              {overviewData.callMinutes} minutes
-            </Typography>
-          </StyledPaper>
+          <StatCard
+            label="Total Calls"
+            value={overviewData.totalCalls.toLocaleString()}
+            icon={<Call color="primary" />}
+            caption={`${overviewData.callMinutes} minutes`}
+          />
         </Box>
 
         {/* User Growth Chart */}
         <Box gridColumn={{ xs: "span 12", md: "span 6" }}>
-          <StyledPaper>
+          <ChartPanel>
             <Typography
               variant="h6"
               gutterBottom
@@ -453,12 +318,12 @@ const AdminOverview: React.FC = () => {
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </StyledPaper>
+          </ChartPanel>
         </Box>
 
         {/* Revenue Trend Chart */}
         <Box gridColumn={{ xs: "span 12", md: "span 6" }}>
-          <StyledPaper>
+          <ChartPanel>
             <Typography
               variant="h6"
               gutterBottom
@@ -479,12 +344,12 @@ const AdminOverview: React.FC = () => {
                 <Bar dataKey="revenue" fill="#82ca9d" name="Revenue ($)" />
               </BarChart>
             </ResponsiveContainer>
-          </StyledPaper>
+          </ChartPanel>
         </Box>
 
         {/* User Distribution */}
         <Box gridColumn={{ xs: "span 12", md: "span 4" }}>
-          <StyledPaper>
+          <ChartPanel>
             <Typography
               variant="h6"
               gutterBottom
@@ -516,12 +381,12 @@ const AdminOverview: React.FC = () => {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-          </StyledPaper>
+          </ChartPanel>
         </Box>
 
         {/* Recent Transactions */}
         <Box gridColumn={{ xs: "span 12", md: "span 4" }}>
-          <StyledPaper sx={{ textAlign: "left" }}>
+          <ChartPanel sx={{ textAlign: "left" }}>
             <Typography
               variant="h6"
               gutterBottom
@@ -557,12 +422,12 @@ const AdminOverview: React.FC = () => {
                 </Box>
               ))}
             </Stack>
-          </StyledPaper>
+          </ChartPanel>
         </Box>
 
         {/* Recent Verifications */}
         <Box gridColumn={{ xs: "span 12", md: "span 4" }}>
-          <StyledPaper sx={{ textAlign: "left" }}>
+          <ChartPanel sx={{ textAlign: "left" }}>
             <Typography
               variant="h6"
               gutterBottom
@@ -610,7 +475,7 @@ const AdminOverview: React.FC = () => {
                 </Box>
               ))}
             </Stack>
-          </StyledPaper>
+          </ChartPanel>
         </Box>
       </Box>
     </Container>
