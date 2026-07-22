@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useCallback } from "react";
 import { useAppDispatch } from "./useRedux";
 import { addNotification } from "@/lib/uiSlice";
 
@@ -30,10 +31,18 @@ import { addNotification } from "@/lib/uiSlice";
 export const useNotification = () => {
   const dispatch = useAppDispatch();
 
-  return (
-    message: string,
-    severity: "success" | "error" | "warning" | "info" = "info",
-  ) => {
-    dispatch(addNotification({ message, severity }));
-  };
+  // Stable across renders (dispatch never changes identity) — components
+  // that put `notify` in a useCallback/useEffect dependency array rely on
+  // that stability; returning a fresh closure every render previously
+  // caused re-render loops wherever it fed into a registration effect
+  // (e.g. seller onboarding's per-step "save handler" registration).
+  return useCallback(
+    (
+      message: string,
+      severity: "success" | "error" | "warning" | "info" = "info",
+    ) => {
+      dispatch(addNotification({ message, severity }));
+    },
+    [dispatch],
+  );
 };

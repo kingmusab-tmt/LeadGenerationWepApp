@@ -12,6 +12,7 @@ import {
   IconButton,
   Menu,
   Typography,
+  TextField,
 } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
 
@@ -19,8 +20,9 @@ interface TransactionFilters {
   type: string;
   status: string;
   dateRange: string;
-  startDate?: Date | null;
-  endDate?: Date | null;
+  // ISO date strings (yyyy-mm-dd), only meaningful when dateRange === "custom"
+  startDate?: string;
+  endDate?: string;
 }
 
 interface TransactionFiltersProps {
@@ -32,9 +34,11 @@ interface TransactionFiltersProps {
 const TransactionFilters: React.FC<TransactionFiltersProps> = ({
   filters,
   onFilterChange,
+  isMobile: isMobileProp,
 }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobileFallback = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobile = isMobileProp ?? isMobileFallback;
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
@@ -42,6 +46,16 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
     onFilterChange({
       ...filters,
       [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleDateInputChange = (
+    field: "startDate" | "endDate",
+    value: string,
+  ) => {
+    onFilterChange({
+      ...filters,
+      [field]: value,
     });
   };
 
@@ -76,6 +90,7 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
         >
           <MenuItem value="all">All Types</MenuItem>
           <MenuItem value="lead_purchase">Lead Purchase</MenuItem>
+          <MenuItem value="call_purchase">Call Purchase</MenuItem>
           <MenuItem value="units_purchase">Units Purchase</MenuItem>
           <MenuItem value="seller_income">Seller Income</MenuItem>
           <MenuItem value="seller_payout">Seller Payout</MenuItem>
@@ -121,6 +136,29 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
           <MenuItem value="custom">Custom Range</MenuItem>
         </Select>
       </FormControl>
+
+      {filters.dateRange === "custom" && (
+        <>
+          <TextField
+            type="date"
+            label="From"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            value={filters.startDate || ""}
+            onChange={(e) => handleDateInputChange("startDate", e.target.value)}
+            sx={{ minWidth: 150 }}
+          />
+          <TextField
+            type="date"
+            label="To"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            value={filters.endDate || ""}
+            onChange={(e) => handleDateInputChange("endDate", e.target.value)}
+            sx={{ minWidth: 150 }}
+          />
+        </>
+      )}
     </Stack>
   );
 
@@ -156,6 +194,7 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
           >
             <MenuItem value="all">All Types</MenuItem>
             <MenuItem value="lead_purchase">Lead Purchase</MenuItem>
+            <MenuItem value="call_purchase">Call Purchase</MenuItem>
             <MenuItem value="units_purchase">Units Purchase</MenuItem>
             <MenuItem value="seller_income">Seller Income</MenuItem>
             <MenuItem value="seller_payout">Seller Payout</MenuItem>
@@ -205,6 +244,33 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
             <MenuItem value="custom">Custom Range</MenuItem>
           </Select>
         </FormControl>
+
+        {filters.dateRange === "custom" && (
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            <TextField
+              type="date"
+              label="From"
+              size="small"
+              fullWidth
+              slotProps={{ inputLabel: { shrink: true } }}
+              value={filters.startDate || ""}
+              onChange={(e) =>
+                handleDateInputChange("startDate", e.target.value)
+              }
+            />
+            <TextField
+              type="date"
+              label="To"
+              size="small"
+              fullWidth
+              slotProps={{ inputLabel: { shrink: true } }}
+              value={filters.endDate || ""}
+              onChange={(e) =>
+                handleDateInputChange("endDate", e.target.value)
+              }
+            />
+          </Stack>
+        )}
       </Menu>
     </>
   );

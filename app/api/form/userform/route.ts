@@ -14,11 +14,25 @@ export async function GET() {
 
     // Connect to MongoDB
     await dbConnect();
-    //(`userId = ${userId}`);
-    // Fetch forms created by the user
-    const forms = await Form.find({ userId });
-    //(forms);
-    return NextResponse.json(forms);
+    // `fields` is kept even though the "My Forms" list itself doesn't render
+    // it — the "Add Lead" dialog (leadform.tsx) also calls this same
+    // endpoint to use a seller's existing form as a template for which
+    // dynamic fields to show, and needs the real field definitions to do
+    // that. submittedLeads is trimmed to just its length (a lead count
+    // badge), not the individual lead IDs.
+    const forms = await Form.find({ userId })
+      .select(
+        "formName formId createdAt status leadSource industry submittedLeads fields",
+      )
+      .sort({ createdAt: -1 })
+      .lean();
+    const withLeadCount = forms.map(
+      ({ submittedLeads, ...form }) => ({
+        ...form,
+        leadCount: submittedLeads?.length ?? 0,
+      }),
+    );
+    return NextResponse.json(withLeadCount);
   } catch (error) {
     console.error("Failed to fetch forms:", error);
     return internalError("Failed to fetch forms.");

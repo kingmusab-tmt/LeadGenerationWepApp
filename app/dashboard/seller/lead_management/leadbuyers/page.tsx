@@ -43,6 +43,7 @@ import {
   ThumbDown,
 } from "@mui/icons-material";
 import { formatDate, formatDuration } from "@/lib/formatUtils";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Call {
   _id: string;
@@ -58,6 +59,7 @@ interface Call {
   createdAt: string;
   callSid?: string;
   unitsCharged?: number;
+  paymentStatus?: string;
   feedback?: {
     buyerRating?: boolean;
     sellerApproved?: boolean;
@@ -89,7 +91,19 @@ export default function LeadTracking() {
     format: string;
   } | null>(null);
   const [audioFormat, setAudioFormat] = useState<"mp3" | "wav">("mp3");
+  const [submittingReview, setSubmittingReview] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const csrfFetch = useCSRFFetch();
+
+  // Parses this route's standard {success, data} envelope, surfacing the
+  // server's actual error message on failure instead of a generic string.
+  const parseEnvelope = async <T,>(response: Response): Promise<T> => {
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body.success === false) {
+      throw new Error(body.error || "Request failed");
+    }
+    return body.data as T;
+  };
 
   useEffect(() => {
     async function init() {
@@ -99,9 +113,8 @@ export default function LeadTracking() {
       setLoading(true);
       try {
         const response = await fetch(`/api/calls/tracking`);
-        if (!response.ok) throw new Error("Failed to load calls");
-        const data = await response.json();
-        setCalls(Array.isArray(data) ? data : data.calls || []);
+        const data = await parseEnvelope<{ calls: Call[] }>(response);
+        setCalls(Array.isArray(data.calls) ? data.calls : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load calls");
       } finally {
@@ -148,10 +161,11 @@ export default function LeadTracking() {
   };
 
   const handleSubmitFeedback = async (approved: boolean) => {
-    if (!currentCall) return;
+    if (!currentCall || submittingReview) return;
 
+    setSubmittingReview(true);
     try {
-      const response = await fetch(
+      const response = await csrfFetch(
         `/api/calls/feedback?callId=${currentCall._id}`,
         {
           method: "POST",
@@ -166,15 +180,11 @@ export default function LeadTracking() {
         },
       );
 
-      if (!response.ok) throw new Error("Failed to submit feedback");
+      const data = await parseEnvelope<{ call: Call }>(response);
 
-      const updatedCall = await response.json();
-
-      // Update local state
+      // Update local state with the call the server actually persisted.
       setCalls(
-        calls.map((call) =>
-          call._id === updatedCall._id ? updatedCall : call,
-        ),
+        calls.map((call) => (call._id === data.call._id ? data.call : call)),
       );
 
       setFeedbackModalOpen(false);
@@ -183,6 +193,8 @@ export default function LeadTracking() {
       setError(
         err instanceof Error ? err.message : "Failed to submit feedback",
       );
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -190,9 +202,8 @@ export default function LeadTracking() {
     setLoading(true);
     try {
       const response = await fetch(`/api/calls/tracking`);
-      if (!response.ok) throw new Error("Failed to refresh calls");
-      const data = await response.json();
-      setCalls(Array.isArray(data) ? data : data.calls || []);
+      const data = await parseEnvelope<{ calls: Call[] }>(response);
+      setCalls(Array.isArray(data.calls) ? data.calls : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh calls");
     } finally {
@@ -272,7 +283,7 @@ export default function LeadTracking() {
           component="h1"
           color="primary"
         >
-          Call Tracking
+          Call Recordings &amp; Feedback
         </Typography>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -385,17 +396,24 @@ export default function LeadTracking() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleOpenFeedback(call)}
-                          disabled={
-                            !call.feedback?.buyerRating &&
-                            call.feedback?.buyerRating !== false
+                        <Tooltip
+                          title={
+                            call.paymentStatus === "pending_refund"
+                              ? ""
+                              : "Only calls awaiting a refund decision can be reviewed"
                           }
                         >
-                          Review
-                        </Button>
+                          <span>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => handleOpenFeedback(call)}
+                              disabled={call.paymentStatus !== "pending_refund"}
+                            >
+                              Review
+                            </Button>
+                          </span>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))
@@ -603,15 +621,21 @@ export default function LeadTracking() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setFeedbackModalOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => setFeedbackModalOpen(false)}
+            disabled={submittingReview}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={() =>
               currentFeedback !== null && handleSubmitFeedback(currentFeedback)
             }
             variant="contained"
-            disabled={currentFeedback === null}
+            disabled={currentFeedback === null || submittingReview}
+            startIcon={submittingReview ? <CircularProgress size={16} /> : undefined}
           >
-            Submit Review
+            {submittingReview ? "Submitting..." : "Submit Review"}
           </Button>
         </DialogActions>
       </Dialog>

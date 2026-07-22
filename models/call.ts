@@ -15,7 +15,7 @@ export interface ICall extends Document {
   recordingUrl?: string;
   paymentIntentId?: string;
   unitsCharged: number; // Units deducted for this call
-  paymentStatus: "paid" | "refunded" | "pending_refund";
+  paymentStatus: "paid" | "refunded" | "pending_refund" | "processing_refund";
   reassigned?: boolean;
   forwardingType: string;
   forwardingNumbers: string[];
@@ -75,7 +75,7 @@ const CallSchema = new Schema<ICall>(
     unitsCharged: { type: Number, default: 0 }, // Units charged for this call
     paymentStatus: {
       type: String,
-      enum: ["paid", "refunded", "pending_refund"],
+      enum: ["paid", "refunded", "pending_refund", "processing_refund"],
       default: "paid",
     },
     forwardingType: { type: String, required: true },

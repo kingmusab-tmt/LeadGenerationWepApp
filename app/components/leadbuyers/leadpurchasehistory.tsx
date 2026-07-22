@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -9,6 +9,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   FormControl,
   InputLabel,
   Select,
@@ -19,10 +20,10 @@ import {
   Button,
   Modal,
   Alert,
+  Chip,
   SelectChangeEvent,
 } from "@mui/material";
 import { MoreVert } from "@mui/icons-material";
-import { useMediaQuery, Theme } from "@mui/material";
 import axios from "axios";
 
 interface LeadPurchaseHistoryProps {
@@ -35,16 +36,55 @@ interface Transaction {
   amount: number;
   previousBalance: number;
   currentBalance: number;
+  currency?: string;
   status: string;
   createdAt: string;
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  lead_purchase: "Lead Purchase",
+  call_purchase: "Call Purchase",
+  units_purchase: "Units Purchase",
+  refund: "Refund",
+  admin_adjustment: "Admin Adjustment",
+};
+
+function formatCurrency(amount: number, currency?: string): string {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: (currency || "USD").toUpperCase(),
+    }).format(amount);
+  } catch {
+    // Intl throws on an unrecognized currency code — fall back rather than crash.
+    return `${amount} ${currency || ""}`.trim();
+  }
+}
+
+function statusColor(
+  status: string,
+): "success" | "warning" | "error" | "default" {
+  switch (status?.toLowerCase()) {
+    case "completed":
+      return "success";
+    case "pending":
+      return "warning";
+    case "failed":
+      return "error";
+    case "refunded":
+      return "warning";
+    default:
+      return "default";
+  }
+}
+
 const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<
-    Transaction[]
-  >([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0); // 0-based, matches TablePagination
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState<
@@ -55,66 +95,91 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
     useState<Transaction | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("sm"),
+  const showSnackbar = useCallback(
+    (message: string, severity: "success" | "error" | "info") => {
+      setSnackbarMessage(message);
+      setSnackbarSeverity(severity);
+      setSnackbarOpen(true);
+    },
+    [],
   );
 
+  // Paginated + filtered server-side (see GET /api/payments/transactions) —
+  // previously this fetched every transaction for the buyer unbounded and
+  // filtered by type entirely client-side.
   useEffect(() => {
+    let cancelled = false;
+
     const fetchTransactions = async () => {
       try {
+        setLoading(true);
+        const params = new URLSearchParams({
+          buyerId: id,
+          page: String(page + 1),
+          limit: String(rowsPerPage),
+        });
+        if (filterType !== "all") params.set("type", filterType);
+
         const response = await axios.get(
-          `/api/payments/transactions?buyerId=${id}`,
+          `/api/payments/transactions?${params.toString()}`,
         );
 
-        if (response.data && Array.isArray(response.data.data)) {
-          setTransactions(response.data.data);
-          setFilteredTransactions(response.data.data);
+        if (cancelled) return;
+
+        const data = response.data?.data;
+        if (data && Array.isArray(data.transactions)) {
+          setTransactions(data.transactions);
+          setTotal(data.pagination?.total ?? data.transactions.length);
+          setLoadError(null);
         } else {
           console.error("Unexpected API response structure:", response.data);
+          setLoadError("Failed to load transaction history.");
           showSnackbar(
             "Failed to fetch transactions: Invalid data format",
             "error",
           );
         }
       } catch (error) {
+        if (cancelled) return;
         console.error("Error fetching transactions:", error);
+        // Previously a fetch error left transactions as [], which rendered
+        // identically to "this buyer genuinely has zero purchases" once the
+        // snackbar auto-hid — no persistent indicator that anything failed.
+        setLoadError("Couldn't load transaction history. Please try again.");
         showSnackbar("Error fetching transactions", "error");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchTransactions();
-  }, [id]);
-
-  const showSnackbar = (
-    message: string,
-    severity: "success" | "error" | "info",
-  ) => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(true);
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [id, page, rowsPerPage, filterType, showSnackbar]);
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
   };
 
   const handleFilterChange = (event: SelectChangeEvent<string>) => {
-    const value = event.target.value as string;
-    setFilterType(value);
+    setFilterType(event.target.value as string);
+    setPage(0);
+  };
 
-    if (value === "all") {
-      setFilteredTransactions(transactions);
-    } else {
-      setFilteredTransactions(
-        transactions.filter((transaction) => transaction.type === value),
-      );
-    }
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   const handleMenuClick = (
-    event: React.MouseEvent<HTMLButtonElement>,
+    _event: React.MouseEvent<HTMLButtonElement>,
     transaction: Transaction,
   ) => {
     setSelectedTransaction(transaction);
@@ -125,7 +190,7 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
     setModalOpen(false);
   };
 
-  if (loading) {
+  if (loading && transactions.length === 0) {
     return (
       <TableContainer component={Paper}>
         <Table>
@@ -168,7 +233,15 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
     );
   }
 
-  if (transactions.length === 0) {
+  if (loadError) {
+    return (
+      <Alert severity="error" sx={{ mt: 2 }}>
+        {loadError}
+      </Alert>
+    );
+  }
+
+  if (total === 0) {
     return (
       <Typography variant="body1" align="center" sx={{ mt: 10 }}>
         No transactions available.
@@ -186,8 +259,11 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
           label="Filter by Type"
         >
           <MenuItem value="all">All</MenuItem>
-          <MenuItem value="lead_purchase">Lead Purchase</MenuItem>
-          <MenuItem value="units_purchase">Units Purchase</MenuItem>
+          {Object.entries(TYPE_LABELS).map(([value, label]) => (
+            <MenuItem key={value} value={value}>
+              {label}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
       <TableContainer component={Paper}>
@@ -203,19 +279,29 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredTransactions.map((transaction) => (
+            {transactions.map((transaction) => (
               <TableRow key={transaction._id}>
                 <TableCell>
                   {new Date(transaction.createdAt).toLocaleString()}
                 </TableCell>
-                <TableCell>{transaction.type}</TableCell>
-                <TableCell>{transaction.previousBalance}</TableCell>
-                <TableCell>{transaction.currentBalance}</TableCell>
-                <TableCell>{transaction.status}</TableCell>
+                <TableCell>
+                  {TYPE_LABELS[transaction.type] || transaction.type}
+                </TableCell>
+                <TableCell>{transaction.previousBalance} units</TableCell>
+                <TableCell>{transaction.currentBalance} units</TableCell>
+                <TableCell>
+                  <Chip
+                    label={transaction.status}
+                    size="small"
+                    color={statusColor(transaction.status)}
+                    variant="outlined"
+                    sx={{ textTransform: "capitalize" }}
+                  />
+                </TableCell>
                 <TableCell>
                   <IconButton
                     onClick={(e) => handleMenuClick(e, transaction)}
-                    aria-label="actions"
+                    aria-label="View transaction details"
                   >
                     <MoreVert />
                   </IconButton>
@@ -224,6 +310,15 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
             ))}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50]}
+        />
       </TableContainer>
 
       <Modal open={modalOpen} onClose={handleCloseModal}>
@@ -251,18 +346,24 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
                 <strong>ID:</strong> {selectedTransaction._id}
               </Typography>
               <Typography>
-                <strong>Type:</strong> {selectedTransaction.type}
+                <strong>Type:</strong>{" "}
+                {TYPE_LABELS[selectedTransaction.type] ||
+                  selectedTransaction.type}
               </Typography>
               <Typography>
-                <strong>Amount:</strong> ${selectedTransaction.amount}
+                <strong>Amount:</strong>{" "}
+                {formatCurrency(
+                  selectedTransaction.amount,
+                  selectedTransaction.currency,
+                )}
               </Typography>
               <Typography>
-                <strong>Previous Balance:</strong>
-                {selectedTransaction.previousBalance}units
+                <strong>Previous Balance:</strong>{" "}
+                {selectedTransaction.previousBalance} units
               </Typography>
               <Typography>
-                <strong>Current Balance:</strong>
-                {selectedTransaction.currentBalance}units
+                <strong>Current Balance:</strong>{" "}
+                {selectedTransaction.currentBalance} units
               </Typography>
               <Typography>
                 <strong>Status:</strong> {selectedTransaction.status}
@@ -271,12 +372,6 @@ const LeadPurchaseHistory: React.FC<LeadPurchaseHistoryProps> = ({ id }) => {
                 <strong>Date:</strong>{" "}
                 {new Date(selectedTransaction.createdAt).toLocaleString()}
               </Typography>
-              {/* <Typography>
-                <strong>Metadata:</strong>
-                <pre>
-                  {JSON.stringify(selectedTransaction.metadata, null, 2)}
-                </pre>
-              </Typography> */}
             </div>
           )}
           <Button

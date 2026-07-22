@@ -55,6 +55,7 @@ import {
   Api as ApiIcon,
   Refresh as RefreshIcon,
   ContentCopy as CopyIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 import LeadForm from "@/app/components/leadmanagement/leadform";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
@@ -122,38 +123,35 @@ function formatLocation(location?: Lead["location"]): string {
   return parts.length > 0 ? parts.join(", ") : "—";
 }
 
-// ---------- Stats Card ----------
-
-function StatsCard({
-  title,
-  value,
-  color,
-}: {
-  title: string;
-  value: number;
-  color: string;
-}) {
-  return (
-    <Card variant="outlined" sx={{ height: "100%" }}>
-      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-        <Typography variant="caption" color="text.secondary">
-          {title}
-        </Typography>
-        <Typography variant="h5" fontWeight="bold" sx={{ color }}>
-          {value}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
+// A lead is "Form Builder" only if it was manually created, imported, or has
+// no leadSource. Everything else (zapier, api, api_test, or any external
+// source) goes to the API tab. Pure/stable — defined at module scope so
+// formBuilderLeads/zapierLeads's useMemo doesn't need it as a dependency.
+function isApiLead(l: Lead): boolean {
+  if (!l.leadSource) return false;
+  const formSources = ["form", "manual", "import", ""];
+  return !formSources.includes(l.leadSource.toLowerCase());
 }
 
 // ==========================================================
 //  MAIN COMPONENT
 // ==========================================================
 
+// Per-request cap enforced server-side too (getLeadsQuerySchema) — this is
+// just how many leads we ask for per page while paging through everything.
+const LEADS_PAGE_SIZE = 500;
+// A hard ceiling on how many leads this dashboard will ever hold client-side
+// at once. Previously a single unbounded `limit=1000` request meant any
+// lead past the newest 1,000 was permanently invisible with no indication
+// data was missing. Paging up to this cap covers realistic seller volumes
+// while still bounding worst-case memory/render cost; a seller who exceeds
+// it sees an explicit banner rather than silently-missing leads.
+const LEADS_HARD_CAP = 5000;
+
 const LeadManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [totalLeadCount, setTotalLeadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -164,8 +162,6 @@ const LeadManagement: React.FC = () => {
   // Lead form dialog state (for form builder leads)
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-
-  const theme = useTheme();
 
   // Subscription limits for export/import permissions
   const { limits } = useSubscriptionLimits();
@@ -182,17 +178,52 @@ const LeadManagement: React.FC = () => {
     return [];
   };
 
+  const extractTotal = (data: unknown, fallback: number): number => {
+    const total =
+      (data as { pagination?: { total?: number }; data?: { pagination?: { total?: number } } })
+        ?.pagination?.total ??
+      (data as { data?: { pagination?: { total?: number } } })?.data?.pagination
+        ?.total;
+    return typeof total === "number" ? total : fallback;
+  };
+
+  // Previously a single `limit=1000` request — anything past the newest
+  // 1,000 leads was permanently invisible with no indication data was
+  // missing, and an unbounded limit was itself a scale/DoS risk. This pages
+  // through the seller's leads (bounded server-side per request, see
+  // getLeadsQuerySchema) up to LEADS_HARD_CAP, so realistic volumes load in
+  // full while a seller who exceeds the cap gets an explicit banner instead
+  // of silently-missing leads.
   const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/leads?limit=1000");
-      setLeads(extractLeads(res.data));
+      let all: Lead[] = [];
+      let page = 1;
+      let total = Infinity;
+
+      while (all.length < total && all.length < LEADS_HARD_CAP) {
+        const res = await axios.get(
+          `/api/leads?limit=${LEADS_PAGE_SIZE}&page=${page}`,
+        );
+        const pageLeads = extractLeads(res.data);
+        total = extractTotal(res.data, all.length + pageLeads.length);
+        if (pageLeads.length === 0) break;
+        all = all.concat(pageLeads);
+        page += 1;
+      }
+
+      setLeads(all);
+      setTotalLeadCount(total);
     } catch (error) {
       console.error("Error fetching leads:", error);
       notify("Failed to load leads", "error");
     } finally {
       setLoading(false);
     }
+    // notify is declared later in this component (referencing it here would
+    // throw before initialization), but its own identity is stable (see its
+    // useCallback below), so omitting it from these deps is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -203,68 +234,76 @@ const LeadManagement: React.FC = () => {
   // A lead is "Form Builder" only if it was manually created or has no leadSource.
   // Everything else (zapier, api, api_test, or any external source) goes to the API tab.
 
-  const isApiLead = (l: Lead) => {
-    if (!l.leadSource) return false;
-    // Form builder leads typically have no leadSource or "form"
-    const formSources = ["form", "manual", ""];
-    return !formSources.includes(l.leadSource.toLowerCase());
-  };
+  const formBuilderLeads = React.useMemo(
+    () => leads.filter((l) => !isApiLead(l)),
+    [leads],
+  );
 
-  const formBuilderLeads = leads.filter((l) => !isApiLead(l));
-
-  const zapierLeads = leads.filter((l) => isApiLead(l));
+  const zapierLeads = React.useMemo(
+    () => leads.filter((l) => isApiLead(l)),
+    [leads],
+  );
 
   // ---------- Handlers ----------
 
-  const notify = (
-    message: string,
-    severity: "success" | "error" | "info" | "warning" = "info",
-  ) => {
-    setSnackbar({ open: true, message, severity });
-  };
+  const notify = useCallback(
+    (
+      message: string,
+      severity: "success" | "error" | "info" | "warning" = "info",
+    ) => {
+      setSnackbar({ open: true, message, severity });
+    },
+    [],
+  );
 
-  const handleDeleteLead = async (leadId: string) => {
-    const confirmed = await confirm({
-      title: "Delete Lead",
-      message:
-        "Are you sure you want to delete this lead? This action cannot be undone.",
-      confirmText: "Delete",
-      confirmColor: "error",
-    });
-    if (!confirmed) return;
-    try {
-      await axios.delete(`/api/leads?id=${leadId}`);
-      setLeads((prev) => prev.filter((l) => l._id !== leadId));
-      notify("Lead deleted successfully", "success");
-    } catch (error) {
-      console.error("Error deleting lead:", error);
-      notify("Failed to delete lead", "error");
-    }
-  };
-
-  const toggleFavorite = async (leadId: string) => {
-    const lead = leads.find((l) => l._id === leadId);
-    if (!lead) return;
-    try {
-      setLeads((prev) =>
-        prev.map((l) =>
-          l._id === leadId ? { ...l, exclusive: !l.exclusive } : l,
-        ),
-      );
-      await axios.patch(`/api/exclusive?id=${leadId}`, {
-        exclusive: !lead.exclusive,
+  const handleDeleteLead = useCallback(
+    async (leadId: string) => {
+      const confirmed = await confirm({
+        title: "Delete Lead",
+        message:
+          "Are you sure you want to delete this lead? This action cannot be undone.",
+        confirmText: "Delete",
+        confirmColor: "error",
       });
-    } catch (error) {
-      console.error("Error toggling favorite:", error);
-      setLeads((prev) =>
-        prev.map((l) =>
-          l._id === leadId ? { ...l, exclusive: lead.exclusive } : l,
-        ),
-      );
-    }
-  };
+      if (!confirmed) return;
+      try {
+        await axios.delete(`/api/leads?id=${leadId}`);
+        setLeads((prev) => prev.filter((l) => l._id !== leadId));
+        notify("Lead deleted successfully", "success");
+      } catch (error) {
+        console.error("Error deleting lead:", error);
+        notify("Failed to delete lead", "error");
+      }
+    },
+    [confirm, notify],
+  );
 
-  const handleOpenDialog = (lead: Lead | null = null) => {
+  const toggleFavorite = useCallback(
+    async (leadId: string) => {
+      const lead = leads.find((l) => l._id === leadId);
+      if (!lead) return;
+      try {
+        setLeads((prev) =>
+          prev.map((l) =>
+            l._id === leadId ? { ...l, exclusive: !l.exclusive } : l,
+          ),
+        );
+        await axios.patch(`/api/exclusive?id=${leadId}`, {
+          exclusive: !lead.exclusive,
+        });
+      } catch (error) {
+        console.error("Error toggling favorite:", error);
+        setLeads((prev) =>
+          prev.map((l) =>
+            l._id === leadId ? { ...l, exclusive: lead.exclusive } : l,
+          ),
+        );
+      }
+    },
+    [leads],
+  );
+
+  const handleOpenDialog = useCallback((lead: Lead | null = null) => {
     if (lead) {
       setSelectedLead(lead);
     } else {
@@ -285,38 +324,55 @@ const LeadManagement: React.FC = () => {
       });
     }
     setOpenDialog(true);
-  };
+  }, [leads]);
 
-  const handleFormSubmit = async () => {
-    if (!selectedLead) return;
-    try {
-      if (selectedLead._id) {
-        await axios.put(`/api/leads?id=${selectedLead._id}`, selectedLead);
-      } else {
-        const { _id, ...newLead } = selectedLead;
-        await axios.post(`/api/leads`, newLead);
+  const handleFormSubmit = useCallback(
+    async (lead: Lead) => {
+      try {
+        if (lead._id) {
+          await axios.put(`/api/leads?id=${lead._id}`, lead);
+        } else {
+          const { _id, ...newLead } = lead;
+          await axios.post(`/api/leads`, newLead);
+        }
+        notify("Lead saved successfully", "success");
+        await fetchLeads();
+        setOpenDialog(false);
+        setSelectedLead(null);
+      } catch (error) {
+        console.error("Error saving lead:", error);
+        notify("Failed to save lead", "error");
       }
-      notify("Lead saved successfully", "success");
-      await fetchLeads();
-      setOpenDialog(false);
-      setSelectedLead(null);
-    } catch (error) {
-      console.error("Error saving lead:", error);
-      notify("Failed to save lead", "error");
-    }
-  };
+    },
+    [notify, fetchLeads],
+  );
 
   // ---------- CSV ----------
+
+  // A cell value beginning with = + - @ is interpreted as a formula by
+  // Excel/Sheets when the exported file is opened (CSV/formula injection).
+  // Lead field values can originate from untrusted sources (public form
+  // submissions, Zapier webhooks), so prefix any such value with a leading
+  // apostrophe to force it to be read as literal text.
+  const sanitizeCsvCell = (value: unknown): unknown => {
+    if (typeof value !== "string") return value;
+    return /^[=+\-@]/.test(value) ? `'${value}` : value;
+  };
 
   const exportToCSV = (leadsToExport: Lead[], filename: string) => {
     const csvData = leadsToExport.map((lead) => {
       const row: Record<string, any> = {
-        Name: lead.name || getFieldValue(lead.fields, /name|full name/i),
-        Email: lead.email || getFieldValue(lead.fields, /email/i),
-        Phone:
+        Name: sanitizeCsvCell(
+          lead.name || getFieldValue(lead.fields, /name|full name/i),
+        ),
+        Email: sanitizeCsvCell(
+          lead.email || getFieldValue(lead.fields, /email/i),
+        ),
+        Phone: sanitizeCsvCell(
           lead.phone ||
-          getFieldValue(lead.fields, /phone|mobile|number|contact/i),
-        Company: lead.company || "",
+            getFieldValue(lead.fields, /phone|mobile|number|contact/i),
+        ),
+        Company: sanitizeCsvCell(lead.company || ""),
         Status: lead.status,
         Source: lead.leadSource || "form",
         "Created At": formatDate(lead.createdAt),
@@ -324,9 +380,11 @@ const LeadManagement: React.FC = () => {
       };
       lead.fields.forEach((field) => {
         if (!row[field.label]) {
-          row[field.label] = Array.isArray(field.value)
-            ? field.value.join(", ")
-            : field.value;
+          row[field.label] = sanitizeCsvCell(
+            Array.isArray(field.value)
+              ? field.value.join(", ")
+              : field.value,
+          );
         }
       });
       return row;
@@ -415,45 +473,13 @@ const LeadManagement: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Stats Row */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="Total Leads"
-            value={leads.length}
-            color={theme.palette.primary.main}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="New"
-            value={leads.filter((l) => l.status === "new").length}
-            color={theme.palette.info.main}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="Qualified"
-            value={
-              leads.filter(
-                (l) => l.status === "qualified" || l.status === "available",
-              ).length
-            }
-            color={theme.palette.success.main}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="Assigned / Sold"
-            value={
-              leads.filter(
-                (l) => l.status === "assigned" || l.status === "sold",
-              ).length
-            }
-            color={theme.palette.warning.main}
-          />
-        </Grid>
-      </Grid>
+      {totalLeadCount > leads.length && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          Showing the most recent {leads.length.toLocaleString()} of{" "}
+          {totalLeadCount.toLocaleString()} leads. Use search or status
+          filters to find older leads.
+        </Alert>
+      )}
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
@@ -501,6 +527,7 @@ const LeadManagement: React.FC = () => {
           onDelete={handleDeleteLead}
           onToggleFavorite={toggleFavorite}
           onEdit={handleOpenDialog}
+          onAdd={() => handleOpenDialog(null)}
           onExportCSV={() => exportToCSV(formBuilderLeads, "formbuilder-leads")}
           onImportCSV={importFromCSV}
           notify={notify}
@@ -579,6 +606,7 @@ interface FormBuilderLeadsTabProps {
   onDelete: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onEdit: (lead: Lead) => void;
+  onAdd: () => void;
   onExportCSV: () => void;
   onImportCSV: (event: React.ChangeEvent<HTMLInputElement>) => void;
   notify: (msg: string, sev?: "success" | "error" | "info" | "warning") => void;
@@ -591,6 +619,7 @@ function FormBuilderLeadsTab({
   onDelete,
   onToggleFavorite,
   onEdit,
+  onAdd,
   onExportCSV,
   onImportCSV,
   notify,
@@ -711,6 +740,15 @@ function FormBuilderLeadsTab({
 
         <Box sx={{ flex: 1 }} />
 
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<AddIcon />}
+          onClick={onAdd}
+        >
+          Add Lead
+        </Button>
+
         {canExport && (
           <Button
             variant="outlined"
@@ -793,7 +831,7 @@ function FormBuilderLeadsTab({
                   <TableCell>Phone</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell>Quality</TableCell>
+                  {!isMobile && <TableCell>Quality</TableCell>}
                   <TableCell>Exclusive</TableCell>
                   <TableCell>Date</TableCell>
                   <TableCell align="right">Actions</TableCell>
@@ -802,7 +840,11 @@ function FormBuilderLeadsTab({
               <TableBody>
                 {displayed.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <TableCell
+                      colSpan={isMobile ? 7 : 8}
+                      align="center"
+                      sx={{ py: 4 }}
+                    >
                       <Typography color="text.secondary">
                         No leads match your filters
                       </Typography>
@@ -844,15 +886,22 @@ function FormBuilderLeadsTab({
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {lead.qualityLevel || "—"}
-                        </Typography>
-                      </TableCell>
+                      {!isMobile && (
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary">
+                            {lead.qualityLevel || "—"}
+                          </Typography>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <IconButton
                           size="small"
                           onClick={() => onToggleFavorite(lead._id)}
+                          aria-label={
+                            lead.exclusive
+                              ? "Remove from favorites"
+                              : "Add to favorites"
+                          }
                         >
                           {lead.exclusive ? (
                             <FavoriteIcon color="error" fontSize="small" />
@@ -873,6 +922,7 @@ function FormBuilderLeadsTab({
                             setAnchorEl(e.currentTarget);
                             setMenuLead(lead);
                           }}
+                          aria-label="More actions"
                         >
                           <MoreVertIcon fontSize="small" />
                         </IconButton>
@@ -1301,6 +1351,11 @@ function ZapierLeadsTab({
                         <IconButton
                           size="small"
                           onClick={() => onToggleFavorite(lead._id)}
+                          aria-label={
+                            lead.exclusive
+                              ? "Remove from favorites"
+                              : "Add to favorites"
+                          }
                         >
                           {lead.exclusive ? (
                             <FavoriteIcon color="error" fontSize="small" />
@@ -1316,6 +1371,7 @@ function ZapierLeadsTab({
                             setAnchorEl(e.currentTarget);
                             setMenuLead(lead);
                           }}
+                          aria-label="More actions"
                         >
                           <MoreVertIcon fontSize="small" />
                         </IconButton>
@@ -1617,6 +1673,7 @@ function ZapierLeadsTab({
                     navigator.clipboard.writeText(detailsLead._id);
                     notify("Lead ID copied", "success");
                   }}
+                  aria-label="Copy lead ID"
                 >
                   <CopyIcon sx={{ fontSize: 14 }} />
                 </IconButton>

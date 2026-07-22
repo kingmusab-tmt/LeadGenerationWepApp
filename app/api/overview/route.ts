@@ -112,6 +112,11 @@ export const GET = withAuth(async (req: NextRequest, session) => {
         $facet: {
           totalBuyers: [{ $count: "count" }],
           activeBuyers: [{ $match: { status: "active" } }, { $count: "count" }],
+          newBuyers: [{ $match: { status: "new" } }, { $count: "count" }],
+          inactiveBuyers: [
+            { $match: { status: "inactive" } },
+            { $count: "count" },
+          ],
           topBuyers: [
             {
               $lookup: {
@@ -540,7 +545,7 @@ export const GET = withAuth(async (req: NextRequest, session) => {
       acc[curr._id] = curr.count;
       return acc;
     },
-    { new: 0, available: 0, sold: 0, assigned: 0 },
+    { new: 0, available: 0, sold: 0, assigned: 0, qualified: 0 },
   );
 
   const { totalRevenue = 0, totalTransactions = 0 } = revenueData[0] || {};
@@ -558,7 +563,12 @@ export const GET = withAuth(async (req: NextRequest, session) => {
   const budgetUsage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
   const totalLeadBuyers = buyerData[0]?.totalBuyers[0]?.count || 0;
-  const newLeadBuyers = buyerData[0]?.activeBuyers[0]?.count || 0;
+  // Previously mapped from the "activeBuyers" facet, so this stat was
+  // silently showing the active count under a "new" label — now backed by
+  // its own facet matching status: "new".
+  const activeLeadBuyers = buyerData[0]?.activeBuyers[0]?.count || 0;
+  const newLeadBuyers = buyerData[0]?.newBuyers[0]?.count || 0;
+  const inactiveLeadBuyers = buyerData[0]?.inactiveBuyers[0]?.count || 0;
   const topLeadBuyers = buyerData[0]?.topBuyers || [];
   const totalLeadBuyerUsedCredits =
     buyerCreditSummary[0]?.totalLeadBuyerUsedCredits || 0;
@@ -598,7 +608,9 @@ export const GET = withAuth(async (req: NextRequest, session) => {
       budgetUsage,
     },
     totalLeadBuyers,
+    activeLeadBuyers,
     newLeadBuyers,
+    inactiveLeadBuyers,
     totalLeadBuyerCredits,
     totalLeadBuyerUsedCredits,
     totalLeadBuyerRemainingCredits,

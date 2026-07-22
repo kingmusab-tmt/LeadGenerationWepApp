@@ -10,7 +10,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/userModel";
-import crypto from "crypto";
+import {
+  ApiKeyAuditEvent,
+  ApiKeySecurityService,
+  ApiKeyType,
+} from "@/lib/security/apiKeySecurityService";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 import {
   internalError,
@@ -62,10 +66,10 @@ export async function POST() {
     }
 
     // Generate new API key (32 random bytes = 64 hex characters)
-    const apiKey = crypto.randomBytes(32).toString("hex");
+    const apiKey = ApiKeySecurityService.generateApiKey();
 
     // Hash the API key for storage
-    const apiKeyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
+    const apiKeyHash = ApiKeySecurityService.hashApiKey(apiKey);
 
     // Store hash in user document
     if (!user.apiSettings) {
@@ -79,11 +83,23 @@ export async function POST() {
     // Store hash + truncated preview (first 8 + last 4 chars)
     const truncatedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
     const apiSettings = user.apiSettings as ZapierApiSettings;
+    const hadExistingKey = !!apiSettings.zapierApiKeyHash;
     apiSettings.zapierApiKeyHash = apiKeyHash;
     apiSettings.zapierApiKeyTruncated = truncatedKey;
     apiSettings.zapierApiKeyCreatedAt = new Date();
 
     await user.save();
+
+    await ApiKeySecurityService.logAuditEvent({
+      keyId: apiKeyHash,
+      userId: String(user._id),
+      event: hadExistingKey
+        ? ApiKeyAuditEvent.ROTATED
+        : ApiKeyAuditEvent.CREATED,
+      timestamp: new Date(),
+      success: true,
+      metadata: { keyType: ApiKeyType.ZAPIER_ACTION },
+    });
 
     // Return the API key (ONLY TIME IT'S SHOWN TO USER)
     return NextResponse.json({
@@ -123,10 +139,22 @@ export async function DELETE() {
     // Remove API key hash
     if (user.apiSettings) {
       const apiSettings = user.apiSettings as ZapierApiSettings;
+      const revokedKeyHash = apiSettings.zapierApiKeyHash;
       delete apiSettings.zapierApiKeyHash;
       delete apiSettings.zapierApiKeyTruncated;
       delete apiSettings.zapierApiKeyCreatedAt;
       await user.save();
+
+      if (revokedKeyHash) {
+        await ApiKeySecurityService.logAuditEvent({
+          keyId: revokedKeyHash,
+          userId: String(user._id),
+          event: ApiKeyAuditEvent.REVOKED,
+          timestamp: new Date(),
+          success: true,
+          metadata: { keyType: ApiKeyType.ZAPIER_ACTION },
+        });
+      }
     }
 
     return NextResponse.json({

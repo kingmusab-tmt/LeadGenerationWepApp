@@ -42,6 +42,7 @@ interface BuyerLocationInfo {
 export default function LocationRoutingDashboard() {
   const [buyers, setBuyers] = useState<BuyerLocationInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalBuyers: 0,
     buyersWithLocations: 0,
@@ -54,11 +55,19 @@ export default function LocationRoutingDashboard() {
   }, []);
 
   const fetchBuyersLocationInfo = async () => {
+    setLoadError(null);
     try {
-      const response = await fetch("/api/buyers");
-      const data = await response.json();
+      // The default page size is 20 — fetch the schema's max (100) instead
+      // so the stats below reflect the seller's whole buyer list rather
+      // than just its first page, for any seller with a realistic buyer
+      // count. `counts.total` (from the server's unfiltered aggregate) is
+      // used for the "Total Buyers" card specifically, since that one stays
+      // accurate even past 100.
+      const response = await fetch("/api/buyers?limit=100");
+      const result = await response.json();
 
-      if (data.success) {
+      if (result.success) {
+        const data = result.data;
         const buyersData: BuyerLocationInfo[] = data.buyers.map(
           (buyer: unknown) => {
             const b = buyer as Record<string, unknown>;
@@ -103,14 +112,17 @@ export default function LocationRoutingDashboard() {
         ).length;
 
         setStats({
-          totalBuyers: buyersData.length,
+          totalBuyers: data.counts?.total ?? buyersData.length,
           buyersWithLocations,
           totalServiceAreas,
           strictMatchingBuyers,
         });
+      } else {
+        setLoadError(result.error || "Failed to load buyer location data");
       }
     } catch (error) {
       console.error("Error fetching buyers location info:", error);
+      setLoadError("Failed to load buyer location data");
     } finally {
       setLoading(false);
     }
@@ -129,6 +141,12 @@ export default function LocationRoutingDashboard() {
       <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
         Location-Based Lead Routing
       </Typography>
+
+      {loadError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {loadError}
+        </Alert>
+      )}
 
       {/* Statistics Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

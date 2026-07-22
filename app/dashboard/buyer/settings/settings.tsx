@@ -120,7 +120,6 @@ interface ILeadBuyerDetail {
   vacationMode?: { enabled: boolean; pauseUntil?: Date; autoReject: boolean };
   locationMatchingStrict?: boolean;
   preferredZones?: { city?: string; state?: string; zipCodes?: string[] }[];
-  radiusFlexibility?: "strict" | "soft" | "flexible";
   leadTypes?: ("exclusive" | "shared")[];
   webhookConfig?: { enabled?: boolean; url?: string; authToken?: string };
   serviceLocations?: {
@@ -131,7 +130,6 @@ interface ILeadBuyerDetail {
     radius?: number;
   }[];
   maxLeadAge?: number;
-  serviceRadius?: number;
   preferredContactMethods?: ("phone" | "email" | "sms")[];
   priorityBySource?: { source: string; priority: number }[];
   priorityByIndustry?: { industry: string; priority: number }[];
@@ -156,7 +154,6 @@ interface BuyerPreferences {
   vacationMode: { enabled: boolean; pauseUntil?: string; autoReject: boolean };
   locationMatchingStrict: boolean;
   preferredZones: { city?: string; state?: string; zipCodes?: string[] }[];
-  radiusFlexibility: "strict" | "soft" | "flexible";
   preferenceMatchingThreshold: "strict" | "moderate" | "flexible";
   leadTypes: ("exclusive" | "shared")[];
   webhookConfig: { enabled: boolean; url: string; authToken: string };
@@ -173,7 +170,6 @@ interface BuyerPreferences {
     [key: string]: { enabled: boolean; start: string; end: string };
   };
   maxLeadAge: number;
-  serviceRadius: number;
   preferredContactMethods: ("phone" | "email" | "sms")[];
   priorityBySource: { source: string; priority: number }[];
   priorityByIndustry: { industry: string; priority: number }[];
@@ -291,7 +287,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
               : { enabled: false, autoReject: true, pauseUntil: "" },
             locationMatchingStrict: buyerDetail.locationMatchingStrict ?? false,
             preferredZones: buyerDetail.preferredZones || [],
-            radiusFlexibility: buyerDetail.radiusFlexibility || "strict",
             preferenceMatchingThreshold:
               buyerDetail.preferenceMatchingThreshold || "moderate",
             leadTypes: buyerDetail.leadTypes || ["shared"],
@@ -317,7 +312,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                     Sunday: { enabled: false, start: "09:00", end: "17:00" },
                   },
             maxLeadAge: buyerDetail.maxLeadAge ?? 24,
-            serviceRadius: buyerDetail.serviceRadius ?? 25,
             preferredContactMethods: buyerDetail.preferredContactMethods || [
               "phone",
               "email",
@@ -505,7 +499,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
       );
     } else if (
       name === "budgetCapType" ||
-      name === "radiusFlexibility" ||
       name === "preferenceMatchingThreshold" ||
       name === "timezone" ||
       name === "preferredDistribution"
@@ -1974,27 +1967,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                           <FormControl fullWidth>
-                            <InputLabel>Radius Flexibility</InputLabel>
-                            <Select
-                              name="radiusFlexibility"
-                              value={preferences.radiusFlexibility}
-                              onChange={handlePreferencesSelect}
-                              label="Radius Flexibility"
-                            >
-                              <MenuItem value="strict">
-                                Strict (Exact Match)
-                              </MenuItem>
-                              <MenuItem value="soft">
-                                Soft (±10% Flexible)
-                              </MenuItem>
-                              <MenuItem value="flexible">
-                                Flexible (Any Radius)
-                              </MenuItem>
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                          <FormControl fullWidth>
                             <InputLabel>Overall Preference Matching</InputLabel>
                             <Select
                               name="preferenceMatchingThreshold"
@@ -2021,17 +1993,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                               preferences
                             </Typography>
                           </FormControl>
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                          <TextField
-                            fullWidth
-                            label="Service Radius (Miles)"
-                            type="number"
-                            value={preferences.serviceRadius}
-                            onChange={handlePreferencesNumber("serviceRadius")}
-                            inputProps={{ min: 1, max: 500 }}
-                            helperText="Geographic coverage radius in miles"
-                          />
                         </Grid>
                       </Grid>
                     </SectionBody>

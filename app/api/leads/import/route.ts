@@ -1,22 +1,38 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
-import { Lead } from "@/models/leads";
+import { ILead, Lead } from "@/models/leads";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import Papa from "papaparse";
-import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
+import {
+  checkAndIncrementUsage,
+  checkFeatureAccess,
+} from "@/lib/subscriptionLimitsService";
 import {
   badRequest,
   forbidden,
   internalError,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { ZapierTriggerHelper } from "@/lib/integrations/zapierTriggerHelper";
+import { DEFAULT_LEAD_FORM_FIELDS } from "@/lib/defaultLeadFormFields";
 
 interface Field {
   id: string;
   label: string;
   value: unknown;
 }
+
+// Alternate header spellings a CSV column might use for each default-form
+// field, checked in order after the field's own id/label.
+const HEADER_ALIASES: Record<string, string[]> = {
+  name: ["full name", "fullname"],
+  email: ["e-mail", "email address"],
+  phone: ["mobile", "phone number", "contact"],
+  city: [],
+  address: ["street address"],
+  service_needed: ["service needed", "service", "notes"],
+};
 
 export async function POST(request: Request) {
   try {
@@ -26,6 +42,16 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
+    }
+
+    // The frontend only hides the Import button for plans without this
+    // entitlement — without this check, anyone could call this route
+    // directly and bypass that paywall regardless of plan.
+    const featureCheck = await checkFeatureAccess(session.user.id, "imports");
+    if (!featureCheck.allowed) {
+      return forbidden(
+        featureCheck.message || "CSV import is not available on your plan.",
+      );
     }
 
     const formData = await request.formData();
@@ -63,7 +89,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Prepare leads for import
+    // Prepare leads for import. Every imported lead is built against the
+    // exact same field set as the "Add Lead" dialog's default form (see
+    // lib/defaultLeadFormFields.ts) — an imported lead and a manually-added
+    // default-form lead always have matching field ids/labels, so editing
+    // either one later lines up against the same form structure.
     const leadsToImport = rows.map((row) => {
       // Create a map of header to value for easy lookup
       const rowData: Record<string, string> = {};
@@ -71,61 +101,33 @@ export async function POST(request: Request) {
         rowData[header.toLowerCase().trim()] = row[index] || "";
       });
 
-      // Extract standard fields from CSV columns
-      const name =
-        rowData["name"] || rowData["full name"] || rowData["fullname"] || "";
-      const email =
-        rowData["email"] || rowData["e-mail"] || rowData["email address"] || "";
-      const phone =
-        rowData["phone"] ||
-        rowData["mobile"] ||
-        rowData["phone number"] ||
-        rowData["contact"] ||
-        "";
-      const company =
-        rowData["company"] ||
-        rowData["company name"] ||
-        rowData["organization"] ||
-        "";
-      const industry = rowData["industry"] || rowData["sector"] || "";
+      const fields: Field[] = DEFAULT_LEAD_FORM_FIELDS.map((fieldDef) => {
+        const candidates = [
+          fieldDef.id.replace(/_/g, " "),
+          fieldDef.label.toLowerCase(),
+          ...(HEADER_ALIASES[fieldDef.id] || []),
+        ];
+        const value =
+          candidates.map((key) => rowData[key]).find((v) => v) || "";
+        return { id: fieldDef.id, label: fieldDef.label, value };
+      });
 
-      // Location fields
-      const city = rowData["city"] || "";
-      const state = rowData["state"] || rowData["province"] || "";
-      const country = rowData["country"] || "USA";
-      const zipCode =
-        rowData["zip code"] ||
-        rowData["zipcode"] ||
-        rowData["zip"] ||
-        rowData["postal code"] ||
-        "";
-      const address = rowData["address"] || rowData["street address"] || "";
-
-      // Build fields array for all columns
-      const fields: Field[] = headers.map((header, index) => ({
-        id: header.toLowerCase().replace(/\s+/g, "_"),
-        label:
-          header.trim() === ""
-            ? `Field ${index + 1}`
-            : toTitleCase(header.trim()),
-        value: row[index] || "",
-      }));
+      const getFieldValue = (id: string) =>
+        String(fields.find((f) => f.id === id)?.value || "");
+      const name = getFieldValue("name");
+      const email = getFieldValue("email");
+      const phone = getFieldValue("phone");
+      const city = getFieldValue("city");
+      const address = getFieldValue("address");
 
       return {
         userId: session.user.id,
         name,
         email,
         phone,
-        company,
-        industry,
-        location: {
-          city,
-          state,
-          country,
-          zipCode,
-          address,
-        },
-        fields: fields,
+        location:
+          city || address ? { city, address, country: "USA" } : undefined,
+        fields,
         status: "new",
         isFavorite: false,
         isManual: false,
@@ -139,7 +141,19 @@ export async function POST(request: Request) {
     });
 
     // Insert leads into database
-    await Lead.insertMany(leadsToImport);
+    const inserted = await Lead.insertMany(leadsToImport);
+
+    // Notify any connected Zaps subscribed to "New Lead" for each imported
+    // row — fire-and-forget so a slow/failing webhook never blocks the
+    // import response.
+    for (const insertedLead of inserted) {
+      ZapierTriggerHelper.triggerLeadCreated(
+        insertedLead as unknown as Partial<ILead>,
+        session.user.id,
+      ).catch((err) =>
+        console.error("Failed to dispatch Zapier leadCreated trigger:", err),
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -153,11 +167,4 @@ export async function POST(request: Request) {
         : "Failed to import leads.",
     );
   }
-}
-
-// Helper function to convert string to Title Case
-function toTitleCase(str: string): string {
-  return str.replace(/\w\S*/g, (txt) => {
-    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-  });
 }

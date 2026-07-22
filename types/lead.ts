@@ -39,7 +39,7 @@ export type LeadDistributionMethod = "manual" | "round_robin" | "marketplace";
 export type LeadQualityLevel = "High" | "Medium" | "Low";
 
 // ---------- Main Lead (Seller Management) ----------
-// Used by: leadmanagement.tsx, leadlist.tsx, leadform.tsx, leadsSlice.ts
+// Used by: leadmanagement.tsx, leadform.tsx, leadsSlice.ts
 
 export interface Lead {
   _id: string;

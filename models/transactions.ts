@@ -27,25 +27,25 @@ export interface ITransaction extends Document {
     sellerId?: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref (ID of the seller earning income)
     sellerName?: string; // Seller's full name at time of transaction
     sellerEmail?: string; // Seller's email at time of transaction
-    buyerId: mongoose.Types.ObjectId; // PHASE 1: Changed from String to ObjectId ref
+    buyerId?: mongoose.Types.ObjectId; // PHASE 1: Changed from String to ObjectId ref
     buyerName?: string; // Buyer's full name at time of transaction
     buyerEmail?: string; // Buyer's email at time of transaction
-    refund: boolean;
-    tierId: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref
-    stripeTransferId: string; // For seller_payout (ID from Stripe transfer)
-    tierName: string;
+    refund?: boolean;
+    tierId?: mongoose.Types.ObjectId; // PHASE 1: Changed from string to ObjectId ref
+    stripeTransferId?: string; // For seller_payout (ID from Stripe transfer)
+    tierName?: string;
     tierRenewalDate?: Date; // For subscription_renewal (renewal date of the subscription)
-    userEmail: string; // For subscription_payment or renewal (email of the user)
-    tierType: string;
-    subscriptionYears: number; // For
+    userEmail?: string; // For subscription_payment or renewal (email of the user)
+    tierType?: string;
+    subscriptionYears?: number; // For
     payoutId?: string; // For seller_payout (ID from payment gateway)
     refundReason?: string; // For refund
     adminNote?: string; // For admin_adjustment
     subscriptionId?: mongoose.Types.ObjectId; // For subscription_payment, renewal, or cancellation
     subscriptionPlan?: string; // For subscription_payment or renewal
     subscriptionDuration?: string; // For subscription_payment or renewal (e.g., "monthly", "yearly")
-    transferVerified: boolean;
-    transferAmount: number;
+    transferVerified?: boolean;
+    transferAmount?: number;
     checkoutSessionId?: string;
     sellerAccountId?: string;
     creditsApplied?: boolean;
@@ -69,6 +69,7 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
       required: true,
       enum: [
         "lead_purchase",
+        "call_purchase",
         "units_purchase",
         "seller_income",
         "seller_payout",

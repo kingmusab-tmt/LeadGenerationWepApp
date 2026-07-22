@@ -15,6 +15,8 @@ import {
   Alert,
   Box,
   CircularProgress,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import dynamic from "next/dynamic";
@@ -28,6 +30,12 @@ import { industryNiches } from "@/utils/industryNiches";
 import { LEAD_SOURCES } from "@/utils/leadSources";
 import { useRouter, useParams } from "next/navigation";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import {
+  findDuplicateLabel,
+  findEmptyOptionsField,
+  isOptionsField,
+  normalizeFieldsForSave,
+} from "@/app/components/leadcapture/formFieldUtils";
 
 interface Field {
   id: string;
@@ -35,6 +43,7 @@ interface Field {
   label: string;
   required?: boolean;
   options?: string[];
+  headingLevel?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 }
 
 export default function EditForm() {
@@ -50,9 +59,16 @@ export default function EditForm() {
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
   const [editOptions, setEditOptions] = useState<string[]>([]);
+  const [editHeadingLevel, setEditHeadingLevel] = useState<
+    "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+  >("h2");
   const [formName, setFormName] = useState<string>("");
   const [leadSource, setLeadSource] = useState<string>("");
   const [industry, setIndustry] = useState<string>("");
+  // No stored value means "published" — forms saved before this field
+  // existed were always live, and must stay that way.
+  const [status, setStatus] = useState<"draft" | "published">("published");
+  const [allowedOriginsInput, setAllowedOriginsInput] = useState<string>("");
   const [newFieldLabel, setNewFieldLabel] = useState<string>("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,6 +77,10 @@ export default function EditForm() {
     message: string;
     severity: "success" | "error" | "info";
   }>({ open: false, message: "", severity: "info" });
+  // Snapshot of what was actually loaded, so the unsaved-changes warning
+  // below only fires on real edits — not on every load, which always
+  // populates non-empty fields/formName.
+  const [loadedSnapshot, setLoadedSnapshot] = useState<string | null>(null);
 
   // Load form data
   useEffect(() => {
@@ -79,9 +99,18 @@ export default function EditForm() {
         const data = result.data || result;
         setFields(data.fields || []);
         setFormName(data.formName || "");
+        setLoadedSnapshot(
+          JSON.stringify({ fields: data.fields || [], formName: data.formName || "" }),
+        );
 
-        // Parse leadSource and industry from description
-        if (data.description) {
+        // Prefer the real leadSource/industry fields (set directly since
+        // creation stopped overloading `description` for this). Forms saved
+        // before that fix only ever have this data inside `description`, as
+        // "Lead Source: X | Industry: Y" — parsed here only as a fallback.
+        if (data.leadSource || data.industry) {
+          setLeadSource(data.leadSource || "");
+          setIndustry(data.industry || "");
+        } else if (data.description) {
           const descParts = data.description
             .split("|")
             .map((s: string) => s.trim());
@@ -92,10 +121,10 @@ export default function EditForm() {
               setIndustry(part.replace("Industry:", "").trim());
             }
           });
-        } else {
-          setLeadSource(data.leadSource || "");
-          setIndustry(data.industry || "");
         }
+
+        setStatus(data.status === "draft" ? "draft" : "published");
+        setAllowedOriginsInput((data.allowedOrigins || []).join(", "));
       } catch (error) {
         setSnackbar({
           open: true,
@@ -111,6 +140,22 @@ export default function EditForm() {
     fetchForm();
   }, [formId]);
 
+  // Warn on tab close/refresh if there are edits that differ from what was
+  // loaded. Doesn't cover in-app sidebar navigation — the App Router has no
+  // built-in navigation-intercept hook — only the browser-level exit paths.
+  useEffect(() => {
+    if (loadedSnapshot === null) return;
+    const currentSnapshot = JSON.stringify({ fields, formName });
+    if (currentSnapshot === loadedSnapshot) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [fields, formName, loadedSnapshot]);
+
   // Add a new field
   const addField = (type: string) => {
     if (!newFieldLabel.trim()) {
@@ -123,14 +168,12 @@ export default function EditForm() {
     }
 
     const newField: Field = {
-      id: Math.random().toString(),
+      id: crypto.randomUUID(),
       type,
       label: newFieldLabel,
       required: false,
-      options:
-        type === "dropdown" || type === "radio" || type === "checkbox"
-          ? []
-          : undefined,
+      options: isOptionsField(type) ? [] : undefined,
+      headingLevel: type === "header" ? "h2" : undefined,
     };
     setFields([...fields, newField]);
     setNewFieldLabel("");
@@ -140,25 +183,25 @@ export default function EditForm() {
   const addLeadContactFields = () => {
     const contactFields: Field[] = [
       {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(),
         type: "text",
         label: "Name",
         required: false,
       },
       {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(),
         type: "email",
         label: "Email",
         required: false,
       },
       {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(),
         type: "tel",
         label: "Phone",
         required: false,
       },
       {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(),
         type: "city_autocomplete",
         label: "City",
         required: false,
@@ -206,6 +249,7 @@ export default function EditForm() {
       setEditingFieldId(id);
       setEditLabel(field.label);
       setEditOptions(field.options || []);
+      setEditHeadingLevel(field.headingLevel || "h2");
     }
   };
 
@@ -213,17 +257,22 @@ export default function EditForm() {
   const saveFieldChanges = () => {
     if (editingFieldId) {
       handleEditLabel(editingFieldId, editLabel);
-      if (
-        fields.find((field) => field.id === editingFieldId)?.type ===
-          "checkbox" ||
-        fields.find((field) => field.id === editingFieldId)?.type === "radio" ||
-        fields.find((field) => field.id === editingFieldId)?.type === "dropdown"
-      ) {
+      if (isOptionsField(fields.find((field) => field.id === editingFieldId)?.type)) {
         handleEditOptions(editingFieldId, editOptions);
+      }
+      if (fields.find((field) => field.id === editingFieldId)?.type === "header") {
+        setFields((prev) =>
+          prev.map((field) =>
+            field.id === editingFieldId
+              ? { ...field, headingLevel: editHeadingLevel }
+              : field,
+          ),
+        );
       }
       setEditingFieldId(null);
       setEditLabel("");
       setEditOptions([]);
+      setEditHeadingLevel("h2");
     }
   };
 
@@ -248,9 +297,36 @@ export default function EditForm() {
       return;
     }
 
+    // Submissions are keyed by label, so two fields sharing a label would
+    // silently overwrite each other's captured value.
+    const duplicateLabel = findDuplicateLabel(fields);
+    if (duplicateLabel) {
+      setSnackbar({
+        open: true,
+        message: `Two fields are both labeled "${duplicateLabel}" — each field needs a unique label so submissions aren't lost.`,
+        severity: "error",
+      });
+      return;
+    }
+
+    const emptyOptionsField = findEmptyOptionsField(fields);
+    if (emptyOptionsField) {
+      setSnackbar({
+        open: true,
+        message: `"${emptyOptionsField.label}" needs at least one option before you can save.`,
+        severity: "error",
+      });
+      return;
+    }
+
     setIsUpdating(true);
 
     try {
+      // Map field types to match backend validation — the same normalization
+      // the create screen applies, so a form saved from either screen ends
+      // up with the same canonical type.
+      const mappedFields = normalizeFieldsForSave(fields);
+
       const response = await fetchWithCSRF("/api/form/update", {
         method: "PUT",
         headers: {
@@ -258,10 +334,15 @@ export default function EditForm() {
         },
         body: JSON.stringify({
           formId,
-          fields,
+          fields: mappedFields,
           formName,
           leadSource,
           industry,
+          status,
+          allowedOrigins: allowedOriginsInput
+            .split(",")
+            .map((origin) => origin.trim())
+            .filter(Boolean),
         }),
       });
 
@@ -276,6 +357,7 @@ export default function EditForm() {
         message: result.message || "Form updated successfully!",
         severity: "success",
       });
+      setLoadedSnapshot(JSON.stringify({ fields: mappedFields, formName }));
 
       // Redirect to forms list after a short delay
       setTimeout(() => {
@@ -401,6 +483,43 @@ export default function EditForm() {
                 </Select>
               </FormControl>
             </Tooltip>
+            <Tooltip
+              title={
+                status === "published"
+                  ? "Live — currently accepting submissions"
+                  : "Draft — won't accept submissions until published"
+              }
+              placement="top"
+              arrow
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={status === "published"}
+                    onChange={(e) =>
+                      setStatus(e.target.checked ? "published" : "draft")
+                    }
+                    color="primary"
+                  />
+                }
+                label={status === "published" ? "Published" : "Draft"}
+                sx={{ mb: 1 }}
+              />
+            </Tooltip>
+            <Tooltip
+              title="Optional — leave blank to accept submissions from anywhere. List the domain(s) where you'll embed this form (e.g. example.com) to reject submissions from anywhere else."
+              placement="top"
+              arrow
+            >
+              <TextField
+                label="Allowed Domains (optional)"
+                value={allowedOriginsInput}
+                onChange={(e) => setAllowedOriginsInput(e.target.value)}
+                fullWidth
+                sx={{ mb: 2 }}
+                placeholder="example.com, www.example.com"
+              />
+            </Tooltip>
             <Typography
               variant="h6"
               gutterBottom
@@ -421,6 +540,34 @@ export default function EditForm() {
                 sx={{ mb: 2 }}
                 placeholder="Enter field label..."
               />
+            </Tooltip>
+            <Tooltip
+              title="Add a heading block to separate sections"
+              placement="top"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => addField("header")}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                Header
+              </Button>
+            </Tooltip>
+            <Tooltip
+              title="Add a paragraph block for helper or intro text"
+              placement="top"
+              arrow
+            >
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => addField("paragraph")}
+                sx={{ mb: 1, fontSize: { xs: "0.8rem", sm: "0.9rem" } }}
+              >
+                Paragraph
+              </Button>
             </Tooltip>
             <Tooltip
               title="Add preconfigured contact fields (Name, Email, Phone) for lead collection"
@@ -569,14 +716,12 @@ export default function EditForm() {
         <Grid size={{ xs: 12, sm: 8 }}>
           <FormPreview
             fields={fields}
-            userId={"Null"}
             formId={"Null"}
             isLoggedIn={true}
             onEdit={startEditing}
             onDelete={deleteField}
             onToggleRequired={toggleRequired}
-            onSubmit={async () => {}}
-            errors={{}}
+            onReorder={setFields}
             loading={false}
           />
           {editingFieldId && (
@@ -595,12 +740,9 @@ export default function EditForm() {
                 fullWidth
                 sx={{ mb: 2 }}
               />
-              {(fields.find((field) => field.id === editingFieldId)?.type ===
-                "checkbox" ||
-                fields.find((field) => field.id === editingFieldId)?.type ===
-                  "radio" ||
-                fields.find((field) => field.id === editingFieldId)?.type ===
-                  "dropdown") && (
+              {isOptionsField(
+                fields.find((field) => field.id === editingFieldId)?.type,
+              ) && (
                 <div>
                   <Typography variant="body2" sx={{ mb: 1 }}>
                     Options:
@@ -627,6 +769,34 @@ export default function EditForm() {
                   </Button>
                 </div>
               )}
+              {fields.find((field) => field.id === editingFieldId)?.type ===
+                "header" && (
+                <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                  <InputLabel>Heading Level</InputLabel>
+                  <Select
+                    label="Heading Level"
+                    value={editHeadingLevel}
+                    onChange={(e) =>
+                      setEditHeadingLevel(
+                        (e.target.value || "h2") as
+                          | "h1"
+                          | "h2"
+                          | "h3"
+                          | "h4"
+                          | "h5"
+                          | "h6",
+                      )
+                    }
+                  >
+                    <MenuItem value="h1">H1</MenuItem>
+                    <MenuItem value="h2">H2</MenuItem>
+                    <MenuItem value="h3">H3</MenuItem>
+                    <MenuItem value="h4">H4</MenuItem>
+                    <MenuItem value="h5">H5</MenuItem>
+                    <MenuItem value="h6">H6</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
               <Box sx={{ mt: 2 }}>
                 <Button
                   onClick={saveFieldChanges}
@@ -641,6 +811,7 @@ export default function EditForm() {
                     setEditingFieldId(null);
                     setEditLabel("");
                     setEditOptions([]);
+                    setEditHeadingLevel("h2");
                   }}
                   variant="outlined"
                   size="small"

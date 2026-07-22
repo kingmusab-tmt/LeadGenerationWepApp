@@ -18,7 +18,7 @@ interface BuyerProfileProps {
 
 const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
   // Helper function to format schedule
-  const formatSchedule = (schedule: any) => {
+  const formatSchedule = (schedule: Buyer["weeklySchedule"]) => {
     if (!schedule) return "Not configured";
     const days = Object.keys(schedule);
     const activeDays = days.filter((day) => schedule[day]?.enabled);
@@ -40,9 +40,28 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
     >
       {/* BASIC INFORMATION */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" color="primary" gutterBottom>
-          Basic Information
-        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            flexWrap: "wrap",
+            gap: 1,
+          }}
+        >
+          <Typography variant="h6" color="primary" gutterBottom>
+            Basic Information
+          </Typography>
+          {(buyer.createdAt || buyer.updatedAt) && (
+            <Typography variant="caption" color="text.secondary">
+              {buyer.createdAt &&
+                `Registered ${new Date(buyer.createdAt).toLocaleDateString()}`}
+              {buyer.createdAt && buyer.updatedAt && " • "}
+              {buyer.updatedAt &&
+                `Last updated ${new Date(buyer.updatedAt).toLocaleDateString()}`}
+            </Typography>
+          )}
+        </Box>
         <Divider sx={{ mb: 2 }} />
         <Box
           sx={{
@@ -288,7 +307,7 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
                 >
                   Preferred Zones
                 </Typography>
-                {buyer.preferredZones.map((zone: any, index: number) => (
+                {buyer.preferredZones.map((zone, index) => (
                   <Box key={index} sx={{ ml: 2, mb: 1 }}>
                     {zone.city && (
                       <Typography variant="body2">
@@ -313,13 +332,6 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
             <Typography sx={{ mt: 1 }}>
               <strong>Strict Location Matching:</strong>{" "}
               {buyer.locationMatchingStrict ? "Yes" : "No"}
-            </Typography>
-            <Typography>
-              <strong>Radius Flexibility:</strong>{" "}
-              {buyer.radiusFlexibility || "strict"}
-            </Typography>
-            <Typography>
-              <strong>Service Radius:</strong> {buyer.serviceRadius ?? 25} miles
             </Typography>
           </Box>
         </AccordionDetails>
@@ -423,7 +435,18 @@ const BuyerProfile: React.FC<BuyerProfileProps> = ({ buyer }) => {
               </Box>
             )}
 
-            <Tooltip title="Minimum quality threshold for auto-assignment:\n• 100: Only High Quality (0-40 spam score)\n• 60: High + Medium Quality (0-69 spam score)\n• 30 or less: Accept any quality level">
+            <Tooltip
+              title={
+                <>
+                  Minimum quality threshold for auto-assignment:
+                  <br />
+                  • 100: Only High Quality (0-40 spam score)
+                  <br />
+                  • 60: High + Medium Quality (0-69 spam score)
+                  <br />• 30 or less: Accept any quality level
+                </>
+              }
+            >
               <Typography>
                 <strong>Min Qualification Score:</strong>{" "}
                 {buyer.qualificationScoreMinimum ?? 0}

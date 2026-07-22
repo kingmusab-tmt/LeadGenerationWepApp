@@ -14,7 +14,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { ITransaction } from "@/models/transactions";
-import { formatCurrency, formatDate } from "@/utils/formater";
+import { formatDate, formatTransactionValue } from "@/utils/formater";
 
 interface TransactionDetailsModalProps {
   open: boolean;
@@ -298,7 +298,11 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
               Amount
             </Typography>
             <Typography variant="body2">
-              {formatCurrency(transaction.amount)}
+              {formatTransactionValue(
+                transaction.amount,
+                transaction.type,
+                transaction.currency,
+              )}
             </Typography>
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -322,7 +326,11 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
               Previous Balance
             </Typography>
             <Typography variant="body2">
-              {formatCurrency(transaction.previousBalance)}
+              {formatTransactionValue(
+                transaction.previousBalance,
+                transaction.type,
+                transaction.currency,
+              )}
             </Typography>
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -330,7 +338,11 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
               Current Balance
             </Typography>
             <Typography variant="body2">
-              {formatCurrency(transaction.currentBalance)}
+              {formatTransactionValue(
+                transaction.currentBalance,
+                transaction.type,
+                transaction.currency,
+              )}
             </Typography>
           </Grid>
         </Grid>

@@ -59,6 +59,40 @@ export function formatCurrency(
   }).format(numAmount);
 }
 
+// Transaction types whose previousBalance/currentBalance/amount fields are
+// actually a unit count (a buyer's walletUnit), not real money (walletBalance)
+// — the two are written from entirely different account fields depending on
+// type (see app/api/buyers/{buyerpurchaselead,acceptOrRejectlead}/route.ts
+// and the Stripe webhook's units_purchase handler), so formatting either as
+// currency misrepresents the value.
+const UNIT_BASED_TRANSACTION_TYPES = new Set([
+  "lead_purchase",
+  "units_purchase",
+  "call_purchase",
+]);
+
+export function isUnitBasedTransactionType(type: string): boolean {
+  return UNIT_BASED_TRANSACTION_TYPES.has(type);
+}
+
+/**
+ * Formats a transaction's amount/previousBalance/currentBalance value,
+ * rendering it as a unit count or as currency depending on the
+ * transaction's actual type — see isUnitBasedTransactionType.
+ */
+export function formatTransactionValue(
+  value: number | string | null | undefined,
+  type: string,
+  currency: string = "USD",
+): string {
+  if (isUnitBasedTransactionType(type)) {
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    const safeNum = typeof num === "number" && !isNaN(num) ? num : 0;
+    return `${formatNumber(safeNum, 0)} unit${safeNum === 1 ? "" : "s"}`;
+  }
+  return formatCurrency(value ?? 0, currency);
+}
+
 /**
  * Formats a number with commas and optional decimals
  * @param num - The number to format

@@ -19,6 +19,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import BuyerProfile from "@/app/components/leadbuyers/buyerprofile";
 import LeadPurchaseHistory from "@/app/components/leadbuyers/leadpurchasehistory";
+import { getBuyerStatusColor } from "@/app/components/leadbuyers/buyerStatusColor";
 import { Buyer } from "@/types/buyer";
 
 interface TabPanelProps {
@@ -29,7 +30,13 @@ interface TabPanelProps {
 
 function TabPanel({ children, value, index }: TabPanelProps) {
   return (
-    <Box role="tabpanel" hidden={value !== index} sx={{ p: { xs: 2, sm: 3 } }}>
+    <Box
+      role="tabpanel"
+      hidden={value !== index}
+      id={`buyer-tabpanel-${index}`}
+      aria-labelledby={`buyer-tab-${index}`}
+      sx={{ p: { xs: 2, sm: 3 } }}
+    >
       {value === index && children}
     </Box>
   );
@@ -54,12 +61,23 @@ const BuyerDetailsPage: React.FC = () => {
       : (params.buyerId?.[0] ?? "");
 
   useEffect(() => {
-    if (!buyerId) return;
+    if (!buyerId) {
+      // Previously this returned with loading still true, leaving the page
+      // spinning forever with no way out for a malformed/missing route param.
+      setError("Buyer not found");
+      setLoading(false);
+      return;
+    }
 
     const fetchBuyer = async () => {
       try {
         const response = await fetch(`/api/buyers?buyerId=${buyerId}`);
-        if (!response.ok) throw new Error("Failed to fetch buyer details");
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(
+            body?.message || body?.error || "Failed to fetch buyer details",
+          );
+        }
 
         const result = await response.json();
         const buyerData = result?.data;
@@ -76,17 +94,12 @@ const BuyerDetailsPage: React.FC = () => {
             ...buyerData,
             notificationPreferences: buyerData.notificationPreferences || [],
           });
-          setSnackbar({
-            open: true,
-            message: "Buyer details loaded successfully!",
-            severity: "success",
-          });
         }
       } catch (err) {
         setError((err as Error).message);
         setSnackbar({
           open: true,
-          message: "Error fetching buyer details",
+          message: (err as Error).message || "Error fetching buyer details",
           severity: "error",
         });
       } finally {
@@ -141,7 +154,7 @@ const BuyerDetailsPage: React.FC = () => {
         <>
           {/* Back navigation */}
           <Box
-            onClick={() => router.back()}
+            onClick={() => router.push("/dashboard/seller/lead_buyers_management")}
             sx={{
               display: "inline-flex",
               alignItems: "center",
@@ -203,17 +216,27 @@ const BuyerDetailsPage: React.FC = () => {
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {/* Previously this rendered a second, separate "Active"/
+                    "Inactive" chip from buyer.isActive right next to this
+                    one — a distinct field from status that could disagree
+                    with it (e.g. a green "active" status next to a red
+                    "Inactive" chip) with nothing explaining the difference.
+                    isActive is now kept in sync with status server-side, so
+                    a single status chip is both simpler and no longer risks
+                    showing a contradiction. */}
                 <Chip
                   label={buyer.status}
                   size="small"
                   sx={{
-                    bgcolor:
-                      buyer.status === "active" ? "success.light" : "grey.300",
-                    color:
-                      buyer.status === "active"
-                        ? "success.dark"
-                        : "text.primary",
+                    textTransform: "capitalize",
                     fontWeight: 600,
+                    ...(getBuyerStatusColor(buyer.status || "") === "success"
+                      ? { bgcolor: "success.light", color: "success.dark" }
+                      : getBuyerStatusColor(buyer.status || "") === "error"
+                        ? { bgcolor: "error.light", color: "error.dark" }
+                        : getBuyerStatusColor(buyer.status || "") === "info"
+                          ? { bgcolor: "info.light", color: "info.dark" }
+                          : { bgcolor: "grey.300", color: "text.primary" }),
                   }}
                 />
                 <Chip
@@ -227,16 +250,6 @@ const BuyerDetailsPage: React.FC = () => {
                   sx={{
                     bgcolor: "rgba(255,255,255,0.2)",
                     color: "inherit",
-                  }}
-                />
-                <Chip
-                  label={buyer.isActive ? "Active" : "Inactive"}
-                  size="small"
-                  sx={{
-                    bgcolor: buyer.isActive
-                      ? "rgba(255,255,255,0.2)"
-                      : "error.light",
-                    color: buyer.isActive ? "inherit" : "error.dark",
                   }}
                 />
               </Stack>
@@ -256,8 +269,16 @@ const BuyerDetailsPage: React.FC = () => {
               variant="scrollable"
               scrollButtons="auto"
             >
-              <Tab label="Buyer Profile" />
-              <Tab label="Transaction History" />
+              <Tab
+                label="Buyer Profile"
+                id="buyer-tab-0"
+                aria-controls="buyer-tabpanel-0"
+              />
+              <Tab
+                label="Transaction History"
+                id="buyer-tab-1"
+                aria-controls="buyer-tabpanel-1"
+              />
             </Tabs>
             <TabPanel value={tabValue} index={0}>
               <BuyerProfile buyer={buyer} />

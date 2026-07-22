@@ -12,6 +12,7 @@ import {
   handleValidationError,
   badRequest,
 } from "@/lib/api/error-handler";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 import { ZodError } from "zod";
 
 export async function GET(req: NextRequest) {
@@ -25,9 +26,18 @@ export async function GET(req: NextRequest) {
     }
     const sellerId = session.user.id;
 
+    const rateLimited = checkSimpleRateLimit(req, {
+      scope: "calls-tracking",
+      limit: 60,
+      windowMs: 60 * 1000,
+      actorId: sellerId,
+    });
+    if (rateLimited) return rateLimited;
+
     // Validate query parameters
+    let queryParams;
     try {
-      await getCallsQuerySchema.parseAsync(
+      queryParams = await getCallsQuerySchema.parseAsync(
         Object.fromEntries(new URL(req.url).searchParams),
       );
     } catch (error) {
@@ -37,8 +47,35 @@ export async function GET(req: NextRequest) {
       return badRequest("Invalid query parameters");
     }
 
-    // Fetch calls as plain objects (lean) for faster serialization
-    const calls = await Call.find({ userId: sellerId }).lean();
+    const query: Record<string, unknown> = { userId: sellerId };
+    if (queryParams.buyerId) query.buyerId = queryParams.buyerId;
+    if (queryParams.status) query.status = queryParams.status;
+    if (queryParams.startDate || queryParams.endDate) {
+      query.createdAt = {
+        ...(queryParams.startDate ? { $gte: new Date(queryParams.startDate) } : {}),
+        ...(queryParams.endDate ? { $lte: new Date(queryParams.endDate) } : {}),
+      };
+    }
+
+    const page = queryParams.page ?? 1;
+    const limit = queryParams.limit ?? 200;
+    const skip = (page - 1) * limit;
+
+    // Fetch calls as plain objects (lean) for faster serialization. Excludes
+    // transcription/aiSummary/voicemail — not rendered by this page — since
+    // pulling them for every call in a seller's history is unnecessary
+    // payload weight at scale.
+    const [calls, total] = await Promise.all([
+      Call.find(query)
+        .select(
+          "userId buyerId callSid from to status callStatus callDuration recordingUrl unitsCharged feedback paymentStatus industry createdAt",
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Call.countDocuments(query),
+    ]);
 
     // Batch-fetch all referenced buyers in a single query (avoids N+1)
     const buyerIds = [
@@ -61,11 +98,14 @@ export async function GET(req: NextRequest) {
       return {
         ...call,
         buyerName: buyer?.name || "N/A",
-        industry: buyer?.leadPreferences?.industries?.[0] || "N/A",
+        industry: buyer?.leadPreferences?.industries?.[0] || call.industry || "N/A",
       };
     });
 
-    return successResponse(callsWithBuyerInfo);
+    return successResponse({
+      calls: callsWithBuyerInfo,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
   } catch (error) {
     console.error("Error fetching calls:", error);
     return internalError("Failed to fetch calls");

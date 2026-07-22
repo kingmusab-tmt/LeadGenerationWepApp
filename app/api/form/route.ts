@@ -17,6 +17,7 @@ import {
   forbidden,
 } from "@/lib/api/error-handler";
 import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
+import { signFormLoadToken } from "@/lib/formLoadToken";
 
 /**
  * GET /api/form?formId=<id>
@@ -33,16 +34,24 @@ export async function GET(req: NextRequest) {
 
     await dbConnect();
 
+    // This route is public/unauthenticated (it backs the embedded form
+    // page), so it must not return the owning seller's raw user ID —
+    // nothing on the frontend consumes it, and there's no reason for an
+    // anonymous caller to receive it.
     const form = await Form.findOne({ formId })
       .select(
-        "userId formId fields formName leadSource description styleConfig recaptchaEnabled redirectUrl",
+        "formId fields formName leadSource industry description styleConfig recaptchaEnabled redirectUrl status allowedOrigins",
       )
       .lean();
     if (!form) {
       return notFound("Form not found");
     }
 
-    return successResponse(form);
+    // Signed load timestamp for the public submit endpoint's anti-bot timing
+    // check — see lib/formLoadToken.ts. Harmless to include for authenticated
+    // builder/preview callers of this same endpoint; only the public form
+    // page actually forwards it on submit.
+    return successResponse({ ...form, formLoadToken: signFormLoadToken() });
   } catch (error) {
     console.error("[GET /api/form]", error);
     return internalError("Failed to fetch form");
@@ -94,9 +103,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check for existing form with the same name
+    // Check for existing form with the same name — scoped to this seller,
+    // not global, so two unrelated sellers can't collide over a common name
+    // like "Contact Us".
     const existingForm = await Form.findOne({
       formName: validatedData.name,
+      userId: creatorUserId,
     }).lean();
 
     if (existingForm) {
@@ -104,17 +116,22 @@ export async function POST(request: Request) {
     }
 
     const formId = uuidv4();
+    const status = validatedData.status || "published";
 
     await Form.create({
       userId: creatorUserId,
       formId,
       fields: validatedData.fields,
       formName: validatedData.name,
+      leadSource: validatedData.leadSource,
+      industry: validatedData.industry,
       description: validatedData.description,
       redirectUrl: validatedData.redirectUrl,
       notificationEmail: validatedData.notificationEmail,
       styleConfig: validatedData.styleConfig,
       recaptchaEnabled: validatedData.recaptchaEnabled,
+      status,
+      allowedOrigins: validatedData.allowedOrigins,
     });
 
     // PHASE 2: Invalidate user cache after creating form
@@ -138,10 +155,14 @@ export async function POST(request: Request) {
 
     return successResponse(
       {
-        message: "Form published successfully!",
+        message:
+          status === "draft"
+            ? "Form saved as draft — it won't accept submissions until you publish it."
+            : "Form published successfully!",
         formUrl,
         embedCode,
         formId,
+        status,
       },
       201,
     );

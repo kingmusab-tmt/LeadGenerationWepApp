@@ -20,16 +20,43 @@ export const signUpSchema = z.object({
 // LEADS SCHEMAS
 // ============================================
 
+// Matches models/leads.ts: name/email/phone are all optional there (the
+// manual-add UI collects real data through the dynamic `fields[]` array,
+// keyed by form-field id, not fixed top-level properties) — `fields` is the
+// one genuinely required data carrier.
 export const createLeadSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100),
-  email: z.string().email("Invalid email"),
-  phone: z.string().regex(/^\d{10,15}$/, "Invalid phone number"),
-  source: z.enum(["form", "api", "import", "call"]).optional(),
+  name: z.string().max(100).optional(),
+  email: z.union([z.literal(""), z.string().email("Invalid email")]).optional(),
+  phone: z.string().max(20).optional(),
+  company: z.string().max(200).optional(),
+  industry: z.string().max(100).optional(),
   status: z
-    .enum(["new", "contacted", "qualified", "converted", "lost"])
+    .enum([
+      "new",
+      "available",
+      "sold",
+      "assigned",
+      "qualified",
+      "unqualified",
+      "transferred",
+    ])
     .optional(),
-  notes: z.string().max(500).optional(),
-  customFields: z.record(z.string(), z.any()).optional(),
+  distributionMethod: z
+    .enum(["manual", "round_robin", "marketplace"])
+    .optional(),
+  unit: z.number().min(0).optional(),
+  shared: z.boolean().optional(),
+  shareNumber: z.number().min(0).optional(),
+  isManual: z.boolean().optional(),
+  fields: z
+    .array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        value: z.any(),
+      }),
+    )
+    .min(1, "At least one field is required"),
 });
 
 export const updateLeadSchema = z
@@ -62,6 +89,8 @@ export const updateLeadSchema = z
       .enum(["manual", "auto", "marketplace", "round_robin"])
       .optional(),
     unit: z.number().min(0).optional(),
+    shared: z.boolean().optional(),
+    shareNumber: z.number().min(0).optional(),
     fields: z
       .array(
         z
@@ -88,11 +117,13 @@ export const getLeadsQuerySchema = z.object({
     .regex(/^\d+$/)
     .optional()
     .transform((v) => (v ? parseInt(v) : 1)),
+  // No upper bound previously existed — any caller could request an
+  // arbitrarily large single query (e.g. limit=999999999).
   limit: z
     .string()
     .regex(/^\d+$/)
     .optional()
-    .transform((v) => (v ? parseInt(v) : 20)),
+    .transform((v) => Math.min(v ? parseInt(v) : 20, 500)),
   status: z.string().optional(),
   source: z.string().optional(),
   sort: z.string().optional(),
@@ -170,48 +201,120 @@ export const updateSMSCampaignSchema = createSMSCampaignSchema.partial();
 // FORM SCHEMAS
 // ============================================
 
+// Shared by create and update — kept as one list so the two form-builder
+// screens (create vs. edit) and the AI generator can never again drift into
+// accepting different sets of field types (previously "dropdown"/"select"
+// and "tel"/"phone" were normalized inconsistently between screens, and
+// city/state auto-fill fields used by the one-click "Contact Fields" button
+// weren't in this enum at all, so publishing/updating a form that used it
+// always failed validation). "file" is deliberately excluded — no upload
+// storage is implemented yet, so accepting the type would silently drop
+// submitted files (see FormPreview.tsx's file-field handling).
+export const formFieldTypeSchema = z.enum([
+  "text",
+  "email",
+  "phone",
+  "tel",
+  "url",
+  "select",
+  "dropdown",
+  "checkbox",
+  "textarea",
+  "date",
+  "number",
+  "radio",
+  "header",
+  "paragraph",
+  "city_autocomplete",
+  "state_auto",
+]);
+
+const FIELD_TYPES_REQUIRING_OPTIONS = ["select", "dropdown", "checkbox", "radio"];
+
+export const formFieldSchema = z
+  .object({
+    id: z.string(),
+    type: formFieldTypeSchema,
+    label: z.string().min(1),
+    required: z.boolean().optional(),
+    placeholder: z.string().optional(),
+    options: z.array(z.string()).optional(),
+    headingLevel: z.enum(["h1", "h2", "h3", "h4", "h5", "h6"]).optional(),
+    linkedTo: z.string().optional(),
+    disabled: z.boolean().optional(),
+  })
+  // A select/dropdown/checkbox/radio field saved with zero options renders
+  // as an empty, permanently-unusable control on the public form — this is
+  // rejected here so it can never reach the database in the first place,
+  // rather than only being caught (or not) client-side.
+  .refine(
+    (field) =>
+      !FIELD_TYPES_REQUIRING_OPTIONS.includes(field.type) ||
+      (field.options ?? []).some((option) => option.trim().length > 0),
+    {
+      message: "Select, dropdown, checkbox, and radio fields must have at least one non-empty option",
+      path: ["options"],
+    },
+  );
+
+// Neither builder screen currently exposes a color picker for these, so
+// they're only reachable via a direct API call — constrained to a real hex
+// color so malformed input can't reach the public form's inline styles.
+const hexColorSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/, "Must be a hex color, e.g. #1976d2")
+  .optional();
+
+const formStyleConfigSchema = z
+  .object({
+    primaryColor: hexColorSchema,
+    buttonText: z.string().max(100).optional(),
+    successMessage: z.string().max(500).optional(),
+    formBackgroundColor: hexColorSchema,
+  })
+  .optional();
+
+const formStatusSchema = z.enum(["draft", "published"]).optional();
+const allowedOriginsSchema = z
+  .array(z.string().max(253))
+  .max(20)
+  .optional();
+
 export const createFormSchema = z.object({
   name: z.string().min(1, "Form name is required").max(500),
   description: z.string().max(1000).optional(),
+  // Previously only carried inside `description` as "Lead Source: X |
+  // Industry: Y" text — fragile to round-trip and, worse, meant the
+  // model's own real leadSource/industry columns were never populated at
+  // creation, only ever set later via an edit/update.
+  leadSource: z.string().max(200).optional(),
+  industry: z.string().max(200).optional(),
   recaptchaEnabled: z.boolean().optional(),
-  fields: z
-    .array(
-      z.object({
-        id: z.string(),
-        type: z.enum([
-          "text",
-          "email",
-          "phone",
-          "select",
-          "checkbox",
-          "textarea",
-          "date",
-          "number",
-          "radio",
-          "header",
-          "paragraph",
-        ]),
-        label: z.string().min(1),
-        required: z.boolean().optional(),
-        placeholder: z.string().optional(),
-        options: z.array(z.string()).optional(),
-        headingLevel: z.enum(["h1", "h2", "h3", "h4", "h5", "h6"]).optional(),
-      }),
-    )
-    .min(1, "At least one field is required"),
+  fields: z.array(formFieldSchema).min(1, "At least one field is required"),
   redirectUrl: z.string().url().optional(),
   notificationEmail: z.string().email().optional(),
-  styleConfig: z
-    .object({
-      primaryColor: z.string().optional(),
-      buttonText: z.string().optional(),
-      successMessage: z.string().optional(),
-      formBackgroundColor: z.string().optional(),
-    })
-    .optional(),
+  styleConfig: formStyleConfigSchema,
+  status: formStatusSchema,
+  allowedOrigins: allowedOriginsSchema,
 });
 
-export const updateFormSchema = createFormSchema.partial();
+// The update route's own request shape (formName/leadSource/industry as
+// their own fields, not createFormSchema's name/description) — previously
+// this route did zero validation at all.
+export const updateFormRequestSchema = z.object({
+  formId: z.string().min(1, "Form ID is required"),
+  formName: z.string().min(1, "Form name is required").max(500),
+  leadSource: z.string().max(200).optional(),
+  industry: z.string().max(200).optional(),
+  fields: z.array(formFieldSchema).min(1, "At least one field is required"),
+  description: z.string().max(1000).optional(),
+  redirectUrl: z.string().url().optional(),
+  notificationEmail: z.string().email().optional(),
+  recaptchaEnabled: z.boolean().optional(),
+  styleConfig: formStyleConfigSchema,
+  status: formStatusSchema,
+  allowedOrigins: allowedOriginsSchema,
+});
 
 // ============================================
 // PAYMENT SCHEMAS
@@ -425,41 +528,134 @@ export const exportDataSchema = z.object({
 // BUYER SCHEMAS
 // ============================================
 
+// NOTE: previously this schema's enums (status, preferredDistribution,
+// notificationPreferences shape) didn't match models/leadbuyers.ts at all —
+// it would have rejected every legitimate payload the app actually sends.
+// Rewritten to match the real IBuyer schema/enums.
+const contactAddressSchema = z
+  .object({
+    addressLine1: z.string().max(150).optional(),
+    addressLine2: z.string().max(150).optional(),
+    city: z.string().max(80).optional(),
+    state: z.string().max(80).optional(),
+    country: z.string().max(80).optional(),
+    postCode: z.string().max(20).optional(),
+  })
+  .optional();
+
+// The lead-matching engine (lib/leadAssignmentService.ts) reads
+// preferredZones, not leadPreferences.location, to decide whether a buyer
+// matches a lead — this schema previously had no way to accept it at all,
+// so edits made via the per-city zone editor in BuyerFormEnhanced were
+// silently dropped by Zod before ever reaching the database.
+const preferredZoneSchema = z.object({
+  city: z.string().max(100).optional(),
+  state: z.string().max(80).optional(),
+  zipCodes: z.array(z.string().max(20)).optional(),
+});
+
 export const createBuyerSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   company: z.string().min(1, "Company is required").max(100),
-  email: z.string().email("Invalid email"),
-  phone: z.string().regex(/^\d{10,15}$/, "Invalid phone number"),
-  status: z.enum(["active", "inactive", "pending"]).optional(),
-  leadPreferences: z.object({
-    industry: z.string().min(1, "Industry is required"),
-    location: z.string().optional(),
-    minBudget: z.number().min(0).optional(),
-    maxBudget: z.number().min(0).optional(),
-    tags: z.array(z.string()).optional(),
-  }),
-  preferredDistribution: z
-    .enum(["sequential", "simultaneous", "hunt"])
-    .optional(),
-  notificationPreferences: z
+  email: z.string().email("Invalid email address"),
+  phone: z
+    .string()
+    .regex(/^\+?[\d\s\-()]{10,20}$/, "Invalid phone number"),
+  status: z.enum(["new", "active", "inactive", "suspended"]).optional(),
+  leadPreferences: z
     .object({
-      email: z.boolean().optional(),
-      sms: z.boolean().optional(),
-      push: z.boolean().optional(),
+      location: z.union([z.string(), z.array(z.string())]).optional(),
+      industries: z.array(z.string()).optional(),
+      industryServicePairs: z.array(z.any()).optional(),
     })
     .optional(),
+  preferredZones: z.array(preferredZoneSchema).optional(),
+  preferredDistribution: z.enum(["Automatic", "Manual", "Both"]).optional(),
+  notificationPreferences: z
+    .array(z.enum(["Email", "SMS", "In-App Notification"]))
+    .optional(),
+  workingHours: z
+    .object({
+      start: z.string().optional(),
+      end: z.string().optional(),
+    })
+    .optional(),
+  timezone: z.string().max(60).optional(),
+  maxLeadsPerDay: z.number().int().min(0).max(10000).optional(),
+  businessDescription: z.string().max(2000).optional(),
+  companyRegNo: z.string().max(50).optional(),
+  vatTaxRegNo: z.string().max(50).optional(),
+  businessWebsite: z
+    .string()
+    .url("Invalid business website URL")
+    .max(300)
+    .optional()
+    .or(z.literal("")),
+  contactAddress: contactAddressSchema,
 });
 
 export const updateBuyerSchema = createBuyerSchema.partial();
 
 export const getBuyersQuerySchema = z.object({
-  buyerId: z
-    .string()
-    .regex(/^[0-9a-fA-F]{24}$/, "Invalid buyer ID")
-    .optional(),
+  buyerId: mongoIdParamSchema.optional(),
   page: z.coerce.number().int().positive().default(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(20).optional(),
-  status: z.enum(["active", "inactive", "pending"]).optional(),
+  status: z.enum(["new", "active", "inactive", "suspended"]).optional(),
+  search: z.string().max(200).optional(),
+});
+
+// ============================================
+// TRANSACTION SCHEMAS
+// ============================================
+
+export const getTransactionsQuerySchema = z.object({
+  buyerId: mongoIdParamSchema.optional(),
+  page: z.coerce.number().int().positive().default(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(25).optional(),
+  type: z
+    .enum([
+      "lead_purchase",
+      "call_purchase",
+      "units_purchase",
+      "seller_income",
+      "seller_payout",
+      "refund",
+      "admin_adjustment",
+      "subscription_payment",
+      "subscription_renewal",
+      "subscription_cancellation",
+    ])
+    .optional(),
+  status: z.enum(["pending", "completed", "failed", "refunded"]).optional(),
+});
+
+// Sanity ceilings, not a business rule — bounds a single manual-credit entry
+// against fat-finger/malicious input rather than any real pricing policy.
+export const MANUAL_CREDIT_MAX_CASH = 100_000;
+export const MANUAL_CREDIT_MAX_CREDITS = 1_000_000;
+
+export const manualCreditSchema = z.object({
+  buyerId: mongoIdParamSchema,
+  cashPaid: z
+    .number({ message: "Cash paid must be a number" })
+    .positive("Cash paid must be greater than 0")
+    .max(
+      MANUAL_CREDIT_MAX_CASH,
+      `Cash paid cannot exceed ${MANUAL_CREDIT_MAX_CASH.toLocaleString()} per transaction`,
+    ),
+  numberOfCredits: z
+    .number({ message: "Number of credits must be a number" })
+    .int("Number of credits must be a whole number")
+    .positive("Number of credits must be greater than 0")
+    .max(
+      MANUAL_CREDIT_MAX_CREDITS,
+      `Number of credits cannot exceed ${MANUAL_CREDIT_MAX_CREDITS.toLocaleString()} per transaction`,
+    ),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Description is required")
+    .max(500, "Description cannot exceed 500 characters"),
 });
 
 // ============================================
@@ -581,9 +777,17 @@ export const getInvoicesQuerySchema = z.object({
 // CALL TRACKING QUERY SCHEMAS
 // ============================================
 
+export const callFeedbackSchema = z.object({
+  isSellerReview: z.boolean().optional(),
+  approved: z.boolean().optional(),
+  feedback: z.boolean().optional(),
+  callDuration: z.number().nonnegative().optional(),
+  comment: z.string().max(1000, "Comment must be 1000 characters or fewer").optional(),
+});
+
 export const getCallsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(20).optional(),
+  limit: z.coerce.number().int().positive().max(200).default(20).optional(),
   buyerId: mongoIdParamSchema.optional(),
   status: z.enum(["completed", "missed", "busy", "failed"]).optional(),
   startDate: z.string().datetime().optional(),

@@ -82,6 +82,13 @@ export async function proxy(request: NextRequest) {
     return csrfProtection(request);
   }
 
+  // Public embedded-form page: set the iframe embed restriction per-form
+  // (see formEmbedCsp) rather than reaching the shared auth/role logic
+  // below, since this route is always public and never role-gated.
+  if (/^\/forms\/[^/]+\/?$/.test(pathname) && request.method === "GET") {
+    return formEmbedCsp(request);
+  }
+
   // Authentication and authorization for pages
   const token = await getToken({ req: request });
 
@@ -158,6 +165,83 @@ export async function proxy(request: NextRequest) {
 }
 
 /**
+ * Per-form iframe embed restriction
+ *
+ * The global X-Frame-Options: DENY (next.config.ts) blocks framing
+ * everywhere by default. This route is the one exception — it's designed
+ * to be embedded in a seller's third-party site — but WHICH sites may
+ * embed a given form is the seller's own choice (the "Allowed Domains"
+ * field in the builder), not something next.config's static headers() can
+ * express (it can't vary per :formId). CSP's frame-ancestors directive
+ * supersedes X-Frame-Options when both are present, so setting it here is
+ * what actually re-opens framing for this route, scoped to whatever the
+ * form owner configured.
+ *
+ * This can't do a direct DB read (middleware/proxy needs the Node.js
+ * runtime for that, which would apply to every request through this file,
+ * not just this route) — so it makes one same-origin fetch to the
+ * existing public GET /api/form endpoint instead, which already returns
+ * allowedOrigins. A failed or slow lookup fails OPEN (unrestricted, same
+ * as today) rather than ever blocking a legitimate embed.
+ */
+async function formEmbedCsp(request: NextRequest): Promise<NextResponse> {
+  const response = NextResponse.next();
+
+  try {
+    const formId = request.nextUrl.pathname.split("/")[2];
+    if (!formId) return response;
+
+    const lookupUrl = new URL(
+      `/api/form?formId=${encodeURIComponent(formId)}`,
+      request.nextUrl.origin,
+    );
+    const formRes = await fetch(lookupUrl);
+    if (!formRes.ok) return response;
+
+    const json = await formRes.json();
+    const allowedOrigins: unknown = json?.data?.allowedOrigins;
+
+    if (!Array.isArray(allowedOrigins) || allowedOrigins.length === 0) {
+      // No restriction configured — embed anywhere, matching the behavior
+      // that existed before this field did.
+      response.headers.set("Content-Security-Policy", "frame-ancestors *");
+      return response;
+    }
+
+    const ancestors = allowedOrigins
+      .filter((entry): entry is string => typeof entry === "string")
+      .map(toFrameAncestorSource)
+      .filter((entry): entry is string => !!entry);
+
+    response.headers.set(
+      "Content-Security-Policy",
+      `frame-ancestors ${ancestors.length > 0 ? ancestors.join(" ") : "'none'"}`,
+    );
+  } catch (error) {
+    console.error("[Proxy] formEmbedCsp lookup failed, failing open:", error);
+    response.headers.set("Content-Security-Policy", "frame-ancestors *");
+  }
+
+  return response;
+}
+
+// CSP frame-ancestors needs a scheme://host[:port] source, not a bare
+// hostname — sellers type plain domains ("example.com") in the builder.
+function toFrameAncestorSource(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      return `${url.protocol}//${url.host}`;
+    } catch {
+      return null;
+    }
+  }
+  return `https://${trimmed}`;
+}
+
+/**
  * CSRF Protection Logic
  * Protects only sensitive API routes from Cross-Site Request Forgery attacks
  *
@@ -200,12 +284,23 @@ async function csrfProtection(request: NextRequest) {
     "/api/users", // User profile and role operations
     "/api/users/type", // Role changes
     "/api/users/profile", // Profile updates
+    "/api/buyers", // Buyer create/update/delete/import (seller-managed contacts)
+    "/api/sellers", // Buyer status updates, manual credit
+    "/api/form", // Form create/update/delete/clone (seller-owned)
+    "/api/leads", // Lead create/update/delete, CSV import, exclusive toggle
+    "/api/exclusive", // Lead exclusivity toggle
+    "/api/calls/feedback", // Buyer/seller call feedback and refund decisions
   ];
 
+  // Public, unauthenticated endpoints carved out of a broader required-CSRF
+  // prefix above — an anonymous visitor submitting an embedded form has no
+  // session or CSRF cookie to send, so this can't (and shouldn't) require one.
+  const CSRF_EXEMPT_ROUTES = ["/api/form/submit"];
+
   // Check if this route requires CSRF
-  const requiresCSRF = CSRF_REQUIRED_ROUTES.some((route) =>
-    pathname.startsWith(route),
-  );
+  const requiresCSRF =
+    !CSRF_EXEMPT_ROUTES.some((route) => pathname.startsWith(route)) &&
+    CSRF_REQUIRED_ROUTES.some((route) => pathname.startsWith(route));
 
   // Skip CSRF for routes that don't require it
   if (!requiresCSRF) {

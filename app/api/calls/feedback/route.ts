@@ -1,5 +1,4 @@
-// app/api/calls/feedback/[callId]/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
 import { Transaction } from "@/models/transactions";
@@ -9,13 +8,17 @@ import { User } from "@/models";
 import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { recordAuditLog } from "@/lib/auditLog";
+import { withErrorHandler } from "@/lib/api/async-handler";
 import {
   badRequest,
   forbidden,
-  internalError,
   notFound,
+  successResponse,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
+import { callFeedbackSchema } from "@/lib/validation/schemas";
 
 type FeedbackState = {
   buyerRating?: boolean;
@@ -28,82 +31,91 @@ type FeedbackState = {
 type FeedbackCallDoc = {
   _id: string;
   userId: string;
-  sellerId: string;
-  buyerId: string;
+  buyerId?: string;
   callSid: string;
   from: string;
   to: string;
   unitsCharged: number;
   paymentStatus: string;
   feedback?: FeedbackState;
-  save(): Promise<unknown>;
 };
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   await dbConnect();
 
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email || !session.user.role) {
-      return unauthorized("Authentication required");
-    }
-
-    const url = new URL(req.url);
-    const callId = url.searchParams.get("callId");
-    const body = await req.json();
-    const { feedback, callDuration, isSellerReview, approved, comment } = body;
-
-    // Find the call record
-    const call = await Call.findById(callId);
-    if (!call) {
-      return notFound("Call");
-    }
-
-    if (isSellerReview) {
-      const isAdmin = session.user.role === "admin";
-      const isSellerOwner =
-        session.user.role === "seller" &&
-        (String(call.userId) === String(session.user.id) ||
-          String(call.sellerId) === String(session.user.id));
-
-      if (!isAdmin && !isSellerOwner) {
-        return forbidden("Forbidden");
-      }
-
-      // Handle seller review/approval
-      return handleSellerReview(
-        call as unknown as FeedbackCallDoc,
-        approved,
-        comment,
-      );
-    } else {
-      const buyerProfile = await Buyer.findOne({ email: session.user.email })
-        .select("_id")
-        .lean();
-      const isBuyerOwner =
-        session.user.role === "buyer" &&
-        !!buyerProfile?._id &&
-        String(call.buyerId) === String(buyerProfile._id);
-
-      if (!isBuyerOwner) {
-        return forbidden("Forbidden");
-      }
-
-      // Handle buyer feedback
-      return handleBuyerFeedback(
-        call as unknown as FeedbackCallDoc,
-        feedback,
-        callDuration,
-      );
-    }
-  } catch (error) {
-    console.error("Error processing feedback:", error);
-    return internalError("Internal server error");
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email || !session.user.role) {
+    return unauthorized("Authentication required");
   }
-}
+
+  const rateLimited = checkSimpleRateLimit(req, {
+    scope: "calls-feedback",
+    limit: 20,
+    windowMs: 10 * 60 * 1000,
+    actorId: session.user.id,
+  });
+  if (rateLimited) return rateLimited;
+
+  const url = new URL(req.url);
+  const callId = url.searchParams.get("callId");
+  if (!callId) {
+    return badRequest("callId is required");
+  }
+
+  const body = callFeedbackSchema.parse(await req.json());
+  const { feedback, callDuration, isSellerReview, approved, comment } = body;
+
+  // Find the call record
+  const call = await Call.findById(callId);
+  if (!call) {
+    return notFound("Call");
+  }
+
+  if (isSellerReview) {
+    const isAdmin = session.user.role === "admin";
+    const isSellerOwner =
+      session.user.role === "seller" &&
+      String(call.userId) === String(session.user.id);
+
+    if (!isAdmin && !isSellerOwner) {
+      return forbidden("Forbidden");
+    }
+
+    if (typeof approved !== "boolean") {
+      return badRequest("`approved` must be a boolean for a seller review.");
+    }
+
+    return handleSellerReview(callId, approved, comment || "", session.user);
+  } else {
+    const buyerProfile = await Buyer.findOne({ email: session.user.email })
+      .select("_id")
+      .lean();
+    const isBuyerOwner =
+      session.user.role === "buyer" &&
+      !!buyerProfile?._id &&
+      String(call.buyerId) === String(buyerProfile._id);
+
+    if (!isBuyerOwner) {
+      return forbidden("Forbidden");
+    }
+
+    if (typeof feedback !== "boolean" || typeof callDuration !== "number") {
+      return badRequest("`feedback` (boolean) and `callDuration` (number) are required.");
+    }
+
+    return handleBuyerFeedback(
+      call as unknown as FeedbackCallDoc & {
+        feedback?: FeedbackState;
+        save(): Promise<unknown>;
+      },
+      feedback,
+      callDuration,
+    );
+  }
+});
 
 async function handleBuyerFeedback(
-  call: FeedbackCallDoc,
+  call: FeedbackCallDoc & { feedback?: FeedbackState; save(): Promise<unknown> },
   feedback: boolean,
   callDuration: number,
 ) {
@@ -118,70 +130,108 @@ async function handleBuyerFeedback(
 
   await call.save();
 
-  return NextResponse.json({
-    success: true,
+  return successResponse({
+    call,
     message: "Feedback submitted successfully",
     requiresSellerReview: feedback === false && callDuration < 30,
   });
 }
 
 async function handleSellerReview(
-  call: FeedbackCallDoc,
+  callId: string,
   approved: boolean,
   comment: string,
+  actor: { id: string; email?: string | null; role?: string | null },
 ) {
-  // Verify this is a pending refund case
-  if (call.paymentStatus !== "pending_refund") {
-    return badRequest("This call doesn't require seller review");
+  // Atomically "claim" this call for review — the filter only matches a call
+  // still in pending_refund, so a double-click or two concurrent requests
+  // can only ever have one of them succeed here. Without this, a plain
+  // read-then-write allowed both requests to pass the eligibility check
+  // before either write landed, crediting the buyer's wallet twice.
+  const claimed = await Call.findOneAndUpdate(
+    { _id: callId, paymentStatus: "pending_refund" },
+    { $set: { paymentStatus: "processing_refund" } },
+    { new: true },
+  );
+
+  if (!claimed) {
+    return badRequest(
+      "This call doesn't require seller review, or a review is already in progress.",
+    );
   }
 
-  // Update seller decision
-  call.feedback = call.feedback || {};
-  call.feedback.sellerApproved = approved;
-  call.feedback.sellerComment = comment;
+  try {
+    if (approved) {
+      await processRefund(claimed as unknown as FeedbackCallDoc, comment);
+    }
 
-  if (approved) {
-    // Process refund
-    await processRefund(call);
-    call.paymentStatus = "refunded";
-  } else {
-    // Reject refund request
-    call.paymentStatus = "paid";
+    const finalStatus = approved ? "refunded" : "paid";
+    const updated = await Call.findByIdAndUpdate(
+      callId,
+      {
+        $set: {
+          paymentStatus: finalStatus,
+          "feedback.sellerApproved": approved,
+          "feedback.sellerComment": comment,
+        },
+      },
+      { new: true },
+    );
+
+    dispatchCallWebhook(claimed.userId, "callRefunded", {
+      callSid: claimed.callSid,
+      from: claimed.from,
+      to: claimed.to,
+      status: finalStatus,
+      buyerId: claimed.buyerId,
+      unitsCharged: claimed.unitsCharged,
+      refundAmount: approved ? claimed.unitsCharged : 0,
+      refundComment: comment,
+      paymentStatus: finalStatus,
+    });
+
+    await recordAuditLog({
+      actor,
+      action: approved ? "call.refund.approved" : "call.refund.rejected",
+      targetType: "Call",
+      targetId: callId,
+      summary: `${approved ? "Approved" : "Rejected"} refund for call ${claimed.callSid}`,
+    });
+
+    return successResponse({
+      call: updated,
+      message: `Feedback ${approved ? "approved" : "rejected"}`,
+      refundProcessed: approved,
+    });
+  } catch (error) {
+    // Roll back the claim so this can be retried rather than getting stuck
+    // in "processing_refund" forever after a failed refund attempt.
+    await Call.findByIdAndUpdate(callId, {
+      $set: { paymentStatus: "pending_refund" },
+    });
+
+    if (error instanceof Error && error.message.startsWith("REFUND_FAILED:")) {
+      return badRequest(error.message.replace("REFUND_FAILED:", "").trim());
+    }
+    throw error;
   }
-
-  await call.save();
-
-  // Fire refund webhook (non-blocking)
-  dispatchCallWebhook(call.userId, "callRefunded", {
-    callSid: call.callSid,
-    from: call.from,
-    to: call.to,
-    status: call.paymentStatus,
-    buyerId: call.buyerId,
-    unitsCharged: call.unitsCharged,
-    refundAmount: approved ? call.unitsCharged : 0,
-    refundComment: comment,
-    paymentStatus: call.paymentStatus,
-  });
-
-  return NextResponse.json({
-    success: true,
-    message: `Feedback ${approved ? "approved" : "rejected"}`,
-    refundProcessed: approved,
-  });
 }
 
-async function processRefund(call: FeedbackCallDoc) {
-  call.feedback = call.feedback || {};
+async function processRefund(call: FeedbackCallDoc, comment: string) {
   // 1. Refund units to buyer
-  const buyer = await Buyer.findById(call.buyerId);
-  if (buyer) {
-    buyer.walletUnit = (buyer.walletUnit || 0) + call.unitsCharged;
-    await buyer.save();
+  const buyer = call.buyerId ? await Buyer.findById(call.buyerId) : null;
+  if (!buyer) {
+    // Don't silently mark this refunded — the credit never actually
+    // reaches anyone if the buyer account no longer exists.
+    throw new Error(
+      "REFUND_FAILED: The buyer account for this call no longer exists, so the refund cannot be processed.",
+    );
   }
+  buyer.walletUnit = (buyer.walletUnit || 0) + call.unitsCharged;
+  await buyer.save();
 
   // 2. Fetch seller details for transaction record
-  const seller = await User.findById(call.sellerId);
+  const seller = await User.findById(call.userId);
 
   // 3. Create refund transaction record
   const refundTransaction = new Transaction({
@@ -191,35 +241,29 @@ async function processRefund(call: FeedbackCallDoc) {
     amount: call.unitsCharged,
     metadata: {
       callId: call._id,
-      sellerId: call.sellerId,
+      sellerId: call.userId,
       sellerName: seller?.name || "Unknown",
       sellerEmail: seller?.email || "N/A",
       buyerId: call.buyerId,
       buyerName: buyer?.name || "Unknown",
       buyerEmail: buyer?.email || "N/A",
       refund: true,
-      refundReason: call.feedback.sellerComment,
+      refundReason: comment,
     },
     status: "completed",
     description: `Refund for call ${call.callSid}`,
   });
   await refundTransaction.save();
 
-  // 3. Update call with refund details
-  call.feedback.refundAmount = call.unitsCharged;
-  call.feedback.refundedAt = new Date();
-
   // 4. Send notification to buyer
-  if (buyer) {
-    await sendNotification({
-      userId: call.buyerId,
-      type: "refund",
-      title: "Refund Processed",
-      message: `You've been refunded ${call.unitsCharged} units for call ${call.callSid}`,
-      metadata: {
-        callId: call._id,
-        amount: call.unitsCharged,
-      },
-    });
-  }
+  await sendNotification({
+    userId: call.buyerId!,
+    type: "refund",
+    title: "Refund Processed",
+    message: `You've been refunded ${call.unitsCharged} units for call ${call.callSid}`,
+    metadata: {
+      callId: call._id,
+      amount: call.unitsCharged,
+    },
+  });
 }

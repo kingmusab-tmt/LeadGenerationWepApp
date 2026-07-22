@@ -14,14 +14,20 @@
 
 import { ILead, Lead } from "@/models/leads";
 import { User } from "@/models/userModel";
+import { Buyer } from "@/models/leadbuyers";
 import mongoose from "mongoose";
 import { processLeadDistribution } from "@/lib/leadAssignmentService";
 import { makeLeadAvailableInMarketplace } from "@/lib/marketplaceNotificationService";
-import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
+import {
+  checkAndIncrementUsage,
+  checkFeatureAccess,
+} from "@/lib/subscriptionLimitsService";
 import {
   normalizeAiQualityResult,
   recordAiScoringMetric,
 } from "@/lib/aiQualityScoring";
+import { recordAuditLog } from "@/lib/auditLog";
+import { ZapierTriggerHelper } from "@/lib/integrations/zapierTriggerHelper";
 
 /**
  * Zapier action result structure
@@ -77,6 +83,16 @@ export interface ZapierSearchLeadInput {
   limit?: number;
 }
 
+const VALID_LEAD_STATUSES: ILead["status"][] = [
+  "new",
+  "available",
+  "sold",
+  "assigned",
+  "qualified",
+  "unqualified",
+  "transferred",
+];
+
 /**
  * Zapier Actions Service
  * Provides actions that Zapier can call to interact with BRIXCOT
@@ -102,6 +118,19 @@ export class ZapierActionsService {
         return {
           success: false,
           error: "Lead name is required",
+        };
+      }
+
+      // Enforce the same subscription lead quota every other lead-creation
+      // path (manual add, CSV import, the session-authenticated API) goes
+      // through — previously absent here, letting Zapier bypass plan caps.
+      const usageCheck = await checkAndIncrementUsage(this.userId, "leads", 1);
+      if (!usageCheck.allowed) {
+        return {
+          success: false,
+          error:
+            usageCheck.message ||
+            `Lead limit reached (${usageCheck.currentUsage}/${usageCheck.limit}). Please upgrade your plan.`,
         };
       }
 
@@ -440,6 +469,23 @@ export class ZapierActionsService {
         );
       }
 
+      const finalLead = (await Lead.findById(lead._id)) || lead;
+
+      await recordAuditLog({
+        actor: { id: this.userId },
+        action: "lead.create",
+        targetType: "Lead",
+        targetId: String(lead._id),
+        summary: `Created lead "${lead.name}" via Zapier Actions API`,
+      });
+
+      // Notify any connected Zaps subscribed to "New Lead" — best-effort,
+      // must never fail the actual lead creation that already succeeded.
+      ZapierTriggerHelper.triggerLeadCreated(finalLead, this.userId).catch(
+        (err) =>
+          console.error("Failed to dispatch Zapier leadCreated trigger:", err),
+      );
+
       return {
         success: true,
         data: {
@@ -500,7 +546,15 @@ export class ZapierActionsService {
       if (input.phone !== undefined) updates.phone = input.phone;
       if (input.company !== undefined) updates.company = input.company;
       if (input.industry !== undefined) updates.industry = input.industry;
-      if (input.status !== undefined) updates.status = input.status;
+      if (input.status !== undefined) {
+        if (!VALID_LEAD_STATUSES.includes(input.status)) {
+          return {
+            success: false,
+            error: `Invalid status. Must be one of: ${VALID_LEAD_STATUSES.join(", ")}`,
+          };
+        }
+        updates.status = input.status;
+      }
       if (input.qualificationScore !== undefined) {
         updates.aiQualityScore = input.qualificationScore;
       }
@@ -546,6 +600,22 @@ export class ZapierActionsService {
           );
         }
       }
+
+      await recordAuditLog({
+        actor: { id: this.userId },
+        action: "lead.update",
+        targetType: "Lead",
+        targetId: String(lead._id),
+        summary: `Updated lead "${lead.name}" via Zapier Actions API`,
+      });
+
+      ZapierTriggerHelper.triggerLeadUpdated(
+        lead,
+        this.userId,
+        Object.keys(updates),
+      ).catch((err) =>
+        console.error("Failed to dispatch Zapier leadUpdated trigger:", err),
+      );
 
       return {
         success: true,
@@ -722,10 +792,14 @@ export class ZapierActionsService {
         };
       }
 
-      // Find buyer
-      const buyer = await User.findOne({
+      // Find buyer — the Buyer model (not User) is the entity every other
+      // part of the assignment system (lib/leadAssignmentService.ts, buyer
+      // dashboards, notifications) actually expects assignedTo.buyerId to
+      // reference. Looking this up against User previously stored an ID
+      // that matched no real Buyer document, silently breaking the
+      // assignment.
+      const buyer = await Buyer.findOne({
         email: buyerEmail.toLowerCase(),
-        role: "buyer",
       });
 
       if (!buyer) {
@@ -759,6 +833,14 @@ export class ZapierActionsService {
 
       lead.status = "assigned";
       await lead.save();
+
+      await recordAuditLog({
+        actor: { id: this.userId },
+        action: "lead.assign",
+        targetType: "Lead",
+        targetId: String(lead._id),
+        summary: `Assigned lead "${lead.name}" to buyer "${buyer.name}" via Zapier Actions API`,
+      });
 
       return {
         success: true,
@@ -801,20 +883,10 @@ export class ZapierActionsService {
       }
 
       // Validate status
-      const validStatuses: ILead["status"][] = [
-        "new",
-        "available",
-        "sold",
-        "assigned",
-        "qualified",
-        "unqualified",
-        "transferred",
-      ];
-
-      if (!validStatuses.includes(status)) {
+      if (!VALID_LEAD_STATUSES.includes(status)) {
         return {
           success: false,
-          error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+          error: `Invalid status. Must be one of: ${VALID_LEAD_STATUSES.join(", ")}`,
         };
       }
 
@@ -831,6 +903,20 @@ export class ZapierActionsService {
           error: "Lead not found or access denied",
         };
       }
+
+      await recordAuditLog({
+        actor: { id: this.userId },
+        action: "lead.update",
+        targetType: "Lead",
+        targetId: String(lead._id),
+        summary: `Updated lead "${lead.name}" status to "${status}" via Zapier Actions API`,
+      });
+
+      ZapierTriggerHelper.triggerLeadUpdated(lead, this.userId, [
+        "status",
+      ]).catch((err) =>
+        console.error("Failed to dispatch Zapier leadUpdated trigger:", err),
+      );
 
       return {
         success: true,

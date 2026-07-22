@@ -15,9 +15,10 @@ import {
   Checkbox,
   CircularProgress,
 } from "@mui/material";
-import axios from "axios";
+import axios from "@/lib/axiosInstance";
 import { useRouter } from "next/navigation";
 import { Lead } from "@/types/lead";
+import { DEFAULT_LEAD_FORM_FIELDS } from "@/lib/defaultLeadFormFields";
 
 interface FormField {
   id: string;
@@ -43,7 +44,7 @@ interface UserForm {
 interface LeadFormProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: (lead: Lead) => void | Promise<void>;
   selectedLead: Lead | null;
   setSelectedLead: React.Dispatch<React.SetStateAction<Lead | null>>;
 }
@@ -55,50 +56,7 @@ const DEFAULT_ADD_LEAD_FORM: UserForm = {
   formName: "Default Lead Form",
   industry: "general",
   leadsource: "manual",
-  fields: [
-    {
-      id: "name",
-      type: "text",
-      label: "Name",
-      required: true,
-      options: [],
-    },
-    {
-      id: "email",
-      type: "email",
-      label: "Email",
-      required: true,
-      options: [],
-    },
-    {
-      id: "phone",
-      type: "tel",
-      label: "Phone",
-      required: false,
-      options: [],
-    },
-    {
-      id: "city",
-      type: "text",
-      label: "City",
-      required: false,
-      options: [],
-    },
-    {
-      id: "address",
-      type: "text",
-      label: "Address",
-      required: false,
-      options: [],
-    },
-    {
-      id: "service_needed",
-      type: "textarea",
-      label: "Service Needed",
-      required: true,
-      options: [],
-    },
-  ],
+  fields: DEFAULT_LEAD_FORM_FIELDS.map((field) => ({ ...field, options: [] })),
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   __v: 0,
@@ -117,6 +75,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [isShared, setIsShared] = useState(selectedLead?.shared || false);
   const [matchingFormLoading, setMatchingFormLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [formFields, setFormFields] = useState<
     Array<{ id: string; label: string; value: string }>
   >([]);
@@ -124,9 +83,10 @@ const LeadForm: React.FC<LeadFormProps> = ({
   // Initialize form fields based on selectedLead or default form
   const initializeFormFields = useCallback(
     (form: UserForm, existingLead?: Lead | null) => {
+      const formFieldDefs = form.fields || [];
       if (existingLead?._id) {
         // For editing existing lead, use existing field values
-        const fields = form.fields.map((formField) => {
+        const fields = formFieldDefs.map((formField) => {
           const existingField = existingLead.fields.find(
             (f) => f.id === formField.id,
           );
@@ -139,7 +99,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
         setFormFields(fields);
       } else {
         // For new lead, initialize with empty values
-        const fields = form.fields.map((field) => ({
+        const fields = formFieldDefs.map((field) => ({
           id: field.id,
           label: field.label,
           value: "",
@@ -165,7 +125,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
           // Editing existing lead - find matching form
           setMatchingFormLoading(true);
           const matchingForm = forms.find((form: UserForm) =>
-            form.fields.some((formField: FormField) =>
+            (form.fields || []).some((formField: FormField) =>
               selectedLead.fields.some(
                 (leadField) => leadField.id === formField.id,
               ),
@@ -188,9 +148,11 @@ const LeadForm: React.FC<LeadFormProps> = ({
           }
           setMatchingFormLoading(false);
         } else {
-          // Adding new lead
+          // Adding new lead. Default to the first form (or the only one, if
+          // there's just one) — when there's more than one, the "Select
+          // Form" dropdown below lets the seller change this pick; with
+          // zero or one form there's nothing to choose, so no prompt shows.
           if (forms.length > 0) {
-            // Use the first available form or let user choose
             setSelectedForm(forms[0]);
             initializeFormFields(forms[0], null);
           } else {
@@ -227,20 +189,26 @@ const LeadForm: React.FC<LeadFormProps> = ({
   };
 
   const handleSubmit = async () => {
-    try {
-      // Update the selectedLead with current form fields before submitting
-      if (selectedLead) {
-        const updatedLead = {
-          ...selectedLead,
-          fields: formFields,
-          shared: isShared,
-          shareNumber: selectedLead.shareNumber || 1,
-          unit: selectedLead.unit || 5,
-        };
-        setSelectedLead(updatedLead);
-      }
+    if (!selectedLead || submitting) return;
 
-      await onSubmit();
+    // Build the final lead object and pass it directly to onSubmit rather
+    // than relying on setSelectedLead + reading the parent's state back —
+    // setSelectedLead schedules an async update, so onSubmit (a callback
+    // closed over the parent's *previous* render) would otherwise still see
+    // the old fields/shared/shareNumber values, silently discarding
+    // whatever the user just typed into the form.
+    const updatedLead: Lead = {
+      ...selectedLead,
+      fields: formFields,
+      shared: isShared,
+      shareNumber: selectedLead.shareNumber || 1,
+      unit: selectedLead.unit || 5,
+    };
+
+    setSubmitting(true);
+    try {
+      setSelectedLead(updatedLead);
+      await onSubmit(updatedLead);
       router.refresh();
       onClose();
 
@@ -249,6 +217,8 @@ const LeadForm: React.FC<LeadFormProps> = ({
       setSelectedForm(null);
     } catch (error) {
       console.error("Error submitting form:", error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -284,8 +254,11 @@ const LeadForm: React.FC<LeadFormProps> = ({
         {selectedForm && ` (Using Form: ${selectedForm.formName})`}
       </DialogTitle>
       <DialogContent>
-        {/* Form Selection for New Leads
-        {!selectedLead?._id && userForms.length > 0 && (
+        {/* Form Selection for New Leads — only shown when there's an actual
+            choice to make. One form (or zero, using the default) is used
+            directly with no prompt; multiple forms means the seller picks
+            which field structure this lead should use. */}
+        {!selectedLead?._id && userForms.length > 1 && (
           <FormControl fullWidth margin="normal">
             <InputLabel>Select Form</InputLabel>
             <Select
@@ -306,7 +279,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
               ))}
             </Select>
           </FormControl>
-        )} */}
+        )}
 
         {/* Form Fields */}
         {formFields.map((field) => (
@@ -327,20 +300,19 @@ const LeadForm: React.FC<LeadFormProps> = ({
             value={selectedLead?.status || "new"}
             label="Status"
             onChange={(e) =>
-              setSelectedLead((prev: any) => ({
+              setSelectedLead((prev) => ({
                 ...prev!,
-                status: e.target.value as
-                  | "new"
-                  | "available"
-                  | "assigned"
-                  | "sold",
+                status: e.target.value as Lead["status"],
               }))
             }
           >
             <MenuItem value="new">New</MenuItem>
             <MenuItem value="available">Available</MenuItem>
+            <MenuItem value="qualified">Qualified</MenuItem>
+            <MenuItem value="unqualified">Unqualified</MenuItem>
             <MenuItem value="assigned">Assigned</MenuItem>
             <MenuItem value="sold">Sold Out</MenuItem>
+            <MenuItem value="transferred">Transferred</MenuItem>
           </Select>
         </FormControl>
 
@@ -360,9 +332,9 @@ const LeadForm: React.FC<LeadFormProps> = ({
               }))
             }
           >
-            <MenuItem value="manual">Specific Buyer</MenuItem>
-            <MenuItem value="round_robin">Automatic</MenuItem>
-            <MenuItem value="marketplace">Manual</MenuItem>
+            <MenuItem value="manual">Assign to Specific Buyer</MenuItem>
+            <MenuItem value="round_robin">Automatic Round-Robin</MenuItem>
+            <MenuItem value="marketplace">List on Marketplace</MenuItem>
           </Select>
         </FormControl>
 
@@ -418,11 +390,16 @@ const LeadForm: React.FC<LeadFormProps> = ({
         </FormControl>
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose} color="secondary">
+        <Button onClick={handleClose} color="secondary" disabled={submitting}>
           Cancel
         </Button>
-        <Button onClick={handleSubmit} color="primary" variant="contained">
-          Save
+        <Button
+          onClick={handleSubmit}
+          color="primary"
+          variant="contained"
+          disabled={submitting}
+        >
+          {submitting ? "Saving..." : "Save"}
         </Button>
       </DialogActions>
     </Dialog>

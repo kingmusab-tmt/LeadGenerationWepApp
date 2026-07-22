@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
+import { Buyer } from "@/models/leadbuyers";
 import { ZodError } from "zod";
 import { mongoIdParamSchema } from "@/lib/validation/schemas";
 import {
@@ -44,28 +45,31 @@ export async function GET(req: NextRequest) {
       return badRequest("Invalid seller ID format");
     }
 
-    // Authorization check
-    if (
-      session.user.id !== sellerId &&
-      session.user.role !== "admin" &&
-      session.user.role !== "business-admin"
-    ) {
+    // Authorization check. business-admin was previously treated as a
+    // blanket bypass here, but there is no data-model relationship tying a
+    // business-admin account to a specific seller — that let ANY
+    // business-admin account read ANY seller's subscription limits and
+    // buyer count by simply passing a different sellerId. Until a real
+    // parent-seller association exists, only the account itself or a true
+    // platform admin may read this data.
+    if (session.user.id !== sellerId && session.user.role !== "admin") {
       return forbidden("You can only access your own data");
     }
 
     await dbConnect();
 
     // Find user with subscription data
-    const user = await User.findById(sellerId)
-      .select("subscription buyers")
-      .lean();
+    const user = await User.findById(sellerId).select("subscription").lean();
 
     if (!user) {
       return notFound("User not found");
     }
 
-    // Calculate current buyer count
-    const buyerCount = user.buyers?.length || 0;
+    // Live count from the Buyer collection itself — the authoritative
+    // source used for limit enforcement in /api/buyers — rather than the
+    // length of the User.buyers array, which is a separately-maintained
+    // list that can drift from it.
+    const buyerCount = await Buyer.countDocuments({ registeredWith: sellerId });
 
     // Prepare response
     return successResponse({

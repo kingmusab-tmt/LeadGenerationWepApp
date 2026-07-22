@@ -107,14 +107,12 @@ export async function GET() {
       vacationMode: buyer.vacationMode,
       locationMatchingStrict: buyer.locationMatchingStrict,
       preferredZones: buyer.preferredZones,
-      radiusFlexibility: buyer.radiusFlexibility,
       preferenceMatchingThreshold: buyer.preferenceMatchingThreshold,
       leadTypes: buyer.leadTypes,
       webhookConfig: buyer.webhookConfig,
       serviceLocations: buyer.serviceLocations,
       weeklySchedule: buyer.weeklySchedule,
       maxLeadAge: buyer.maxLeadAge,
-      serviceRadius: buyer.serviceRadius,
       preferredContactMethods: buyer.preferredContactMethods,
       priorityBySource: buyer.priorityBySource,
       priorityByIndustry: buyer.priorityByIndustry,
@@ -217,13 +215,6 @@ export async function PUT(req: NextRequest) {
     }
 
     if (
-      body.radiusFlexibility &&
-      ["strict", "soft", "flexible"].includes(body.radiusFlexibility)
-    ) {
-      update.radiusFlexibility = body.radiusFlexibility;
-    }
-
-    if (
       body.preferenceMatchingThreshold &&
       ["strict", "moderate", "flexible"].includes(
         body.preferenceMatchingThreshold,
@@ -272,10 +263,6 @@ export async function PUT(req: NextRequest) {
       update.maxLeadAge = body.maxLeadAge;
     }
 
-    if (typeof body.serviceRadius === "number" && body.serviceRadius > 0) {
-      update.serviceRadius = body.serviceRadius;
-    }
-
     if (Array.isArray(body.preferredContactMethods)) {
       const allowed = ["phone", "email", "sms"];
       const methods = sanitizeStringArray(body.preferredContactMethods).filter(
@@ -322,7 +309,6 @@ export async function PUT(req: NextRequest) {
         vacationMode: updatedBuyer?.vacationMode,
         locationMatchingStrict: updatedBuyer?.locationMatchingStrict,
         preferredZones: updatedBuyer?.preferredZones,
-        radiusFlexibility: updatedBuyer?.radiusFlexibility,
         preferenceMatchingThreshold: updatedBuyer?.preferenceMatchingThreshold,
         leadTypes: updatedBuyer?.leadTypes,
         webhookConfig: updatedBuyer?.webhookConfig,
@@ -332,7 +318,6 @@ export async function PUT(req: NextRequest) {
         acceptCallLeads: updatedBuyer?.acceptCallLeads,
         weeklySchedule: updatedBuyer?.weeklySchedule,
         maxLeadAge: updatedBuyer?.maxLeadAge,
-        serviceRadius: updatedBuyer?.serviceRadius,
         preferredContactMethods: updatedBuyer?.preferredContactMethods,
         priorityBySource: updatedBuyer?.priorityBySource,
         priorityByIndustry: updatedBuyer?.priorityByIndustry,

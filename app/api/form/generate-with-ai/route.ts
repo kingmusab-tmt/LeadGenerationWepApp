@@ -3,43 +3,28 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import {
   badRequest,
+  forbidden,
   internalError,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
+import { formFieldSchema } from "@/lib/validation/schemas";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-
-interface FormField {
-  id: string;
-  type:
-    | "text"
-    | "email"
-    | "phone"
-    | "select"
-    | "checkbox"
-    | "textarea"
-    | "date"
-    | "number"
-    | "radio"
-    | "header"
-    | "paragraph";
-  label: string;
-  required?: boolean;
-  options?: string[];
-  headingLevel?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
-}
+const MAX_PROMPT_LENGTH = 2000;
 
 interface GenerateFormResponse {
-  fields: FormField[];
+  fields: unknown[];
   formName: string;
   description: string;
 }
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.role !== "seller") {
+  if (!session?.user?.id || session.user?.role !== "seller") {
     return unauthorized("Authentication required");
   }
 
@@ -47,11 +32,37 @@ export async function POST(req: NextRequest) {
     return internalError("Gemini API key not configured");
   }
 
+  // The frontend already hides this behind the aiGenerativeEnabled feature
+  // flag, but that's a UI convenience, not enforcement — without this check
+  // any seller could call the route directly regardless of their plan.
+  const featureAccess = await checkFeatureAccess(
+    session.user.id,
+    "aiGenerativeEnabled",
+  );
+  if (!featureAccess.allowed) {
+    return forbidden(
+      featureAccess.message || "AI form generation is not available on your plan.",
+    );
+  }
+
+  const rateLimited = checkSimpleRateLimit(req, {
+    scope: "form-ai-generate",
+    limit: 10,
+    windowMs: 24 * 60 * 60 * 1000,
+    actorId: session.user.id,
+  });
+  if (rateLimited) return rateLimited;
+
   try {
     const { prompt } = await req.json();
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
       return badRequest("Prompt is required");
+    }
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return badRequest(
+        `Prompt cannot exceed ${MAX_PROMPT_LENGTH} characters.`,
+      );
     }
 
     const systemPrompt = `You are an expert form builder assistant. Based on the user's description of leads they want to capture, generate a structured form in JSON format.
@@ -148,11 +159,28 @@ Respond ONLY with valid JSON, no additional text or markdown.`;
       return internalError("Invalid form structure from AI");
     }
 
-    // Add unique IDs to fields
-    const fieldsWithIds = formData.fields.map((field) => ({
-      ...field,
-      id: field.id || Math.random().toString(),
-    }));
+    // Assign a real ID to each field, then validate against the same schema
+    // that create/update enforce (field type enum, options required for
+    // select/radio/checkbox, etc.) — the AI's output was previously trusted
+    // as-is and could contain a type outside what the rest of the app
+    // accepts, or a choice field with no options.
+    const fieldsWithIds = (formData.fields as Record<string, unknown>[]).map(
+      (field) => ({
+        ...field,
+        id:
+          typeof field.id === "string" && field.id ? field.id : crypto.randomUUID(),
+      }),
+    );
+
+    const validFields = fieldsWithIds.filter(
+      (field) => formFieldSchema.safeParse(field).success,
+    );
+
+    if (validFields.length === 0) {
+      return internalError(
+        "The AI didn't return a usable form structure. Please try rephrasing your request.",
+      );
+    }
 
     return NextResponse.json(
       {
@@ -160,7 +188,7 @@ Respond ONLY with valid JSON, no additional text or markdown.`;
         data: {
           formName: formData.formName || "AI Generated Form",
           description: formData.description || "",
-          fields: fieldsWithIds,
+          fields: validFields,
         },
       },
       { status: 200 },

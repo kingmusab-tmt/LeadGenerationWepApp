@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   Container,
@@ -35,6 +35,12 @@ import { useRouter } from "next/navigation";
 import { useConfirm } from "@/app/hooks/useConfirm";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import {
+  findDuplicateLabel,
+  findEmptyOptionsField,
+  normalizeFieldsForSave,
+} from "./formFieldUtils";
 
 interface Field {
   id: string;
@@ -54,6 +60,7 @@ const FormBuilder = () => {
   const [editOptions, setEditOptions] = useState<string[]>([]);
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const { limits } = useSubscriptionLimits();
+  const csrfFetch = useCSRFFetch();
   const [editHeadingLevel, setEditHeadingLevel] = useState<
     "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
   >("h2");
@@ -75,11 +82,30 @@ const FormBuilder = () => {
     "Thank you! Your form has been submitted successfully.",
   );
   const [recaptchaEnabled, setRecaptchaEnabled] = useState<boolean>(false);
+  // Comma-separated list of domains allowed to submit to this form — empty
+  // means unrestricted (the only behavior that existed before this field).
+  const [allowedOriginsInput, setAllowedOriginsInput] = useState<string>("");
 
   // AI Generation State
   const [aiDialogOpen, setAiDialogOpen] = useState<boolean>(false);
   const [aiPrompt, setAiPrompt] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+  // Warn on tab close/refresh if there's an in-progress, unsaved form. This
+  // doesn't cover navigating away via an in-app sidebar link (Next.js App
+  // Router has no built-in navigation-intercept hook), only the browser-level
+  // exit paths, which are the ones with no other recovery option.
+  useEffect(() => {
+    const hasUnsavedWork = fields.length > 0 || formName.trim().length > 0;
+    if (!hasUnsavedWork) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [fields.length, formName]);
 
   // Add a new field with a custom label
   const addField = (type: string, defaultLabel: string) => {
@@ -93,7 +119,7 @@ const FormBuilder = () => {
     }
 
     const newField: Field = {
-      id: Math.random().toString(),
+      id: crypto.randomUUID(),
       type,
       label: newFieldLabel, // Use the custom label provided by the user
       required: false,
@@ -109,23 +135,23 @@ const FormBuilder = () => {
 
   // Add lead contact fields
   const addLeadContactFields = () => {
-    const cityFieldId = Math.random().toString();
-    const stateFieldId = Math.random().toString();
+    const cityFieldId = crypto.randomUUID();
+    const stateFieldId = crypto.randomUUID();
     const contactFields: Field[] = [
       {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(),
         type: "text",
         label: "Name",
         required: false,
       },
       {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(),
         type: "email",
         label: "Email",
         required: false,
       },
       {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(),
         type: "phone",
         label: "Phone",
         required: false,
@@ -146,7 +172,7 @@ const FormBuilder = () => {
         linkedTo: cityFieldId, // This state field is linked to the city field
       },
       {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(),
         type: "text",
         label: "Postcode",
         required: false,
@@ -199,7 +225,7 @@ const FormBuilder = () => {
 
     setIsGenerating(true);
     try {
-      const response = await fetch("/api/form/generate-with-ai", {
+      const response = await csrfFetch("/api/form/generate-with-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: aiPrompt }),
@@ -223,15 +249,21 @@ const FormBuilder = () => {
         setLeadSource(description || "");
 
         // Convert generated fields to our Field format
-        const aiFields: Field[] = (generatedFields || []).map(
-          (field: any, index: number) => ({
-            id: Math.random().toString(),
-            type: field.type || "text",
-            label: field.label || field.name || `Field ${index + 1}`,
-            required: field.required || false,
-            options: field.options || undefined,
-          }),
-        );
+        const aiFields: Field[] = (
+          generatedFields as Array<{
+            type?: string;
+            label?: string;
+            name?: string;
+            required?: boolean;
+            options?: string[];
+          }>
+        ).map((field, index) => ({
+          id: crypto.randomUUID(),
+          type: field.type || "text",
+          label: field.label || field.name || `Field ${index + 1}`,
+          required: field.required || false,
+          options: field.options || undefined,
+        }));
 
         setFields(aiFields);
         setAiPrompt("");
@@ -260,8 +292,22 @@ const FormBuilder = () => {
     }
   };
 
-  // Publish the form
-  const handlePublish = async () => {
+  // Publish (or save as draft) the form
+  const handlePublish = async (status: "draft" | "published") => {
+    // Matches the edit screen's validation — previously a form could be
+    // published with no name at all (showing up as a blank row in the
+    // forms list) but the same form could never be re-saved from Edit
+    // without filling these in, since that screen already required them.
+    if (!formName.trim() || !leadSource.trim() || !industry.trim()) {
+      setSnackbar({
+        open: true,
+        message:
+          "Please fill in all required fields (Form Name, Lead Source, Industry).",
+        severity: "error",
+      });
+      return;
+    }
+
     if (fields.length === 0) {
       setSnackbar({
         open: true,
@@ -270,33 +316,52 @@ const FormBuilder = () => {
       });
       return;
     }
+
+    // Submissions are keyed by label, so two fields sharing a label would
+    // silently overwrite each other's captured value.
+    const duplicateLabel = findDuplicateLabel(fields);
+    if (duplicateLabel) {
+      setSnackbar({
+        open: true,
+        message: `Two fields are both labeled "${duplicateLabel}" — each field needs a unique label so submissions aren't lost.`,
+        severity: "error",
+      });
+      return;
+    }
+
+    const emptyOptionsField = findEmptyOptionsField(fields);
+    if (emptyOptionsField) {
+      setSnackbar({
+        open: true,
+        message: `"${emptyOptionsField.label}" needs at least one option before you can publish.`,
+        severity: "error",
+      });
+      return;
+    }
+
     setIsPublishing(true);
     try {
       // Map field types to match backend validation
-      const mappedFields = fields.map((field) => ({
-        ...field,
-        type:
-          field.type === "dropdown"
-            ? "select"
-            : field.type === "tel"
-              ? "phone"
-              : field.type,
-      }));
+      const mappedFields = normalizeFieldsForSave(fields);
 
-      const response = await fetch("/api/form", {
+      const response = await csrfFetch("/api/form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formName,
-          description: leadSource
-            ? `Lead Source: ${leadSource} | Industry: ${industry}`
-            : undefined,
+          leadSource,
+          industry,
           fields: mappedFields,
           recaptchaEnabled,
           styleConfig: {
             buttonText,
             successMessage,
           },
+          status,
+          allowedOrigins: allowedOriginsInput
+            .split(",")
+            .map((origin) => origin.trim())
+            .filter(Boolean),
         }),
       });
       const result = await response.json();
@@ -319,6 +384,7 @@ const FormBuilder = () => {
           "Thank you! Your form has been submitted successfully.",
         );
         setRecaptchaEnabled(false);
+        setAllowedOriginsInput("");
 
         // Redirect to forms page
         router.push("/dashboard/seller/lead_management/forms");
@@ -525,9 +591,24 @@ const FormBuilder = () => {
               label="reCAPTCHA"
               sx={{ mb: 0.5 }}
               slotProps={{
-                typography: { variant: "caption", sx: { fontSize: "0.7rem" } },
+                typography: { variant: "caption", sx: { fontSize: "0.75rem" } },
               }}
             />
+            <Tooltip
+              title="Optional — leave blank to accept submissions from anywhere. List the domain(s) where you'll embed this form (e.g. example.com) to reject submissions from anywhere else."
+              placement="right"
+              arrow
+            >
+              <TextField
+                label="Allowed Domains (optional)"
+                value={allowedOriginsInput}
+                onChange={(e) => setAllowedOriginsInput(e.target.value)}
+                fullWidth
+                size="small"
+                placeholder="example.com, www.example.com"
+                sx={{ mb: 1, "& .MuiInputBase-input": { fontSize: "0.8rem" } }}
+              />
+            </Tooltip>
 
             {limits?.aiGenerativeEnabled && (
               <Tooltip
@@ -543,7 +624,7 @@ const FormBuilder = () => {
                   startIcon={<AutoFixHighIcon sx={{ fontSize: "0.85rem" }} />}
                   sx={{
                     mt: 0.75,
-                    fontSize: "0.7rem",
+                    fontSize: "0.75rem",
                     py: 0.5,
                     backgroundColor: "#9c27b0",
                     "&:hover": { backgroundColor: "#7b1fa2" },
@@ -560,19 +641,12 @@ const FormBuilder = () => {
         <Grid size={{ xs: 12, md: 8 }}>
           <FormPreview
             fields={fields}
-            userId={"Null"}
             formId={"Null"}
             isLoggedIn={true}
             onEdit={startEditing}
             onDelete={deleteField}
             onToggleRequired={toggleRequired}
             onReorder={setFields}
-            onSubmit={function (formData: {
-              [key: string]: any;
-            }): Promise<void> {
-              throw new Error("Function not implemented.");
-            }}
-            errors={{}}
             loading={false}
             styleConfig={{
               buttonText,
@@ -712,6 +786,7 @@ const FormBuilder = () => {
                     "Thank you! Your form has been submitted successfully.",
                   );
                   setRecaptchaEnabled(false);
+                  setAllowedOriginsInput("");
                   setSnackbar({
                     open: true,
                     message: "Form cleared successfully",
@@ -722,15 +797,30 @@ const FormBuilder = () => {
             >
               Clear Form
             </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              disabled={isPublishing}
-              onClick={handlePublish}
-            >
-              {isPublishing ? "Publishing..." : "Publish Form"}
-            </Button>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Tooltip title="Save privately — won't accept submissions until you publish it">
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    size="small"
+                    disabled={isPublishing}
+                    onClick={() => handlePublish("draft")}
+                  >
+                    {isPublishing ? "Saving..." : "Save as Draft"}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Button
+                variant="contained"
+                color="primary"
+                size="small"
+                disabled={isPublishing}
+                onClick={() => handlePublish("published")}
+              >
+                {isPublishing ? "Publishing..." : "Publish Form"}
+              </Button>
+            </Box>
           </Box>
         </Grid>
 
@@ -767,7 +857,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("header", "Section Header")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Header
               </Button>
@@ -783,7 +873,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("paragraph", "Paragraph text")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Paragraph
               </Button>
@@ -799,7 +889,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={addLeadContactFields}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Contact Fields
               </Button>
@@ -815,7 +905,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("text", "Text Input")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Text
               </Button>
@@ -831,7 +921,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("textarea", "Long Text / Textarea")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Textarea
               </Button>
@@ -847,7 +937,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("select", "Dropdown")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Dropdown
               </Button>
@@ -863,7 +953,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("checkbox", "Checkbox")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Checkbox
               </Button>
@@ -879,7 +969,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("radio", "Radio Button")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Radio
               </Button>
@@ -895,7 +985,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("number", "Number Input")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Number
               </Button>
@@ -911,7 +1001,7 @@ const FormBuilder = () => {
                 fullWidth
                 size="small"
                 onClick={() => addField("date", "Date Picker")}
-                sx={{ mb: 0.4, fontSize: "0.65rem", py: 0.35, minHeight: 30 }}
+                sx={{ mb: 0.5, fontSize: "0.75rem", py: 0.5, minHeight: 36 }}
               >
                 Date
               </Button>

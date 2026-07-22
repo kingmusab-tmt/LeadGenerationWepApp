@@ -25,6 +25,9 @@ import {
 import { ZodError } from "zod";
 import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 import { NextRequest } from "next/server";
+import { recordAuditLog } from "@/lib/auditLog";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
+import { ZapierTriggerHelper } from "@/lib/integrations/zapierTriggerHelper";
 
 // GET /api/leads - Fetch all leads with pagination
 export async function GET(req: NextRequest) {
@@ -32,6 +35,9 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return unauthorized();
+    }
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Only sellers can access lead management.");
     }
 
     // Validate query parameters
@@ -93,6 +99,17 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return unauthorized();
     }
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Only sellers can access lead management.");
+    }
+
+    const rateLimited = checkSimpleRateLimit(req, {
+      scope: "leads-create",
+      limit: 30,
+      windowMs: 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     // Validate request body
     let validatedData;
@@ -132,17 +149,23 @@ export async function POST(req: NextRequest) {
     // PHASE 2: Invalidate user cache after creating lead
     await invalidateAllUserSessions(session.user.id);
 
+    await recordAuditLog({
+      actor: session.user,
+      action: "lead.create",
+      targetType: "Lead",
+      targetId: String(newLead._id),
+      summary: `Created lead "${newLead.name || newLead._id}"`,
+      req,
+    });
+
+    ZapierTriggerHelper.triggerLeadCreated(newLead, session.user.id).catch(
+      (err) =>
+        console.error("Failed to dispatch Zapier leadCreated trigger:", err),
+    );
+
     return successResponse({ lead: newLead }, 201);
   } catch (error: unknown) {
     console.error("[POST /api/leads]", error);
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: number }).code === 11000
-    ) {
-      return badRequest("Lead with this email already exists");
-    }
     return internalError("Failed to create lead");
   }
 }
@@ -154,6 +177,17 @@ export async function PUT(req: NextRequest) {
     if (!session) {
       return unauthorized();
     }
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Only sellers can access lead management.");
+    }
+
+    const rateLimited = checkSimpleRateLimit(req, {
+      scope: "leads-update",
+      limit: 60,
+      windowMs: 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     const { searchParams } = new URL(req.url);
     const leadId = searchParams.get("id");
@@ -200,7 +234,7 @@ export async function PUT(req: NextRequest) {
       session.user.role !== "admin" &&
       lead.userId.toString() !== session.user.id
     ) {
-      return unauthorized("You cannot modify this lead");
+      return forbidden("You cannot modify this lead");
     }
 
     const updatedLead = await Lead.findByIdAndUpdate(
@@ -212,6 +246,25 @@ export async function PUT(req: NextRequest) {
     // PHASE 2: Invalidate caches after updating lead
     await invalidateLeadCache(leadId);
     await invalidateAllUserSessions(session.user.id);
+
+    await recordAuditLog({
+      actor: session.user,
+      action: "lead.update",
+      targetType: "Lead",
+      targetId: leadId,
+      summary: `Updated lead "${updatedLead?.name || leadId}"`,
+      req,
+    });
+
+    if (updatedLead) {
+      ZapierTriggerHelper.triggerLeadUpdated(
+        updatedLead,
+        session.user.id,
+        Object.keys(validatedData),
+      ).catch((err) =>
+        console.error("Failed to dispatch Zapier leadUpdated trigger:", err),
+      );
+    }
 
     return successResponse({ lead: updatedLead }, 200);
   } catch (error: unknown) {
@@ -227,6 +280,17 @@ export async function DELETE(req: NextRequest) {
     if (!session) {
       return unauthorized();
     }
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Only sellers can access lead management.");
+    }
+
+    const rateLimited = checkSimpleRateLimit(req, {
+      scope: "leads-delete",
+      limit: 30,
+      windowMs: 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     const { searchParams } = new URL(req.url);
     const leadId = searchParams.get("id");
@@ -257,7 +321,7 @@ export async function DELETE(req: NextRequest) {
       session.user.role !== "admin" &&
       lead.userId.toString() !== session.user.id
     ) {
-      return unauthorized("You cannot delete this lead");
+      return forbidden("You cannot delete this lead");
     }
 
     await Lead.findByIdAndDelete(leadId);
@@ -265,6 +329,15 @@ export async function DELETE(req: NextRequest) {
     // PHASE 2: Invalidate caches after deleting lead
     await invalidateLeadCache(leadId);
     await invalidateAllUserSessions(session.user.id);
+
+    await recordAuditLog({
+      actor: session.user,
+      action: "lead.delete",
+      targetType: "Lead",
+      targetId: leadId,
+      summary: `Deleted lead "${lead.name || leadId}"`,
+      req,
+    });
 
     return successResponse({ message: "Lead deleted successfully" }, 200);
   } catch (error) {

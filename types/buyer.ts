@@ -144,4 +144,7 @@ export interface Buyer {
   isIndependentBuyer?: boolean;
   assignedLeads?: string[];
   purchasedLeads?: string[];
+
+  createdAt?: string;
+  updatedAt?: string;
 }

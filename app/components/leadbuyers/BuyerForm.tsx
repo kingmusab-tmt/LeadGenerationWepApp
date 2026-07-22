@@ -23,6 +23,7 @@ import { IBuyer } from "@/models/leadbuyers";
 import { industryNiches } from "@/utils/industryNiches";
 import GooglePlacesAutocomplete from "../GooglePlacesAutocomplete";
 import GoogleTimezoneAutocomplete from "../GoogleTimezoneAutocomplete";
+import { validateBuyerCoreFields } from "./buyerFormValidation";
 
 interface BuyerFormProps {
   open: boolean;
@@ -98,11 +99,7 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
   }, [initialValues]);
 
   const validate = () => {
-    const newErrors: { [key: string]: string } = {};
-    if (!formData.name) newErrors.name = "Full Name is required";
-    if (!formData.company) newErrors.company = "Company is required";
-    if (!formData.email) newErrors.email = "Email is required";
-    if (!formData.phone) newErrors.phone = "Phone Number is required";
+    const newErrors = validateBuyerCoreFields(formData);
     if (
       !formData.leadPreferences?.location ||
       formData.leadPreferences.location.length === 0
@@ -110,14 +107,10 @@ const BuyerForm: React.FC<BuyerFormProps> = ({
       newErrors.location = "At least one location is required";
     if (!formData.leadPreferences?.industries?.length)
       newErrors.industry = "Industry is required";
-    if (!formData.timezone) newErrors.timezone = "Timezone is required";
     if (!formData.workingHours?.start)
       newErrors.workingHoursStart = "Start time is required";
     if (!formData.workingHours?.end)
       newErrors.workingHoursEnd = "End time is required";
-    if (formData.maxLeadsPerDay === undefined || formData.maxLeadsPerDay < 0) {
-      newErrors.maxLeadsPerDay = "Must be a positive number";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

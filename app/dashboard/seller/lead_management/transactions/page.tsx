@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import {
   Box,
@@ -20,6 +20,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Typography,
   useTheme,
 } from "@mui/material";
@@ -33,13 +34,15 @@ import {
   Paid,
 } from "@mui/icons-material";
 import { useMediaQuery } from "@mui/material";
+import { useRouter } from "next/navigation";
 import { ITransaction } from "@/models/transactions";
 import TransactionDetailsModal from "./transactiondetails";
 import TransactionFilters from "./transactionfilter";
-import { formatCurrency, formatDate } from "@/utils/formater";
+import { formatDate, formatTransactionValue } from "@/utils/formater";
 
 const TransactionHistory = () => {
   const theme = useTheme();
+  const router = useRouter();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const [transactions, setTransactions] = useState<ITransaction[]>([]);
@@ -52,7 +55,13 @@ const TransactionHistory = () => {
     useState<ITransaction | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    type: string;
+    status: string;
+    dateRange: string;
+    startDate?: string;
+    endDate?: string;
+  }>({
     type: "all",
     status: "all",
     dateRange: "all",
@@ -61,55 +70,106 @@ const TransactionHistory = () => {
     key: keyof ITransaction;
     direction: "asc" | "desc";
   }>({ key: "createdAt", direction: "desc" });
+  const [page, setPage] = useState(0); // 0-based, matches TablePagination
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [total, setTotal] = useState(0);
 
-  // Fetch transactions
-  useEffect(() => {
-    const fetchTransactions = async () => {
+  // Paginated + filtered server-side (see GET /api/payments/transactions) —
+  // previously fetched every transaction for this seller unbounded and
+  // filtered type/status entirely client-side. Date range and column sort
+  // still apply client-side, scoped to whichever page is currently loaded —
+  // the same tradeoff any paginated table makes.
+  const fetchTransactions = useCallback(
+    async (signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const response = await axios.get("/api/payments/transactions");
-        setTransactions(response.data.data);
-        setFilteredTransactions(response.data.data);
+        const params = new URLSearchParams({
+          page: String(page + 1),
+          limit: String(rowsPerPage),
+        });
+        if (filters.type !== "all") params.set("type", filters.type);
+        if (filters.status !== "all") params.set("status", filters.status);
+
+        const response = await axios.get(
+          `/api/payments/transactions?${params.toString()}`,
+          { signal },
+        );
+        const data = response.data?.data;
+        setTransactions(
+          Array.isArray(data?.transactions) ? data.transactions : [],
+        );
+        setTotal(data?.pagination?.total ?? 0);
+        setError(null);
       } catch (err) {
-        setError("Failed to fetch transactions");
+        if (axios.isCancel(err)) return;
         console.error("Error fetching transactions:", err);
+        if (axios.isAxiosError(err)) {
+          if (err.response?.status === 401) {
+            router.push("/auth/sign-in");
+            return;
+          }
+          setError(
+            err.response?.data?.error ||
+              "Failed to fetch transactions. Please try again.",
+          );
+        } else {
+          setError("Failed to fetch transactions. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
-    };
+    },
+    [page, rowsPerPage, filters.type, filters.status, router],
+  );
 
-    fetchTransactions();
-  }, []);
+  // A rapid filter/page change can let an older, slower response resolve
+  // after a newer one and overwrite the table with stale data — aborting
+  // the previous in-flight request whenever the dependencies change (or
+  // this effect unmounts) prevents that race.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchTransactions(controller.signal);
+    return () => controller.abort();
+  }, [fetchTransactions]);
 
-  // Apply filters and sorting
+  // Changing any filter re-queries or re-scopes the result set, so a stale
+  // later page (from a now much-shorter result set) would otherwise show an
+  // empty table with pagination still claiming more pages exist.
+  useEffect(() => {
+    setPage(0);
+  }, [filters.type, filters.status, filters.dateRange, filters.startDate, filters.endDate]);
+
+  // Apply date-range filter and sorting to the currently loaded page
   useEffect(() => {
     let result = [...transactions];
 
-    // Apply type filter
-    if (filters.type !== "all") {
-      result = result.filter((t) => t.type === filters.type);
-    }
-
-    // Apply status filter
-    if (filters.status !== "all") {
-      result = result.filter((t) => t.status === filters.status);
-    }
-
-    // Apply date range filter
     if (filters.dateRange !== "all") {
-      const now = new Date();
-      const cutoffDate = new Date();
+      if (filters.dateRange === "custom") {
+        const start = filters.startDate ? new Date(filters.startDate) : null;
+        // Include the entire end day, not just midnight at its start.
+        const end = filters.endDate ? new Date(filters.endDate) : null;
+        if (end) end.setHours(23, 59, 59, 999);
 
-      if (filters.dateRange === "week") {
-        cutoffDate.setDate(now.getDate() - 7);
-      } else if (filters.dateRange === "month") {
-        cutoffDate.setMonth(now.getMonth() - 1);
+        result = result.filter((t) => {
+          const created = new Date(t.createdAt);
+          if (start && created < start) return false;
+          if (end && created > end) return false;
+          return true;
+        });
+      } else {
+        const now = new Date();
+        const cutoffDate = new Date();
+
+        if (filters.dateRange === "week") {
+          cutoffDate.setDate(now.getDate() - 7);
+        } else if (filters.dateRange === "month") {
+          cutoffDate.setMonth(now.getMonth() - 1);
+        }
+
+        result = result.filter((t) => new Date(t.createdAt) >= cutoffDate);
       }
-
-      result = result.filter((t) => new Date(t.createdAt) >= cutoffDate);
     }
 
-    // Apply sorting
     result.sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) {
         return sortConfig.direction === "asc" ? -1 : 1;
@@ -121,7 +181,18 @@ const TransactionHistory = () => {
     });
 
     setFilteredTransactions(result);
-  }, [transactions, filters, sortConfig]);
+  }, [transactions, filters.dateRange, filters.startDate, filters.endDate, sortConfig]);
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const handleSort = (key: keyof ITransaction) => {
     setSortConfig((prev) => ({
@@ -131,17 +202,7 @@ const TransactionHistory = () => {
   };
 
   const handleRefresh = () => {
-    setLoading(true);
-    axios
-      .get("/api/payments/transactions")
-      .then((response) => {
-        setTransactions(response.data.data);
-        setFilteredTransactions(response.data.data);
-      })
-      .catch(() => {
-        setError("Failed to refresh transactions");
-      })
-      .finally(() => setLoading(false));
+    fetchTransactions();
   };
 
   const handleMenuClick = (
@@ -269,17 +330,31 @@ const TransactionHistory = () => {
 
     // Amount Section
     drawSectionHeader("Amount");
-    const currencySymbol =
-      selectedTransaction.currency === "usd"
-        ? "$"
-        : selectedTransaction.currency?.toUpperCase() || "";
     drawRow(
       "Amount:",
-      `${currencySymbol}${selectedTransaction.amount.toFixed(2)}`,
+      formatTransactionValue(
+        selectedTransaction.amount,
+        selectedTransaction.type,
+        selectedTransaction.currency,
+      ),
       true,
     );
-    drawRow("Previous Balance:", `${selectedTransaction.previousBalance}`);
-    drawRow("Current Balance:", `${selectedTransaction.currentBalance}`);
+    drawRow(
+      "Previous Balance:",
+      formatTransactionValue(
+        selectedTransaction.previousBalance,
+        selectedTransaction.type,
+        selectedTransaction.currency,
+      ),
+    );
+    drawRow(
+      "Current Balance:",
+      formatTransactionValue(
+        selectedTransaction.currentBalance,
+        selectedTransaction.type,
+        selectedTransaction.currency,
+      ),
+    );
 
     // Metadata Section based on transaction type
     drawSectionHeader("Additional Information");
@@ -398,22 +473,29 @@ const TransactionHistory = () => {
     handleMenuClose();
   };
 
+  // "deposit"/"withdrawal" are not real ITransaction.type values — every row
+  // fell through to the generic default icon regardless of direction. These
+  // are this seller's actual transaction types, grouped by whether money
+  // moved into or out of their account.
+  const CREDIT_TRANSACTION_TYPES = new Set(["seller_income", "refund"]);
+  const DEBIT_TRANSACTION_TYPES = new Set([
+    "seller_payout",
+    "subscription_payment",
+    "subscription_renewal",
+    "lead_purchase",
+    "units_purchase",
+    "call_purchase",
+  ]);
+
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "deposit":
-        return (
-          <ArrowDownward
-            color="success"
-            fontSize={isMobile ? "small" : "medium"}
-          />
-        );
-      case "withdrawal":
-        return (
-          <ArrowUpward color="error" fontSize={isMobile ? "small" : "medium"} />
-        );
-      default:
-        return <Paid color="info" fontSize={isMobile ? "small" : "medium"} />;
+    const size = isMobile ? "small" : "medium";
+    if (CREDIT_TRANSACTION_TYPES.has(type)) {
+      return <ArrowUpward color="success" fontSize={size} />;
     }
+    if (DEBIT_TRANSACTION_TYPES.has(type)) {
+      return <ArrowDownward color="error" fontSize={size} />;
+    }
+    return <Paid color="info" fontSize={size} />;
   };
 
   const getStatusColor = (status: string) => {
@@ -433,10 +515,13 @@ const TransactionHistory = () => {
     <Card variant="outlined" sx={{ mb: 2 }}>
       <CardContent>
         <Stack spacing={1}>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="subtitle1" fontWeight="bold">
-              {transaction.type}
-            </Typography>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Box display="flex" alignItems="center" gap={1}>
+              {getTypeIcon(transaction.type)}
+              <Typography variant="subtitle1" fontWeight="bold">
+                {transaction.type.replace(/_/g, " ")}
+              </Typography>
+            </Box>
             <Chip
               label={transaction.status}
               color={getStatusColor(transaction.status)}
@@ -449,16 +534,26 @@ const TransactionHistory = () => {
           </Typography>
 
           <Typography variant="body1" fontWeight="bold">
-            {formatCurrency(transaction.amount)}
+            {formatTransactionValue(
+              transaction.amount,
+              transaction.type,
+              transaction.currency,
+            )}
           </Typography>
 
           <Box display="flex" justifyContent="space-between">
             <Typography variant="body2">
-              Balance: {formatCurrency(transaction.currentBalance)}
+              Balance:{" "}
+              {formatTransactionValue(
+                transaction.currentBalance,
+                transaction.type,
+                transaction.currency,
+              )}
             </Typography>
             <IconButton
               size="small"
               onClick={(e) => handleMenuClick(e, transaction)}
+              aria-label="Transaction actions"
             >
               <MoreVert fontSize="small" />
             </IconButton>
@@ -477,7 +572,9 @@ const TransactionHistory = () => {
           {transaction.type.replace(/_/g, " ")}
         </Box>
       </TableCell>
-      <TableCell align="right">{formatCurrency(transaction.amount)}</TableCell>
+      <TableCell align="right">
+        {formatTransactionValue(transaction.amount, transaction.type, transaction.currency)}
+      </TableCell>
       <TableCell>
         <Chip
           label={transaction.status}
@@ -489,6 +586,7 @@ const TransactionHistory = () => {
         <IconButton
           size="small"
           onClick={(e) => handleMenuClick(e, transaction)}
+          aria-label="Transaction actions"
         >
           <MoreVert fontSize="small" />
         </IconButton>
@@ -505,7 +603,9 @@ const TransactionHistory = () => {
           {transaction.type.replace(/_/g, " ")}
         </Box>
       </TableCell>
-      <TableCell align="right">{formatCurrency(transaction.amount)}</TableCell>
+      <TableCell align="right">
+        {formatTransactionValue(transaction.amount, transaction.type, transaction.currency)}
+      </TableCell>
       <TableCell>
         <Chip
           label={transaction.status}
@@ -514,12 +614,13 @@ const TransactionHistory = () => {
         />
       </TableCell>
       <TableCell align="right">
-        {formatCurrency(transaction.currentBalance)}
+        {formatTransactionValue(transaction.currentBalance, transaction.type, transaction.currency)}
       </TableCell>
       <TableCell>
         <IconButton
           size="small"
           onClick={(e) => handleMenuClick(e, transaction)}
+          aria-label="Transaction actions"
         >
           <MoreVert fontSize="small" />
         </IconButton>
@@ -649,6 +750,7 @@ const TransactionHistory = () => {
                         <IconButton
                           size="small"
                           onClick={() => handleSort("createdAt")}
+                          aria-label="Sort by date"
                         >
                           {sortConfig.key === "createdAt" &&
                           sortConfig.direction === "asc" ? (
@@ -674,6 +776,18 @@ const TransactionHistory = () => {
               </Table>
             </TableContainer>
           </Paper>
+        )}
+
+        {total > 0 && (
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+          />
         )}
 
         <Menu

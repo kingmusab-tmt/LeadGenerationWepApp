@@ -197,7 +197,7 @@ const BuyerSchema: Schema = new Schema({
   isActive: { type: Boolean, required: true, default: true },
   currentLeads: { type: Number, required: true, default: 0 },
   walletUnit: { type: Number, required: true, default: 0 },
-  email: { type: String, required: true, unique: true }, // From Google
+  email: { type: String, required: true }, // From Google — uniqueness is scoped per seller, see the compound index below
   phone: { type: String, default: "" }, // Optional, not from Google auth
   walletBalance: { type: Number, required: true, default: 0 },
   maxLeadsPerDay: { type: Number, required: true, default: 10 },
@@ -483,6 +483,11 @@ const BuyerSchema: Schema = new Schema({
 });
 
 BuyerSchema.index({ registeredWith: 1 }); // Index on registeredWith field
+// Email uniqueness is scoped per seller relationship, not global — the same
+// real-world contact can legitimately be a buyer of several unrelated
+// sellers. This also correctly keeps independent (registeredWith: null)
+// buyer accounts unique among themselves, matching login-account semantics.
+BuyerSchema.index({ email: 1, registeredWith: 1 }, { unique: true });
 BuyerSchema.index({ assignedLeads: 1 }); // PHASE 1: Index on assignedLeads for fast queries
 BuyerSchema.index({ purchasedLeads: 1 }); // PHASE 1: Index on purchasedLeads for fast queries
 BuyerSchema.index({ processedCreditSessionIds: 1 });

@@ -68,8 +68,10 @@ const initialOverviewData = {
   conversionRate: 0,
   leadStatus: {
     new: 0,
-    verified: 0,
-    closed: 0,
+    available: 0,
+    sold: 0,
+    assigned: 0,
+    qualified: 0,
   },
   totalPayments: 0,
   campaignPerformance: {
@@ -77,7 +79,9 @@ const initialOverviewData = {
     roi: 0,
   },
   totalLeadBuyers: 0,
+  activeLeadBuyers: 0,
   newLeadBuyers: 0,
+  inactiveLeadBuyers: 0,
   totalLeadBuyerCredits: 0,
   totalLeadBuyerUsedCredits: 0,
   totalLeadBuyerRemainingCredits: 0,
@@ -296,6 +300,37 @@ const Overview: React.FC = () => {
       })) || [],
     [overviewData.leadStatusDistribution],
   );
+
+  const buyerStatusData = useMemo(
+    () => [
+      { name: "Active", value: overviewData.activeLeadBuyers || 0 },
+      { name: "New", value: overviewData.newLeadBuyers || 0 },
+      { name: "Inactive", value: overviewData.inactiveLeadBuyers || 0 },
+    ],
+    [
+      overviewData.activeLeadBuyers,
+      overviewData.newLeadBuyers,
+      overviewData.inactiveLeadBuyers,
+    ],
+  );
+  const hasBuyerStatusData = buyerStatusData.some((entry) => entry.value > 0);
+
+  // Moved from the four stat cards on the Lead Management page.
+  const leadPipelineData = useMemo(
+    () => [
+      { name: "New", value: overviewData.leadStatus?.new || 0 },
+      { name: "Qualified", value: overviewData.leadStatus?.qualified || 0 },
+      { name: "Assigned", value: overviewData.leadStatus?.assigned || 0 },
+      { name: "Sold", value: overviewData.leadStatus?.sold || 0 },
+    ],
+    [
+      overviewData.leadStatus?.new,
+      overviewData.leadStatus?.qualified,
+      overviewData.leadStatus?.assigned,
+      overviewData.leadStatus?.sold,
+    ],
+  );
+  const hasLeadPipelineData = leadPipelineData.some((entry) => entry.value > 0);
 
   const leadSourcesData = overviewData.leadSources || [];
   const salesPerformanceData = overviewData.salesPerformance?.[timeframe] || [];
@@ -547,6 +582,84 @@ const Overview: React.FC = () => {
                       `${props.payload.source}: ${value} leads (${props.payload.conversionRate}% conversion)`,
                     ]}
                   />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartPanel>
+          </Grid>
+        )}
+
+        {hasBuyerStatusData && (
+          <Grid size={{ xs: 12, md: 4 }}>
+            <ChartPanel>
+              <Typography
+                variant="h6"
+                gutterBottom
+                sx={{ display: "flex", alignItems: "center" }}
+              >
+                <People sx={{ mr: 1 }} /> Lead Buyer Status
+              </Typography>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={buyerStatusData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={isMobile ? 60 : 80}
+                    fill="#8884d8"
+                    label={({ name, percent }) =>
+                      `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                    }
+                  >
+                    {buyerStatusData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartPanel>
+          </Grid>
+        )}
+
+        {hasLeadPipelineData && (
+          <Grid size={{ xs: 12, md: 4 }}>
+            <ChartPanel>
+              <Typography
+                variant="h6"
+                gutterBottom
+                sx={{ display: "flex", alignItems: "center" }}
+              >
+                <Assessment sx={{ mr: 1 }} /> Lead Pipeline
+              </Typography>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={leadPipelineData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={isMobile ? 60 : 80}
+                    fill="#8884d8"
+                    label={({ name, percent }) =>
+                      `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                    }
+                  >
+                    {leadPipelineData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             </ChartPanel>

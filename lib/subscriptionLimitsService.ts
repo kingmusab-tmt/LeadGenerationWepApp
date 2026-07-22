@@ -316,8 +316,12 @@ export async function checkAndIncrementUsage(
     // Soft limits allow exceeding but notify
     allowed = true;
   } else {
-    // Hard limits block when reached
-    allowed = currentUsage < limit;
+    // Hard limits block if this request would push usage past the limit.
+    // Checking currentUsage alone (rather than newUsage) let a single
+    // bulk request (e.g. importing thousands of buyers in one CSV) blow
+    // straight through the cap as long as the account wasn't already
+    // sitting exactly at/over it before the request.
+    allowed = newUsage <= limit;
   }
 
   // If not allowed (hard limit reached), return without incrementing

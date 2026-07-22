@@ -13,6 +13,7 @@ import {
   Box,
   InputLabel,
   FormControl,
+  FormHelperText,
   SelectChangeEvent,
   Snackbar,
   Alert,
@@ -33,6 +34,7 @@ import { IBuyer } from "@/models/leadbuyers";
 import { industryNiches } from "@/utils/industryNiches";
 import GooglePlacesAutocomplete from "../GooglePlacesAutocomplete";
 import GoogleTimezoneAutocomplete from "../GoogleTimezoneAutocomplete";
+import { validateBuyerCoreFields } from "./buyerFormValidation";
 
 interface BuyerFormProps {
   open: boolean;
@@ -42,14 +44,11 @@ interface BuyerFormProps {
   sellerId: string;
 }
 
-const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
-  open,
-  onClose,
-  onSave,
-  initialValues,
-  sellerId,
-}) => {
-  const [formData, setFormData] = useState<Partial<IBuyer>>({
+// Extracted so it can be reused both as the initial state and as the
+// reset target when the form switches from editing a buyer back to "Add
+// New" — previously there was no reset path for that transition at all.
+function getDefaultFormData(): Partial<IBuyer> {
+  return {
     name: "",
     company: "",
     email: "",
@@ -84,7 +83,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
     maxConcurrentLeads: 10,
     autoAcceptMatchingLeads: false,
     locationMatchingStrict: false,
-    radiusFlexibility: "strict",
     preferenceMatchingThreshold: "moderate",
     preferredZones: [],
     serviceLocations: [],
@@ -98,12 +96,23 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
       Sunday: { enabled: false, start: "09:00", end: "17:00" },
     },
     maxLeadAge: 24,
-    serviceRadius: 25,
     preferredContactMethods: ["phone", "email"],
     priorityBySource: [],
     priorityByIndustry: [],
     priorityByLocation: [],
-  });
+  };
+}
+
+const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
+  open,
+  onClose,
+  onSave,
+  initialValues,
+  sellerId,
+}) => {
+  const [formData, setFormData] = useState<Partial<IBuyer>>(
+    getDefaultFormData(),
+  );
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,11 +146,15 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
           end: "17:00",
         },
         timezone: initialValues.timezone || "America/New_York",
-        maxLeadsPerDay: initialValues.maxLeadsPerDay || 5,
-        qualificationScoreMinimum: initialValues.qualificationScoreMinimum || 0,
-        maxPricePerLead: initialValues.maxPricePerLead || 0,
+        // These five use ?? rather than || — a legitimate stored value of 0
+        // (e.g. a paused buyer with maxLeadsPerDay: 0) was previously being
+        // silently overwritten with the non-zero default every time the
+        // edit form reopened.
+        maxLeadsPerDay: initialValues.maxLeadsPerDay ?? 5,
+        qualificationScoreMinimum: initialValues.qualificationScoreMinimum ?? 0,
+        maxPricePerLead: initialValues.maxPricePerLead ?? 0,
         leadTypes: initialValues.leadTypes || ["shared"],
-        priority: initialValues.priority || 5,
+        priority: initialValues.priority ?? 5,
         acceptOnlyDuringBusinessHours:
           initialValues.acceptOnlyDuringBusinessHours || false,
         notifyOnWeekends:
@@ -153,12 +166,11 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
           autoReject: true,
         },
         budgetCapType: initialValues.budgetCapType || "daily",
-        budgetLimitAmount: initialValues.budgetLimitAmount || 0,
-        volumeLimitCount: initialValues.volumeLimitCount || 0,
-        maxConcurrentLeads: initialValues.maxConcurrentLeads || 10,
+        budgetLimitAmount: initialValues.budgetLimitAmount ?? 0,
+        volumeLimitCount: initialValues.volumeLimitCount ?? 0,
+        maxConcurrentLeads: initialValues.maxConcurrentLeads ?? 10,
         autoAcceptMatchingLeads: initialValues.autoAcceptMatchingLeads || false,
         locationMatchingStrict: initialValues.locationMatchingStrict || false,
-        radiusFlexibility: initialValues.radiusFlexibility || "strict",
         preferenceMatchingThreshold:
           initialValues.preferenceMatchingThreshold || "moderate",
         preferredZones: initialValues.preferredZones || [],
@@ -172,8 +184,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
           Saturday: { enabled: false, start: "09:00", end: "17:00" },
           Sunday: { enabled: false, start: "09:00", end: "17:00" },
         },
-        maxLeadAge: initialValues.maxLeadAge || 24,
-        serviceRadius: initialValues.serviceRadius || 25,
+        maxLeadAge: initialValues.maxLeadAge ?? 24,
         preferredContactMethods: initialValues.preferredContactMethods || [
           "phone",
           "email",
@@ -182,19 +193,50 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
         priorityByIndustry: initialValues.priorityByIndustry || [],
         priorityByLocation: initialValues.priorityByLocation || [],
       });
+    } else {
+      // Switching from "Edit Buyer" to "Add New" (or the dialog opening
+      // fresh) — previously there was no reset here at all, so the form
+      // could show the last-edited buyer's data under an "Add New" title.
+      setFormData(getDefaultFormData());
     }
+    setErrors({});
   }, [initialValues]);
 
   const validate = () => {
-    const newErrors: { [key: string]: string } = {};
-    if (!formData.name) newErrors.name = "Full Name is required";
-    if (!formData.company) newErrors.company = "Company is required";
-    if (!formData.email) newErrors.email = "Email is required";
-    if (!formData.phone) newErrors.phone = "Phone Number is required";
-    if (!formData.timezone) newErrors.timezone = "Timezone is required";
+    const newErrors = validateBuyerCoreFields(formData);
+
+    // Numeric fields previously only had cosmetic min/max on the input —
+    // native constraint validation never actually ran because submission
+    // is handled entirely by this function, so out-of-range values (or a
+    // priority of 999) reached the network layer unchecked.
+    if (
+      formData.priority !== undefined &&
+      (formData.priority < 1 || formData.priority > 10)
+    ) {
+      newErrors.priority = "Priority must be between 1 and 10";
+    }
+    if (
+      formData.qualificationScoreMinimum !== undefined &&
+      (formData.qualificationScoreMinimum < 0 ||
+        formData.qualificationScoreMinimum > 100)
+    ) {
+      newErrors.qualificationScoreMinimum = "Must be between 0 and 100";
+    }
+    if (
+      formData.maxLeadAge !== undefined &&
+      (formData.maxLeadAge < 1 || formData.maxLeadAge > 168)
+    ) {
+      newErrors.maxLeadAge = "Must be between 1 and 168 hours";
+    }
+    if (
+      formData.maxConcurrentLeads !== undefined &&
+      formData.maxConcurrentLeads < 0
+    ) {
+      newErrors.maxConcurrentLeads = "Cannot be negative";
+    }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
   const handleChange = (
@@ -279,7 +321,12 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
     }));
   };
 
-  const handleVacationModeChange = (field: string, value: any) => {
+  const handleVacationModeChange = (
+    field: keyof IBuyer["vacationMode"],
+    // pauseUntil comes in as a raw datetime-local input string; Mongoose
+    // casts it to Date on save.
+    value: boolean | Date | string | undefined,
+  ) => {
     setFormData((prev) => ({
       ...prev,
       vacationMode: {
@@ -291,8 +338,8 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
 
   const handleWeeklyScheduleChange = (
     day: string,
-    field: string,
-    value: any,
+    field: "enabled" | "start" | "end",
+    value: boolean | string,
   ) => {
     setFormData((prev) => {
       const currentSchedule = prev.weeklySchedule?.[day] || {
@@ -329,62 +376,93 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
     }));
   };
 
-  const handlePreferredZoneChange = (
-    field: "city" | "state" | "zipCodes",
-    value: string | string[],
-  ) => {
+  // preferredZones is schema'd as one entry PER CITY (each with its own
+  // city/state/zipCodes), but this used to always write a single entry
+  // whose city field was every selected city joined into one string (e.g.
+  // "New York, Los Angeles"). Since the schema types city as a plain
+  // string, any matching logic doing an equality/contains check against a
+  // real lead's city would never match that literal joined string — a
+  // buyer selecting more than one city stopped matching any lead at all.
+  //
+  // GooglePlacesAutocomplete's auto-populate callbacks return one merged
+  // zip/state set across every currently-selected city (not attributed
+  // per-city), so full per-city zip isolation isn't achievable without
+  // changing that shared component's contract (it's also used by
+  // BuyerForm.tsx and the buyer settings page). This at least keeps one
+  // real zone entry per selected city, fixing the exact-match case.
+  const handleCitiesChange = (cities: string[]) => {
+    setFormData((prev) => {
+      const sharedState = prev.preferredZones?.[0]?.state || "";
+      const sharedZipCodes = prev.preferredZones?.[0]?.zipCodes || [];
+      return {
+        ...prev,
+        preferredZones: cities.map((city) => ({
+          city,
+          state: sharedState,
+          zipCodes: sharedZipCodes,
+        })),
+      };
+    });
+  };
+
+  const handleZonesStateChange = (states: string[]) => {
+    const stateValue = states.join(", ");
     setFormData((prev) => ({
       ...prev,
-      preferredZones: [
-        {
-          city:
-            field === "city"
-              ? Array.isArray(value)
-                ? value.join(", ")
-                : value
-              : prev.preferredZones?.[0]?.city || "",
-          state:
-            field === "state"
-              ? Array.isArray(value)
-                ? value.join(", ")
-                : value
-              : prev.preferredZones?.[0]?.state || "",
-          zipCodes:
-            field === "zipCodes"
-              ? typeof value === "string"
-                ? value
-                    .split(",")
-                    .map((z) => z.trim())
-                    .filter(Boolean)
-                : value
-              : prev.preferredZones?.[0]?.zipCodes || [],
-        },
-      ],
+      preferredZones: (prev.preferredZones || []).map((zone) => ({
+        ...zone,
+        state: stateValue,
+      })),
+    }));
+  };
+
+  const handleZonesZipCodesChange = (zipCodes: string[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      preferredZones: (prev.preferredZones || []).map((zone) => ({
+        ...zone,
+        zipCodes,
+      })),
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      setIsSubmitting(true);
-      try {
-        await onSave({ ...formData, sellerId });
-        setSnackbar({
-          open: true,
-          message: "Buyer saved successfully!",
-          severity: "success",
-        });
-        onClose();
-      } catch (error) {
-        console.error("Failed to save buyer:", error);
-        setSnackbar({
-          open: true,
-          message: "Failed to save buyer. Please try again.",
-          severity: "error",
-        });
-      } finally {
-        setIsSubmitting(false);
-      }
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      // Previously a validation failure did nothing visible at all if the
+      // only invalid field lived inside a collapsed accordion (e.g.
+      // Timezone, inside "Location Preferences") — clicking Save just
+      // appeared to do nothing. This at least surfaces what's wrong.
+      setSnackbar({
+        open: true,
+        message: `Please fix: ${Object.values(validationErrors).join("; ")}`,
+        severity: "error",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSave({ ...formData, sellerId });
+      setSnackbar({
+        open: true,
+        message: "Buyer saved successfully!",
+        severity: "success",
+      });
+      onClose();
+    } catch (error) {
+      console.error("Failed to save buyer:", error);
+      setSnackbar({
+        open: true,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to save buyer. Please try again.",
+        severity: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -466,10 +544,21 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                         label="Status"
                       >
                         <MenuItem value="new">New</MenuItem>
-                        <MenuItem value="active">Active</MenuItem>
+                        <MenuItem
+                          value="active"
+                          disabled={initialValues?.status !== "active"}
+                        >
+                          Active
+                        </MenuItem>
                         <MenuItem value="inactive">Inactive</MenuItem>
                         <MenuItem value="suspended">Suspended</MenuItem>
                       </Select>
+                      {initialValues?.status !== "active" && (
+                        <FormHelperText>
+                          Activates automatically after the buyer&apos;s first
+                          purchase — it can&apos;t be set manually.
+                        </FormHelperText>
+                      )}
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
@@ -537,13 +626,12 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                       label="Preferred Cities"
                       type="city"
                       value={
-                        formData.preferredZones?.[0]?.city
-                          ?.split(", ")
-                          .filter(Boolean) || []
+                        formData.preferredZones
+                          ?.map((zone) => zone.city)
+                          .filter((city): city is string => Boolean(city)) ||
+                        []
                       }
-                      onChange={(values) =>
-                        handlePreferredZoneChange("city", values)
-                      }
+                      onChange={handleCitiesChange}
                       onSelectWithState={(extractedStates) => {
                         // Auto-populate states from selected cities
                         const currentStates =
@@ -553,7 +641,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                         const mergedStates = [
                           ...new Set([...currentStates, ...extractedStates]),
                         ];
-                        handlePreferredZoneChange("state", mergedStates);
+                        handleZonesStateChange(mergedStates);
                       }}
                       onSelectWithZipCodes={(extractedZips) => {
                         // Auto-populate zip codes from selected cities
@@ -562,10 +650,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                         const mergedZips = [
                           ...new Set([...currentZips, ...extractedZips]),
                         ];
-                        handlePreferredZoneChange(
-                          "zipCodes",
-                          mergedZips.join(", "),
-                        );
+                        handleZonesZipCodesChange(mergedZips);
                       }}
                       placeholder="Search cities..."
                       helperText="States & zip codes auto-populated from cities"
@@ -581,9 +666,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                           ?.split(", ")
                           .filter(Boolean) || []
                       }
-                      onChange={(values) =>
-                        handlePreferredZoneChange("state", values)
-                      }
+                      onChange={handleZonesStateChange}
                       placeholder="Search states..."
                       helperText="Auto-populated from cities, or add manually"
                     />
@@ -597,11 +680,16 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                         formData.preferredZones?.[0]?.zipCodes?.join(", ") || ""
                       }
                       onChange={(e) =>
-                        handlePreferredZoneChange("zipCodes", e.target.value)
+                        handleZonesZipCodesChange(
+                          e.target.value
+                            .split(",")
+                            .map((z) => z.trim())
+                            .filter(Boolean),
+                        )
                       }
                       fullWidth
                       placeholder="e.g. 88901, 89104"
-                      helperText="Auto-populated from cities, or add manually (comma separated)"
+                      helperText="Applies to every selected city — auto-populated from cities, or add manually (comma separated)"
                     />
                   </Grid>
 
@@ -625,23 +713,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                     >
                       Only accept leads that exactly match preferred locations
                     </Typography>
-                  </Grid>
-
-                  {/* LOCATION MATCHING FLEXIBILITY */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth>
-                      <InputLabel>Location Matching Flexibility</InputLabel>
-                      <Select
-                        name="radiusFlexibility"
-                        value={formData.radiusFlexibility}
-                        onChange={handleSelectChange}
-                        label="Location Matching Flexibility"
-                      >
-                        <MenuItem value="strict">Strict (Exact Match)</MenuItem>
-                        <MenuItem value="soft">Soft (Close Match)</MenuItem>
-                        <MenuItem value="flexible">Flexible (Any)</MenuItem>
-                      </Select>
-                    </FormControl>
                   </Grid>
 
                   {/* OVERALL PREFERENCE MATCHING */}
@@ -673,20 +744,6 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                         preferences
                       </Typography>
                     </FormControl>
-                  </Grid>
-
-                  {/* SERVICE RADIUS */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      label="Service Radius (Miles)"
-                      name="serviceRadius"
-                      type="number"
-                      value={formData.serviceRadius}
-                      onChange={handleNumberChange}
-                      fullWidth
-                      inputProps={{ min: 1, max: 500 }}
-                      helperText="Geographic coverage radius"
-                    />
                   </Grid>
                 </Grid>
               </AccordionDetails>
@@ -884,6 +941,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                             key={day}
                             sx={{
                               display: "flex",
+                              flexWrap: "wrap",
                               gap: 2,
                               alignItems: "center",
                               mb: 1,

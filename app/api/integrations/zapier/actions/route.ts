@@ -20,8 +20,9 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models/userModel";
 import { ZapierActionsService } from "@/lib/integrations/services/zapierActionsService";
-import crypto from "crypto";
+import { ApiKeySecurityService } from "@/lib/security/apiKeySecurityService";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 import {
   badRequest,
   internalError,
@@ -38,6 +39,11 @@ async function authenticateApiKey(
   req: NextRequest,
 ): Promise<{ success: boolean; userId?: string; error?: string }> {
   const apiKey = req.headers.get("X-API-Key") || req.headers.get("x-api-key");
+  const ipAddress =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    undefined;
+  const userAgent = req.headers.get("user-agent") || undefined;
 
   if (!apiKey) {
     return {
@@ -48,7 +54,7 @@ async function authenticateApiKey(
 
   try {
     // Hash the API key to compare with stored hash
-    const apiKeyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
+    const apiKeyHash = ApiKeySecurityService.hashApiKey(apiKey);
 
     // Find user with this API key hash
     // Note: This assumes we've added apiKeyHash field to User model
@@ -57,6 +63,17 @@ async function authenticateApiKey(
     });
 
     if (!user) {
+      // Not tied to a specific keyId since we don't know which key this
+      // was meant to be — logged under the hash itself so repeated guesses
+      // against the same invalid key are still traceable.
+      await ApiKeySecurityService.logKeyUsage(
+        apiKeyHash,
+        "unknown",
+        false,
+        ipAddress,
+        userAgent,
+        "Invalid API key",
+      );
       return {
         success: false,
         error: "Invalid API key",
@@ -69,11 +86,27 @@ async function authenticateApiKey(
       "zapierIntegration",
     );
     if (!featureCheck.allowed) {
+      await ApiKeySecurityService.logKeyUsage(
+        apiKeyHash,
+        String(user._id),
+        false,
+        ipAddress,
+        userAgent,
+        "Zapier integration not available on current plan",
+      );
       return {
         success: false,
         error: "Zapier integration is not available on your current plan",
       };
     }
+
+    await ApiKeySecurityService.logKeyUsage(
+      apiKeyHash,
+      String(user._id),
+      true,
+      ipAddress,
+      userAgent,
+    );
 
     return {
       success: true,
@@ -102,6 +135,22 @@ export async function POST(req: NextRequest) {
       return unauthorized(auth.error || "Authentication failed");
     }
 
+    // Create service
+    if (!auth.userId) {
+      return unauthorized("Authentication failed");
+    }
+
+    // Keyed by the authenticated user rather than IP — a leaked key can be
+    // used from anywhere, so this is the only throttle that actually bounds
+    // abuse of that specific key.
+    const rateLimited = checkSimpleRateLimit(req, {
+      scope: "zapier-actions",
+      limit: 60,
+      windowMs: 60 * 1000,
+      actorId: auth.userId,
+    });
+    if (rateLimited) return rateLimited;
+
     // Parse request body
     const body = await req.json();
     const { action, data } = body;
@@ -110,10 +159,6 @@ export async function POST(req: NextRequest) {
       return badRequest("Action is required");
     }
 
-    // Create service
-    if (!auth.userId) {
-      return unauthorized("Authentication failed");
-    }
     const service = new ZapierActionsService(auth.userId);
 
     // Route to appropriate action

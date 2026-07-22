@@ -12,6 +12,17 @@ export interface IForm extends Document {
   redirectUrl?: string;
   notificationEmail?: string;
   recaptchaEnabled?: boolean;
+  // Missing entirely before this field existed, every saved form was
+  // instantly live for public submission with no way to build privately
+  // first. Documents saved before this field existed have no value stored
+  // for it at all — every read path must treat that (not just "published")
+  // as publishable, so a pre-existing live form never silently goes dark.
+  status?: "draft" | "published";
+  // Domains this form will accept submissions from. Empty/absent means
+  // unrestricted (the default, and the only behavior that existed before
+  // this field) — this is opt-in hardening a seller can turn on, not a
+  // default restriction.
+  allowedOrigins?: string[];
   fields: Array<{
     id: string;
     type: string;
@@ -39,6 +50,12 @@ const FormSchema = new Schema<IForm>(
     redirectUrl: { type: String },
     notificationEmail: { type: String },
     recaptchaEnabled: { type: Boolean, default: false },
+    status: {
+      type: String,
+      enum: ["draft", "published"],
+      default: "published",
+    },
+    allowedOrigins: { type: [String], default: [] },
     fields: {
       type: [
         {

@@ -42,6 +42,7 @@ import {
   Email,
   Sms,
   Extension,
+  LocationOn,
 } from "@mui/icons-material";
 import { useRouter, usePathname } from "next/navigation";
 import { handleSignOut } from "@/lib/signOutServerAction";
@@ -110,6 +111,11 @@ const navItems: NavItem[] = [
         title: "Call Leads",
         path: "lead_management/leadbuyers",
         icon: <People />,
+      },
+      {
+        title: "Location Routing",
+        path: "lead_management/location-routing",
+        icon: <LocationOn />,
       },
     ],
   },
@@ -362,6 +368,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
 
   // Filter nav items based on subscription limits (show all while loading)
   const filteredNavItems = navItems.filter((item) => {
+    // Manual credit's API requires the exact "seller" role — there's no
+    // parent-seller association for business-admin accounts to act through,
+    // so surfacing this nav entry to them is a guaranteed dead end (empty
+    // buyer list, then a 403 on submit).
+    if (item.path === "manual-credit" && currentUser?.role !== "seller") {
+      return false;
+    }
     if (!limits) return true;
     if (
       item.path === "email-campaigns" &&

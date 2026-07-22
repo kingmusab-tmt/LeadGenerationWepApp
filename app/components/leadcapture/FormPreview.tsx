@@ -57,6 +57,8 @@ declare global {
   }
 }
 
+const DRAFT_TTL_MS = 30 * 60 * 1000;
+
 interface Field {
   id: string;
   label: string;
@@ -161,31 +163,40 @@ interface StyleConfig {
 
 interface FormPreviewProps {
   fields: Field[];
-  userId: string;
   formId: string;
   isLoggedIn: boolean;
   onEdit?: (id: string) => void;
-  onSubmit: (formData: Record<string, unknown>) => Promise<void>;
+  // Called after this component's own submission to /api/form/submit
+  // succeeds — lets the public page show its own success state (e.g. a
+  // full "Thank You" screen) without owning the submission request itself.
+  onSubmitSuccess?: () => void;
   onDelete?: (id: string) => void;
-  errors: { [key: string]: string };
   onToggleRequired?: (id: string) => void;
   onReorder?: (newFields: Field[]) => void;
   loading: boolean;
   styleConfig?: StyleConfig;
   recaptchaEnabled?: boolean;
+  // Anti-spam signals owned by the parent page (which renders the honeypot
+  // input itself) but sent as part of THIS component's own submission,
+  // since this is the only code path that actually posts to
+  // /api/form/submit today.
+  honeypot?: string;
+  formLoadToken?: string;
 }
 
 const FormPreview = ({
   fields,
-  userId,
   formId,
   isLoggedIn,
   onEdit = () => {},
+  onSubmitSuccess,
   onDelete = () => {},
   onToggleRequired = () => {},
   onReorder = () => {},
   styleConfig = {},
   recaptchaEnabled = false,
+  honeypot,
+  formLoadToken,
 }: FormPreviewProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -211,6 +222,9 @@ const FormPreview = ({
   const [currentFieldId, setCurrentFieldId] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">(
+    "error",
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -243,15 +257,18 @@ const FormPreview = ({
     };
   }, [recaptchaEnabled, isLoggedIn, recaptchaSiteKey]);
 
-  // Auto-save draft to localStorage (only when not logged in as seller)
+  // Auto-save draft to localStorage (only when not logged in as seller).
+  // TTL is intentionally short (30 min, not 24h) — this form is typically
+  // embedded under a public/shared formId, so on a kiosk or shared device a
+  // long-lived draft could resurface a prior visitor's partial name/email/
+  // phone for the next person who opens the same form.
   useEffect(() => {
     if (!isLoggedIn && formId) {
       const savedData = localStorage.getItem(`form-draft-${formId}`);
       if (savedData) {
         try {
           const parsed = JSON.parse(savedData);
-          // Check if saved data is less than 24 hours old
-          if (parsed.timestamp && Date.now() - parsed.timestamp < 86400000) {
+          if (parsed.timestamp && Date.now() - parsed.timestamp < DRAFT_TTL_MS) {
             setFormData(parsed.data || {});
           } else {
             // Clear stale data
@@ -364,7 +381,9 @@ const FormPreview = ({
       }
     }
 
-    if (field.type === "number") {
+    // Number("") is 0, which would otherwise fail a min > 0 check on a field
+    // that's simply empty (and, if not required, is allowed to be).
+    if (field.type === "number" && value !== undefined && value !== "") {
       const numValue = Number(value);
       if (field.min !== undefined && numValue < field.min) {
         return `Minimum value is ${field.min}`;
@@ -374,14 +393,49 @@ const FormPreview = ({
       }
     }
 
+    // No current save path can persist field.pattern (it's absent from both
+    // the Zod and Mongoose form schemas), so this isn't reachable with
+    // today's data — but a malformed or intentionally-catastrophic regex
+    // here would otherwise be able to hang every visitor's browser on every
+    // keystroke, so it's guarded defensively rather than assumed safe.
     if (field.pattern && value) {
-      const regex = new RegExp(field.pattern);
-      if (!regex.test(value as string)) {
+      try {
+        if (field.pattern.length > 200) {
+          return field.helperText || "Invalid format";
+        }
+        const regex = new RegExp(field.pattern);
+        if (!regex.test(value as string)) {
+          return field.helperText || "Invalid format";
+        }
+      } catch {
         return field.helperText || "Invalid format";
       }
     }
 
     return "";
+  };
+
+  const showMessage = (message: string, severity: "success" | "error") => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // Moves focus (and scrolls) to the first invalid field after a failed
+  // validation pass, rather than leaving a sighted-only Snackbar as the only
+  // signal that something needs correction (WCAG 2.4.3 / 3.3.1).
+  const focusFirstError = (errors: Record<string, string>) => {
+    const firstErrorField = inputFields.find((field) => errors[field.id]);
+    if (!firstErrorField) return;
+    const wrapper = document.getElementById(
+      `field-wrapper-${firstErrorField.id}`,
+    );
+    if (!wrapper) return;
+    wrapper.scrollIntoView({ behavior: "smooth", block: "center" });
+    const focusable = wrapper.querySelector<HTMLElement>(
+      "input, select, textarea, [tabindex]",
+    );
+    focusable?.focus();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -393,17 +447,16 @@ const FormPreview = ({
     // Execute reCAPTCHA v3 if enabled
     if (recaptchaEnabled && !isLoggedIn) {
       if (!recaptchaSiteKey) {
-        setSnackbarMessage(
+        showMessage(
           "reCAPTCHA is not configured. Please contact the form owner.",
+          "error",
         );
-        setSnackbarOpen(true);
         setIsSubmitting(false);
         return;
       }
 
       if (!recaptchaLoaded || !window.grecaptcha) {
-        setSnackbarMessage("Security verification is loading. Please wait...");
-        setSnackbarOpen(true);
+        showMessage("Security verification is loading. Please wait...", "error");
         setIsSubmitting(false);
         return;
       }
@@ -415,10 +468,10 @@ const FormPreview = ({
         });
       } catch (error) {
         console.error("reCAPTCHA execution error:", error);
-        setSnackbarMessage(
+        showMessage(
           "Security verification failed. Please refresh and try again.",
+          "error",
         );
-        setSnackbarOpen(true);
         setIsSubmitting(false);
         return;
       }
@@ -440,8 +493,8 @@ const FormPreview = ({
     setFieldErrors(errors);
 
     if (Object.keys(errors).length > 0) {
-      setSnackbarMessage("Please fix all errors before submitting");
-      setSnackbarOpen(true);
+      showMessage("Please fix all errors before submitting", "error");
+      focusFirstError(errors);
       setIsSubmitting(false);
       return;
     }
@@ -467,11 +520,11 @@ const FormPreview = ({
 
       if (!filterResponse.ok) {
         // Lead was rejected by the filter
-        setSnackbarMessage(
+        showMessage(
           filterResult.message ||
             "Your submission was flagged by our quality filter. Please review and try again.",
+          "error",
         );
-        setSnackbarOpen(true);
         setIsSubmitting(false);
         return;
       }
@@ -480,9 +533,13 @@ const FormPreview = ({
       // Continue with submission if filter fails (fail-open approach)
     }
 
-    // Lead passed the filter - proceed with form submission
+    // Lead passed the filter - proceed with form submission. This is the
+    // only code path that actually calls /api/form/submit — a parent-owned
+    // onSubmit used to exist for this but was never invoked, silently
+    // disconnecting the honeypot/timing anti-spam signals and the
+    // post-submit success UI from the request that actually runs; both are
+    // folded in here instead.
     const submissionData = {
-      userId,
       formId,
       fields: inputFields.map((field) => ({
         id: field.id,
@@ -490,6 +547,8 @@ const FormPreview = ({
         value: formData[field.id]?.value || "",
       })),
       recaptchaToken: recaptchaEnabled && !isLoggedIn ? token : undefined,
+      honeypot: !isLoggedIn ? honeypot : undefined,
+      formLoadToken: !isLoggedIn ? formLoadToken : undefined,
     };
 
     try {
@@ -501,12 +560,12 @@ const FormPreview = ({
 
       const result = await response.json();
       if (result.success) {
-        setSnackbarMessage(
+        showMessage(
           styleConfig?.successMessage ||
             result.message ||
             "Thank you! Your form has been submitted successfully.",
+          "success",
         );
-        setSnackbarOpen(true);
         setFormData({});
         setTouched({});
         setFieldErrors({});
@@ -516,13 +575,12 @@ const FormPreview = ({
         if (!isLoggedIn && formId) {
           localStorage.removeItem(`form-draft-${formId}`);
         }
+        onSubmitSuccess?.();
       } else {
-        setSnackbarMessage(result.message || "Failed to submit form");
-        setSnackbarOpen(true);
+        showMessage(result.message || "Failed to submit form", "error");
       }
     } catch {
-      setSnackbarMessage("An error occurred. Please try again.");
-      setSnackbarOpen(true);
+      showMessage("An error occurred. Please try again.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -614,7 +672,11 @@ const FormPreview = ({
         p: { xs: 2, sm: 3 },
         mt: 2,
         backgroundColor: getFormBackgroundColor(),
-        color: isDarkMode ? theme.palette.text.primary : "#000000",
+        // Derived from the actual background in use (theme's or the
+        // seller's custom formBackgroundColor) rather than hardcoded, so a
+        // dark or light custom brand color can't produce illegible
+        // black-on-black or white-on-white text.
+        color: theme.palette.getContrastText(getFormBackgroundColor()),
         transition: "background-color 0.3s ease, color 0.3s ease",
       }}
     >
@@ -678,7 +740,7 @@ const FormPreview = ({
                     field={field}
                     isLoggedIn={isLoggedIn}
                   >
-                    <Box sx={{ flex: 1, width: "100%" }}>
+                    <Box id={`field-wrapper-${field.id}`} sx={{ flex: 1, width: "100%" }}>
                       {field.description && (
                         <Typography
                           variant="caption"
@@ -949,7 +1011,9 @@ const FormPreview = ({
                           fullWidth
                           error={touched[field.id] && !!fieldErrors[field.id]}
                         >
-                          <InputLabel>{field.label}</InputLabel>
+                          <InputLabel required={field.required}>
+                            {field.label}
+                          </InputLabel>
                           <Select
                             label={field.label}
                             value={(formData[field.id]?.value as string) || ""}
@@ -1013,8 +1077,8 @@ const FormPreview = ({
                           }}
                           sx={{
                             "& .MuiInputBase-input.Mui-disabled": {
-                              WebkitTextFillColor: "rgba(0, 0, 0, 0.6)",
-                              color: "rgba(0, 0, 0, 0.6)",
+                              WebkitTextFillColor: theme.palette.text.disabled,
+                              color: theme.palette.text.disabled,
                             },
                           }}
                         />
@@ -1026,7 +1090,7 @@ const FormPreview = ({
                           component="fieldset"
                           error={touched[field.id] && !!fieldErrors[field.id]}
                         >
-                          <FormLabel component="legend">
+                          <FormLabel component="legend" required={field.required}>
                             {field.label}
                           </FormLabel>
                           <RadioGroup
@@ -1061,7 +1125,7 @@ const FormPreview = ({
                           component="fieldset"
                           error={touched[field.id] && !!fieldErrors[field.id]}
                         >
-                          <FormLabel component="legend">
+                          <FormLabel component="legend" required={field.required}>
                             {field.label}
                           </FormLabel>
                           <FormGroup>
@@ -1104,21 +1168,23 @@ const FormPreview = ({
                       )}
 
                       {/* File Upload Field */}
+                      {/* File upload isn't wired to any storage backend —
+                          the previous input silently captured only the
+                          filename and discarded the actual file, giving no
+                          indication anything was lost. This type can no
+                          longer be created going forward (excluded from the
+                          form-field schema); this branch only covers a
+                          field saved before that change. */}
                       {field.type === "file" && (
                         <Box>
                           <Typography variant="body1" gutterBottom>
                             {field.label}
                           </Typography>
-                          <input
-                            type="file"
-                            onChange={(e) =>
-                              handleChange(
-                                field.id,
-                                e.target.files?.[0]?.name || "",
-                              )
-                            }
-                            style={{ display: "block", marginTop: 8 }}
-                          />
+                          <Typography variant="body2" color="error">
+                            File upload isn&apos;t currently supported for
+                            this form. Please contact the site owner if you
+                            need to share a file.
+                          </Typography>
                           {field.helperText && (
                             <Typography variant="caption" color="textSecondary">
                               {field.helperText}
@@ -1133,6 +1199,7 @@ const FormPreview = ({
                         onClick={(e) => handleClick(e, field.id)}
                         size="small"
                         sx={{ ml: 1 }}
+                        aria-label={`Field options for ${field.label}`}
                       >
                         <MoreVertIcon />
                       </IconButton>
@@ -1188,7 +1255,7 @@ const FormPreview = ({
                 minWidth: { xs: "100%", sm: 200 },
                 py: { xs: 1.5, sm: 1 },
                 backgroundColor: getPrimaryColor(),
-                color: "#ffffff",
+                color: theme.palette.getContrastText(getPrimaryColor()),
                 "&:hover": {
                   backgroundColor: getPrimaryColor(),
                   opacity: 0.9,
@@ -1228,7 +1295,7 @@ const FormPreview = ({
       >
         <Alert
           onClose={() => setSnackbarOpen(false)}
-          severity={snackbarMessage.includes("success") ? "success" : "error"}
+          severity={snackbarSeverity}
           sx={{ width: "100%" }}
         >
           {snackbarMessage}

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Typography,
   Box,
@@ -20,16 +20,13 @@ import {
   Tooltip,
   TextField,
   InputAdornment,
-  Card,
-  CardContent,
-  Grid,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Collapse,
   Paper,
   CircularProgress,
+  LinearProgress,
 } from "@mui/material";
 import {
   ContentCopy,
@@ -37,13 +34,9 @@ import {
   PersonAdd as PersonAddIcon,
   People as PeopleIcon,
   CheckCircle as ActiveIcon,
-  PauseCircle as InactiveIcon,
-  FiberNew as NewIcon,
   Refresh as RefreshIcon,
   Code as CodeIcon,
   Link as LinkIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   WarningAmber as WarningIcon,
   Email as EmailIcon,
   FileDownload as FileDownloadIcon,
@@ -62,43 +55,6 @@ import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import Papa from "papaparse";
 import axios from "@/lib/axiosInstance";
-
-// ---------- Stats Card ----------
-
-function StatsCard({
-  title,
-  value,
-  color,
-  icon,
-  subtitle,
-}: {
-  title: string;
-  value: number | string;
-  color: string;
-  icon: React.ReactNode;
-  subtitle?: string;
-}) {
-  return (
-    <Card variant="outlined" sx={{ height: "100%" }}>
-      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-          <Box sx={{ color, display: "flex" }}>{icon}</Box>
-          <Typography variant="caption" color="text.secondary">
-            {title}
-          </Typography>
-        </Box>
-        <Typography variant="h5" fontWeight="bold" sx={{ color }}>
-          {value}
-        </Typography>
-        {subtitle && (
-          <Typography variant="caption" color="text.secondary">
-            {subtitle}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 const BuyersPage: React.FC = () => {
   const { currentUser } = useInitializeUser();
@@ -131,6 +87,18 @@ const BuyersPage: React.FC = () => {
     currentCount: 0,
     maxAllowed: null as number | null,
   });
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 20,
+  });
+  const [rowCount, setRowCount] = useState(0);
+  const [statusCounts, setStatusCounts] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    new: 0,
+    suspended: 0,
+  });
 
   // Subscription limits for export/import permissions
   const { limits: subLimits } = useSubscriptionLimits();
@@ -139,6 +107,7 @@ const BuyersPage: React.FC = () => {
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showEmbedSection, setShowEmbedSection] = useState(false);
 
@@ -146,68 +115,52 @@ const BuyersPage: React.FC = () => {
   const [registrationLink, setRegistrationLink] = useState("");
   const [iframeCode, setIframeCode] = useState("");
 
-  // ---------- Computed Stats ----------
+  // Debounce the search query so typing doesn't trigger a server fetch on
+  // every keystroke.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [searchQuery]);
 
-  const stats = useMemo(() => {
-    const total = buyers.length;
-    const active = buyers.filter((b) => b.status === "active").length;
-    const inactive = buyers.filter((b) => b.status === "inactive").length;
-    const newBuyers = buyers.filter((b) => b.status === "new").length;
-    return { total, active, inactive, newBuyers };
-  }, [buyers]);
-
-  // ---------- Filtered Buyers ----------
-
-  const filteredBuyers = useMemo(() => {
-    let result = [...buyers];
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (b) =>
-          b.name?.toLowerCase().includes(q) ||
-          b.email?.toLowerCase().includes(q) ||
-          b.company?.toLowerCase().includes(q),
-      );
-    }
-
-    // Status filter
-    if (statusFilter !== "all") {
-      result = result.filter((b) => b.status === statusFilter);
-    }
-
-    return result;
-  }, [buyers, searchQuery, statusFilter]);
+  // Jump back to page 1 whenever the search/status filter changes — staying
+  // on, say, page 3 of a now much-shorter filtered result set would show an
+  // empty grid with no obvious explanation.
+  useEffect(() => {
+    setPaginationModel((prev) => (prev.page === 0 ? prev : { ...prev, page: 0 }));
+  }, [debouncedSearchQuery, statusFilter]);
 
   // ---------- Data Fetching ----------
-
-  const extractBuyers = (payload: unknown): IBuyer[] => {
-    if (Array.isArray(payload)) return payload;
-
-    if (
-      payload &&
-      typeof payload === "object" &&
-      "data" in payload &&
-      Array.isArray((payload as { data?: unknown }).data)
-    ) {
-      return (payload as { data: IBuyer[] }).data;
-    }
-
-    return [];
-  };
+  // Previously fetched every buyer for the seller in one unbounded request
+  // and filtered/paginated entirely client-side. Now paginated server-side
+  // (see GET /api/buyers) — buyers holds only the current page, search/status
+  // are applied by the server, and rowCount/statusCounts track the true
+  // totals independently of what's currently loaded.
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Fire status update in background (non-blocking) and fetch buyers + limits in parallel
-      csrfFetch("/api/sellers/update-buyer-status", { method: "POST" }).catch(
-        () => {},
-      );
+      // Awaited (not fire-and-forget) so the buyers fetch below always reflects
+      // the latest auto-activation statuses — previously this ran concurrently
+      // with the buyers fetch, so a manual Refresh could still show stale
+      // statuses if the update hadn't committed yet.
+      await csrfFetch("/api/sellers/update-buyer-status", {
+        method: "POST",
+      }).catch(() => {});
+
+      const params = new URLSearchParams({
+        page: String(paginationModel.page + 1),
+        limit: String(paginationModel.pageSize),
+      });
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (debouncedSearchQuery.trim()) {
+        params.set("search", debouncedSearchQuery.trim());
+      }
 
       const [buyersResponse, limitsResponse] = await Promise.all([
-        fetch("/api/buyers"),
+        fetch(`/api/buyers?${params.toString()}`),
         fetch(`/api/subscriptions/limits?sellerId=${sellerId}`),
       ]);
 
@@ -220,12 +173,29 @@ const BuyersPage: React.FC = () => {
         limitsResponse.json(),
       ]);
 
-      const buyersData = extractBuyers(buyersPayload);
+      const data = buyersPayload?.data ?? {};
+      setBuyers(Array.isArray(data.buyers) ? data.buyers : []);
+      setRowCount(data.pagination?.total ?? 0);
+      setStatusCounts({
+        total: data.counts?.total ?? 0,
+        active: data.counts?.active ?? 0,
+        inactive: data.counts?.inactive ?? 0,
+        new: data.counts?.new ?? 0,
+        suspended: data.counts?.suspended ?? 0,
+      });
 
-      setBuyers(buyersData);
       setSubscriptionLimits({
-        currentCount: buyersData.length,
-        maxAllowed: limitsData.data?.subscriptionLimits?.buyers || 0,
+        // The live, account-wide count from /api/subscriptions/limits — not
+        // derived from the (now paginated) buyers array, which would only
+        // ever reflect one page's length.
+        currentCount: limitsData.data?.currentCount ?? data.counts?.total ?? 0,
+        // Preserve null (still loading / genuinely unknown) distinctly from
+        // a real 0 — this previously coerced a missing field to 0, and
+        // since 0 >= 0 is always true, that permanently locked out buyer
+        // creation for any account whose subscription document happened to
+        // lack this nested field, with a message that looked like a real
+        // usage cap rather than a data problem.
+        maxAllowed: limitsData.data?.subscriptionLimits?.buyers ?? null,
       });
     } catch (err) {
       setError((err as Error).message);
@@ -237,17 +207,29 @@ const BuyersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [csrfFetch, sellerId]);
+  }, [
+    csrfFetch,
+    sellerId,
+    paginationModel.page,
+    paginationModel.pageSize,
+    statusFilter,
+    debouncedSearchQuery,
+  ]);
 
   useEffect(() => {
     if (sellerId) {
       fetchData();
+    }
+  }, [fetchData, sellerId]);
+
+  useEffect(() => {
+    if (sellerId) {
       const link = `${window.location.origin}/RegisterBuyer?sellerId=${sellerId}`;
       const code = `<iframe src="${link}" width="100%" height="500px" style="border: none;"></iframe>`;
       setRegistrationLink(link);
       setIframeCode(code);
     }
-  }, [fetchData, sellerId]);
+  }, [sellerId]);
 
   // ---------- Handlers ----------
 
@@ -261,7 +243,13 @@ const BuyersPage: React.FC = () => {
       return;
     }
 
-    if (subscriptionLimits.currentCount >= subscriptionLimits.maxAllowed) {
+    // 0 means unlimited (matches the backend convention in
+    // lib/subscriptionLimitsService.ts) — only block when there's a real,
+    // positive limit that's been reached.
+    if (
+      subscriptionLimits.maxAllowed > 0 &&
+      subscriptionLimits.currentCount >= subscriptionLimits.maxAllowed
+    ) {
       setSnackbar({
         open: true,
         message: `You've reached your buyer limit (${subscriptionLimits.maxAllowed}). Please upgrade your subscription.`,
@@ -279,47 +267,48 @@ const BuyersPage: React.FC = () => {
   };
 
   const handleSaveBuyer = async (buyerData: Partial<IBuyer>) => {
-    try {
-      const isNewBuyer = !selectedBuyer;
-      const response = selectedBuyer
-        ? await fetch(`/api/buyers?id=${selectedBuyer._id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buyerData),
-          })
-        : await fetch("/api/buyers", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buyerData),
-          });
-
-      if (!response.ok) throw new Error("Failed to save buyer");
-
-      const result = await response.json();
-
-      fetchData();
-      setOpenBuyerForm(false);
-
-      // Show success modal for new buyers
-      if (isNewBuyer) {
-        setSuccessModal({
-          open: true,
-          buyerName: buyerData.name,
-          buyerEmail: buyerData.email,
-          emailSent: result.emailSent ?? true,
+    // Deliberately does NOT catch its own errors: BuyerFormEnhanced.handleSubmit
+    // already wraps this call in a try/catch that shows an error and keeps the
+    // dialog open on failure — swallowing the error here defeated that and
+    // made every failed save look like a success to the seller.
+    const isNewBuyer = !selectedBuyer;
+    const response = selectedBuyer
+      ? await csrfFetch(`/api/buyers?id=${selectedBuyer._id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buyerData),
+        })
+      : await csrfFetch("/api/buyers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buyerData),
         });
-      } else {
-        setSnackbar({
-          open: true,
-          message: "Buyer updated!",
-          severity: "success",
-        });
-      }
-    } catch {
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(
+        body?.message || body?.error || "Failed to save buyer",
+      );
+    }
+
+    const result = await response.json();
+
+    fetchData();
+    setOpenBuyerForm(false);
+
+    // Show success modal for new buyers
+    if (isNewBuyer) {
+      setSuccessModal({
+        open: true,
+        buyerName: buyerData.name,
+        buyerEmail: buyerData.email,
+        emailSent: result.emailSent === true,
+      });
+    } else {
       setSnackbar({
         open: true,
-        message: "Error saving buyer.",
-        severity: "error",
+        message: "Buyer updated!",
+        severity: "success",
       });
     }
   };
@@ -337,13 +326,18 @@ const BuyersPage: React.FC = () => {
     }
 
     try {
-      const response = await fetch(
+      const response = await csrfFetch(
         `/api/buyers?id=${deleteConfirmModal.buyerId}`,
         {
           method: "DELETE",
         },
       );
-      if (!response.ok) throw new Error("Failed to delete buyer");
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(
+          body?.message || body?.error || "Failed to delete buyer",
+        );
+      }
 
       await fetchData();
       setSnackbar({
@@ -351,10 +345,11 @@ const BuyersPage: React.FC = () => {
         message: "Buyer deleted!",
         severity: "success",
       });
-    } catch {
+    } catch (error) {
       setSnackbar({
         open: true,
-        message: "Failed to delete buyer.",
+        message:
+          error instanceof Error ? error.message : "Failed to delete buyer.",
         severity: "error",
       });
     } finally {
@@ -364,34 +359,84 @@ const BuyersPage: React.FC = () => {
 
   // ---------- Export/Import ----------
 
-  const exportToCSV = () => {
-    const csvData = filteredBuyers.map((buyer) => ({
-      Name: buyer.name || "",
-      Email: buyer.email || "",
-      Phone: buyer.phone || "",
-      Company: buyer.company || "",
-      "Business Description": buyer.businessDescription || "",
-      Priority: buyer.priority || 5,
-      "Max Leads Per Day": buyer.maxLeadsPerDay || 10,
-      Status: buyer.status || "new",
-      "Preferred Distribution": buyer.preferredDistribution || "Automatic",
-      Location: buyer.leadPreferences?.location
-        ? Array.isArray(buyer.leadPreferences.location)
-          ? buyer.leadPreferences.location.join(", ")
-          : buyer.leadPreferences.location
-        : "",
-      Industries: buyer.leadPreferences?.industries?.join(", ") || "",
-    }));
+  // Prevents CSV/formula injection: a cell value beginning with =, +, -, or
+  // @ can be interpreted as a formula by Excel/Sheets when the exported file
+  // is opened, potentially executing attacker-supplied content (e.g. a
+  // buyer's business description containing =HYPERLINK(...)). Prefixing
+  // with a leading apostrophe forces spreadsheet apps to treat it as text.
+  const sanitizeCsvField = (value: string): string =>
+    /^[=+\-@]/.test(value) ? `'${value}` : value;
 
-    const csv = Papa.unparse(csvData);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "buyers-export.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // buyers now only holds the current page — exporting needs every buyer
+  // matching the active search/status filter, so this fetches its own pages
+  // directly from the API rather than reusing component state.
+  const EXPORT_PAGE_SIZE = 100;
+  const EXPORT_MAX_PAGES = 50; // safety cap: 5,000 buyers
+
+  const exportToCSV = async () => {
+    try {
+      const allBuyers: IBuyer[] = [];
+      const params = new URLSearchParams({ limit: String(EXPORT_PAGE_SIZE) });
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (debouncedSearchQuery.trim()) {
+        params.set("search", debouncedSearchQuery.trim());
+      }
+
+      for (let page = 1; page <= EXPORT_MAX_PAGES; page++) {
+        params.set("page", String(page));
+        const res = await fetch(`/api/buyers?${params.toString()}`);
+        if (!res.ok) throw new Error("Failed to fetch buyers for export");
+        const payload = await res.json();
+        const pageBuyers: IBuyer[] = Array.isArray(payload?.data?.buyers)
+          ? payload.data.buyers
+          : [];
+        allBuyers.push(...pageBuyers);
+        const total = payload?.data?.pagination?.total ?? allBuyers.length;
+        if (allBuyers.length >= total || pageBuyers.length === 0) break;
+      }
+
+      const csvData = allBuyers.map((buyer) => ({
+        Name: sanitizeCsvField(buyer.name || ""),
+        Email: sanitizeCsvField(buyer.email || ""),
+        Phone: sanitizeCsvField(buyer.phone || ""),
+        Company: sanitizeCsvField(buyer.company || ""),
+        "Business Description": sanitizeCsvField(
+          buyer.businessDescription || "",
+        ),
+        Priority: buyer.priority || 5,
+        "Max Leads Per Day": buyer.maxLeadsPerDay || 10,
+        Status: buyer.status || "new",
+        "Preferred Distribution": buyer.preferredDistribution || "Automatic",
+        Location: sanitizeCsvField(
+          buyer.leadPreferences?.location
+            ? Array.isArray(buyer.leadPreferences.location)
+              ? buyer.leadPreferences.location.join(", ")
+              : buyer.leadPreferences.location
+            : "",
+        ),
+        Industries: sanitizeCsvField(
+          buyer.leadPreferences?.industries?.join(", ") || "",
+        ),
+      }));
+
+      const csv = Papa.unparse(csvData);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "buyers-export.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message:
+          err instanceof Error ? err.message : "Failed to export buyers",
+        severity: "error",
+      });
+    }
   };
 
   const importFromCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -450,15 +495,8 @@ const BuyersPage: React.FC = () => {
 
   const isLimitReached =
     subscriptionLimits.maxAllowed !== null &&
+    subscriptionLimits.maxAllowed > 0 &&
     subscriptionLimits.currentCount >= subscriptionLimits.maxAllowed;
-
-  const limitPercentage =
-    subscriptionLimits.maxAllowed && subscriptionLimits.maxAllowed > 0
-      ? Math.round(
-          (subscriptionLimits.currentCount / subscriptionLimits.maxAllowed) *
-            100,
-        )
-      : 0;
 
   return (
     <Box sx={{ width: "100%", p: { xs: 2, sm: 3 } }}>
@@ -483,10 +521,18 @@ const BuyersPage: React.FC = () => {
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <Tooltip title="Refresh data">
-            <IconButton onClick={fetchData} size="small">
+            <IconButton onClick={fetchData} size="small" aria-label="Refresh data">
               <RefreshIcon />
             </IconButton>
           </Tooltip>
+          <Button
+            variant="outlined"
+            startIcon={<LinkIcon />}
+            onClick={() => setShowEmbedSection(true)}
+            size={isMobile ? "small" : "medium"}
+          >
+            Registration &amp; Embed Code
+          </Button>
           <Button
             variant="contained"
             startIcon={<PersonAddIcon />}
@@ -520,146 +566,6 @@ const BuyersPage: React.FC = () => {
           Upgrade your subscription to add more buyers.
         </Alert>
       )}
-
-      {/* Stats Cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="Total Buyers"
-            value={stats.total}
-            color={theme.palette.primary.main}
-            icon={<PeopleIcon fontSize="small" />}
-            subtitle={`${limitPercentage}% of limit`}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="Active"
-            value={stats.active}
-            color={theme.palette.success.main}
-            icon={<ActiveIcon fontSize="small" />}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="New"
-            value={stats.newBuyers}
-            color={theme.palette.info.main}
-            icon={<NewIcon fontSize="small" />}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="Inactive"
-            value={stats.inactive}
-            color={theme.palette.error.main}
-            icon={<InactiveIcon fontSize="small" />}
-          />
-        </Grid>
-      </Grid>
-
-      {/* Registration / Embed Section (Collapsible) */}
-      <Paper variant="outlined" sx={{ mb: 3, overflow: "hidden" }}>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            px: 2,
-            py: 1.5,
-            cursor: "pointer",
-            "&:hover": { bgcolor: "action.hover" },
-          }}
-          onClick={() => setShowEmbedSection(!showEmbedSection)}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <LinkIcon fontSize="small" color="primary" />
-            <Typography variant="subtitle2" fontWeight="bold">
-              Buyer Registration & Embed Code
-            </Typography>
-          </Box>
-          {showEmbedSection ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        </Box>
-        <Collapse in={showEmbedSection}>
-          <Box sx={{ px: 2, pb: 2 }}>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  gutterBottom
-                  sx={{ display: "block" }}
-                >
-                  Registration Link
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={registrationLink}
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <Tooltip title="Copy registration link">
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                copyToClipboard(
-                                  registrationLink,
-                                  "Registration link",
-                                )
-                              }
-                              disabled={isLimitReached}
-                            >
-                              <ContentCopy fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  gutterBottom
-                  sx={{ display: "block" }}
-                >
-                  Iframe Embed Code
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={iframeCode}
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <Tooltip title="Copy iframe code">
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                copyToClipboard(iframeCode, "Iframe code")
-                              }
-                              disabled={isLimitReached}
-                            >
-                              <CodeIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        </Collapse>
-      </Paper>
 
       {/* Search & Filter Toolbar */}
       <Box
@@ -745,19 +651,29 @@ const BuyersPage: React.FC = () => {
         )}
 
         <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
-          {filteredBuyers.length} of {buyers.length} buyer
-          {buyers.length !== 1 ? "s" : ""}
+          {rowCount === 0
+            ? "0 buyers"
+            : `${paginationModel.page * paginationModel.pageSize + 1}-${Math.min(
+                rowCount,
+                (paginationModel.page + 1) * paginationModel.pageSize,
+              )} of ${rowCount} buyer${rowCount !== 1 ? "s" : ""}`}
         </Typography>
       </Box>
 
+      {loading && buyers.length > 0 && <LinearProgress sx={{ mb: 1 }} />}
+
       {/* Buyer Table */}
-      {loading ? (
+      {/* Only the first load (no data yet) replaces this section with a
+          spinner — a post-mutation Refresh now keeps the existing table
+          visible with a thin progress bar on top instead of tearing down
+          and re-mounting the whole grid. */}
+      {loading && buyers.length === 0 ? (
         <CircularProgress />
       ) : error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
-      ) : filteredBuyers.length === 0 ? (
+      ) : rowCount === 0 ? (
         <Paper
           variant="outlined"
           sx={{
@@ -767,16 +683,16 @@ const BuyersPage: React.FC = () => {
         >
           <PeopleIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            {buyers.length === 0
+            {statusCounts.total === 0
               ? "No buyers registered yet"
               : "No buyers match your search"}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {buyers.length === 0
+            {statusCounts.total === 0
               ? "Add your first buyer or share your registration link to get started."
               : "Try adjusting your search or filter criteria."}
           </Typography>
-          {buyers.length === 0 && (
+          {statusCounts.total === 0 && (
             <Button
               variant="contained"
               startIcon={<PersonAddIcon />}
@@ -789,27 +705,117 @@ const BuyersPage: React.FC = () => {
         </Paper>
       ) : (
         <BuyerTable
-          buyers={filteredBuyers}
+          buyers={buyers}
           onDelete={handleDelete}
           onEdit={handleEditBuyer}
+          rowCount={rowCount}
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          loading={loading}
         />
       )}
 
-      {/* Buyer Form Modal */}
+      {/* Registration & Embed Code — moved from an always-visible collapsible
+          section into a dialog opened from the header, next to Add Buyer. */}
       <Dialog
-        open={openBuyerForm}
-        onClose={() => setOpenBuyerForm(false)}
-        maxWidth="lg"
+        open={showEmbedSection}
+        onClose={() => setShowEmbedSection(false)}
+        maxWidth="sm"
         fullWidth
       >
-        <BuyerFormEnhanced
-          open={openBuyerForm}
-          onClose={() => setOpenBuyerForm(false)}
-          onSave={handleSaveBuyer}
-          initialValues={selectedBuyer || undefined}
-          sellerId={sellerId}
-        />
+        <DialogTitle>Buyer Registration &amp; Embed Code</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1 }}>
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                sx={{ display: "block" }}
+              >
+                Registration Link
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={registrationLink}
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip title="Copy registration link">
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              copyToClipboard(
+                                registrationLink,
+                                "Registration link",
+                              )
+                            }
+                            aria-label="Copy registration link"
+                          >
+                            <ContentCopy fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            </Box>
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                gutterBottom
+                sx={{ display: "block" }}
+              >
+                Iframe Embed Code
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={iframeCode}
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip title="Copy iframe code">
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              copyToClipboard(iframeCode, "Iframe code")
+                            }
+                            aria-label="Copy iframe embed code"
+                          >
+                            <CodeIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowEmbedSection(false)}>Close</Button>
+        </DialogActions>
       </Dialog>
+
+      {/* Buyer Form Modal — BuyerFormEnhanced owns its own Dialog internally;
+          wrapping it in a second Dialog here used to mount two independent
+          modal instances (two backdrops, two focus traps) at once. */}
+      <BuyerFormEnhanced
+        open={openBuyerForm}
+        onClose={() => setOpenBuyerForm(false)}
+        onSave={handleSaveBuyer}
+        initialValues={selectedBuyer || undefined}
+        sellerId={sellerId}
+      />
 
       {/* Success Modal - New Buyer Registration */}
       <Dialog

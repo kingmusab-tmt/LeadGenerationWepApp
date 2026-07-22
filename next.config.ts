@@ -21,6 +21,20 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // The public form page is designed to be embedded in a third-party
+      // site's <iframe> — that's the whole point of the embed code sellers
+      // copy from the forms list. The blanket X-Frame-Options: DENY above
+      // applies to every route including this one, so browsers would
+      // otherwise refuse to frame it anywhere. CSP's frame-ancestors
+      // directive supersedes X-Frame-Options when both are present (per
+      // spec, honored by all current browsers) — but the actual
+      // frame-ancestors VALUE for this route is set dynamically per-form in
+      // proxy.ts (each form can optionally restrict which sites may embed
+      // it), not declared statically here, since next.config's headers()
+      // can't vary by the form's own saved configuration. This block is
+      // intentionally absent; proxy.ts is the single source of truth for
+      // this header on /forms/:formId so there's no ambiguity about which
+      // layer wins.
       {
         source: "/sw.js",
         headers: [
