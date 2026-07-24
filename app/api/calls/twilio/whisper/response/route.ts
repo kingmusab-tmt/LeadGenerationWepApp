@@ -4,6 +4,8 @@ import { debugLog } from "@/utils/callHandlers";
 import { callSecurityMiddleware } from "@/lib/security/callSecurity";
 import { env } from "@/lib/env";
 import { getRedisClient } from "@/lib/redis";
+import dbConnect from "@/lib/connectdb";
+import { User } from "@/models";
 
 const SCREEN_REJECT_TTL = 600; // 10 minutes
 
@@ -80,12 +82,53 @@ export async function POST(req: NextRequest) {
       trackingNumber,
     )}&tryOverflow=true&buyerNumber=${encodeURIComponent(buyerNumber)}`;
 
+    // Resolve which Twilio account actually owns this call's parent leg.
+    // Numbers registered with method "Manual" live in the seller's own
+    // Twilio subaccount (see register_number/route.ts) — a REST call made
+    // with system credentials against a callSid in a different account
+    // returns a 404 from Twilio and fails silently (caught below), leaving
+    // the caller in dead air instead of being redirected to fallback/voicemail.
+    const resolveCallClient = async (): Promise<ReturnType<typeof twilio>> => {
+      const systemClient = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+      if (!sellerId || !trackingNumber) return systemClient;
+      try {
+        await dbConnect();
+        const seller = await User.findById(sellerId).lean();
+        const trackingNumbers = (
+          seller as unknown as {
+            trackingNumbers?: { phoneNumber: string; method?: string }[];
+          }
+        )?.trackingNumbers;
+        const trackingConfig = trackingNumbers?.find(
+          (num) => num.phoneNumber === trackingNumber,
+        );
+        const sellerCreds = seller as unknown as {
+          twilioAccountSid?: string;
+          twilioAuthToken?: string;
+        };
+        if (
+          trackingConfig?.method === "Manual" &&
+          sellerCreds?.twilioAccountSid &&
+          sellerCreds?.twilioAuthToken
+        ) {
+          return twilio(sellerCreds.twilioAccountSid, sellerCreds.twilioAuthToken);
+        }
+      } catch (err) {
+        debugLog(
+          "Failed to resolve seller Twilio credentials — falling back to system client",
+          { sellerId, trackingNumber, err },
+          "warn",
+        );
+      }
+      return systemClient;
+    };
+
     // Redirect the parent call to the fallback handler (overflow → voicemail).
     // Used when a non-multi-ring buyer rejects, or when the LAST multi-ring
     // leg rejects (so the caller is not left in dead air).
     const redirectParentToFallback = async (reason: string) => {
       try {
-        const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+        const client = await resolveCallClient();
         await client
           .calls(callSid)
           .update({ url: fallbackUrl, method: "POST" });

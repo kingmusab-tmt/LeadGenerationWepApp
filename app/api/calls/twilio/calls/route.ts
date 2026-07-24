@@ -455,7 +455,6 @@ async function handleNewCall(
     workingHoursStart,
     workingHoursEnd,
     // New feature flags
-    recordingConsent,
     recordingConsentMessage,
     missedCallTextBack,
     missedCallTextMessage,
@@ -477,6 +476,23 @@ async function handleNewCall(
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say("This number is not able to receive your call. Goodbye.");
     twiml.hangup();
+    // Create a record for tracking/audit — proving DNC requests are honored
+    // requires being able to show the blocked attempt actually happened.
+    await createCallRecord({
+      callSid,
+      userId: String(seller._id),
+      from,
+      to,
+      status: "dnc_blocked",
+      callRecorded: false,
+      forwardingType,
+      forwardingNumbers,
+      trackingNumber: to,
+      leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
+      industry,
+      insufficientBalance: false,
+      leadSource,
+    });
     return new NextResponse(twiml.toString(), {
       status: 200,
       headers: { "Content-Type": "text/xml" },
@@ -663,13 +679,19 @@ async function handleNewCall(
   // tracking for all multi-ring legs when the call completes or goes no-answer).
   const dialedBuyerIds: string[] = [];
 
-  // Play recording consent announcement if enabled
-  if (recordingConsent && recordCall) {
+  // Play a recording disclosure whenever the call is actually being
+  // recorded — decoupled from the separate recordingConsent toggle, which
+  // let a seller record with recordCall on but the disclosure off. This is
+  // a safe one-party-consent-state baseline; it is NOT a substitute for
+  // true all-party consent in two-party-consent states, which needs
+  // jurisdiction-aware enforcement still pending legal review (see R-20 in
+  // the production readiness audit).
+  if (recordCall) {
     const consent =
       recordingConsentMessage ||
       "This call may be recorded for quality and training purposes.";
     twiml.say(consent);
-    debugLog("Recording consent played", { consent });
+    debugLog("Recording disclosure played", { consent });
   }
 
   // Play welcome message if set
