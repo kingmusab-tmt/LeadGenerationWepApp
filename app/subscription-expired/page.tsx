@@ -111,8 +111,7 @@ export default function SubscriptionExpiredPage() {
   };
 
   const handleContactSupport = () => {
-    // You can implement support contact logic here
-    window.open("mailto:support@yourapp.com", "_blank");
+    window.open("mailto:support@brixcot.com", "_blank");
   };
 
   if (loading) {

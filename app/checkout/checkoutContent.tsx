@@ -150,6 +150,12 @@ const StripeCheckoutButton = ({
   );
 };
 
+// Payment-outcome handling (success/cancel verification) lives entirely in
+// CheckoutContent's effect below now — this used to duplicate that same
+// verification here, racing two independent /api/payments/status calls
+// against each other and, because CheckoutContent unmounted this component
+// the moment it saw ?payment=success in the URL (before verification could
+// even run), this effect was unreachable dead code in practice.
 const PaymentSection = ({
   tier,
   billingInterval,
@@ -163,35 +169,6 @@ const PaymentSection = ({
   onError: (message: string) => void;
   onCancel: () => void;
 }) => {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const paymentStatus = searchParams.get("payment");
-    const sessionId = searchParams.get("session_id");
-
-    if (paymentStatus === "success" && sessionId) {
-      const verifyPayment = async () => {
-        try {
-          const response = await axios.get(
-            `/api/payments/status?sessionId=${sessionId}`,
-          );
-          if (response.data.success) {
-            onSuccess();
-            router.replace(window.location.pathname);
-          } else {
-            onError("Payment verification failed");
-          }
-        } catch (err) {
-          onError("Error verifying payment");
-        }
-      };
-      verifyPayment();
-    } else if (paymentStatus === "canceled") {
-      onCancel();
-    }
-  }, [onSuccess, onError, onCancel, router, searchParams]);
-
   return (
     <StripeCheckoutButton
       tier={tier}
@@ -235,17 +212,47 @@ const CheckoutContent = () => {
 
   useEffect(() => {
     const paymentStatus = searchParams.get("payment");
+    const sessionId = searchParams.get("session_id");
+
     if (paymentStatus === "success") {
-      setShowSuccessModal(true);
-      setActiveStep(2);
       window.history.replaceState({}, document.title, window.location.pathname);
+
+      if (!sessionId) {
+        // Nothing to verify against — do not claim success from the URL
+        // param alone.
+        setError("Missing payment session — unable to verify payment.");
+        setActiveStep(1);
+        return;
+      }
+
+      setVerifying(true);
+      setActiveStep(2);
+      axios
+        .get(`/api/payments/status?sessionId=${sessionId}`)
+        .then((response) => {
+          if (response.data.success) {
+            setShowSuccessModal(true);
+          } else {
+            setError("Payment verification failed");
+            setActiveStep(1);
+          }
+        })
+        .catch(() => {
+          setError("Error verifying payment");
+          setActiveStep(1);
+        })
+        .finally(() => setVerifying(false));
     } else if (paymentStatus === "canceled") {
       setShowFailureModal(true);
       setIsCanceled(true);
       setActiveStep(1);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [searchParams]);
+    // Intentionally runs once per mount off the initial URL params, not on
+    // every searchParams identity change (verification must not re-fire
+    // just because state elsewhere in this component triggers a re-render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const fetchTier = async () => {

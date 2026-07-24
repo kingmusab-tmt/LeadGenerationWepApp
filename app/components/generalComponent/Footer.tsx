@@ -73,7 +73,7 @@ const Footer = React.memo(() => {
                   Resources
                 </Typography>
                 <List dense>
-                  {["Pricing", "Blog", "Contact", "Support"].map((text) => (
+                  {["Pricing", "Contact", "Support"].map((text) => (
                     <ListItem key={text} disableGutters>
                       <MuiLink
                         component={Link}

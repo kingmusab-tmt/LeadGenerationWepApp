@@ -31,6 +31,7 @@
     "@mui/x-date-pickers-pro": "^8.25.0",
     "@react-google-maps/api": "^2.20.8",
     "@reduxjs/toolkit": "^2.11.2",
+    "@sentry/nextjs": "^10.68.0",
     "@stripe/react-stripe-js": "^5.4.1",
     "@stripe/stripe-js": "^8.6.1",
     "@upstash/ratelimit": "^2.0.8",

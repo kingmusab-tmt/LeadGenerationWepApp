@@ -7,6 +7,16 @@ import { requireAdmin, requireSuperAdmin } from "@/lib/api/adminAuth";
 import { recordAuditLog } from "@/lib/auditLog";
 import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 
+// Must match models/userModel.ts's role enum.
+const VALID_ROLES = [
+  "admin",
+  "seller",
+  "buyer",
+  "user",
+  "staff",
+  "business-admin",
+];
+
 const toIsoDateOrNull = (value: unknown): string | null => {
   if (!value) return null;
   const parsed = value instanceof Date ? value : new Date(value as string);
@@ -37,6 +47,21 @@ export async function PUT(
       if (superError) return superError;
       if (adminLevel !== "standard" && adminLevel !== "super") {
         return badRequest('adminLevel must be "standard" or "super"');
+      }
+    }
+
+    if (role) {
+      if (!VALID_ROLES.includes(role)) {
+        return badRequest(`Invalid role. Must be one of: ${VALID_ROLES.join(", ")}`);
+      }
+      // Promoting someone to "admin" is the same class of action as raising
+      // adminLevel above — it grants full base admin capabilities — so it
+      // gets the same super-admin-only gate. Without this, a standard admin
+      // could set any user's role straight to "admin" and sidestep the
+      // adminLevel check entirely.
+      if (role === "admin") {
+        const { error: superError } = await requireSuperAdmin();
+        if (superError) return superError;
       }
     }
 

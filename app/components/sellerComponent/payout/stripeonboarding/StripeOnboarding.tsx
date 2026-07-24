@@ -58,9 +58,10 @@ export default function StripeOnboarding({
     const checkInitialStatus = async () => {
       try {
         setLoading(true);
-        const response = await fetch(
-          `/api/payments/stripe/account-status?email=${encodeURIComponent(userEmail)}`,
-        );
+        // The route derives the account from the caller's own session now
+        // (it used to trust this query param, letting anyone look up any
+        // seller's Stripe status) — no email needed on the request.
+        const response = await fetch("/api/payments/stripe/account-status");
         const data = await response.json();
 
         if (response.ok) {

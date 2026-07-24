@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { Box, Button, Container, Paper, Typography } from "@mui/material";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Shared body for the seller/buyer/admin dashboard error.tsx boundaries.
@@ -25,6 +26,7 @@ export default function DashboardErrorBoundary({
 }) {
   useEffect(() => {
     console.error(`[${dashboardName} Error]`, error);
+    Sentry.captureException(error, { tags: { boundary: dashboardName } });
   }, [error, dashboardName]);
 
   return (

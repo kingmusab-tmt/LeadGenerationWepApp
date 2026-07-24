@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { ErrorCode } from "./error-handler";
 
 // ============================================
@@ -52,9 +53,45 @@ class ErrorLogger {
     // Console output with formatting
     this.consoleLog(logEntry);
 
+    // Every "error" entry funnels through here regardless of which helper
+    // (logError, logDatabaseError, logExternalServiceError, ...) produced
+    // it, so this is the one place that needs to forward to Sentry.
+    if (entry.level === "error") {
+      this.reportToSentry(logEntry);
+    }
+
     // In production, send to external service
     if (process.env.NODE_ENV === "production") {
       this.sendToExternalService(logEntry);
+    }
+  }
+
+  /**
+   * Forward an error-level entry to Sentry. A no-op if Sentry has no DSN
+   * configured (see instrumentation.ts) — never allowed to throw, since
+   * error reporting itself must not become a new source of errors.
+   */
+  private reportToSentry(entry: ErrorLogEntry): void {
+    try {
+      Sentry.withScope((scope) => {
+        scope.setLevel("error");
+        scope.setTag("errorCode", String(entry.code));
+        if (entry.path) scope.setTag("path", entry.path);
+        if (entry.method) scope.setTag("method", entry.method);
+        if (entry.requestId) scope.setTag("requestId", entry.requestId);
+        if (entry.userId) scope.setUser({ id: entry.userId });
+        if (entry.metadata) scope.setContext("metadata", entry.metadata);
+
+        if (entry.stack) {
+          const reconstructed = new Error(entry.message);
+          reconstructed.stack = entry.stack;
+          Sentry.captureException(reconstructed);
+        } else {
+          Sentry.captureMessage(entry.message, "error");
+        }
+      });
+    } catch {
+      // Never let Sentry reporting itself break the app.
     }
   }
 
