@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     return unauthorized("Please log in to access this recording.");
   }
 
-  const rateLimited = checkSimpleRateLimit(req, {
+  const rateLimited = await checkSimpleRateLimit(req, {
     scope: "call-recording-proxy",
     limit: 60,
     windowMs: 60 * 1000,

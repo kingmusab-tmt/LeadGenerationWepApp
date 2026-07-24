@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useInitializeUser } from "@/app/hooks";
+import { useInitializeUser, useDashboardTerms } from "@/app/hooks";
 import {
   Box,
   Button,
@@ -39,6 +39,7 @@ import {
   Send as SendIcon,
   Pause as PauseIcon,
   PlayArrow as ResumeIcon,
+  Group as SegmentIcon,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import RecipientPicker from "@/app/components/RecipientPicker";
@@ -46,6 +47,7 @@ import { useConfirm } from "@/app/hooks/useConfirm";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
+import SegmentsManagerDialog from "./SegmentsManagerDialog";
 
 interface Campaign {
   _id: string;
@@ -66,6 +68,7 @@ export default function EmailCampaigns() {
   const router = useRouter();
   const fetchWithCSRF = useCSRFFetch();
   const { currentUser } = useInitializeUser();
+  const terms = useDashboardTerms();
   const { limits, isTrial } = useSubscriptionLimits();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +102,7 @@ export default function EmailCampaigns() {
   }>({ campaignId: "", action: null });
   const [emailSettingsRequiredOpen, setEmailSettingsRequiredOpen] =
     useState(false);
+  const [segmentsDialogOpen, setSegmentsDialogOpen] = useState(false);
 
   // Fetch campaigns
   useEffect(() => {
@@ -189,7 +193,7 @@ export default function EmailCampaigns() {
 
     try {
       setAiGenerating(true);
-      const response = await fetch("/api/ai/generate-campaign", {
+      const response = await fetchWithCSRF("/api/ai/generate-campaign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -246,7 +250,7 @@ export default function EmailCampaigns() {
         .map((e) => e.trim())
         .filter((e) => e.length > 0);
 
-      const response = await fetch(url, {
+      const response = await fetchWithCSRF(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -277,15 +281,19 @@ export default function EmailCampaigns() {
     }
   };
 
-  const handleDeleteCampaign = async (id: string) => {
+  const handleDeleteCampaign = async (campaign: Campaign) => {
+    const hasSendHistory = campaign.analytics.sent > 0;
     const confirmed = await confirm({
       title: "Delete Campaign",
-      message:
-        "Are you sure you want to delete this campaign? This action cannot be undone.",
+      message: hasSendHistory
+        ? `This campaign was already sent to ${campaign.analytics.sent} recipient(s) — deleting it permanently erases all of its send, open, and click history. This cannot be undone.`
+        : "Are you sure you want to delete this campaign? This action cannot be undone.",
       confirmText: "Delete",
       confirmColor: "error",
     });
     if (!confirmed) return;
+
+    const id = campaign._id;
 
     try {
       setActionLoading({ campaignId: id, action: "delete" });
@@ -323,7 +331,7 @@ export default function EmailCampaigns() {
 
     try {
       setActionLoading({ campaignId: id, action: "send" });
-      const response = await fetch(
+      const response = await fetchWithCSRF(
         `/api/marketing/email/campaigns/${id}/actions?action=send`,
         {
           method: "POST",
@@ -364,7 +372,7 @@ export default function EmailCampaigns() {
   const handlePauseCampaign = async (id: string) => {
     try {
       setActionLoading({ campaignId: id, action: "pause" });
-      const response = await fetch(
+      const response = await fetchWithCSRF(
         `/api/marketing/email/campaigns/${id}/actions?action=pause`,
         { method: "POST" },
       );
@@ -386,7 +394,7 @@ export default function EmailCampaigns() {
   const handleResumeCampaign = async (id: string) => {
     try {
       setActionLoading({ campaignId: id, action: "resume" });
-      const response = await fetch(
+      const response = await fetchWithCSRF(
         `/api/marketing/email/campaigns/${id}/actions?action=resume`,
         { method: "POST" },
       );
@@ -470,15 +478,29 @@ export default function EmailCampaigns() {
         <Typography variant="h4" sx={{ fontWeight: "bold" }}>
           Email Campaigns
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          New Campaign
-        </Button>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<SegmentIcon />}
+            onClick={() => setSegmentsDialogOpen(true)}
+          >
+            Manage Segments
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            New Campaign
+          </Button>
+        </Box>
       </Box>
+
+      <SegmentsManagerDialog
+        open={segmentsDialogOpen}
+        onClose={() => setSegmentsDialogOpen(false)}
+      />
 
       {/* Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -523,18 +545,22 @@ export default function EmailCampaigns() {
                 Avg Open Rate
               </Typography>
               <Typography variant="h5">
-                {campaigns.length > 0
-                  ? (
-                      campaigns.reduce(
-                        (sum, c) =>
-                          sum +
-                          (c.totalRecipients > 0
-                            ? (c.analytics.opened / c.totalRecipients) * 100
-                            : 0),
-                        0,
-                      ) / campaigns.length
-                    ).toFixed(1) + "%"
-                  : "0%"}
+                {(() => {
+                  // Open rate is only meaningful relative to how many
+                  // emails actually went out, not the recipient list size —
+                  // using totalRecipients understated the rate for any
+                  // campaign that hadn't finished sending or had failures.
+                  const withSends = campaigns.filter(
+                    (c) => c.analytics.sent > 0,
+                  );
+                  if (withSends.length === 0) return "0%";
+                  const avg =
+                    withSends.reduce(
+                      (sum, c) => sum + (c.analytics.opened / c.analytics.sent) * 100,
+                      0,
+                    ) / withSends.length;
+                  return avg.toFixed(1) + "%";
+                })()}
               </Typography>
             </CardContent>
           </Card>
@@ -557,6 +583,7 @@ export default function EmailCampaigns() {
           );
         }}
         sx={{ mb: 3 }}
+        aria-label="Filter campaigns by status"
       >
         <Tab label="All" />
         <Tab label="Drafts" />
@@ -696,7 +723,7 @@ export default function EmailCampaigns() {
                             <DeleteIcon />
                           )
                         }
-                        onClick={() => handleDeleteCampaign(campaign._id)}
+                        onClick={() => handleDeleteCampaign(campaign)}
                         disabled={
                           actionLoading.campaignId === campaign._id &&
                           actionLoading.action === "delete"
@@ -777,6 +804,9 @@ export default function EmailCampaigns() {
                 <div
                   contentEditable
                   suppressContentEditableWarning
+                  role="textbox"
+                  aria-multiline="true"
+                  aria-label="Email content, rich text editor"
                   onBlur={(e) =>
                     setFormData({
                       ...formData,
@@ -882,9 +912,13 @@ export default function EmailCampaigns() {
               label="Recipient Source"
             >
               <MenuItem value="leads">Leads</MenuItem>
-              <MenuItem value="buyers">Buyers</MenuItem>
-              <MenuItem value="leadsAndBuyers">Leads and Buyers</MenuItem>
-              <MenuItem value="all">All (Leads, Buyers & Manual)</MenuItem>
+              <MenuItem value="buyers">{terms.buyers}</MenuItem>
+              <MenuItem value="leadsAndBuyers">
+                Leads and {terms.buyers}
+              </MenuItem>
+              <MenuItem value="all">
+                All (Leads, {terms.buyers} & Manual)
+              </MenuItem>
             </Select>
           </FormControl>
           <Box>

@@ -33,6 +33,7 @@ import {
   TrendingUp,
 } from "@mui/icons-material";
 import { useCSRF, useCSRFFetch } from "@/app/hooks/useCSRF";
+import { hasTrialIntent, clearTrialIntent } from "@/lib/trialIntent";
 
 type UserRole = "user" | "seller" | "buyer" | "business-admin" | "staff";
 
@@ -78,17 +79,8 @@ const RoleSelectionPage: React.FC = () => {
 
   // Check for trial intent on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      let trialIntentStored = sessionStorage.getItem("trialIntent");
-      if (!trialIntentStored && typeof window !== "undefined") {
-        const match = document.cookie
-          .split("; ")
-          .find((row) => row.startsWith("trialIntent="));
-        trialIntentStored = match ? match.split("=")[1] : null;
-      }
-      if (trialIntentStored === "true") {
-        setTrialIntent(true);
-      }
+    if (hasTrialIntent()) {
+      setTrialIntent(true);
     }
   }, []);
 
@@ -128,7 +120,7 @@ const RoleSelectionPage: React.FC = () => {
 
     // Handle sellers and business-admins
     if (role === "seller" || role === "business-admin") {
-      // Only start trial if trialIntent flag is set in sessionStorage
+      // Only start trial if trial intent was captured (see hasTrialIntent effect above)
       if (trialIntent) {
         try {
           setSnackbar({
@@ -148,14 +140,7 @@ const RoleSelectionPage: React.FC = () => {
           );
 
           if (trialResponse.ok) {
-            // Clear trial intent from sessionStorage and cookie fallback
-            sessionStorage.removeItem("trialIntent");
-            try {
-              // best-effort delete via document.cookie
-              document.cookie = "trialIntent=; Max-Age=0; path=/";
-            } catch {
-              // ignore
-            }
+            clearTrialIntent();
 
             // Update session to reflect new subscription status
             await updateSession();
@@ -179,10 +164,9 @@ const RoleSelectionPage: React.FC = () => {
               trialError?.message ||
               "Your free trial could not be started. Please review the available plans.";
 
-            // Expected rejections such as an already-used trial should not be treated as errors.
-            // Remove sessionStorage flag but keep cookie to allow retries where appropriate
-            sessionStorage.removeItem("trialIntent");
-
+            // Expected rejections such as an already-used trial should not
+            // be treated as errors — leave the cookie in place so /plan's
+            // retry path can still pick up the intent.
             setSnackbar({
               open: true,
               message: trialMessage,
@@ -194,7 +178,6 @@ const RoleSelectionPage: React.FC = () => {
           }
         } catch (error) {
           console.error("[CompleteRegistration] Error starting trial:", error);
-          sessionStorage.removeItem("trialIntent");
           router.push("/plan");
           return;
         }
@@ -421,21 +404,19 @@ const RoleSelectionPage: React.FC = () => {
                         "Connect with qualified buyers (requires plan selection)",
                     },
                     {
-                      value: "buyer",
-                      label: "Lead Buyer",
-                      description: "Find quality leads for your business",
-                    },
-                    {
                       value: "business-admin",
                       label: "Business Admin",
                       description:
-                        "Manage your organization's account (requires plan selection)",
+                        "Manage your organization's lead buyers and staff (requires plan selection)",
                     },
-                    {
-                      value: "staff",
-                      label: "Staff Member",
-                      description: "Access assigned business tools",
-                    },
+                    // Lead Buyer and Staff Member are intentionally not
+                    // offered here — they're never self-service. A lead
+                    // seller adds their buyers (manually or via the buyer
+                    // registration link under Lead Buyer Management), and a
+                    // Business Admin adds their staff the same way. Once
+                    // pre-registered, that person is auto-assigned the right
+                    // role on sign-in and goes straight to their dashboard
+                    // without ever seeing this page.
                   ].map((role) => (
                     <Button
                       key={role.value}

@@ -166,7 +166,7 @@ export default function SmsCampaignEditorPage() {
     if (!confirmed) return;
     try {
       setSaving(true);
-      const res = await fetch(
+      const res = await fetchWithCSRF(
         `/api/marketing/sms/campaigns/${campaignId}/actions?action=send`,
         { method: "POST" },
       );
@@ -192,7 +192,7 @@ export default function SmsCampaignEditorPage() {
     }
     try {
       setSaving(true);
-      const res = await fetch(
+      const res = await fetchWithCSRF(
         `/api/marketing/sms/campaigns/${campaignId}/actions?action=test`,
         {
           method: "POST",
@@ -213,7 +213,7 @@ export default function SmsCampaignEditorPage() {
   const handlePause = async () => {
     try {
       setSaving(true);
-      const res = await fetch(
+      const res = await fetchWithCSRF(
         `/api/marketing/sms/campaigns/${campaignId}/actions?action=pause`,
         { method: "POST" },
       );
@@ -233,7 +233,7 @@ export default function SmsCampaignEditorPage() {
   const handleResume = async () => {
     try {
       setSaving(true);
-      const res = await fetch(
+      const res = await fetchWithCSRF(
         `/api/marketing/sms/campaigns/${campaignId}/actions?action=resume`,
         { method: "POST" },
       );

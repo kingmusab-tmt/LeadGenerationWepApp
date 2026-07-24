@@ -61,32 +61,60 @@ export default function ScheduledCallbacksPanel() {
   }>({ open: false, callback: null, action: "complete" });
   const [notes, setNotes] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const fetchCallbacks = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch(
-        `/api/calls/scheduled-callbacks?status=${statusFilter}&page=${page}&limit=15`,
-      );
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setCallbacks(data.callbacks || []);
-      setTotalPages(data.pagination?.pages || 1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, statusFilter]);
+  // Guards against two races:
+  // 1. Out-of-order responses — switching the status filter or page quickly
+  //    could let a slower, older request resolve after a newer one and
+  //    clobber the UI with stale data. `isStale()` is checked right after
+  //    the await and skips applying the response if a newer request/unmount
+  //    has since superseded it.
+  // 2. Stale pagination — resolving/cancelling the last item on a later
+  //    page leaves `requestPage` pointing past the new last page; if so,
+  //    clamp to the last valid page and let the effect below refetch,
+  //    instead of showing a false "no callbacks" empty state.
+  const fetchCallbacks = useCallback(
+    async (requestPage: number, isStale: () => boolean) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(
+          `/api/calls/scheduled-callbacks?status=${statusFilter}&page=${requestPage}&limit=15`,
+        );
+        if (!res.ok) throw new Error("Failed to fetch");
+        const body = await res.json();
+        const data = body?.data ?? body;
+        if (isStale()) return;
+        const pages = data.pagination?.pages || 1;
+        const total = data.pagination?.total ?? 0;
+        if (requestPage > pages && total > 0) {
+          setPage(pages);
+          return;
+        }
+        setCallbacks(data.callbacks || []);
+        setTotalPages(pages);
+      } catch (err) {
+        if (isStale()) return;
+        setError(err instanceof Error ? err.message : "Failed to load");
+      } finally {
+        if (!isStale()) setLoading(false);
+      }
+    },
+    [statusFilter],
+  );
 
   useEffect(() => {
-    fetchCallbacks();
-  }, [fetchCallbacks]);
+    let cancelled = false;
+    fetchCallbacks(page, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchCallbacks, page]);
 
   const handleAction = async () => {
     if (!actionDialog.callback) return;
     setActionLoading(true);
+    setActionError(null);
     try {
       const res = await fetchWithCSRF("/api/calls/scheduled-callbacks", {
         method: "PATCH",
@@ -100,9 +128,12 @@ export default function ScheduledCallbacksPanel() {
       if (!res.ok) throw new Error("Failed to update");
       setActionDialog({ open: false, callback: null, action: "complete" });
       setNotes("");
-      fetchCallbacks();
+      fetchCallbacks(page, () => false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update");
+      // Shown inside the dialog (see the Dialog below) rather than the
+      // page-level error banner — the seller is looking at the modal when
+      // this happens, and the banner sits behind it out of view.
+      setActionError(err instanceof Error ? err.message : "Failed to update");
     } finally {
       setActionLoading(false);
     }
@@ -137,7 +168,13 @@ export default function ScheduledCallbacksPanel() {
           mb: 2,
         }}
       >
-        <Typography variant="h6">Scheduled Callbacks</Typography>
+        <Box>
+          <Typography variant="h6">Scheduled Callbacks</Typography>
+          <Typography variant="caption" color="text.secondary">
+            These are not dialed automatically — call the customer back
+            yourself, then mark the request completed or cancelled below.
+          </Typography>
+        </Box>
         <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Status</InputLabel>
@@ -156,7 +193,11 @@ export default function ScheduledCallbacksPanel() {
             </Select>
           </FormControl>
           <Tooltip title="Refresh">
-            <IconButton onClick={fetchCallbacks} size="small">
+            <IconButton
+              aria-label="Refresh callbacks"
+              onClick={() => fetchCallbacks(page, () => false)}
+              size="small"
+            >
               <Refresh />
             </IconButton>
           </Tooltip>
@@ -185,7 +226,6 @@ export default function ScheduledCallbacksPanel() {
                   <TableCell sx={{ fontWeight: 700 }}>Industry</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Requested</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Attempts</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Notes</TableCell>
                   <TableCell sx={{ fontWeight: 700 }} align="center">
                     Actions
@@ -219,9 +259,6 @@ export default function ScheduledCallbacksPanel() {
                       />
                     </TableCell>
                     <TableCell>
-                      {cb.attemptCount}/{cb.maxAttempts}
-                    </TableCell>
-                    <TableCell>
                       <Typography
                         variant="caption"
                         color="text.secondary"
@@ -246,30 +283,34 @@ export default function ScheduledCallbacksPanel() {
                         >
                           <Tooltip title="Mark as completed">
                             <IconButton
+                              aria-label={`Mark callback from ${cb.callerPhone} as completed`}
                               size="small"
                               color="success"
-                              onClick={() =>
+                              onClick={() => {
+                                setActionError(null);
                                 setActionDialog({
                                   open: true,
                                   callback: cb,
                                   action: "complete",
-                                })
-                              }
+                                });
+                              }}
                             >
                               <CheckCircle fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Cancel callback">
                             <IconButton
+                              aria-label={`Cancel callback from ${cb.callerPhone}`}
                               size="small"
                               color="error"
-                              onClick={() =>
+                              onClick={() => {
+                                setActionError(null);
                                 setActionDialog({
                                   open: true,
                                   callback: cb,
                                   action: "cancel",
-                                })
-                              }
+                                });
+                              }}
                             >
                               <Cancel fontSize="small" />
                             </IconButton>
@@ -299,9 +340,10 @@ export default function ScheduledCallbacksPanel() {
       {/* Action Dialog */}
       <Dialog
         open={actionDialog.open}
-        onClose={() =>
-          setActionDialog({ open: false, callback: null, action: "complete" })
-        }
+        onClose={() => {
+          setActionDialog({ open: false, callback: null, action: "complete" });
+          setActionError(null);
+        }}
         maxWidth="sm"
         fullWidth
       >
@@ -311,6 +353,11 @@ export default function ScheduledCallbacksPanel() {
             : "Cancel Callback"}
         </DialogTitle>
         <DialogContent>
+          {actionError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {actionError}
+            </Alert>
+          )}
           {actionDialog.callback && (
             <Box sx={{ mb: 2 }}>
               <Typography variant="body2" color="text.secondary">
@@ -340,6 +387,7 @@ export default function ScheduledCallbacksPanel() {
                 action: "complete",
               });
               setNotes("");
+              setActionError(null);
             }}
           >
             Cancel

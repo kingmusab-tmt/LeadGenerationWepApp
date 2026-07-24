@@ -2,12 +2,13 @@ import dbConnect from "@/lib/connectdb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import Call from "@/models/call";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { PipelineStage } from "mongoose";
 import {
   badRequest,
   forbidden,
   internalError,
+  successResponse,
   unauthorized,
 } from "@/lib/api/error-handler";
 
@@ -49,7 +50,12 @@ export async function GET(req: NextRequest) {
     const matchStage: Record<string, unknown> = {
       userId: session.user.id,
       createdAt: { $gte: dateFrom },
-      buyerId: { $exists: true, $ne: null },
+      // "single_multiple" forwarded calls have no real buyer, so
+      // createCallRecord stores buyerId as "" (not null/undefined) —
+      // $ne: null lets that through, and the $lookup below converts "$_id"
+      // to an ObjectId, which throws on an empty string and fails the whole
+      // pipeline. Exclude "" explicitly.
+      buyerId: { $exists: true, $nin: [null, ""] },
     };
     if (industry) {
       matchStage.industry = industry;
@@ -68,7 +74,20 @@ export async function GET(req: NextRequest) {
             $sum: { $cond: [{ $eq: ["$status", "no-answer"] }, 1, 0] },
           },
           totalDuration: { $sum: { $ifNull: ["$callDuration", 0] } },
-          avgDuration: { $avg: { $ifNull: ["$callDuration", 0] } },
+          // Sum only over completed calls; divided by answeredCalls below to
+          // get the average duration of calls that actually connected. A
+          // plain $avg over every document (including no-answer/failed
+          // calls, whose duration coerces to 0) would drag the average down
+          // with calls that were never actually answered.
+          completedDuration: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "completed"] },
+                { $ifNull: ["$callDuration", 0] },
+                0,
+              ],
+            },
+          },
           totalUnitsCharged: { $sum: { $ifNull: ["$unitsCharged", 0] } },
           // Disposition breakdown
           qualifiedLeads: {
@@ -132,7 +151,20 @@ export async function GET(req: NextRequest) {
       {
         $lookup: {
           from: "leadbuyers",
-          let: { buyerId: { $toObjectId: "$_id" } },
+          // $convert with onError/onNull instead of bare $toObjectId — a
+          // malformed/empty _id (belt-and-suspenders alongside the $match
+          // filter above) degrades to "no buyerInfo" instead of throwing and
+          // failing the entire aggregation.
+          let: {
+            buyerId: {
+              $convert: {
+                input: "$_id",
+                to: "objectId",
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
           pipeline: [
             { $match: { $expr: { $eq: ["$_id", "$$buyerId"] } } },
             {
@@ -151,6 +183,13 @@ export async function GET(req: NextRequest) {
       { $unwind: { path: "$buyerInfo", preserveNullAndEmptyArrays: true } },
       {
         $addFields: {
+          avgDuration: {
+            $cond: [
+              { $gt: ["$answeredCalls", 0] },
+              { $divide: ["$completedDuration", "$answeredCalls"] },
+              0,
+            ],
+          },
           answerRate: {
             $cond: [
               { $gt: ["$totalCalls", 0] },
@@ -164,20 +203,28 @@ export async function GET(req: NextRequest) {
             ],
           },
           conversionRate: {
-            $cond: [
-              { $gt: ["$answeredCalls", 0] },
+            // Clamped to 100 as a safety net — disposition is set by the
+            // buyer and (pre-existing data aside) could in principle still
+            // put qualifiedLeads+soldLeads ahead of answeredCalls.
+            $min: [
+              100,
               {
-                $multiply: [
+                $cond: [
+                  { $gt: ["$answeredCalls", 0] },
                   {
-                    $divide: [
-                      { $add: ["$qualifiedLeads", "$soldLeads"] },
-                      "$answeredCalls",
+                    $multiply: [
+                      {
+                        $divide: [
+                          { $add: ["$qualifiedLeads", "$soldLeads"] },
+                          "$answeredCalls",
+                        ],
+                      },
+                      100,
                     ],
                   },
-                  100,
+                  0,
                 ],
               },
-              0,
             ],
           },
         },
@@ -209,8 +256,7 @@ export async function GET(req: NextRequest) {
           : 0,
     };
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       buyers: buyerPerformance,
       summary,
       period: { days, from: dateFrom.toISOString() },

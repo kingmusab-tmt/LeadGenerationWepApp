@@ -7,7 +7,7 @@
 export interface LeadField {
   id: string;
   label: string;
-  value: any;
+  value: string | number | boolean | string[] | Record<string, string>;
   _id?: string;
 }
 

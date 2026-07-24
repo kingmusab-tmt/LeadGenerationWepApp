@@ -52,6 +52,7 @@ import DirectionsCar from "@mui/icons-material/DirectionsCar";
 import AttachMoney from "@mui/icons-material/AttachMoney";
 import Lightbulb from "@mui/icons-material/Lightbulb";
 import Header from "../components/generalComponent/Header";
+import { setTrialIntent } from "@/lib/trialIntent";
 import Footer from "../components/generalComponent/Footer";
 import logo from "../../public/BRIXCOT.webp";
 import Image from "next/image";
@@ -538,15 +539,7 @@ const LandingPage = () => {
                     size="large"
                     href="/auth/sign-in?trial=true"
                     startIcon={<Rocket />}
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        sessionStorage.setItem("trialIntent", "true");
-                        // dynamic import to avoid SSR issues; swallow failures
-                        import("@/lib/cookieUtils")
-                          .then((cu) => cu.setCookie("trialIntent", "true", 10))
-                          .catch(() => {});
-                      }
-                    }}
+                    onClick={() => setTrialIntent()}
                     sx={{
                       px: 4,
                       py: 1.8,

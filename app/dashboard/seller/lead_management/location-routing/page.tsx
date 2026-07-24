@@ -22,6 +22,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import InfoIcon from "@mui/icons-material/Info";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface BuyerLocationInfo {
   buyerId: string;
@@ -40,6 +41,7 @@ interface BuyerLocationInfo {
 }
 
 export default function LocationRoutingDashboard() {
+  const terms = useDashboardTerms();
   const [buyers, setBuyers] = useState<BuyerLocationInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -154,7 +156,7 @@ export default function LocationRoutingDashboard() {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Total Buyers
+                Total {terms.buyers}
               </Typography>
               <Typography variant="h4">{stats.totalBuyers}</Typography>
             </CardContent>
@@ -164,7 +166,7 @@ export default function LocationRoutingDashboard() {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Buyers with Locations
+                {terms.buyers} with Locations
               </Typography>
               <Typography variant="h4" color="primary">
                 {stats.buyersWithLocations}
@@ -200,7 +202,7 @@ export default function LocationRoutingDashboard() {
                 {stats.strictMatchingBuyers}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                Buyers only accepting location matches
+                {terms.buyers} only accepting location matches
               </Typography>
             </CardContent>
           </Card>
@@ -214,20 +216,20 @@ export default function LocationRoutingDashboard() {
         </Typography>
         <ul style={{ margin: 0, paddingLeft: 20 }}>
           <li>
-            Leads are automatically matched to buyers based on their service
-            locations
+            Leads are automatically matched to {terms.buyersLower} based on
+            their service locations
           </li>
           <li>
-            Buyers with matching locations are prioritized in the assignment
-            queue
+            {terms.buyers} with matching locations are prioritized in the
+            assignment queue
           </li>
           <li>
-            Buyers with strict matching enabled will ONLY receive leads from
-            their service areas
+            {terms.buyers} with strict matching enabled will ONLY receive
+            leads from their service areas
           </li>
           <li>
-            Buyers without strict matching will receive all leads, but local
-            leads are prioritized
+            {terms.buyers} without strict matching will receive all leads, but
+            local leads are prioritized
           </li>
         </ul>
       </Alert>
@@ -238,7 +240,7 @@ export default function LocationRoutingDashboard() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Buyer</TableCell>
+                <TableCell>{terms.buyer}</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Priority</TableCell>
                 <TableCell>Service Locations</TableCell>
@@ -250,7 +252,7 @@ export default function LocationRoutingDashboard() {
                 <TableRow>
                   <TableCell colSpan={5} align="center">
                     <Typography color="textSecondary">
-                      No buyers found
+                      No {terms.buyersLower} found
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -346,9 +348,9 @@ export default function LocationRoutingDashboard() {
       {/* Summary */}
       {stats.buyersWithLocations === 0 && (
         <Alert severity="warning" sx={{ mt: 3 }}>
-          No buyers have configured service locations yet. Buyers can add
-          service locations in their settings to enable location-based lead
-          routing.
+          No {terms.buyersLower} have configured service locations yet.{" "}
+          {terms.buyers} can add service locations in their settings to enable
+          location-based lead routing.
         </Alert>
       )}
     </Box>

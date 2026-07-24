@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
         rejected: boolean;
       }>;
       status: string;
+      name?: string;
       save(): unknown;
       _id: string;
     }>;
@@ -83,28 +84,32 @@ export async function POST(req: NextRequest) {
     for (const lead of leads) {
       for (const buyer of buyers) {
         try {
-          // Update the lead's assignedTo array
-          lead.assignedTo = lead.assignedTo || [];
-
-          // Check if the buyer is already assigned
-          const isAlreadyAssigned = lead.assignedTo.some(
-            (assigned: { buyerId: { toString: () => string } }) =>
-              assigned.buyerId.toString() === buyer._id.toString(),
+          // Atomically add the buyer to assignedTo only if they aren't
+          // already there — the query condition ("assignedTo.buyerId" $ne)
+          // is re-checked against the live document, so two concurrent
+          // bulk-assign requests for the same lead/buyer pair can't both
+          // push a duplicate entry (the previous in-memory check-then-save
+          // could race and double-assign under concurrent calls).
+          const updatedLead = await Lead.findOneAndUpdate(
+            { _id: lead._id, "assignedTo.buyerId": { $ne: buyer._id } },
+            {
+              $push: {
+                assignedTo: { buyerId: buyer._id, accepted: false, rejected: false },
+              },
+              $set: { status: "assigned" },
+            },
+            { new: true },
           );
 
-          if (!isAlreadyAssigned) {
-            // Add the buyer to the assignedTo array in the correct format
-            lead.assignedTo.push({
+          if (!updatedLead) {
+            // Already assigned to this buyer — nothing to do, not an error.
+            assignmentResults.push({
+              leadId: lead._id,
               buyerId: buyer._id,
-              accepted: false,
-              rejected: false,
+              status: "already_assigned",
             });
+            continue;
           }
-
-          lead.status = "assigned";
-
-          // Save the updated lead
-          await lead.save();
 
           // PHASE 1: Sync Buyer.assignedLeads array
           await Buyer.findByIdAndUpdate(

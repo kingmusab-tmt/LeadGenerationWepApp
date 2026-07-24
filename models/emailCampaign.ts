@@ -1,18 +1,17 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export interface IEmailSegment {
-  _id?: mongoose.Types.ObjectId;
+// A segment is a seller's own saved, reusable filter over their own leads
+// and/or buyers (e.g. "High-quality TX leads") — not a platform-wide
+// targeting tool. Always scoped to the seller that created it.
+export interface IEmailSegment extends Document {
+  userId: mongoose.Schema.Types.ObjectId;
   name: string;
   description?: string;
   filters: {
-    role?: "seller" | "buyer" | "business-admin";
-    status?: "active" | "suspended";
-    industryFilter?: string[];
-    minLeads?: number;
-    maxLeads?: number;
-    subscriptionTier?: string[];
-    regions?: string[];
-    customTags?: string[];
+    source: "leads" | "buyers" | "both";
+    industries?: string[];
+    leadQuality?: ("High" | "Medium" | "Low")[];
+    buyerActiveOnly?: boolean;
   };
   recipientCount?: number;
   createdAt?: Date;
@@ -80,10 +79,10 @@ export interface IEmailCampaign extends Document {
   totalRecipients: number;
   sentCount?: number;
 
-  // A/B Testing
+  // A/B Testing — a single campaign document holds both variants; each
+  // recipient's EmailQueue row records which one (A or B) it received.
   abTesting?: {
     enabled: boolean;
-    variant: "A" | "B" | "control";
     variantSubject?: string;
     variantContent?: string;
     splitPercentage?: number;
@@ -136,6 +135,9 @@ export interface IEmailQueue extends Document {
   trackingToken?: string;
   openedAt?: Date;
   clickedAt?: Date;
+  // Which A/B content variant this recipient received, when the campaign
+  // has abTesting.enabled — unset for non-A/B campaigns.
+  variant?: "A" | "B";
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -303,10 +305,6 @@ const EmailCampaignSchema = new Schema<IEmailCampaign>(
         type: Boolean,
         default: false,
       },
-      variant: {
-        type: String,
-        enum: ["A", "B", "control"],
-      },
       variantSubject: String,
       variantContent: String,
       splitPercentage: Number,
@@ -347,26 +345,26 @@ const EmailCampaignSchema = new Schema<IEmailCampaign>(
 // Email Segment Schema
 const EmailSegmentSchema = new Schema<IEmailSegment>(
   {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
     name: {
       type: String,
       required: true,
     },
     description: String,
     filters: {
-      role: {
+      source: {
         type: String,
-        enum: ["seller", "buyer", "business-admin"],
+        enum: ["leads", "buyers", "both"],
+        required: true,
       },
-      status: {
-        type: String,
-        enum: ["active", "suspended"],
-      },
-      industryFilter: [String],
-      minLeads: Number,
-      maxLeads: Number,
-      subscriptionTier: [String],
-      regions: [String],
-      customTags: [String],
+      industries: [String],
+      leadQuality: [{ type: String, enum: ["High", "Medium", "Low"] }],
+      buyerActiveOnly: Boolean,
     },
     recipientCount: Number,
   },
@@ -374,6 +372,7 @@ const EmailSegmentSchema = new Schema<IEmailSegment>(
     timestamps: true,
   },
 );
+EmailSegmentSchema.index({ userId: 1, name: 1 }, { unique: true });
 
 // Email Queue Schema
 const EmailQueueSchema = new Schema<IEmailQueue>(
@@ -412,6 +411,10 @@ const EmailQueueSchema = new Schema<IEmailQueue>(
     },
     openedAt: Date,
     clickedAt: Date,
+    variant: {
+      type: String,
+      enum: ["A", "B"],
+    },
   },
   {
     timestamps: true,
@@ -470,6 +473,9 @@ const EmailTrackingEventSchema = new Schema<IEmailTrackingEvent>(
 // Create Indexes for Performance
 EmailCampaignSchema.index({ userId: 1, createdAt: -1 });
 EmailCampaignSchema.index({ status: 1, schedule: 1 });
+// Scoped per-seller (not global) so two different sellers can each name a
+// campaign "Spring Sale" — only duplicates within the same account collide.
+EmailCampaignSchema.index({ userId: 1, name: 1 }, { unique: true });
 EmailQueueSchema.index({
   campaignId: 1,
   status: 1,

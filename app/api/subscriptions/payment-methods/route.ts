@@ -8,6 +8,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import {
   badRequest,
+  forbidden,
   internalError,
   unauthorized,
 } from "@/lib/api/error-handler";
@@ -19,6 +20,10 @@ import {
   attachPaymentMethod,
 } from "@/lib/stripeSubscriptionService";
 import connectDB from "@/lib/connectdb";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
+
+const SUBSCRIPTION_ROLES = ["seller", "business-admin", "admin"];
 
 /**
  * GET /api/subscriptions/payment-methods
@@ -30,6 +35,10 @@ export async function GET() {
 
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
+    }
+
+    if (!SUBSCRIPTION_ROLES.includes(session.user.role || "")) {
+      return forbidden("Seller access required");
     }
 
     await connectDB();
@@ -62,6 +71,21 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
     }
+
+    if (!SUBSCRIPTION_ROLES.includes(session.user.role || "")) {
+      return forbidden("Seller access required");
+    }
+
+    const csrfError = requireCsrf(request, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(request, {
+      scope: "subscriptions-payment-methods",
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     const body = await request.json();
     const { action, ...params } = body;

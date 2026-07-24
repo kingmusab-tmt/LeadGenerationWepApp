@@ -7,12 +7,21 @@ export interface IScheduledCallback extends Document {
   industry: string;
   callSid: string; // Original call SID
   status: "pending" | "completed" | "failed" | "cancelled";
-  scheduledFor?: Date; // When to call back (null = ASAP)
+  // Always set to the creation time today (see createScheduledCallback) —
+  // there's no caller- or seller-facing way to request a future time, so
+  // this currently just tracks "when the request came in," not a real
+  // schedule.
+  scheduledFor?: Date;
+  // Reserved for an automated retry-dialer that hasn't been built — nothing
+  // in the codebase currently increments attemptCount or reads maxAttempts.
+  // Today, resolving a callback is entirely manual: the seller sees it in
+  // the Scheduled Callbacks tab, calls the customer themselves, then marks
+  // it completed/cancelled.
   attemptCount: number;
   maxAttempts: number;
   lastAttemptAt?: Date;
   completedAt?: Date;
-  completedBy?: string; // buyerId who completed the callback
+  completedBy?: string; // User _id (seller or admin) who marked this callback completed
   notes?: string;
   createdAt: Date;
   updatedAt: Date;

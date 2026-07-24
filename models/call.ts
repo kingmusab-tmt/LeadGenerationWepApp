@@ -22,6 +22,18 @@ export interface ICall extends Document {
   leadBuyers: string[];
   industry: string;
   callRecorded: boolean;
+  // The seller's tracking number that actually received this call — `to` gets
+  // overwritten with the forwarded-to buyer/number once routing decides where
+  // the call goes, so this is the only reliable way to look up which
+  // TrackingNumberSchema config (and its feature flags) applies to this call.
+  trackingNumber?: string;
+  // Count of no-answer retry attempts already made for this call chain, used
+  // to enforce CALL_DEFAULTS.maxRetryAttempts instead of retrying unbounded.
+  retryAttempt?: number;
+  // The tracking number's configured lead source (e.g. "Google Ads",
+  // "Referral") at the time this call came in — informational/reporting
+  // only, does not affect routing.
+  leadSource?: string;
   // Disposition
   disposition?: string;
   dispositionNotes?: string;
@@ -82,6 +94,9 @@ const CallSchema = new Schema<ICall>(
     forwardingNumbers: { type: [String], default: [] },
     leadBuyers: { type: [String], default: [] },
     industry: { type: String, required: true },
+    trackingNumber: { type: String },
+    retryAttempt: { type: Number, default: 0 },
+    leadSource: { type: String },
     reassigned: { type: Boolean, default: false },
     // Disposition
     disposition: {

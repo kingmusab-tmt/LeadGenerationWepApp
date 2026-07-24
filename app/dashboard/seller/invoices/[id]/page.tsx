@@ -31,6 +31,7 @@ import {
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import Link from "next/link";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface Invoice {
   _id: string;
@@ -66,6 +67,7 @@ export default function InvoiceDetailPage() {
   const [markPaidDialogOpen, setMarkPaidDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("stripe");
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const fetchWithCSRF = useCSRFFetch();
 
   const fetchInvoice = useCallback(async () => {
     try {
@@ -91,9 +93,12 @@ export default function InvoiceDetailPage() {
 
   const handleSendInvoice = async () => {
     try {
-      const res = await fetch(`/api/invoices/${id}/actions?action=send`, {
-        method: "POST",
-      });
+      const res = await fetchWithCSRF(
+        `/api/invoices/${id}/actions?action=send`,
+        {
+          method: "POST",
+        },
+      );
 
       if (res.ok) {
         toast.success("Invoice sent successfully");
@@ -110,11 +115,14 @@ export default function InvoiceDetailPage() {
 
   const handleMarkAsPaid = async () => {
     try {
-      const res = await fetch(`/api/invoices/${id}/actions?action=mark-paid`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod }),
-      });
+      const res = await fetchWithCSRF(
+        `/api/invoices/${id}/actions?action=mark-paid`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paymentMethod }),
+        },
+      );
 
       if (res.ok) {
         toast.success("Invoice marked as paid");
@@ -132,9 +140,12 @@ export default function InvoiceDetailPage() {
 
   const handleDuplicate = async () => {
     try {
-      const res = await fetch(`/api/invoices/${id}/actions?action=duplicate`, {
-        method: "POST",
-      });
+      const res = await fetchWithCSRF(
+        `/api/invoices/${id}/actions?action=duplicate`,
+        {
+          method: "POST",
+        },
+      );
 
       if (res.ok) {
         const newInvoice = await res.json();

@@ -31,7 +31,6 @@ import {
   Call,
   Receipt,
   FormatListBulleted,
-  People,
   Person,
   Build,
   ExpandLess,
@@ -49,7 +48,7 @@ import { handleSignOut } from "@/lib/signOutServerAction";
 import InactivityLogout from "@/app/components/generalComponent/InactivityLogout";
 import DarkModeToggle from "@/app/components/generalComponent/darkmodetoggle";
 import NotificationBell from "@/app/components/generalComponent/NotificationBell";
-import { useInitializeUser } from "@/app/hooks";
+import { useInitializeUser, useDashboardTerms } from "@/app/hooks";
 import { useSession } from "next-auth/react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import { isSellerOnboardingFlowComplete } from "@/lib/sellerOnboarding";
@@ -108,11 +107,6 @@ const navItems: NavItem[] = [
         icon: <Receipt />,
       },
       {
-        title: "Call Leads",
-        path: "lead_management/leadbuyers",
-        icon: <People />,
-      },
-      {
         title: "Location Routing",
         path: "lead_management/location-routing",
         icon: <LocationOn />,
@@ -166,6 +160,7 @@ const getLocalDateKey = (date: Date) =>
 const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   useDashboardReducers();
   const { currentUser, loading: userLoading } = useInitializeUser();
+  const terms = useDashboardTerms();
   const { status } = useSession();
   const { limits, isTrial, loading: limitsLoading } = useSubscriptionLimits();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -465,7 +460,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
                 >
                   <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
                   <ListItemText
-                    primary={item.title}
+                    primary={
+                      item.path === "lead_buyers_management"
+                        ? terms.buyers
+                        : item.title
+                    }
                     primaryTypographyProps={{
                       fontWeight: active ? 600 : 500,
                       fontSize: 14,
@@ -652,8 +651,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
             fontWeight={600}
             sx={{ flexGrow: 1, display: "block" }}
           >
-            {currentUser?.role === "business-admin" ? "Business" : "Seller"}{" "}
-            Dashboard
+            {terms.org} Dashboard
           </Typography>
 
           {/* Right side icons */}

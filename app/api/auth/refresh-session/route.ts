@@ -34,7 +34,7 @@ function getSubscriptionSnapshot(
  */
 export async function POST(req: NextRequest) {
   try {
-    const limitResponse = checkSimpleRateLimit(req, {
+    const limitResponse = await checkSimpleRateLimit(req, {
       scope: "auth-refresh-session",
       limit: 20,
       windowMs: 60_000,

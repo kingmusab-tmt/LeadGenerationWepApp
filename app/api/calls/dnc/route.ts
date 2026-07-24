@@ -2,19 +2,24 @@ import dbConnect from "@/lib/connectdb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { User } from "@/models";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   badRequest,
   internalError,
   notFound,
+  successResponse,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 type TrackingNumberEntry = {
   phoneNumber?: string;
   dncEnabled?: boolean;
   dncList?: string[];
 };
+
+const MAX_DNC_ENTRIES = 500;
 
 /**
  * DNC (Do-Not-Call) List Management API
@@ -47,8 +52,7 @@ export async function GET(req: NextRequest) {
       return notFound("Tracking number");
     }
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       dncEnabled: tn.dncEnabled || false,
       dncList: tn.dncList || [],
       count: (tn.dncList || []).length,
@@ -66,6 +70,17 @@ export async function POST(req: NextRequest) {
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
     }
+
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "dnc-post",
+      limit: 30,
+      windowMs: 5 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     const { phoneNumber, numbers } = await req.json();
 
@@ -85,27 +100,46 @@ export async function POST(req: NextRequest) {
       return notFound("Tracking number");
     }
 
-    const currentList = new Set(tn.dncList || []);
-    const cleaned = numbers
-      .map((n: string) => n.replace(/[^+\d]/g, "").trim())
-      .filter((n: string) => n.length >= 10);
+    const existingList = new Set(tn.dncList || []);
+    const cleaned = Array.from(
+      new Set(
+        numbers
+          .map((n: string) => n.replace(/[^+\d]/g, "").trim())
+          .filter((n: string) => n.length >= 10),
+      ),
+    );
 
-    let added = 0;
-    for (const num of cleaned) {
-      if (!currentList.has(num)) {
-        currentList.add(num);
-        added++;
-      }
+    if (existingList.size + cleaned.length > MAX_DNC_ENTRIES) {
+      return badRequest(
+        `DNC list cannot exceed ${MAX_DNC_ENTRIES} numbers (currently ${existingList.size}).`,
+      );
     }
 
-    tn.dncList = Array.from(currentList);
-    await seller.save();
+    // Atomic $addToSet instead of read-modify-write on the whole seller
+    // document — a plain seller.save() here would clobber any concurrent
+    // edit (e.g. updateForwarding/removeNumber) to a different tracking
+    // number on the same User document.
+    const updated = await User.findOneAndUpdate(
+      { _id: session.user.id, "trackingNumbers.phoneNumber": phoneNumber },
+      {
+        $addToSet: {
+          "trackingNumbers.$.dncList": { $each: cleaned },
+        },
+      },
+      { new: true },
+    ).select("trackingNumbers");
 
-    return NextResponse.json({
-      success: true,
-      added,
-      total: tn.dncList.length,
-    });
+    if (!updated) {
+      return notFound("Tracking number");
+    }
+
+    const updatedTn = (
+      updated.trackingNumbers as unknown as TrackingNumberEntry[]
+    ).find((n) => n.phoneNumber === phoneNumber);
+    const total = updatedTn?.dncList?.length || 0;
+    const added = cleaned.filter((n) => !existingList.has(n)).length;
+
+    return successResponse({ added, total });
   } catch (error) {
     console.error("Error adding to DNC list:", error);
     return internalError("Failed to add to DNC list");
@@ -119,6 +153,17 @@ export async function DELETE(req: NextRequest) {
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
     }
+
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "dnc-delete",
+      limit: 30,
+      windowMs: 5 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     const { phoneNumber, number } = await req.json();
 
@@ -139,16 +184,24 @@ export async function DELETE(req: NextRequest) {
     }
 
     const before = (tn.dncList || []).length;
-    tn.dncList = (tn.dncList || []).filter((n: string) => n !== number);
-    const removed = before - tn.dncList.length;
 
-    await seller.save();
+    const updated = await User.findOneAndUpdate(
+      { _id: session.user.id, "trackingNumbers.phoneNumber": phoneNumber },
+      { $pull: { "trackingNumbers.$.dncList": number } },
+      { new: true },
+    ).select("trackingNumbers");
 
-    return NextResponse.json({
-      success: true,
-      removed,
-      total: tn.dncList.length,
-    });
+    if (!updated) {
+      return notFound("Tracking number");
+    }
+
+    const updatedTn = (
+      updated.trackingNumbers as unknown as TrackingNumberEntry[]
+    ).find((n) => n.phoneNumber === phoneNumber);
+    const total = updatedTn?.dncList?.length || 0;
+    const removed = before - total;
+
+    return successResponse({ removed, total });
   } catch (error) {
     console.error("Error removing from DNC list:", error);
     return internalError("Failed to remove from DNC list");

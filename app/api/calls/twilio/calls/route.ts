@@ -22,7 +22,7 @@ import {
   addVoicemailToTwiml,
   addOverflowToTwiml,
 } from "@/utils/callHandlers";
-import { callSecurityMiddleware } from "@/lib/security/callSecurity";
+import { callSecurityMiddleware, CALL_DEFAULTS } from "@/lib/security/callSecurity";
 import { dispatchCallWebhook } from "@/lib/integrations/callWebhookDispatcher";
 import { env } from "@/lib/env";
 import {
@@ -79,6 +79,7 @@ type TrackingNumberConfig = {
   reconnectCaller: boolean;
   transcriptionEnabled?: boolean;
   aiSummaryEnabled?: boolean;
+  leadSource?: string;
 };
 
 function appendSingleMultipleIndex(actionUrl: string, index?: number): string {
@@ -88,6 +89,20 @@ function appendSingleMultipleIndex(actionUrl: string, index?: number): string {
 
   const separator = actionUrl.includes("?") ? "&" : "?";
   return `${actionUrl}${separator}singleMultipleIndex=${index}`;
+}
+
+// Tracks which lead buyers have already been dialed for a "specific_lead"
+// sequential call, the same way singleMultipleIndex tracks position for
+// "single_multiple" — needed because only the first sibling <Dial> in any
+// given TwiML response ever actually rings (see appendSingleMultipleIndex's
+// call sites), so advancing to the next lead buyer on no-answer requires
+// remembering who was already tried rather than relying on unreachable
+// sibling verbs.
+function appendTriedLeadBuyerIds(actionUrl: string, ids: string[]): string {
+  const filtered = ids.filter(Boolean);
+  if (filtered.length === 0) return actionUrl;
+  const separator = actionUrl.includes("?") ? "&" : "?";
+  return `${actionUrl}${separator}triedLeadBuyerIds=${encodeURIComponent(filtered.join(","))}`;
 }
 
 /**
@@ -257,6 +272,11 @@ export async function POST(req: NextRequest) {
       singleMultipleIndexParam !== null
         ? Number.parseInt(singleMultipleIndexParam, 10)
         : undefined;
+    const triedLeadBuyerIds = (
+      searchParams.get("triedLeadBuyerIds") || ""
+    )
+      .split(",")
+      .filter(Boolean);
 
     debugLog("Extracted parameters", {
       callSid,
@@ -315,6 +335,7 @@ export async function POST(req: NextRequest) {
         buyerId || undefined,
         singleMultipleIndex,
         callRate,
+        triedLeadBuyerIds,
       );
     } else if (callStatus && callStatus !== "ringing") {
       return handleCallAnswered(formData, callSid, callRate);
@@ -447,6 +468,7 @@ async function handleNewCall(
     multiRingEnabled,
     geoRoutingEnabled,
     concurrentCallLimit,
+    leadSource,
   } = trackingNumber;
 
   // ─── DNC List Check ───
@@ -487,9 +509,11 @@ async function handleNewCall(
       callRecorded: false,
       forwardingType,
       forwardingNumbers,
+      trackingNumber: to,
       leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
       industry,
       insufficientBalance: false,
+      leadSource,
     });
     return new NextResponse(twiml.toString(), {
       status: 200,
@@ -576,10 +600,12 @@ async function handleNewCall(
         status: "after_hours",
         callRecorded: false,
         forwardingType,
+        trackingNumber: to,
         forwardingNumbers,
         leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
         industry,
         insufficientBalance: false,
+        leadSource,
       });
       return new NextResponse(afterHoursTwiml.toString(), {
         status: 200,
@@ -719,7 +745,7 @@ async function handleNewCall(
       const cbDigit = scheduledCallbackDigit || "1";
       const gather = twiml.gather({
         numDigits: 1,
-        action: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/callback-request?sellerId=${sellerId}&callSid=${callSid}&from=${encodeURIComponent(from)}&trackingNumber=${encodeURIComponent(to)}&industry=${encodeURIComponent(industry)}`,
+        action: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/callback-request?sellerId=${sellerId}&callSid=${callSid}&from=${encodeURIComponent(from)}&trackingNumber=${encodeURIComponent(to)}&industry=${encodeURIComponent(industry)}&expectedDigit=${encodeURIComponent(cbDigit)}`,
         method: "POST",
         timeout: 5,
       });
@@ -740,18 +766,6 @@ async function handleNewCall(
       sendMissedCallTextBack(from, msg, callSid);
     }
   }
-
-  const appendSingleMultipleIndex = (
-    actionUrl: string,
-    index?: number,
-  ): string => {
-    if (!Number.isInteger(index)) {
-      return actionUrl;
-    }
-
-    const separator = actionUrl.includes("?") ? "&" : "?";
-    return `${actionUrl}${separator}singleMultipleIndex=${index}`;
-  };
 
   const dialNumbersSimultaneously = (
     phoneTargets: string[],
@@ -854,27 +868,18 @@ async function handleNewCall(
           );
         }
       } else {
-        // Use atomic round-robin to prevent race conditions (Issue #1 fix)
+        // Atomic round-robin, now filtering geo-routing/concurrent-limit
+        // eligibility *during* rotation (via extraEligibilityCheck) instead
+        // of only validating the single ticket-selected buyer afterward —
+        // previously a geo/concurrent-limit failure on that one buyer sent
+        // the whole call to fallback even when other buyers in the same
+        // industry were eligible right now.
         const { buyer } = await getNextRoundRobinBuyerAtomic(
           seller,
           industry,
           callRate,
+          (candidate) => isBuyerEligible(candidate, candidate._id.toString()),
         );
-
-        // Additional eligibility checks (geo, concurrent)
-        const buyerDoc = await Buyer.findById(buyer._id);
-        if (
-          (geoRoutingEnabled ||
-            (concurrentCallLimit && concurrentCallLimit > 0)) &&
-          buyerDoc &&
-          !(await isBuyerEligible(buyerDoc, buyer._id.toString()))
-        ) {
-          throw new Error("Buyer not eligible after extended checks");
-        }
-
-        if (!buyer.phone) {
-          throw new Error("Buyer has no phone number");
-        }
 
         forwardedTo = buyer.phone;
         newBuyerId = buyer._id.toString();
@@ -949,46 +954,59 @@ async function handleNewCall(
       }
     }
 
+    // Always dial the buyer's live/current phone (buyerDoc.phone), not the
+    // phone snapshotted on the tracking number's leadBuyers list at
+    // configuration time — that snapshot goes stale the moment a buyer
+    // updates their number in their own profile.
+    const livePhone = (buyer: { id: string; phone: string }) =>
+      buyerDocMap.get(buyer.id.toString())?.phone || buyer.phone;
+
     if (eligibleBuyers.length === 0) {
       handleNoBuyersFallback();
       debugLog("No eligible buyers — filtered by all criteria", null, "warn");
     } else if (multiRingEnabled && eligibleBuyers.length > 1) {
       // Use the shared multi-ring helper so screening/whisper behavior matches single_multiple.
       dialNumbersSimultaneously(
-        eligibleBuyers.map((buyer) => buyer.phone),
+        eligibleBuyers.map(livePhone),
         {
           buyerIds: eligibleBuyers.map((buyer) => buyer.id.toString()),
           buyerIdForAction: eligibleBuyers[0].id.toString(),
         },
         withMultiRingScreening(effectiveWhisperUrl, eligibleBuyers.length),
       );
-      forwardedTo = eligibleBuyers.map((b) => b.phone).join(", ");
+      forwardedTo = eligibleBuyers.map(livePhone).join(", ");
       newBuyerId = eligibleBuyers[0]?.id;
       debugLog("Multi-ring initiated", {
         buyerCount: eligibleBuyers.length,
         numbers: forwardedTo,
       });
     } else {
-      // Sequential dial
-      eligibleBuyers.forEach((buyer, index) => {
-        const dialParams = getDialParams({
-          from,
-          sellerId,
-          callSid,
-          buyerId: buyer.id.toString(),
-          passCallerId,
-          trackingNumber: to,
-          recordCall,
-        });
-        dialWithWhisper(twiml, buyer.phone, dialParams, effectiveWhisperUrl);
-        markCallActive(buyer.id.toString(), callSid);
-        dialedBuyerIds.push(buyer.id.toString());
-        if (index < eligibleBuyers.length - 1) {
-          twiml.pause({ length: 1 });
-        }
+      // Sequential dial — only the FIRST eligible buyer can ever actually
+      // ring in this TwiML response: a <Dial> with an `action` (which every
+      // dial here has, via getDialParams) hijacks control to that action's
+      // response once it completes, so sibling <Dial> verbs after it never
+      // execute. Advancing to the next eligible buyer therefore has to
+      // happen through the no-answer retry chain (see triedLeadBuyerIds in
+      // handleNoAnswer) rather than by emitting more sibling verbs here.
+      const firstBuyer = eligibleBuyers[0];
+      const firstBuyerPhone = livePhone(firstBuyer);
+      const dialParams = getDialParams({
+        from,
+        sellerId,
+        callSid,
+        buyerId: firstBuyer.id.toString(),
+        passCallerId,
+        trackingNumber: to,
+        recordCall,
       });
-      forwardedTo = eligibleBuyers.map((b) => b.phone).join(", ");
-      newBuyerId = eligibleBuyers[0]?.id;
+      dialParams.action = appendTriedLeadBuyerIds(dialParams.action, [
+        firstBuyer.id.toString(),
+      ]);
+      dialWithWhisper(twiml, firstBuyerPhone, dialParams, effectiveWhisperUrl);
+      markCallActive(firstBuyer.id.toString(), callSid);
+      dialedBuyerIds.push(firstBuyer.id.toString());
+      forwardedTo = firstBuyerPhone;
+      newBuyerId = firstBuyer.id;
     }
   } else {
     twiml.say("No forwarding rules configured. Ending call.");
@@ -1015,6 +1033,8 @@ async function handleNewCall(
     leadBuyers: recordLeadBuyers,
     industry,
     insufficientBalance,
+    trackingNumber: to,
+    leadSource,
   });
 
   // Update call with geo/spam data (non-blocking)
@@ -1070,6 +1090,7 @@ async function handleNoAnswer(
   buyerId?: string,
   singleMultipleIndex?: number,
   callRate?: { units: number; seconds: number },
+  triedLeadBuyerIds: string[] = [],
 ) {
   try {
     debugLog("Handling no-answer scenario", { callSid, buyerId });
@@ -1096,8 +1117,14 @@ async function handleNoAnswer(
     // Clear concurrent-call tracking for all dialed legs of this call.
     markAllLegsInactive(originalCall, callSid);
 
-    // Update original call status
+    // Update original call status and bump the retry-attempt counter. Twilio
+    // reports the same parent CallSid on every no-answer for this phone call
+    // no matter how many <Dial> hops have happened, so this one record (and
+    // its counter) is authoritative across the whole retry chain regardless
+    // of forwarding type.
     originalCall.status = "no-answer";
+    const currentRetryAttempt = (originalCall.retryAttempt || 0) + 1;
+    originalCall.retryAttempt = currentRetryAttempt;
     await originalCall.save();
 
     const {
@@ -1107,6 +1134,7 @@ async function handleNoAnswer(
       industry,
       callRecorded,
       passCallerId,
+      leadSource,
     } = originalCall;
 
     const twiml = new twilio.twiml.VoiceResponse();
@@ -1159,7 +1187,7 @@ async function handleNoAnswer(
         const gather = twiml.gather({
           numDigits: 1,
           timeout: 5,
-          action: `${baseUrl}/api/calls/twilio/callback-request?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&sellerId=${seller._id}&industry=${industry || ""}`,
+          action: `${baseUrl}/api/calls/twilio/callback-request?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&sellerId=${seller._id}&industry=${industry || ""}&expectedDigit=${encodeURIComponent(scheduledCallbackDigit)}`,
           method: "POST",
         });
         gather.say(`Press ${scheduledCallbackDigit} to request a callback.`);
@@ -1181,9 +1209,24 @@ async function handleNoAnswer(
       }
     };
 
-    // Handle different forwarding types for retry
-    // Only attempt reconnection if Auto-Reconnect is enabled
-    if (!reconnectEnabled) {
+    // Handle different forwarding types for retry.
+    //
+    // Auto-Reconnect only gates whether "direct" round-robin tries an
+    // additional *buyer* beyond the one first picked — it does not gate
+    // whether single_multiple/specific_lead advance through the list of
+    // targets the seller explicitly configured. Treating "try the next
+    // configured number/buyer" as an optional extra (rather than the whole
+    // point of listing more than one) meant sellers who left this toggle at
+    // its default (off) only ever had their first configured number/buyer
+    // attempted, with the rest silently unused.
+    if (currentRetryAttempt > CALL_DEFAULTS.maxRetryAttempts) {
+      debugLog("Max retry attempts reached — falling back", {
+        callSid,
+        currentRetryAttempt,
+        maxRetryAttempts: CALL_DEFAULTS.maxRetryAttempts,
+      });
+      handleNoAnswerFallback();
+    } else if (!reconnectEnabled && forwardingType === "direct") {
       debugLog("Auto-Reconnect disabled — going straight to fallback", {
         callSid,
       });
@@ -1277,14 +1320,39 @@ async function handleNoAnswer(
               // for every ringing buyer when this retry leg completes/no-answers.
               leadBuyers: eligibleRetryBuyers.map((b) => b.id),
               industry,
+              trackingNumber: to,
+              retryAttempt: currentRetryAttempt,
+              leadSource,
             });
           }
         } else {
-          // Use atomic round-robin for retry as well (Issue #1 fix)
+          // Atomic round-robin for retry too, with the same geo/concurrent
+          // eligibility filtering applied during rotation as the initial
+          // call (previously this retry path skipped those checks entirely
+          // and could dial a geo-mismatched or over-limit buyer).
           const { buyer } = await getNextRoundRobinBuyerAtomic(
             seller,
             industry,
             callRate || { units: 1, seconds: 60 },
+            async (candidate) => {
+              if (
+                geoRoutingEnabled &&
+                geoData &&
+                !doesBuyerServiceArea(candidate, geoData)
+              ) {
+                return false;
+              }
+              if (
+                concurrentCallLimit > 0 &&
+                (await isBuyerAtConcurrentLimit(
+                  candidate._id.toString(),
+                  concurrentCallLimit,
+                ))
+              ) {
+                return false;
+              }
+              return true;
+            },
           );
           const newCallSid = `${callSid}-retry-${Date.now()}`;
 
@@ -1312,6 +1380,9 @@ async function handleNoAnswer(
             forwardingNumbers,
             leadBuyers: leadBuyers?.map((b: { id: string }) => b.id),
             industry,
+            trackingNumber: to,
+            retryAttempt: currentRetryAttempt,
+            leadSource,
           });
         }
       } catch (e) {
@@ -1403,9 +1474,18 @@ async function handleNoAnswer(
         retryBuyerDocs.map((b) => [b._id.toString(), b]),
       );
 
-      // Filter lead buyers by availability, business hours, geo, concurrent, and balance
+      // Filter lead buyers by availability, business hours, geo, concurrent,
+      // balance, AND exclude anyone already tried in this call chain —
+      // without this exclusion, the sequential branch below would just keep
+      // re-selecting the same first-in-list buyer forever, since nothing
+      // else about their eligibility changes between a no-answer and the
+      // retry that follows it.
+      const triedSet = new Set(triedLeadBuyerIds);
       const eligibleBuyers = [];
       for (const buyer of leadBuyers) {
+        if (triedSet.has(buyer.id.toString())) {
+          continue;
+        }
         const buyerDoc = retryBuyerDocMap.get(buyer.id.toString());
 
         if (buyerDoc && isBuyerOnVacation(buyerDoc)) {
@@ -1461,6 +1541,9 @@ async function handleNoAnswer(
         }
       }
 
+      const retryLivePhone = (buyer: { id: string; phone: string }) =>
+        retryBuyerDocMap.get(buyer.id.toString())?.phone || buyer.phone;
+
       if (eligibleBuyers.length === 0) {
         handleNoAnswerFallback();
       } else if (multiRingEnabled && eligibleBuyers.length > 1) {
@@ -1486,7 +1569,7 @@ async function handleNoAnswer(
             numberAttrs.url = retryMultiRingWhisper;
             numberAttrs.method = "POST";
           }
-          dial.number(numberAttrs, buyer.phone);
+          dial.number(numberAttrs, retryLivePhone(buyer));
           markCallActive(buyer.id.toString(), retryActionCallSid);
         });
 
@@ -1498,9 +1581,7 @@ async function handleNoAnswer(
           userId: String(seller._id),
           buyerId: eligibleBuyers[0].id.toString(),
           from,
-          to: eligibleBuyers
-            .map((b: { phone: string }) => b.phone)
-            .join(", "),
+          to: eligibleBuyers.map(retryLivePhone).join(", "),
           status: "forwarded",
           callRecorded,
           forwardingType,
@@ -1509,28 +1590,32 @@ async function handleNoAnswer(
             b.id.toString(),
           ),
           industry,
+          trackingNumber: to,
+          retryAttempt: currentRetryAttempt,
+          leadSource,
         });
       } else {
-        eligibleBuyers.forEach(
-          (buyer: { id: string; phone: string | undefined }, index: number) => {
-            const dialParams = getDialParams({
-              from,
-              sellerId: seller._id as string,
-              callSid: `${callSid}-retry-${index}`,
-              buyerId: buyer.id.toString(),
-              passCallerId,
-              trackingNumber: to,
-              recordCall: callRecorded,
-            });
-            if (!buyer.phone) {
-              return;
-            }
-            dialWithWhisper(twiml, buyer.phone, dialParams, retryWhisperUrl);
-            if (index < eligibleBuyers.length - 1) {
-              twiml.pause({ length: 1 });
-            }
-          },
-        );
+        // Sequential: only the next remaining eligible buyer can ever
+        // actually ring (see the comment on appendTriedLeadBuyerIds), so
+        // dial just that one and extend the tried-list for the *next*
+        // no-answer instead of emitting unreachable sibling verbs.
+        const nextBuyer = eligibleBuyers[0];
+        const nextBuyerPhone = retryLivePhone(nextBuyer);
+        const dialParams = getDialParams({
+          from,
+          sellerId: seller._id as string,
+          callSid,
+          buyerId: nextBuyer.id.toString(),
+          passCallerId,
+          trackingNumber: to,
+          recordCall: callRecorded,
+        });
+        dialParams.action = appendTriedLeadBuyerIds(dialParams.action, [
+          ...triedLeadBuyerIds,
+          nextBuyer.id.toString(),
+        ]);
+        dialWithWhisper(twiml, nextBuyerPhone, dialParams, retryWhisperUrl);
+        markCallActive(nextBuyer.id.toString(), callSid);
       }
     } else {
       twiml.say("No forwarding rules configured. Ending call.");
@@ -1602,9 +1687,18 @@ async function handleCallAnswered(
         const trackingNumbers = ((
           seller as unknown as { trackingNumbers?: TrackingNumberConfig[] }
         ).trackingNumbers ?? []) as TrackingNumberConfig[];
-        const tn = trackingNumbers.find(
-          (n: { industry?: string }) => n.industry === updatedCall.industry,
-        );
+        // Match by the specific tracking number that took this call, not by
+        // industry — a seller can have multiple tracking numbers sharing the
+        // same industry with different AI/transcription settings, and an
+        // industry-only match could apply the wrong number's config.
+        const tn = updatedCall.trackingNumber
+          ? trackingNumbers.find(
+              (n: { phoneNumber?: string }) =>
+                n.phoneNumber === updatedCall.trackingNumber,
+            )
+          : trackingNumbers.find(
+              (n: { industry?: string }) => n.industry === updatedCall.industry,
+            );
         if (tn?.transcriptionEnabled || tn?.aiSummaryEnabled) {
           processCallAIAnalysis(callSid, {
             transcriptionEnabled: !!tn.transcriptionEnabled,

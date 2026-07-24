@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * Rotate an API key
  */
 export async function POST(req: NextRequest) {
-  const limitResponse = checkSimpleRateLimit(req, {
+  const limitResponse = await checkSimpleRateLimit(req, {
     scope: "api-key-rotate",
     limit: 10,
     windowMs: 60_000,

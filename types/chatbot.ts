@@ -4,7 +4,7 @@ export interface Message {
   type: "user" | "bot";
   content: string;
   timestamp: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Lead {
@@ -27,7 +27,7 @@ export interface Lead {
     | "unqualified"
     | "transferred";
   conversationId: string;
-  responses: Record<string, any>;
+  responses: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,7 +58,7 @@ export interface ScoringRule {
   field: string;
   conditions: {
     operator: "equals" | "contains" | "greater_than" | "less_than";
-    value: any;
+    value: string | number | boolean;
     score: number;
   }[];
 }
@@ -70,5 +70,5 @@ export interface RoutingRule {
     | "schedule_callback"
     | "add_to_nurture"
     | "disqualify";
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }

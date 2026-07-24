@@ -1,11 +1,15 @@
 // Description: This code is responsible for sending email notifications to buyers when they are assigned a new lead. It uses the Nodemailer library to handle email sending and connects to a MongoDB database to retrieve buyer and seller information.
 import nodemailer from "nodemailer";
+import { Types } from "mongoose";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import { env } from "@/lib/env";
 
-export const sendEmailNotification = async (buyerId: any, lead: any) => {
+export const sendEmailNotification = async (
+  buyerId: Types.ObjectId | string,
+  lead: { name?: string },
+) => {
   try {
     await dbConnect();
 

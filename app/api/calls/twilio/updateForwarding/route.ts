@@ -9,6 +9,29 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
+
+const MAX_TEXT_LENGTH = 500;
+const MAX_LIST_ENTRIES = 200;
+const MAX_FORWARDING_NUMBERS = 10;
+const PHONE_PATTERN = /^\+?[1-9]\d{6,14}$/;
+
+function isValidPhone(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    PHONE_PATTERN.test(value.replace(/[\s\-()]/g, ""))
+  );
+}
+
+function sanitizeText(
+  value: unknown,
+  fallback: string,
+  maxLength: number = MAX_TEXT_LENGTH,
+): string {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  return value.trim().slice(0, maxLength);
+}
 
 type ResponseEntry = { message: string; digit: string };
 type LeadBuyerEntry = { id: string; name: string; phone?: string };
@@ -44,7 +67,6 @@ type TrackingNumberRecord = {
   transcriptionEnabled?: boolean;
   aiSummaryEnabled?: boolean;
   buyerResponses?: ResponseEntry[];
-  leadResponses?: ResponseEntry[];
   forwardingNumbers?: string[];
   leadBuyers?: LeadBuyerEntry[];
 };
@@ -81,6 +103,17 @@ export async function POST(req: NextRequest) {
       return forbidden("Seller or admin access required");
     }
 
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "twilio-update-forwarding",
+      limit: 30,
+      windowMs: 5 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
+
     await dbConnect();
 
     // Parse the request body with new fields
@@ -97,8 +130,7 @@ export async function POST(req: NextRequest) {
       welcomeMessage,
       callWhisper,
       requireResponse,
-      buyerResponses,
-      leadResponses,
+      buyerResponses: rawBuyerResponses,
       forwardingNumbers,
       leadBuyers,
       overflowNumber,
@@ -134,7 +166,9 @@ export async function POST(req: NextRequest) {
       return forbidden("You can only update your own forwarding settings");
     }
 
-    // Find the seller
+    // Find the seller (read-only — used to check entitlements, that the
+    // number exists, and to fall back to existing values for fields that
+    // are only conditionally overwritten below)
     const seller = await User.findById(targetSellerId);
     if (!seller) {
       return notFound("Seller");
@@ -151,105 +185,141 @@ export async function POST(req: NextRequest) {
       return notFound("Number");
     }
 
-    // Update the tracking number fields
-    number.industry = industry || number.industry;
-    number.forwardingType = forwardingType;
-    number.method = method || number.method;
-    number.recordCall = recordCall || false;
-    number.reconnectCaller = reconnectCaller || false;
-    number.passCallerId = passCallerId || false;
-    number.leadSource = leadSource || "";
-    number.welcomeMessage = welcomeMessage || "";
-    number.callWhisper = callWhisper || "";
-    number.requireResponse = requireResponse || false;
-    number.overflowNumber = overflowNumber || "";
+    // Paid-feature gating: the client only shows these toggles when the
+    // seller's plan includes them, but that's a UI convenience, not
+    // enforcement — without this check any seller could POST directly and
+    // enable call recording / transcription / AI analysis regardless of
+    // subscription tier.
+    const subscriptionLimits = seller.subscription?.subscriptionLimits;
+    const canRecord = !!subscriptionLimits?.callRecording;
+    const canUseAI = !!subscriptionLimits?.callAIAnalysis;
 
-    // Save working hours
-    number.enableWorkingHours = !!enableWorkingHours;
-    number.workingHoursStart = workingHoursStart || "09:00";
-    number.workingHoursEnd = workingHoursEnd || "17:00";
+    const effectiveRecordCall = canRecord ? !!recordCall : false;
+    const effectiveRecordingConsent = canRecord ? !!recordingConsent : false;
+    const effectiveTranscriptionEnabled = canUseAI
+      ? !!transcriptionEnabled
+      : false;
+    const effectiveAiSummaryEnabled = canUseAI ? !!aiSummaryEnabled : false;
 
-    // Update new feature flags
-    number.recordingConsent = !!recordingConsent;
-    number.recordingConsentMessage =
-      recordingConsentMessage ||
-      "This call may be recorded for quality assurance purposes.";
-    number.missedCallTextBack = !!missedCallTextBack;
-    number.missedCallTextMessage =
-      missedCallTextMessage ||
-      "We missed your call! We will get back to you shortly.";
-    number.dncEnabled = !!dncEnabled;
+    // Build the field set atomically via the positional operator instead of
+    // mutating the in-memory subdocument and calling seller.save() — a
+    // full-document save would silently overwrite any other tracking-number
+    // edit (e.g. a concurrent removeNumber/dnc call) that landed on this
+    // same User document between our read above and this write.
+    const setFields: Record<string, unknown> = {
+      "trackingNumbers.$.industry": sanitizeText(
+        industry,
+        number.industry || "",
+        100,
+      ),
+      "trackingNumbers.$.forwardingType": forwardingType,
+      "trackingNumbers.$.method": method || number.method,
+      "trackingNumbers.$.recordCall": effectiveRecordCall,
+      "trackingNumbers.$.reconnectCaller": !!reconnectCaller,
+      "trackingNumbers.$.passCallerId": !!passCallerId,
+      "trackingNumbers.$.leadSource": sanitizeText(leadSource, ""),
+      "trackingNumbers.$.welcomeMessage": sanitizeText(welcomeMessage, ""),
+      "trackingNumbers.$.callWhisper": sanitizeText(callWhisper, ""),
+      "trackingNumbers.$.requireResponse": !!requireResponse,
+      "trackingNumbers.$.overflowNumber": isValidPhone(overflowNumber)
+        ? overflowNumber.trim()
+        : "",
+      "trackingNumbers.$.enableWorkingHours": !!enableWorkingHours,
+      "trackingNumbers.$.workingHoursStart": workingHoursStart || "09:00",
+      "trackingNumbers.$.workingHoursEnd": workingHoursEnd || "17:00",
+      "trackingNumbers.$.recordingConsent": effectiveRecordingConsent,
+      "trackingNumbers.$.recordingConsentMessage": sanitizeText(
+        recordingConsentMessage,
+        "This call may be recorded for quality assurance purposes.",
+      ),
+      "trackingNumbers.$.missedCallTextBack": !!missedCallTextBack,
+      "trackingNumbers.$.missedCallTextMessage": sanitizeText(
+        missedCallTextMessage,
+        "We missed your call! We will get back to you shortly.",
+      ),
+      "trackingNumbers.$.dncEnabled": !!dncEnabled,
+      "trackingNumbers.$.spamFilterEnabled": !!spamFilterEnabled,
+      "trackingNumbers.$.spamFilterAction":
+        spamFilterAction === "warn" ? "warn" : "block",
+      "trackingNumbers.$.scheduledCallbackEnabled": !!scheduledCallbackEnabled,
+      "trackingNumbers.$.scheduledCallbackDigit": scheduledCallbackDigit || "1",
+      "trackingNumbers.$.multiRingEnabled": !!multiRingEnabled,
+      "trackingNumbers.$.geoRoutingEnabled": !!geoRoutingEnabled,
+      "trackingNumbers.$.concurrentCallLimit":
+        typeof concurrentCallLimit === "number"
+          ? Math.max(0, Math.min(100, concurrentCallLimit))
+          : 0,
+      "trackingNumbers.$.transcriptionEnabled": effectiveTranscriptionEnabled,
+      "trackingNumbers.$.aiSummaryEnabled": effectiveAiSummaryEnabled,
+    };
+
+    const unsetFields: Record<string, ""> = {};
+
     if (dncList && Array.isArray(dncList)) {
-      number.dncList = dncList
-        .filter((n: string) => n && n.trim())
-        .map((n: string) => n.trim());
-    }
-    number.spamFilterEnabled = !!spamFilterEnabled;
-    number.spamFilterAction = spamFilterAction === "warn" ? "warn" : "block";
-    number.scheduledCallbackEnabled = !!scheduledCallbackEnabled;
-    number.scheduledCallbackDigit = scheduledCallbackDigit || "1";
-    number.multiRingEnabled = !!multiRingEnabled;
-    number.geoRoutingEnabled = !!geoRoutingEnabled;
-    number.concurrentCallLimit =
-      typeof concurrentCallLimit === "number" ? concurrentCallLimit : 0;
-    number.transcriptionEnabled = !!transcriptionEnabled;
-    number.aiSummaryEnabled = !!aiSummaryEnabled;
-
-    // Handle response verification settings
-    if (requireResponse) {
-      // Validate and set buyer responses
-      if (buyerResponses && Array.isArray(buyerResponses)) {
-        number.buyerResponses = buyerResponses
-          .filter(isResponseEntry)
-          .map((res) => ({
-            message: res.message.trim(),
-            digit: res.digit.trim(),
-          }));
-      } else {
-        number.buyerResponses = undefined;
-      }
-
-      // Validate and set lead responses
-      if (leadResponses && Array.isArray(leadResponses)) {
-        number.leadResponses = leadResponses
-          .filter(isResponseEntry)
-          .map((res) => ({
-            message: res.message.trim(),
-            digit: res.digit.trim(),
-          }));
-      } else {
-        number.leadResponses = undefined;
-      }
-    } else {
-      // Clear responses if verification is disabled
-      number.buyerResponses = undefined;
-      number.leadResponses = undefined;
+      setFields["trackingNumbers.$.dncList"] = dncList
+        .filter(isValidPhone)
+        .map((n: string) => n.trim())
+        .slice(0, MAX_LIST_ENTRIES);
     }
 
-    // Update forwarding numbers (if applicable)
-    if (forwardingType === "single_multiple" && forwardingNumbers) {
-      number.forwardingNumbers = forwardingNumbers
-        .filter((num: string) => num.trim())
-        .map((num: string) => num.trim());
-    } else {
-      number.forwardingNumbers = undefined;
-    }
-
-    // Update lead buyers (if applicable)
-    if (forwardingType === "specific_lead" && leadBuyers) {
-      number.leadBuyers = leadBuyers
-        .filter(isLeadBuyerEntry)
-        .map((buyer: LeadBuyerEntry) => ({
-          id: buyer.id,
-          name: buyer.name,
-          phone: buyer.phone || "", // Include phone if available
+    let buyerResponses: ResponseEntry[] | undefined;
+    if (requireResponse && Array.isArray(rawBuyerResponses)) {
+      buyerResponses = rawBuyerResponses
+        .filter(isResponseEntry)
+        .map((res) => ({
+          message: res.message.trim().slice(0, MAX_TEXT_LENGTH),
+          digit: res.digit.trim().slice(0, 1),
         }));
+    }
+    if (buyerResponses?.length) {
+      setFields["trackingNumbers.$.buyerResponses"] = buyerResponses;
     } else {
-      number.leadBuyers = undefined;
+      unsetFields["trackingNumbers.$.buyerResponses"] = "";
     }
 
-    // Save the updated seller document
-    await seller.save();
+    if (forwardingType === "single_multiple" && Array.isArray(forwardingNumbers)) {
+      const cleaned = forwardingNumbers
+        .filter(isValidPhone)
+        .map((num: string) => num.trim())
+        .slice(0, MAX_FORWARDING_NUMBERS);
+      if (cleaned.length) {
+        setFields["trackingNumbers.$.forwardingNumbers"] = cleaned;
+      } else {
+        unsetFields["trackingNumbers.$.forwardingNumbers"] = "";
+      }
+    } else {
+      unsetFields["trackingNumbers.$.forwardingNumbers"] = "";
+    }
+
+    if (forwardingType === "specific_lead" && Array.isArray(leadBuyers)) {
+      const cleaned = leadBuyers.filter(isLeadBuyerEntry).map((buyer) => ({
+        id: buyer.id,
+        name: buyer.name,
+        phone: buyer.phone || "",
+      }));
+      if (cleaned.length) {
+        setFields["trackingNumbers.$.leadBuyers"] = cleaned;
+      } else {
+        unsetFields["trackingNumbers.$.leadBuyers"] = "";
+      }
+    } else {
+      unsetFields["trackingNumbers.$.leadBuyers"] = "";
+    }
+
+    const updatedSeller = await User.findOneAndUpdate(
+      { _id: targetSellerId, "trackingNumbers.phoneNumber": phoneNumber },
+      {
+        $set: setFields,
+        ...(Object.keys(unsetFields).length ? { $unset: unsetFields } : {}),
+      },
+      { new: true },
+    ).select("trackingNumbers");
+
+    if (!updatedSeller) {
+      // The number was removed by a concurrent request between our read and
+      // this write.
+      return notFound("Number");
+    }
 
     return NextResponse.json(
       {
@@ -258,8 +328,7 @@ export async function POST(req: NextRequest) {
           message: "Forwarding settings updated successfully",
           phoneNumber,
           requireResponse,
-          hasBuyerResponses: (number.buyerResponses ?? []).length > 0,
-          hasLeadResponses: (number.leadResponses ?? []).length > 0,
+          hasBuyerResponses: (buyerResponses ?? []).length > 0,
         },
       },
       { status: 200 },

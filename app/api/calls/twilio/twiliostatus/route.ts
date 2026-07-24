@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
 import { getServerSession } from "next-auth";
@@ -8,6 +8,7 @@ import {
   forbidden,
   internalError,
   notFound,
+  successResponse,
   unauthorized,
 } from "@/lib/api/error-handler";
 
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
       tierId: user.subscription?.subscriptionTierId || null,
     };
 
-    return NextResponse.json(responseData);
+    return successResponse(responseData);
   } catch (error) {
     console.error("Error in GET /api/calls/twilio/twiliostatus:", error);
 

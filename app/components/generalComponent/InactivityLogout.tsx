@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   Dialog,
@@ -20,7 +20,12 @@ const InactivityLogout = () => {
 
   const [showModal, setShowModal] = useState(false);
 
-  const resetInactivityTimer = () => {
+  const handleLogout = useCallback(() => {
+    setShowModal(false);
+    signOut({ callbackUrl: "/auth/sign-in" });
+  }, []);
+
+  const resetInactivityTimer = useCallback(() => {
     if (logoutTimer.current) clearTimeout(logoutTimer.current);
     if (modalTimer.current) clearTimeout(modalTimer.current);
 
@@ -33,12 +38,7 @@ const InactivityLogout = () => {
         handleLogout();
       }, AUTO_LOGOUT_COUNTDOWN);
     }, INACTIVITY_LIMIT);
-  };
-
-  const handleLogout = () => {
-    setShowModal(false);
-    signOut({ callbackUrl: "/auth/sign-in" });
-  };
+  }, [handleLogout, INACTIVITY_LIMIT, AUTO_LOGOUT_COUNTDOWN]);
 
   const handleContinue = () => {
     setShowModal(false);
@@ -69,7 +69,7 @@ const InactivityLogout = () => {
         window.removeEventListener(event, handleActivity),
       );
     };
-  }, []);
+  }, [resetInactivityTimer]);
 
   return (
     <Dialog open={showModal}>

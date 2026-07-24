@@ -23,6 +23,8 @@ import {
   LinearProgress,
 } from "@mui/material";
 import { TrendingUp, Phone, PhoneMissed, Timer } from "@mui/icons-material";
+import { formatDuration, formatDate } from "@/lib/formatUtils";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface BuyerMetrics {
   _id: string;
@@ -67,6 +69,7 @@ interface Summary {
 }
 
 export default function BuyerPerformanceDashboard() {
+  const terms = useDashboardTerms();
   const [buyers, setBuyers] = useState<BuyerMetrics[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,30 +77,37 @@ export default function BuyerPerformanceDashboard() {
   const [days, setDays] = useState(30);
 
   useEffect(() => {
+    // Larger day ranges aggregate more documents and can take longer than
+    // smaller ones — without this guard, switching from e.g. 90 days to 7
+    // days could let the slower 90-day response resolve after the 7-day one
+    // and silently overwrite the UI with the wrong period's data.
+    let cancelled = false;
+
     const fetchPerformance = async () => {
       try {
         setLoading(true);
         setError(null);
         const res = await fetch(`/api/calls/buyer-performance?days=${days}`);
         if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
+        const body = await res.json();
+        const data = body?.data ?? body;
+        if (cancelled) return;
         setBuyers(data.buyers || []);
         setSummary(data.summary || null);
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchPerformance();
+    return () => {
+      cancelled = true;
+    };
   }, [days]);
 
-  const formatDuration = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = Math.round(seconds % 60);
-    return `${m}m ${s}s`;
-  };
 
   const getBuyerName = (buyer: BuyerMetrics) => {
     if (buyer.buyerInfo?.company) return buyer.buyerInfo.company;
@@ -128,7 +138,7 @@ export default function BuyerPerformanceDashboard() {
           mb: 2,
         }}
       >
-        <Typography variant="h6">Buyer Performance</Typography>
+        <Typography variant="h6">{terms.buyer} Performance</Typography>
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel>Period</InputLabel>
           <Select
@@ -158,7 +168,7 @@ export default function BuyerPerformanceDashboard() {
           <Card variant="outlined">
             <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
               <Typography variant="caption" color="text.secondary">
-                Active Buyers
+                Active {terms.buyers}
               </Typography>
               <Typography variant="h5">{summary.totalBuyers}</Typography>
             </CardContent>
@@ -229,7 +239,7 @@ export default function BuyerPerformanceDashboard() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Buyer</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>{terms.buyer}</TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="center">
                   Calls
                 </TableCell>
@@ -256,6 +266,12 @@ export default function BuyerPerformanceDashboard() {
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="center">
                   Sentiment
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700 }} align="center">
+                  Other Dispositions
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700 }} align="center">
+                  Last Call
                 </TableCell>
               </TableRow>
             </TableHead>
@@ -443,6 +459,69 @@ export default function BuyerPerformanceDashboard() {
                         </Typography>
                       )}
                     </Box>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 0.3,
+                        justifyContent: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {buyer.notInterested > 0 && (
+                        <Tooltip title="Not interested">
+                          <Chip
+                            label={`NI:${buyer.notInterested}`}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </Tooltip>
+                      )}
+                      {buyer.wrongNumbers > 0 && (
+                        <Tooltip title="Wrong number">
+                          <Chip
+                            label={`WN:${buyer.wrongNumbers}`}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </Tooltip>
+                      )}
+                      {buyer.callbackRequested > 0 && (
+                        <Tooltip title="Callback requested">
+                          <Chip
+                            label={`CB:${buyer.callbackRequested}`}
+                            size="small"
+                            color="info"
+                            variant="outlined"
+                          />
+                        </Tooltip>
+                      )}
+                      {buyer.spamCalls > 0 && (
+                        <Tooltip title="Spam">
+                          <Chip
+                            label={`Spam:${buyer.spamCalls}`}
+                            size="small"
+                            color="error"
+                            variant="outlined"
+                          />
+                        </Tooltip>
+                      )}
+                      {buyer.notInterested +
+                        buyer.wrongNumbers +
+                        buyer.callbackRequested +
+                        buyer.spamCalls ===
+                        0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          —
+                        </Typography>
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Typography variant="caption" color="text.secondary">
+                      {buyer.lastCallDate ? formatDate(buyer.lastCallDate) : "—"}
+                    </Typography>
                   </TableCell>
                 </TableRow>
               ))}

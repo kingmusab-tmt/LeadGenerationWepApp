@@ -43,7 +43,6 @@ import {
   InputAdornment,
   FormHelperText,
   useTheme,
-  useMediaQuery,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -53,7 +52,12 @@ import GoogleCityAutocomplete from "../GoogleCityAutocomplete";
 // Declare grecaptcha for TypeScript
 declare global {
   interface Window {
-    grecaptcha: any;
+    grecaptcha: {
+      execute: (
+        siteKey: string,
+        options: { action: string },
+      ) => Promise<string>;
+    };
   }
 }
 
@@ -199,7 +203,6 @@ const FormPreview = ({
   formLoadToken,
 }: FormPreviewProps) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDarkMode = theme.palette.mode === "dark";
 
   const sensors = useSensors(
@@ -268,7 +271,10 @@ const FormPreview = ({
       if (savedData) {
         try {
           const parsed = JSON.parse(savedData);
-          if (parsed.timestamp && Date.now() - parsed.timestamp < DRAFT_TTL_MS) {
+          if (
+            parsed.timestamp &&
+            Date.now() - parsed.timestamp < DRAFT_TTL_MS
+          ) {
             setFormData(parsed.data || {});
           } else {
             // Clear stale data
@@ -456,7 +462,10 @@ const FormPreview = ({
       }
 
       if (!recaptchaLoaded || !window.grecaptcha) {
-        showMessage("Security verification is loading. Please wait...", "error");
+        showMessage(
+          "Security verification is loading. Please wait...",
+          "error",
+        );
         setIsSubmitting(false);
         return;
       }
@@ -740,7 +749,10 @@ const FormPreview = ({
                     field={field}
                     isLoggedIn={isLoggedIn}
                   >
-                    <Box id={`field-wrapper-${field.id}`} sx={{ flex: 1, width: "100%" }}>
+                    <Box
+                      id={`field-wrapper-${field.id}`}
+                      sx={{ flex: 1, width: "100%" }}
+                    >
                       {field.description && (
                         <Typography
                           variant="caption"
@@ -1090,7 +1102,10 @@ const FormPreview = ({
                           component="fieldset"
                           error={touched[field.id] && !!fieldErrors[field.id]}
                         >
-                          <FormLabel component="legend" required={field.required}>
+                          <FormLabel
+                            component="legend"
+                            required={field.required}
+                          >
                             {field.label}
                           </FormLabel>
                           <RadioGroup
@@ -1125,7 +1140,10 @@ const FormPreview = ({
                           component="fieldset"
                           error={touched[field.id] && !!fieldErrors[field.id]}
                         >
-                          <FormLabel component="legend" required={field.required}>
+                          <FormLabel
+                            component="legend"
+                            required={field.required}
+                          >
                             {field.label}
                           </FormLabel>
                           <FormGroup>
@@ -1181,9 +1199,9 @@ const FormPreview = ({
                             {field.label}
                           </Typography>
                           <Typography variant="body2" color="error">
-                            File upload isn&apos;t currently supported for
-                            this form. Please contact the site owner if you
-                            need to share a file.
+                            File upload isn&apos;t currently supported for this
+                            form. Please contact the site owner if you need to
+                            share a file.
                           </Typography>
                           {field.helperText && (
                             <Typography variant="caption" color="textSecondary">

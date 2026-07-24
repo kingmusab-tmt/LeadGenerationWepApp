@@ -128,7 +128,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return forbidden("Only sellers can add buyers");
   }
 
-  const rateLimited = checkSimpleRateLimit(req, {
+  const rateLimited = await checkSimpleRateLimit(req, {
     scope: "buyers:create",
     limit: 30,
     windowMs: 10 * 60 * 1000,

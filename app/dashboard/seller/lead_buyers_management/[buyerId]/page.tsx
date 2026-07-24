@@ -21,6 +21,7 @@ import BuyerProfile from "@/app/components/leadbuyers/buyerprofile";
 import LeadPurchaseHistory from "@/app/components/leadbuyers/leadpurchasehistory";
 import { getBuyerStatusColor } from "@/app/components/leadbuyers/buyerStatusColor";
 import { Buyer } from "@/types/buyer";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -43,6 +44,7 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 }
 
 const BuyerDetailsPage: React.FC = () => {
+  const terms = useDashboardTerms();
   const [buyer, setBuyer] = useState<Buyer | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,7 @@ const BuyerDetailsPage: React.FC = () => {
     if (!buyerId) {
       // Previously this returned with loading still true, leaving the page
       // spinning forever with no way out for a malformed/missing route param.
-      setError("Buyer not found");
+      setError(`${terms.buyer} not found`);
       setLoading(false);
       return;
     }
@@ -75,7 +77,9 @@ const BuyerDetailsPage: React.FC = () => {
         if (!response.ok) {
           const body = await response.json().catch(() => null);
           throw new Error(
-            body?.message || body?.error || "Failed to fetch buyer details",
+            body?.message ||
+              body?.error ||
+              `Failed to fetch ${terms.buyerLower} details`,
           );
         }
 
@@ -83,10 +87,10 @@ const BuyerDetailsPage: React.FC = () => {
         const buyerData = result?.data;
 
         if (!buyerData) {
-          setError("Buyer not found");
+          setError(`${terms.buyer} not found`);
           setSnackbar({
             open: true,
-            message: "Buyer not found",
+            message: `${terms.buyer} not found`,
             severity: "warning",
           });
         } else {
@@ -99,7 +103,9 @@ const BuyerDetailsPage: React.FC = () => {
         setError((err as Error).message);
         setSnackbar({
           open: true,
-          message: (err as Error).message || "Error fetching buyer details",
+          message:
+            (err as Error).message ||
+            `Error fetching ${terms.buyerLower} details`,
           severity: "error",
         });
       } finally {
@@ -166,7 +172,7 @@ const BuyerDetailsPage: React.FC = () => {
             }}
           >
             <ArrowBackIcon fontSize="small" />
-            <Typography variant="body2">Back to Buyers</Typography>
+            <Typography variant="body2">Back to {terms.buyers}</Typography>
           </Box>
 
           {/* Hero Header Card */}
@@ -270,7 +276,7 @@ const BuyerDetailsPage: React.FC = () => {
               scrollButtons="auto"
             >
               <Tab
-                label="Buyer Profile"
+                label={`${terms.buyer} Profile`}
                 id="buyer-tab-0"
                 aria-controls="buyer-tabpanel-0"
               />
@@ -289,7 +295,7 @@ const BuyerDetailsPage: React.FC = () => {
           </Paper>
         </>
       ) : (
-        <Alert severity="warning">Buyer not found.</Alert>
+        <Alert severity="warning">{terms.buyer} not found.</Alert>
       )}
     </Container>
   );

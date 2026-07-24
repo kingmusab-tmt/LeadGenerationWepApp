@@ -153,7 +153,7 @@ const CallHistory: React.FC = () => {
       setOpenModal(true);
 
       setCurrentAudio({
-        url: `/api/recordings/proxy?recordingSid=${recordingSid}&format=${audioFormat}`,
+        url: `/api/calls/tracking/recordingproxy?recordingSid=${recordingSid}&format=${audioFormat}`,
         callSid,
         format: audioFormat,
       });
@@ -214,7 +214,7 @@ const CallHistory: React.FC = () => {
   const handleDownload = () => {
     if (!currentAudio) return;
     window.open(
-      `/api/recordings/proxy?recordingSid=${extractRecordingSid(
+      `/api/calls/tracking/recordingproxy?recordingSid=${extractRecordingSid(
         currentAudio.url,
       )}&format=${audioFormat}&download=true`,
       "_blank",

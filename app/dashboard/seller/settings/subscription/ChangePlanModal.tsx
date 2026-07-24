@@ -28,7 +28,7 @@ import {
   Star as StarIcon,
   Close as CloseIcon,
 } from "@mui/icons-material";
-import { useNotification } from "@/app/hooks";
+import { useNotification, useDashboardTerms } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks";
 
 interface Tier {
@@ -83,6 +83,7 @@ export default function ChangePlanModal({
   onClose,
   onSuccess,
 }: ChangePlanModalProps) {
+  const terms = useDashboardTerms();
   const notify = useNotification();
   const csrfFetch = useCSRFFetch();
   const [loading, setLoading] = useState(true);
@@ -618,6 +619,17 @@ export default function ChangePlanModal({
                   ? "You're upgrading your plan!"
                   : "You're downgrading your plan. Some features may become unavailable."}
               </Alert>
+
+              {!preview.isUpgrade && (
+                <Alert severity="info" icon={false}>
+                  If your usage this billing period already exceeds the new
+                  plan&apos;s limits (leads, forms, {terms.buyersLower}, calls,
+                  etc.), further usage of those specific features will be
+                  blocked
+                  until your next billing cycle resets them — nothing already
+                  created or on file will be deleted.
+                </Alert>
+              )}
 
               <Box
                 display="flex"

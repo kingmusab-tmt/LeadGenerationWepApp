@@ -41,6 +41,16 @@ type AuthenticatedSession = {
   user: SessionUser;
 };
 
+type MongoServerErrorLike = Error & {
+  code?: number;
+  keyPattern?: Record<string, unknown>;
+  keyValue?: Record<string, unknown>;
+};
+
+type TwilioErrorLike = Error & {
+  status?: number;
+};
+
 // ============================================
 // ASYNC ROUTE WRAPPER
 // ============================================
@@ -136,15 +146,16 @@ function handleError(error: unknown, req: NextRequest): NextResponse {
   if (
     error instanceof Error &&
     error.name === "MongoServerError" &&
-    (error as any).code === 11000
+    (error as MongoServerErrorLike).code === 11000
   ) {
-    const field = Object.keys((error as any).keyPattern || {})[0] || "field";
+    const mongoError = error as MongoServerErrorLike;
+    const field = Object.keys(mongoError.keyPattern || {})[0] || "field";
     return NextResponse.json(
       {
         success: false,
         error: `Duplicate ${field} already exists`,
         code: ErrorCode.DUPLICATE_ENTRY,
-        details: { field, value: (error as any).keyValue?.[field] },
+        details: { field, value: mongoError.keyValue?.[field] },
         timestamp: new Date().toISOString(),
       },
       { status: 409 },
@@ -199,14 +210,15 @@ function handleError(error: unknown, req: NextRequest): NextResponse {
   // Handle Twilio errors
   if (
     error instanceof Error &&
-    (error.constructor.name.includes("Twilio") || (error as any).status)
+    (error.constructor.name.includes("Twilio") ||
+      (error as TwilioErrorLike).status)
   ) {
     return NextResponse.json(
       {
         success: false,
         error: error.message,
         code: ErrorCode.TWILIO_ERROR,
-        details: { status: (error as any).status },
+        details: { status: (error as TwilioErrorLike).status },
         timestamp: new Date().toISOString(),
       },
       { status: 502 },
@@ -265,7 +277,11 @@ export function logError(
  */
 export function withValidation<T>(
   schema: { parseAsync: (data: unknown) => Promise<T> },
-  handler: (req: NextRequest, data: T, context?: any) => Promise<NextResponse>,
+  handler: (
+    req: NextRequest,
+    data: T,
+    context?: RouteContext,
+  ) => Promise<NextResponse>,
 ): RouteHandler {
   return withErrorHandler(async (req, context) => {
     const body = await req.json();
@@ -282,7 +298,7 @@ export function withQueryValidation<T>(
   handler: (
     req: NextRequest,
     queryData: T,
-    context?: any,
+    context?: RouteContext,
   ) => Promise<NextResponse>,
 ): RouteHandler {
   return withErrorHandler(async (req, context) => {
@@ -314,7 +330,7 @@ export function withAuth(
     session: {
       user: SessionUser;
     },
-    context?: any,
+    context?: RouteContext,
   ) => Promise<NextResponse>,
   options?: { requireRole?: string[] },
 ): RouteHandler {
@@ -355,7 +371,7 @@ export function withAuthAndValidation<T>(
       user: SessionUser;
     },
     data: T,
-    context?: any,
+    context?: RouteContext,
   ) => Promise<NextResponse>,
   options?: { requireRole?: string[] },
 ): RouteHandler {

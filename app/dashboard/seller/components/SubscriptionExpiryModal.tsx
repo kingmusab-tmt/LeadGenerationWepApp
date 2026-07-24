@@ -15,6 +15,7 @@ import {
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import UpgradeRoundedIcon from "@mui/icons-material/UpgradeRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface SubscriptionExpiryModalProps {
   open: boolean;
@@ -49,11 +50,12 @@ export default function SubscriptionExpiryModal({
   onUpgradePlan,
   onClose,
 }: SubscriptionExpiryModalProps) {
+  const terms = useDashboardTerms();
   const daysLabel = daysRemaining === 1 ? "day" : "days";
   const canRenewPlan = !isFreeTrial;
   const bodyCopy = isFreeTrial
-    ? "Your 14-day free trial is ending soon. Upgrade now to avoid losing access to your seller dashboard, lead tools, and automations."
-    : "Renew now to avoid losing access to your seller dashboard, lead tools, and automations.";
+    ? `Your 14-day free trial is ending soon. Upgrade now to avoid losing access to your ${terms.org.toLowerCase()} dashboard, lead tools, and automations.`
+    : `Renew now to avoid losing access to your ${terms.org.toLowerCase()} dashboard, lead tools, and automations.`;
 
   return (
     <Dialog
@@ -71,7 +73,7 @@ export default function SubscriptionExpiryModal({
               Subscription expiring soon
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Action required to keep seller tools active
+              Action required to keep {terms.org.toLowerCase()} tools active
             </Typography>
           </Box>
         </Stack>

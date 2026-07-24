@@ -291,6 +291,7 @@ const HelpManagement = () => {
       const data = await response.json();
       setVideos(data);
     } catch (err) {
+      console.log(err);
       setError("Failed to fetch videos");
     }
   };
@@ -302,6 +303,7 @@ const HelpManagement = () => {
       const data = await response.json();
       setFaqs(data);
     } catch (err) {
+      console.log(err);
       setError("Failed to fetch FAQs");
     }
   };
@@ -332,6 +334,7 @@ const HelpManagement = () => {
       setEditDialogOpen(false);
       notify(editingItem ? "Video updated" : "Video added", "success");
     } catch (err) {
+      console.log(err);
       setError("Failed to save video");
     }
   };
@@ -358,6 +361,7 @@ const HelpManagement = () => {
       setEditDialogOpen(false);
       notify(editingItem ? "FAQ updated" : "FAQ added", "success");
     } catch (err) {
+      console.log(err);
       setError("Failed to save FAQ");
     }
   };
@@ -368,6 +372,7 @@ const HelpManagement = () => {
       fetchVideos();
       notify("Video deleted", "success");
     } catch (err) {
+      console.log(err);
       setError("Failed to delete video");
     }
   };
@@ -378,6 +383,7 @@ const HelpManagement = () => {
       fetchFaqs();
       notify("FAQ deleted", "success");
     } catch (err) {
+      console.log(err);
       setError("Failed to delete FAQ");
     }
   };
@@ -439,6 +445,7 @@ const HelpManagement = () => {
       try {
         await Promise.all([fetchVideos(), fetchFaqs()]);
       } catch (err) {
+        console.log(err);
         setError("Failed to load data");
       } finally {
         setLoading(false);

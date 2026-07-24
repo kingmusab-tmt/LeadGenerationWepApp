@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import { ITransaction } from "@/models/transactions";
 import { formatDate, formatTransactionValue } from "@/utils/formater";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface TransactionDetailsModalProps {
   open: boolean;
@@ -28,6 +29,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
   transaction,
 }) => {
   const theme = useTheme();
+  const terms = useDashboardTerms();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   if (!transaction) return null;
@@ -49,7 +51,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
           {metadata.buyerName && (
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
-                Buyer Name
+                {terms.buyer} Name
               </Typography>
               <Typography variant="body2" fontWeight="bold">
                 {metadata.buyerName}
@@ -60,7 +62,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
           {metadata.buyerEmail && (
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
-                Buyer Email
+                {terms.buyer} Email
               </Typography>
               <Typography variant="body2" noWrap>
                 {metadata.buyerEmail}
@@ -71,7 +73,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
           {metadata.buyerId && (
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
-                Buyer ID
+                {terms.buyer} ID
               </Typography>
               <Typography variant="body2" noWrap>
                 {metadata.buyerId.toString()}
@@ -129,7 +131,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
           {metadata.sellerId && (
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Typography variant="subtitle2" color="textSecondary">
-                Seller ID
+                {terms.org} ID
               </Typography>
               <Typography variant="body2" noWrap>
                 {metadata.sellerId.toString()}

@@ -32,7 +32,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return forbidden("Only sellers can import buyers");
   }
 
-  const rateLimited = checkSimpleRateLimit(request, {
+  const rateLimited = await checkSimpleRateLimit(request, {
     scope: "buyers:import",
     limit: 5,
     windowMs: 10 * 60 * 1000,

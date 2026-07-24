@@ -23,12 +23,19 @@ import {
   Add as AddIcon,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface Recipient {
   email: string;
   name: string;
   company: string;
   type: "buyer" | "lead" | "manual";
+}
+
+interface Segment {
+  _id: string;
+  name: string;
+  recipientCount?: number;
 }
 
 interface RecipientPickerProps {
@@ -42,6 +49,7 @@ export default function RecipientPicker({
   onChange,
   disabled = false,
 }: RecipientPickerProps) {
+  const terms = useDashboardTerms();
   const [recipientSource, setRecipientSource] = useState<string>("");
   const [availableBuyers, setAvailableBuyers] = useState<Recipient[]>([]);
   const [availableLeads, setAvailableLeads] = useState<Recipient[]>([]);
@@ -49,6 +57,10 @@ export default function RecipientPicker({
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [manualEmail, setManualEmail] = useState("");
   const [fetched, setFetched] = useState(false);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [segmentsFetched, setSegmentsFetched] = useState(false);
+  const [selectedSegmentId, setSelectedSegmentId] = useState("");
+  const [applyingSegment, setApplyingSegment] = useState(false);
 
   // Parse current value into selected list on mount
   useEffect(() => {
@@ -80,6 +92,47 @@ export default function RecipientPicker({
       setLoadingRecipients(false);
     }
   }, [fetched]);
+
+  const fetchSegments = useCallback(async () => {
+    if (segmentsFetched) return;
+    try {
+      const response = await fetch("/api/marketing/email/segments");
+      if (!response.ok) throw new Error("Failed to fetch");
+      const data = await response.json();
+      setSegments(data?.data?.segments || []);
+      setSegmentsFetched(true);
+    } catch {
+      // Non-fatal — segments are an optional convenience, not required to
+      // use the picker at all.
+    }
+  }, [segmentsFetched]);
+
+  useEffect(() => {
+    fetchSegments();
+  }, [fetchSegments]);
+
+  const handleApplySegment = async () => {
+    if (!selectedSegmentId) return;
+    try {
+      setApplyingSegment(true);
+      const response = await fetch(
+        `/api/marketing/email/recipients?segmentId=${selectedSegmentId}`,
+      );
+      if (!response.ok) throw new Error("Failed to resolve segment");
+      const data = await response.json();
+      const emails: string[] = [
+        ...(data.buyers || []).map((b: Recipient) => b.email),
+        ...(data.leads || []).map((l: Recipient) => l.email),
+      ];
+      const merged = new Set([...selectedRecipients, ...emails]);
+      setSelectedRecipients(Array.from(merged));
+      toast.success(`Added ${emails.length} recipients from segment`);
+    } catch {
+      toast.error("Failed to apply segment");
+    } finally {
+      setApplyingSegment(false);
+    }
+  };
 
   // Update parent when selectedRecipients change (but not on initial mount)
   const [initialized, setInitialized] = useState(false);
@@ -175,9 +228,9 @@ export default function RecipientPicker({
             label="Add From"
             disabled={disabled}
           >
-            <MenuItem value="buyers">Lead Buyers</MenuItem>
+            <MenuItem value="buyers">{terms.leadBuyers}</MenuItem>
             <MenuItem value="leads">Leads</MenuItem>
-            <MenuItem value="both">Both (Buyers + Leads)</MenuItem>
+            <MenuItem value="both">Both ({terms.buyers} + Leads)</MenuItem>
           </Select>
         </FormControl>
 
@@ -191,7 +244,7 @@ export default function RecipientPicker({
           >
             Add All{" "}
             {recipientSource === "buyers"
-              ? "Buyers"
+              ? terms.buyers
               : recipientSource === "leads"
                 ? "Leads"
                 : ""}
@@ -200,6 +253,45 @@ export default function RecipientPicker({
 
         {loadingRecipients && <CircularProgress size={20} />}
       </Box>
+
+      {/* Saved Segments */}
+      {segments.length > 0 && (
+        <Box sx={{ display: "flex", gap: 1, mb: 2, alignItems: "center" }}>
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel>Add From Saved Segment</InputLabel>
+            <Select
+              value={selectedSegmentId}
+              onChange={(e) => setSelectedSegmentId(e.target.value)}
+              label="Add From Saved Segment"
+              disabled={disabled}
+            >
+              {segments.map((s) => (
+                <MenuItem key={s._id} value={s._id}>
+                  {s.name}
+                  {typeof s.recipientCount === "number"
+                    ? ` (${s.recipientCount})`
+                    : ""}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleApplySegment}
+            disabled={disabled || !selectedSegmentId || applyingSegment}
+            startIcon={
+              applyingSegment ? (
+                <CircularProgress size={16} />
+              ) : (
+                <AddIcon />
+              )
+            }
+          >
+            Add Segment
+          </Button>
+        </Box>
+      )}
 
       {/* Individual Recipients List from Source */}
       {recipientSource && fetched && (
@@ -221,7 +313,7 @@ export default function RecipientPicker({
             >
               No{" "}
               {recipientSource === "buyers"
-                ? "lead buyers"
+                ? terms.leadBuyers.toLowerCase()
                 : recipientSource === "leads"
                   ? "leads"
                   : "recipients"}{" "}
@@ -270,7 +362,7 @@ export default function RecipientPicker({
                   secondary={
                     <Typography variant="caption" color="text.secondary">
                       {r.email} &middot;{" "}
-                      {r.type === "buyer" ? "Lead Buyer" : "Lead"}
+                      {r.type === "buyer" ? terms.leadBuyer : "Lead"}
                     </Typography>
                   }
                 />

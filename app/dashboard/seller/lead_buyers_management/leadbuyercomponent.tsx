@@ -50,7 +50,7 @@ const BuyerTable = dynamic(
   { ssr: false },
 );
 import { IBuyer } from "@/models/leadbuyers";
-import { useInitializeUser } from "@/app/hooks";
+import { useInitializeUser, useDashboardTerms } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import Papa from "papaparse";
@@ -58,6 +58,7 @@ import axios from "@/lib/axiosInstance";
 
 const BuyersPage: React.FC = () => {
   const { currentUser } = useInitializeUser();
+  const terms = useDashboardTerms();
   const csrfFetch = useCSRFFetch();
   const [buyers, setBuyers] = useState<IBuyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -252,7 +253,7 @@ const BuyersPage: React.FC = () => {
     ) {
       setSnackbar({
         open: true,
-        message: `You've reached your buyer limit (${subscriptionLimits.maxAllowed}). Please upgrade your subscription.`,
+        message: `You've reached your ${terms.buyerLower} limit (${subscriptionLimits.maxAllowed}). Please upgrade your subscription.`,
         severity: "warning",
       });
       return;
@@ -287,7 +288,7 @@ const BuyersPage: React.FC = () => {
     if (!response.ok) {
       const body = await response.json().catch(() => null);
       throw new Error(
-        body?.message || body?.error || "Failed to save buyer",
+        body?.message || body?.error || `Failed to save ${terms.buyerLower}`,
       );
     }
 
@@ -307,7 +308,7 @@ const BuyersPage: React.FC = () => {
     } else {
       setSnackbar({
         open: true,
-        message: "Buyer updated!",
+        message: `${terms.buyer} updated!`,
         severity: "success",
       });
     }
@@ -335,21 +336,23 @@ const BuyersPage: React.FC = () => {
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(
-          body?.message || body?.error || "Failed to delete buyer",
+          body?.message || body?.error || `Failed to delete ${terms.buyerLower}`,
         );
       }
 
       await fetchData();
       setSnackbar({
         open: true,
-        message: "Buyer deleted!",
+        message: `${terms.buyer} deleted!`,
         severity: "success",
       });
     } catch (error) {
       setSnackbar({
         open: true,
         message:
-          error instanceof Error ? error.message : "Failed to delete buyer.",
+          error instanceof Error
+            ? error.message
+            : `Failed to delete ${terms.buyerLower}.`,
         severity: "error",
       });
     } finally {
@@ -451,7 +454,7 @@ const BuyersPage: React.FC = () => {
       if (res.data.success) {
         setSnackbar({
           open: true,
-          message: res.data.message || "Buyers imported successfully",
+          message: res.data.message || `${terms.buyers} imported successfully`,
           severity: "success",
         });
         await fetchData();
@@ -463,10 +466,10 @@ const BuyersPage: React.FC = () => {
         });
       }
     } catch (err) {
-      console.error("Error importing buyers:", err);
+      console.error(`Error importing ${terms.buyersLower}:`, err);
       setSnackbar({
         open: true,
-        message: "Error importing buyers",
+        message: `Error importing ${terms.buyersLower}`,
         severity: "error",
       });
     } finally {
@@ -513,10 +516,11 @@ const BuyersPage: React.FC = () => {
       >
         <Box>
           <Typography variant="h5" fontWeight="bold">
-            Lead Buyer Management
+            {terms.leadBuyer} Management
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage your lead buyers, registration, and distribution settings
+            Manage your {terms.leadBuyers.toLowerCase()}, registration, and
+            distribution settings
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -544,7 +548,7 @@ const BuyersPage: React.FC = () => {
             }
             size={isMobile ? "small" : "medium"}
           >
-            Add Buyer
+            Add {terms.buyer}
           </Button>
         </Box>
       </Box>
@@ -561,9 +565,9 @@ const BuyersPage: React.FC = () => {
             </Button>
           }
         >
-          You&apos;ve reached your buyer limit (
+          You&apos;ve reached your {terms.buyerLower} limit (
           {subscriptionLimits.currentCount}/{subscriptionLimits.maxAllowed}).
-          Upgrade your subscription to add more buyers.
+          Upgrade your subscription to add more {terms.buyersLower}.
         </Alert>
       )}
 
@@ -652,11 +656,13 @@ const BuyersPage: React.FC = () => {
 
         <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
           {rowCount === 0
-            ? "0 buyers"
+            ? `0 ${terms.buyersLower}`
             : `${paginationModel.page * paginationModel.pageSize + 1}-${Math.min(
                 rowCount,
                 (paginationModel.page + 1) * paginationModel.pageSize,
-              )} of ${rowCount} buyer${rowCount !== 1 ? "s" : ""}`}
+              )} of ${rowCount} ${
+                rowCount !== 1 ? terms.buyersLower : terms.buyerLower
+              }`}
         </Typography>
       </Box>
 
@@ -684,12 +690,12 @@ const BuyersPage: React.FC = () => {
           <PeopleIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>
             {statusCounts.total === 0
-              ? "No buyers registered yet"
-              : "No buyers match your search"}
+              ? `No ${terms.buyersLower} registered yet`
+              : `No ${terms.buyersLower} match your search`}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {statusCounts.total === 0
-              ? "Add your first buyer or share your registration link to get started."
+              ? `Add your first ${terms.buyerLower} or share your registration link to get started.`
               : "Try adjusting your search or filter criteria."}
           </Typography>
           {statusCounts.total === 0 && (
@@ -699,7 +705,7 @@ const BuyersPage: React.FC = () => {
               onClick={handleAddNewBuyer}
               disabled={isLimitReached}
             >
-              Add First Buyer
+              Add First {terms.buyer}
             </Button>
           )}
         </Paper>
@@ -723,7 +729,9 @@ const BuyersPage: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Buyer Registration &amp; Embed Code</DialogTitle>
+        <DialogTitle>
+          {terms.buyer} Registration &amp; Embed Code
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1 }}>
             <Box>
@@ -828,7 +836,7 @@ const BuyersPage: React.FC = () => {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <ActiveIcon sx={{ color: "success.main", fontSize: 28 }} />
             <Typography variant="h6">
-              Buyer Registered Successfully! 🎉
+              {terms.buyer} Registered Successfully! 🎉
             </Typography>
           </Box>
         </DialogTitle>
@@ -855,17 +863,17 @@ const BuyersPage: React.FC = () => {
             <Typography variant="body2">
               {successModal.emailSent
                 ? `An email has been sent to ${successModal.buyerEmail} with sign-in instructions.`
-                : `Buyer created, but email notification could not be sent. Please inform the buyer manually.`}
+                : `${terms.buyer} created, but email notification could not be sent. Please inform the ${terms.buyerLower} manually.`}
             </Typography>
           </Box>
 
           <Typography variant="body1" sx={{ mb: 2 }}>
-            <strong>{successModal.buyerName}</strong> has been registered as a
-            lead buyer.
+            <strong>{successModal.buyerName}</strong> has been registered as{" "}
+            {terms.isBusinessAdmin ? "staff" : "a lead buyer"}.
           </Typography>
 
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-            The buyer will receive an email with instructions to:
+            The {terms.buyerLower} will receive an email with instructions to:
           </Typography>
 
           <List sx={{ mb: 2 }}>
@@ -887,7 +895,7 @@ const BuyersPage: React.FC = () => {
                 </Typography>
               </ListItemIcon>
               <ListItemText
-                primary='Select "Buyer" on the role selection page'
+                primary={`Their account is automatically set up with ${terms.buyerLower} access`}
                 primaryTypographyProps={{ variant: "body2" }}
               />
             </ListItem>
@@ -898,7 +906,7 @@ const BuyersPage: React.FC = () => {
                 </Typography>
               </ListItemIcon>
               <ListItemText
-                primary="Access their buyer dashboard"
+                primary={`Access their ${terms.buyerLower} dashboard`}
                 primaryTypographyProps={{ variant: "body2" }}
               />
             </ListItem>
@@ -926,8 +934,8 @@ const BuyersPage: React.FC = () => {
           >
             <Typography variant="caption" display="block">
               <strong>Note:</strong> The email includes your company information
-              and the registration details you provided. The buyer can update
-              their information from their dashboard.
+              and the registration details you provided. The {terms.buyerLower}{" "}
+              can update their information from their dashboard.
             </Typography>
           </Box>
         </DialogContent>
@@ -952,12 +960,13 @@ const BuyersPage: React.FC = () => {
         <DialogTitle sx={{ pb: 1 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <WarningIcon sx={{ color: "warning.main", fontSize: 28 }} />
-            <Typography variant="h6">Delete Buyer?</Typography>
+            <Typography variant="h6">Delete {terms.buyer}?</Typography>
           </Box>
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 1.5 }}>
-            If you delete this buyer, they will lose access to your platform.
+            If you delete this {terms.buyerLower}, they will lose access to
+            your platform.
           </Typography>
           <Typography variant="body2" color="text.secondary">
             This action cannot be undone.
@@ -975,7 +984,7 @@ const BuyersPage: React.FC = () => {
             color="error"
             onClick={confirmDeleteBuyer}
           >
-            Delete Buyer
+            Delete {terms.buyer}
           </Button>
         </DialogActions>
       </Dialog>

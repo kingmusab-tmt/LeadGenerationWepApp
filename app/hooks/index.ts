@@ -11,6 +11,8 @@ export { useAppDispatch, useAppSelector } from "./useRedux";
 
 // User hooks
 export { useInitializeUser, normalizeUser } from "./useUser";
+export { useDashboardTerms } from "./useDashboardTerms";
+export type { DashboardTerms } from "./useDashboardTerms";
 
 // Notification hook
 export { useNotification } from "./useNotification";
@@ -20,14 +22,6 @@ export { useStripePromise } from "./useStripe";
 
 // Session refresh hook (for subscription changes)
 export { useSessionRefresh } from "./useSessionRefresh";
-
-// Subscription cancellation hook
-export {
-  useSubscriptionCancel,
-  CANCELLATION_REASONS,
-  CANCELLATION_REASON_LABELS,
-} from "./useSubscriptionCancel";
-export type { CancellationReason } from "./useSubscriptionCancel";
 
 // Confirm dialog hook
 export { useConfirm } from "./useConfirm";

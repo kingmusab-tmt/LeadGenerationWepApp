@@ -1,22 +1,6 @@
 import { z } from "zod";
 
 // ============================================
-// AUTHENTICATION SCHEMAS
-// ============================================
-
-export const signInSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-});
-
-export const signUpSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  userType: z.enum(["seller", "buyer", "business"]),
-});
-
-// ============================================
 // LEADS SCHEMAS
 // ============================================
 
@@ -133,22 +117,62 @@ export const getLeadsQuerySchema = z.object({
 // EMAIL CAMPAIGN SCHEMAS
 // ============================================
 
+// `schedule` is deliberately not accepted here — nothing in this codebase
+// currently sends anything but an immediate campaign (there's no scheduling
+// UI, and the scheduler that would act on a future send time was dead code),
+// so exposing it would let a caller set a "scheduled"/"recurring" campaign
+// that can never actually be sent. Re-add once real scheduling exists.
 export const createEmailCampaignSchema = z.object({
   name: z.string().min(1, "Campaign name is required").max(100),
   subject: z.string().min(1, "Subject is required").max(200),
   body: z.string().optional(),
   htmlContent: z.string().optional(),
+  textContent: z.string().optional(),
   fromEmail: z.string().email().optional(),
-  recipientList: z.array(z.string().email()).optional(),
-  schedule: z
-    .object({
-      scheduledTime: z.string().datetime().optional(),
-      recurring: z.boolean().optional(),
-      frequency: z.enum(["daily", "weekly", "monthly"]).optional(),
-    })
+  fromName: z.string().max(100).optional(),
+  replyTo: z.string().email().optional(),
+  recipientList: z
+    .array(z.string().email())
+    .max(5000, "A single campaign can target at most 5,000 recipients")
     .optional(),
   tags: z.array(z.string()).optional(),
+  segmentId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+  goals: z
+    .object({
+      targetOpenRate: z.number().min(0).max(100).optional(),
+      targetClickRate: z.number().min(0).max(100).optional(),
+      targetConversionRate: z.number().min(0).max(100).optional(),
+    })
+    .optional(),
+  abTesting: z
+    .object({
+      enabled: z.boolean(),
+      variantSubject: z.string().max(200).optional(),
+      variantContent: z.string().optional(),
+      splitPercentage: z.number().min(1).max(99).optional(),
+    })
+    .optional(),
 });
+
+// ============================================
+// EMAIL SEGMENT SCHEMAS (seller's own leads/buyers, saved as a reusable
+// filter — NOT platform-user targeting)
+// ============================================
+
+export const emailSegmentFiltersSchema = z.object({
+  source: z.enum(["leads", "buyers", "both"]),
+  industries: z.array(z.string()).optional(),
+  leadQuality: z.array(z.enum(["High", "Medium", "Low"])).optional(),
+  buyerActiveOnly: z.boolean().optional(),
+});
+
+export const createEmailSegmentSchema = z.object({
+  name: z.string().min(1, "Segment name is required").max(100),
+  description: z.string().max(500).optional(),
+  filters: emailSegmentFiltersSchema,
+});
+
+export const updateEmailSegmentSchema = createEmailSegmentSchema.partial();
 
 export const updateEmailCampaignSchema = createEmailCampaignSchema.partial();
 
@@ -789,7 +813,27 @@ export const getCallsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).optional(),
   limit: z.coerce.number().int().positive().max(200).default(20).optional(),
   buyerId: mongoIdParamSchema.optional(),
-  status: z.enum(["completed", "missed", "busy", "failed"]).optional(),
+  // Matches the actual values written to Call.status across the call-routing
+  // handlers (twilio/calls, no-answer, fallback, etc.) — the previous enum
+  // ("missed" isn't a real status) silently rejected valid filters.
+  status: z
+    .enum([
+      "completed",
+      "forwarded",
+      "no-answer",
+      "failed",
+      "busy",
+      "insufficient_balance",
+      "in-progress",
+      "ringing",
+      "voicemail",
+      "spam_blocked",
+      "after_hours",
+    ])
+    .optional(),
+  paymentStatus: z
+    .enum(["paid", "refunded", "pending_refund", "processing_refund"])
+    .optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
 });
@@ -798,8 +842,6 @@ export const getCallsQuerySchema = z.object({
 // TYPE EXPORTS
 // ============================================
 
-export type SignInInput = z.infer<typeof signInSchema>;
-export type SignUpInput = z.infer<typeof signUpSchema>;
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 export type BulkImportLeadsInput = z.infer<typeof bulkImportLeadsSchema>;

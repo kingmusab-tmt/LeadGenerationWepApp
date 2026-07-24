@@ -35,6 +35,7 @@ import { industryNiches } from "@/utils/industryNiches";
 import GooglePlacesAutocomplete from "../GooglePlacesAutocomplete";
 import GoogleTimezoneAutocomplete from "../GoogleTimezoneAutocomplete";
 import { validateBuyerCoreFields } from "./buyerFormValidation";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface BuyerFormProps {
   open: boolean;
@@ -110,6 +111,7 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
   initialValues,
   sellerId,
 }) => {
+  const terms = useDashboardTerms();
   const [formData, setFormData] = useState<Partial<IBuyer>>(
     getDefaultFormData(),
   );
@@ -447,18 +449,18 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
       await onSave({ ...formData, sellerId });
       setSnackbar({
         open: true,
-        message: "Buyer saved successfully!",
+        message: `${terms.buyer} saved successfully!`,
         severity: "success",
       });
       onClose();
     } catch (error) {
-      console.error("Failed to save buyer:", error);
+      console.error(`Failed to save ${terms.buyerLower}:`, error);
       setSnackbar({
         open: true,
         message:
           error instanceof Error
             ? error.message
-            : "Failed to save buyer. Please try again.",
+            : `Failed to save ${terms.buyerLower}. Please try again.`,
         severity: "error",
       });
     } finally {
@@ -470,7 +472,9 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
     <>
       <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
         <DialogTitle>
-          {initialValues ? "Edit Buyer" : "Register Buyer"}
+          {initialValues
+            ? `Edit ${terms.buyer}`
+            : `Register ${terms.buyer}`}
         </DialogTitle>
         <DialogContent sx={{ maxHeight: "80vh", overflow: "auto" }}>
           <Box
@@ -555,8 +559,9 @@ const BuyerFormEnhanced: React.FC<BuyerFormProps> = ({
                       </Select>
                       {initialValues?.status !== "active" && (
                         <FormHelperText>
-                          Activates automatically after the buyer&apos;s first
-                          purchase — it can&apos;t be set manually.
+                          Activates automatically after the{" "}
+                          {terms.buyerLower}&apos;s first purchase — it
+                          can&apos;t be set manually.
                         </FormHelperText>
                       )}
                     </FormControl>

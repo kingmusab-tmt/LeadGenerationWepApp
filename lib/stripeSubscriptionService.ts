@@ -22,6 +22,10 @@ import {
   getCouponForTierDiscount,
   syncTierPricesWithStripe,
 } from "@/lib/priceSyncService";
+import {
+  TIER_LIMIT_PRESETS,
+  buildSubscriptionLimitsFromTier,
+} from "@/lib/subscriptionLimitsService";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
@@ -694,6 +698,17 @@ export async function getProrationPreview(
     return { success: false, message: "Tier not found" };
   }
 
+  // The frontend only ever offers active, seller-facing tiers, but that
+  // filter is client-side only — re-check here so a crafted request can't
+  // select a deprecated or wrong-audience (e.g. "business") tier.
+  if (newTier.isActive === false || newTier.tierUserType !== "seller") {
+    console.error(
+      "[StripeSubscription] Tier not eligible for seller plan change:",
+      { newTierId, isActive: newTier.isActive, tierUserType: newTier.tierUserType },
+    );
+    return { success: false, message: "Tier not available" };
+  }
+
   console.log("[StripeSubscription] Found user and tier:", {
     userName: user.name,
     userEmail: user.email,
@@ -728,7 +743,10 @@ export async function getProrationPreview(
         currentPlanPrice: 0,
         newPlanPrice: tierPrice,
         prorationAmount: 0,
-        immediateCharge: tierPrice,
+        // The new subscription is created with trial_end set to the
+        // existing trial expiry date, so Stripe won't actually attempt the
+        // first charge until then — nothing is due today.
+        immediateCharge: 0,
         nextBillingDate,
         isUpgrade: true,
         currency: "usd",
@@ -976,6 +994,16 @@ export async function changeSubscriptionPlan(
     return { success: false, message: "Tier not found" };
   }
 
+  // Same re-check as getProrationPreview — the frontend's tier filter is
+  // client-side only.
+  if (newTier.isActive === false || newTier.tierUserType !== "seller") {
+    console.error(
+      "[StripeSubscription] changeSubscriptionPlan: tier not eligible:",
+      { newTierId, isActive: newTier.isActive, tierUserType: newTier.tierUserType },
+    );
+    return { success: false, message: "Tier not available" };
+  }
+
   let stripeSubscriptionId = user.subscription?.stripeSubscriptionId;
   const isTrialConversion = user.subscription?.isTrial && !stripeSubscriptionId;
 
@@ -1065,6 +1093,7 @@ export async function changeSubscriptionPlan(
         items: [{ price: newPriceId }],
         metadata: {
           tierId: newTierId,
+          userId,
           billingInterval: newBillingInterval,
           convertedFromTrial: "true",
           originalTrialStartDate:
@@ -1081,15 +1110,16 @@ export async function changeSubscriptionPlan(
       const newSubscription =
         await stripe.subscriptions.create(subscriptionParams);
 
-      // Update user subscription with new Stripe subscription ID
-      await User.findByIdAndUpdate(userId, {
-        $set: {
-          "subscription.stripeSubscriptionId": newSubscription.id,
-          "subscription.subscriptionTierId": newTierId,
-          "subscription.billingInterval": newBillingInterval,
-          "subscription.subscriptionTierType": newTier.tierType,
-        },
-      });
+      // SECURITY FIX: Do NOT update database here! Same reasoning as the
+      // regular plan-change path below — the tier/limits/stripeSubscriptionId
+      // fields are finalized by the customer.subscription.created/updated
+      // webhook (handleSubscriptionUpdated → activateSubscription) once
+      // Stripe actually confirms the subscription, not before. `userId` is
+      // included in the metadata above so that webhook can find this user
+      // even though stripeSubscriptionId isn't set on the User doc yet.
+      console.log(
+        "[StripeSubscription] Trial-conversion subscription created in Stripe. Waiting for webhook to confirm and activate...",
+      );
 
       return {
         success: true,
@@ -1329,6 +1359,17 @@ export async function setDefaultPaymentMethod(
   }
 
   try {
+    // Verify the payment method belongs to this customer before touching
+    // it — same check removePaymentMethod already does, previously missing
+    // here.
+    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+    if (paymentMethod.customer !== user.stripeCustomerId) {
+      return {
+        success: false,
+        message: "Payment method does not belong to user",
+      };
+    }
+
     // Update customer's default payment method
     await stripe.customers.update(user.stripeCustomerId, {
       invoice_settings: {
@@ -1432,6 +1473,21 @@ export async function attachPaymentMethod(
   }
 
   try {
+    // A payment method fresh off SetupIntent confirmation has no customer
+    // yet, but don't blindly trust the client-supplied ID — reject outright
+    // if it's already attached to someone else's customer rather than
+    // relying solely on Stripe's own attach-conflict error.
+    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+    if (
+      paymentMethod.customer &&
+      paymentMethod.customer !== user.stripeCustomerId
+    ) {
+      return {
+        success: false,
+        message: "Payment method does not belong to user",
+      };
+    }
+
     // Attach payment method to customer
     await stripe.paymentMethods.attach(paymentMethodId, {
       customer: user.stripeCustomerId,
@@ -1754,9 +1810,15 @@ export async function deactivateSubscription(
     return { success: false, message: "User with subscription not found" };
   }
 
+  // Reset subscriptionLimits along with the active flag — it's the only
+  // thing checkFeatureAccess/checkAndIncrementUsage read, and nothing else
+  // ever lowers it, so leaving it untouched here would let a cancelled
+  // subscriber keep their old plan's full feature/usage access forever.
   await User.findByIdAndUpdate(user._id, {
     "subscription.isSubscriptionActive": false,
     "subscription.canceledAt": new Date(),
+    "subscription.subscriptionLimits":
+      buildSubscriptionLimitsFromTier(TIER_LIMIT_PRESETS.free),
   });
 
   // Force refresh session to reflect cancelled state immediately

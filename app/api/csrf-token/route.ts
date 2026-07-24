@@ -17,7 +17,7 @@ import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
  */
 export async function GET(req: NextRequest) {
   try {
-    const limitResponse = checkSimpleRateLimit(req, {
+    const limitResponse = await checkSimpleRateLimit(req, {
       scope: "csrf-token:get",
       limit: 60,
       windowMs: 60_000,
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const limitResponse = checkSimpleRateLimit(req, {
+    const limitResponse = await checkSimpleRateLimit(req, {
       scope: "csrf-token:post",
       limit: 30,
       windowMs: 60_000,

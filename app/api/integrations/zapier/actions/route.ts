@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
     // Keyed by the authenticated user rather than IP — a leaked key can be
     // used from anywhere, so this is the only throttle that actually bounds
     // abuse of that specific key.
-    const rateLimited = checkSimpleRateLimit(req, {
+    const rateLimited = await checkSimpleRateLimit(req, {
       scope: "zapier-actions",
       limit: 60,
       windowMs: 60 * 1000,

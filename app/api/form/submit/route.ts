@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { Lead } from "@/models/leads";
 import Form from "@/models/form";
-import { User } from "@/models/userModel";
 import { processLeadDistribution } from "@/lib/leadAssignmentService";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 import { sendNotification } from "@/lib/notificationService";
@@ -12,6 +11,7 @@ import { verifyFormLoadToken } from "@/lib/formLoadToken";
 import { ZapierTriggerHelper } from "@/lib/integrations/zapierTriggerHelper";
 
 import { normalizeAiQualityResult } from "@/lib/aiQualityScoring";
+import { applyLeadPricing } from "@/lib/leadPricing";
 import { badRequest } from "@/lib/api/error-handler";
 
 interface Field {
@@ -113,7 +113,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     "unknown";
   const clientIp = ip.split(",")[0].trim();
 
-  const rateLimited = checkSimpleRateLimit(request, {
+  const rateLimited = await checkSimpleRateLimit(request, {
     scope: "form-submit",
     limit: 5,
     windowMs: 60 * 1000,
@@ -351,36 +351,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       });
 
       try {
-        const seller = await User.findById(formOwnerId)
-          .select("leadPricing")
-          .lean();
-        const pricing =
-          seller && typeof seller === "object"
-            ? (
-                seller as {
-                  leadPricing?: {
-                    high?: number;
-                    medium?: number;
-                    low?: number;
-                  };
-                }
-              ).leadPricing || {
-                high: 10,
-                medium: 5,
-                low: 2,
-              }
-            : {
-                high: 10,
-                medium: 5,
-                low: 2,
-              };
-        const unitPrice =
-          normalized.qualityLevel === "High"
-            ? pricing.high
-            : normalized.qualityLevel === "Low"
-              ? pricing.low
-              : pricing.medium;
-        await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
+        await applyLeadPricing(lead._id.toString(), formOwnerId, normalized.qualityLevel);
       } catch (pricingError) {
         console.error("⚠️ Error setting lead pricing:", pricingError);
       }
@@ -393,6 +364,14 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         exclusive: false,
         shared: true,
       });
+      try {
+        await applyLeadPricing(lead._id.toString(), formOwnerId, "Medium");
+      } catch (pricingError) {
+        console.error(
+          "⚠️ Error setting lead pricing (AI fallback):",
+          pricingError,
+        );
+      }
     }
   } else {
     await Lead.findByIdAndUpdate(lead._id, {
@@ -402,6 +381,14 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       exclusive: false,
       shared: true,
     });
+    try {
+      await applyLeadPricing(lead._id.toString(), formOwnerId, "Medium");
+    } catch (pricingError) {
+      console.error(
+        "⚠️ Error setting lead pricing (scoring disabled):",
+        pricingError,
+      );
+    }
   }
 
   // ========================================

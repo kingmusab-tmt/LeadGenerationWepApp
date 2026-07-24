@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     }
     const sellerId = session.user.id;
 
-    const rateLimited = checkSimpleRateLimit(req, {
+    const rateLimited = await checkSimpleRateLimit(req, {
       scope: "calls-tracking",
       limit: 60,
       windowMs: 60 * 1000,
@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
     const query: Record<string, unknown> = { userId: sellerId };
     if (queryParams.buyerId) query.buyerId = queryParams.buyerId;
     if (queryParams.status) query.status = queryParams.status;
+    if (queryParams.paymentStatus) query.paymentStatus = queryParams.paymentStatus;
     if (queryParams.startDate || queryParams.endDate) {
       query.createdAt = {
         ...(queryParams.startDate ? { $gte: new Date(queryParams.startDate) } : {}),

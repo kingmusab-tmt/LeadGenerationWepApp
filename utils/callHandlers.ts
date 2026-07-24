@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { User } from "@/models";
 import { Buyer } from "@/models/leadbuyers";
 import Call from "@/models/call";
@@ -131,19 +132,28 @@ export const addOverflowToTwiml = (
     "All agents are currently unavailable. We are connecting you to an alternative line.",
   );
 
-  const dialParams: DialParams = {
+  // No `action` here on purpose: with none set, Twilio falls through to the
+  // next verb in this same document (the voicemail below) once the dial
+  // fails to connect. If the overflow line answers and the call completes
+  // normally instead, the whole call session ends at hangup and the
+  // voicemail verb below is simply never reached.
+  const dialParams: Omit<DialParams, "action"> = {
     callerId: options.passCallerId ? options.from : options.overflowNumber,
     timeout: CALL_DEFAULTS.dialTimeout,
-    action: `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/voicemail?callSid=${options.callSid}`,
-    method: "POST",
   };
 
   if (options.recordCall) {
     dialParams.record = "record-from-answer";
-    dialParams.recordingStatusCallback = `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/voicemail`;
   }
 
   twiml.dial(dialParams, options.overflowNumber);
+
+  // Overflow line didn't pick up — fall back to voicemail instead of ending
+  // the call cold.
+  addVoicemailToTwiml(twiml, {
+    sellerId: options.sellerId,
+    callSid: options.callSid,
+  });
 };
 
 export const addVoicemailToTwiml = (
@@ -213,7 +223,12 @@ export const getDialParams = (options: {
 
   if (options.recordCall) {
     dialParams.record = "record-from-answer";
-    dialParams.recordingStatusCallback = `https://${env.NEXT_PUBLIC_DOMAIN}/api/calls/twilio/calls`;
+    // No recordingStatusCallback: Twilio already includes RecordingUrl/
+    // RecordingSid on the `action` callback above once the dial completes
+    // (handleCallAnswered reads them from that same request). A separate
+    // recordingStatusCallback here would need its own sellerId/callSid query
+    // params to be routed correctly, and would just duplicate data already
+    // captured via `action`.
   }
 
   return dialParams;
@@ -314,6 +329,12 @@ export const checkBuyerUnitBalance = async (
   };
 };
 
+const isDuplicateKeyError = (err: unknown): boolean =>
+  typeof err === "object" &&
+  err !== null &&
+  "code" in err &&
+  (err as { code?: number }).code === 11000;
+
 export const chargeBuyerForCall = async (
   buyerId: string,
   callDuration: number,
@@ -328,6 +349,25 @@ export const chargeBuyerForCall = async (
     return { charged: false, unitsCharged: 0 };
   }
 
+  // Twilio documents retrying this status callback on timeout/non-2xx
+  // responses. Without this check, a retry would charge the buyer's
+  // wallet and write a duplicate transaction a second time for the same
+  // call. The unique index on {type:"call_purchase","metadata.callId"}
+  // (models/transactions.ts) is the authoritative backstop for the race
+  // between this check and the write below; this lookup just avoids
+  // redoing the wallet debit in the common (non-racing) retry case.
+  const existing = await Transaction.findOne({
+    type: "call_purchase",
+    "metadata.callId": callSid,
+  });
+  if (existing) {
+    debugLog("Call already charged, skipping duplicate charge", {
+      callSid,
+      unitsCharged: existing.amount,
+    });
+    return { charged: false, unitsCharged: existing.amount };
+  }
+
   const buyer = await Buyer.findById(buyerId);
   if (!buyer) {
     throw new Error(`Buyer not found with ID: ${buyerId}`);
@@ -336,28 +376,56 @@ export const chargeBuyerForCall = async (
   const unitsPerSecond = callRate.units / callRate.seconds;
   const unitsCharged = Math.ceil(callDuration * unitsPerSecond);
 
-  const transaction = new Transaction({
-    userId: buyerId,
-    callId: callSid,
-    amount: unitsCharged,
-    type: "call_purchase",
-    status: "completed",
-    description: `Call charge for ${callDuration} seconds at ${callRate.units} units per ${callRate.seconds} seconds`,
-    balanceBefore: buyer.walletUnit,
-    balanceAfter: buyer.walletUnit - unitsCharged,
-  });
+  const mongoSession = await mongoose.startSession();
+  mongoSession.startTransaction();
 
-  buyer.walletUnit -= unitsCharged;
-  await Promise.all([buyer.save(), transaction.save()]);
+  try {
+    const updatedBuyer = await Buyer.findByIdAndUpdate(
+      buyerId,
+      { $inc: { walletUnit: -unitsCharged } },
+      { session: mongoSession, new: true },
+    );
 
-  debugLog("Buyer charged for call", {
-    buyerId,
-    callDuration,
-    unitsCharged,
-    newBalance: buyer.walletUnit,
-  });
+    await Transaction.create(
+      [
+        {
+          userId: buyerId,
+          amount: unitsCharged,
+          type: "call_purchase",
+          status: "completed",
+          previousBalance: (updatedBuyer?.walletUnit ?? 0) + unitsCharged,
+          currentBalance: updatedBuyer?.walletUnit ?? 0,
+          metadata: { callId: callSid },
+        },
+      ],
+      { session: mongoSession },
+    );
 
-  return { charged: true, unitsCharged };
+    await mongoSession.commitTransaction();
+
+    debugLog("Buyer charged for call", {
+      buyerId,
+      callDuration,
+      unitsCharged,
+      newBalance: updatedBuyer?.walletUnit,
+    });
+
+    return { charged: true, unitsCharged };
+  } catch (err) {
+    await mongoSession.abortTransaction();
+    // A concurrent retry that raced past the findOne check above and hit
+    // the unique index first — treat it as already-charged rather than a
+    // failure (and don't double-debit the wallet).
+    if (isDuplicateKeyError(err)) {
+      debugLog("Duplicate call charge detected via unique index", {
+        callSid,
+      });
+      return { charged: false, unitsCharged };
+    }
+    throw err;
+  } finally {
+    mongoSession.endSession();
+  }
 };
 
 export const getNextRoundRobinBuyer = async (
@@ -447,6 +515,14 @@ export const getNextRoundRobinBuyerAtomic = async (
   seller: SellerLike,
   industry: string,
   callRate: { units: number; seconds: number },
+  // Additional per-candidate eligibility (geo-routing, concurrent-call limit,
+  // etc.) evaluated during rotation, not just against the single ticket-
+  // selected buyer — without this, a buyer failing e.g. geo-routing caused
+  // the whole call to fall back to voicemail even when other eligible buyers
+  // existed, because only one buyer was ever considered.
+  extraEligibilityCheck?: (
+    buyer: InstanceType<typeof Buyer>,
+  ) => Promise<boolean>,
 ) => {
   const sellerBuyerIds = seller.buyers ?? [];
   let allBuyers = await Buyer.find({
@@ -463,6 +539,13 @@ export const getNextRoundRobinBuyerAtomic = async (
   }
 
   const buyers = allBuyers.filter((buyer) => {
+    if (!buyer.phone) {
+      debugLog("Skipping buyer with no phone number (atomic RR)", {
+        buyerId: buyer._id,
+      });
+      return false;
+    }
+
     if (isBuyerOnVacation(buyer)) {
       debugLog("Skipping buyer on vacation (atomic RR)", {
         buyerId: buyer._id,
@@ -516,15 +599,21 @@ export const getNextRoundRobinBuyerAtomic = async (
       callRate.units,
     );
 
-    if (hasSufficientBalance) {
+    const passesExtraCheck = extraEligibilityCheck
+      ? await extraEligibilityCheck(candidate)
+      : true;
+
+    if (hasSufficientBalance && passesExtraCheck) {
       leadBuyer = candidate;
       break;
     }
 
-    debugLog("Buyer has insufficient balance in atomic RR", {
+    debugLog("Buyer skipped in atomic RR", {
       buyerId: candidate._id,
       requiredUnits: callRate.units,
       industry,
+      hasSufficientBalance,
+      passesExtraCheck,
     });
     attempts++;
     nextBuyerIndex = (nextBuyerIndex + 1) % buyers.length;
@@ -532,7 +621,7 @@ export const getNextRoundRobinBuyerAtomic = async (
 
   if (!leadBuyer) {
     throw new Error(
-      `No buyers with sufficient balance for industry: ${industry}`,
+      `No eligible buyers with sufficient balance for industry: ${industry}`,
     );
   }
 
@@ -566,6 +655,9 @@ export const createCallRecord = async (data: {
   industry: string;
   unitsCharged?: number;
   insufficientBalance?: boolean;
+  trackingNumber?: string;
+  retryAttempt?: number;
+  leadSource?: string;
 }) => {
   const newCall = new Call({
     callSid: data.callSid,
@@ -582,6 +674,9 @@ export const createCallRecord = async (data: {
     industry: data.industry,
     unitsCharged: data.unitsCharged,
     insufficientBalance: data.insufficientBalance || false,
+    trackingNumber: data.trackingNumber,
+    retryAttempt: data.retryAttempt || 0,
+    leadSource: data.leadSource,
   });
 
   await newCall.save();

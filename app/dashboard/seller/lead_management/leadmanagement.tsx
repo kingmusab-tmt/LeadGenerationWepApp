@@ -171,10 +171,12 @@ const LeadManagement: React.FC = () => {
   // Confirm dialog hook
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 
-  const extractLeads = (data: any): Lead[] => {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.leads)) return data.leads;
-    if (Array.isArray(data?.data?.leads)) return data.data.leads;
+  const extractLeads = (data: unknown): Lead[] => {
+    if (Array.isArray(data)) return data as Lead[];
+    const withLeads = data as { leads?: unknown; data?: { leads?: unknown } };
+    if (Array.isArray(withLeads?.leads)) return withLeads.leads as Lead[];
+    if (Array.isArray(withLeads?.data?.leads))
+      return withLeads.data!.leads as Lead[];
     return [];
   };
 
@@ -361,7 +363,7 @@ const LeadManagement: React.FC = () => {
 
   const exportToCSV = (leadsToExport: Lead[], filename: string) => {
     const csvData = leadsToExport.map((lead) => {
-      const row: Record<string, any> = {
+      const row: Record<string, unknown> = {
         Name: sanitizeCsvCell(
           lead.name || getFieldValue(lead.fields, /name|full name/i),
         ),

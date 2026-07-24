@@ -13,7 +13,6 @@
  */
 
 import { ILead, Lead } from "@/models/leads";
-import { User } from "@/models/userModel";
 import { Buyer } from "@/models/leadbuyers";
 import mongoose from "mongoose";
 import { processLeadDistribution } from "@/lib/leadAssignmentService";
@@ -26,6 +25,7 @@ import {
   normalizeAiQualityResult,
   recordAiScoringMetric,
 } from "@/lib/aiQualityScoring";
+import { applyLeadPricing } from "@/lib/leadPricing";
 import { recordAuditLog } from "@/lib/auditLog";
 import { ZapierTriggerHelper } from "@/lib/integrations/zapierTriggerHelper";
 
@@ -330,32 +330,13 @@ export class ZapierActionsService {
 
             // Apply seller's quality-based lead pricing
             try {
-              const seller = await User.findById(this.userId)
-                .select("leadPricing")
-                .lean();
-              const pricing = (
-                seller as {
-                  leadPricing?: {
-                    high?: number;
-                    medium?: number;
-                    low?: number;
-                  };
-                } | null
-              )?.leadPricing || {
-                high: 10,
-                medium: 5,
-                low: 2,
-              };
-              const unitPrice =
-                normalized.qualityLevel === "High"
-                  ? pricing.high
-                  : normalized.qualityLevel === "Low"
-                    ? pricing.low
-                    : pricing.medium;
-              await Lead.findByIdAndUpdate(lead._id, { unit: unitPrice });
+              await applyLeadPricing(
+                lead._id.toString(),
+                this.userId,
+                normalized.qualityLevel,
+              );
               console.log("[AI Scoring] ✅ Lead unit price set:", {
                 qualityLevel: normalized.qualityLevel,
-                unitPrice,
               });
             } catch (pricingError) {
               console.error(
@@ -375,6 +356,14 @@ export class ZapierActionsService {
               qualityLevel: "Medium",
               aiQualityReason: `AI scoring failed: HTTP ${filterResponse.status}`,
             });
+            try {
+              await applyLeadPricing(lead._id.toString(), this.userId, "Medium");
+            } catch (pricingError) {
+              console.error(
+                "[AI Scoring] ⚠️ Error setting lead pricing (http fallback):",
+                pricingError,
+              );
+            }
             console.log(
               "[AI Scoring] ⚠️ Fell back to default (50/Medium) due to unexpected API error",
             );
@@ -393,6 +382,14 @@ export class ZapierActionsService {
             qualityLevel: "Medium",
             aiQualityReason: "AI evaluation unavailable - using default",
           });
+          try {
+            await applyLeadPricing(lead._id.toString(), this.userId, "Medium");
+          } catch (pricingError) {
+            console.error(
+              "[AI Scoring] ⚠️ Error setting lead pricing (exception fallback):",
+              pricingError,
+            );
+          }
           console.log(
             "[AI Scoring] ⚠️ Fell back to default (50/Medium) due to exception",
           );
@@ -416,6 +413,14 @@ export class ZapierActionsService {
           exclusive: false,
           shared: true,
         });
+        try {
+          await applyLeadPricing(lead._id.toString(), this.userId, "Medium");
+        } catch (pricingError) {
+          console.error(
+            "[AI Scoring] ⚠️ Error setting lead pricing (scoring disabled):",
+            pricingError,
+          );
+        }
       }
 
       // ========================================

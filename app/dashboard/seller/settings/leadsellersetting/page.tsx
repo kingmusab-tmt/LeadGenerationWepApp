@@ -9,8 +9,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormControlLabel,
-  Switch,
   Card,
   CardContent,
   Divider,
@@ -22,12 +20,11 @@ import {
 import {
   Share as ShareIcon,
   AttachMoney as MoneyIcon,
-  Store as MarketplaceIcon,
-  TrendingUp as VolumeIcon,
   CheckCircle,
 } from "@mui/icons-material";
 import axios from "@/lib/axiosInstance";
 import { toast } from "react-toastify";
+import { useDashboardTerms } from "@/app/hooks";
 
 type LeadSettingsProps = {
   hideSaveButton?: boolean;
@@ -38,6 +35,7 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
   hideSaveButton = false,
   onSaveHandlerReady,
 }) => {
+  const terms = useDashboardTerms();
   // Lead distribution configuration state
   const [autoAssignLeads, setAutoAssignLeads] = useState<boolean>(false);
   const [distributionMode, setDistributionMode] = useState<
@@ -45,7 +43,6 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
   >("marketplace");
   const [maxAutoAssignPerDay, setMaxAutoAssignPerDay] = useState<number>(50);
   const [aiQualityThreshold, setAiQualityThreshold] = useState<number>(50);
-  const [marketplaceFallback, setMarketplaceFallback] = useState<boolean>(true);
   const [leadPricing, setLeadPricing] = useState<{
     high: number;
     medium: number;
@@ -71,7 +68,7 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
         : {
             severity: "warning" as const,
             title: "High volume mode",
-            text: "High, Medium, and some Low-quality leads (spam >= 70) can auto-assign. Review buyer fit carefully.",
+            text: `High, Medium, and some Low-quality leads (spam >= 70) can auto-assign. Review ${terms.buyerLower} fit carefully.`,
           };
 
   // Load current settings
@@ -85,7 +82,6 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
           setDistributionMode(s.distributionMode || "marketplace");
           setMaxAutoAssignPerDay(s.maxAutoAssignPerDay ?? 50);
           setAiQualityThreshold(s.aiQualityThreshold ?? 50);
-          setMarketplaceFallback(s.marketplaceFallback ?? true);
           if (s.leadPricing) {
             setLeadPricing({
               high: s.leadPricing.high ?? 10,
@@ -122,7 +118,6 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
         distributionMode,
         maxAutoAssignPerDay,
         aiQualityThreshold,
-        marketplaceFallback,
         leadPricing,
       });
       toast.success("Settings updated successfully");
@@ -150,8 +145,9 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
   return (
     <Box sx={{ mt: -2 }}>
       <Alert severity="info" icon={<ShareIcon />} sx={{ mb: 3 }}>
-        Configure how leads are distributed to buyers - automatically assign to
-        registered buyers or post to marketplace for manual purchase.
+        Configure how leads are distributed to {terms.buyersLower} -
+        automatically assign to registered {terms.buyersLower} or post to
+        marketplace for manual purchase.
       </Alert>
 
       {/* LEAD DISTRIBUTION SECTION */}
@@ -167,32 +163,20 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
                 Lead Distribution Mode
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Choose how leads are distributed to buyers
+                Choose how leads are distributed to {terms.buyersLower}
               </Typography>
             </Box>
           </Box>
           <Divider sx={{ mb: 3 }} />
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={autoAssignLeads}
-                  onChange={(e) => setAutoAssignLeads(e.target.checked)}
-                  disabled={distributionMode !== "marketplace"}
-                />
-              }
-              label="Enable Auto-Assignment of Leads"
-            />
-            <Typography
-              variant="caption"
-              sx={{ display: "block", mt: -1, mb: 1, color: "text.secondary" }}
-            >
-              {distributionMode === "marketplace"
-                ? "Automatically assign matching leads to buyers based on your preferences"
-                : "Auto-assignment is controlled by Distribution Mode selection"}
-            </Typography>
-
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+              gap: 3,
+              alignItems: "start",
+            }}
+          >
             <FormControl fullWidth>
               <InputLabel>Distribution Mode</InputLabel>
               <Select
@@ -208,7 +192,7 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
                       Automatic Only
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Auto-assign all leads to buyers
+                      Auto-assign all leads to {terms.buyersLower}
                     </Typography>
                   </Box>
                 </MenuItem>
@@ -235,8 +219,6 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
                 </MenuItem>
               </Select>
             </FormControl>
-
-            <Divider sx={{ my: 1 }} />
 
             <Box>
               <Typography variant="subtitle2" fontWeight={600} gutterBottom>
@@ -358,7 +340,9 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
                 helperText="Spam score 0–40 (Best leads)"
               />
             </Tooltip>
-            <Tooltip title="Medium Quality leads have some minor red flags but are still worth pursuing (AI spam score 41-69). Price these moderately to attract buyers while maintaining reasonable earnings.">
+            <Tooltip
+              title={`Medium Quality leads have some minor red flags but are still worth pursuing (AI spam score 41-69). Price these moderately to attract ${terms.buyersLower} while maintaining reasonable earnings.`}
+            >
               <TextField
                 label="🟡 Medium Quality"
                 type="number"
@@ -394,73 +378,8 @@ const LeadSettings: React.FC<LeadSettingsProps> = ({
         </CardContent>
       </Card>
 
-      {/* MARKETPLACE FALLBACK */}
-      <Card
-        elevation={0}
-        sx={{ mb: 3, border: "1px solid", borderColor: "divider" }}
-      >
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
-            <MarketplaceIcon color="primary" />
-            <Box>
-              <Typography variant="h6" fontWeight="600">
-                Marketplace Fallback
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Handle unassigned leads automatically
-              </Typography>
-            </Box>
-          </Box>
-          <Divider sx={{ mb: 3 }} />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={marketplaceFallback}
-                onChange={(e) => setMarketplaceFallback(e.target.checked)}
-              />
-            }
-            label="Post to Marketplace if Not Auto-Assigned"
-          />
-          <Typography
-            variant="caption"
-            sx={{ display: "block", mt: 1, color: "text.secondary" }}
-          >
-            Leads that don&apos;t auto-assign will be available in the
-            marketplace for manual purchase
-          </Typography>
-        </CardContent>
-      </Card>
-
-      {/* VOLUME & LIMITS SECTION */}
+      {/* SAVE FOOTER */}
       <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider" }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
-            <VolumeIcon color="primary" />
-            <Box>
-              <Typography variant="h6" fontWeight="600">
-                Daily Volume Limits
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Control maximum leads per day
-              </Typography>
-            </Box>
-          </Box>
-          <Divider sx={{ mb: 3 }} />
-
-          <TextField
-            label="Maximum Leads Per Day"
-            type="number"
-            value={maxAutoAssignPerDay}
-            onChange={(e) =>
-              setMaxAutoAssignPerDay(parseInt(e.target.value || "0", 10))
-            }
-            inputProps={{ min: 0 }}
-            fullWidth
-            helperText="Set to 0 for unlimited daily leads"
-          />
-        </CardContent>
-        <Divider />
         <Box
           sx={{
             display: "flex",

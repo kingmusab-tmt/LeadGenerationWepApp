@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import twilio from "twilio";
 import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
 import { debugLog } from "@/utils/callHandlers";
@@ -10,12 +11,29 @@ import {
   badRequest,
   internalError,
   notFound,
+  successResponse,
   unauthorized,
 } from "@/lib/api/error-handler";
 
+function twimlResponse(twiml: InstanceType<typeof twilio.twiml.VoiceResponse>) {
+  return new NextResponse(twiml.toString(), {
+    status: 200,
+    headers: { "Content-Type": "text/xml" },
+  });
+}
+
 /**
  * POST /api/calls/voicemail
- * Twilio recording status callback — updates call record with voicemail data
+ *
+ * Twilio hits this from two different places with two different response
+ * requirements:
+ * - As the `action` on a <Record> verb (addVoicemailToTwiml): the call is
+ *   still live, so this must return TwiML to tell Twilio what to do next.
+ *   Twilio does not include `RecordingStatus` on this request.
+ * - As the async `recordingStatusCallback`: fire-and-forget, call has
+ *   already ended, response body is ignored. Twilio always includes
+ *   `RecordingStatus` here.
+ * We use the presence of `RecordingStatus` to tell the two apart.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -31,22 +49,33 @@ export async function POST(req: NextRequest) {
     const callSid = formData.get("CallSid") as string;
     const recordingUrl = formData.get("RecordingUrl") as string;
     const recordingDuration = formData.get("RecordingDuration") as string;
-    const recordingStatus = formData.get("RecordingStatus") as string;
+    const recordingStatus = formData.get("RecordingStatus") as string | null;
     const transcriptionText = formData.get("TranscriptionText") as string;
+
+    const isAsyncStatusCallback = recordingStatus !== null;
 
     debugLog("Voicemail recording callback", {
       callSid,
       recordingUrl,
       recordingDuration,
       recordingStatus,
+      isAsyncStatusCallback,
       hasTranscription: !!transcriptionText,
     });
 
     if (!callSid) {
-      return badRequest("Missing CallSid");
+      if (isAsyncStatusCallback) return badRequest("Missing CallSid");
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("Thank you for your message. Goodbye.");
+      twiml.hangup();
+      return twimlResponse(twiml);
     }
 
-    if (recordingStatus !== "completed") {
+    // The async recordingStatusCallback fires once per recording and is the
+    // only request guaranteed to report a terminal status — skip persisting
+    // on anything other than "completed" so partial/failed recordings don't
+    // overwrite a good one.
+    if (isAsyncStatusCallback && recordingStatus !== "completed") {
       debugLog("Voicemail recording not completed", { recordingStatus });
       return NextResponse.json({ status: "ignored" }, { status: 200 });
     }
@@ -68,7 +97,11 @@ export async function POST(req: NextRequest) {
 
     if (!updatedCall) {
       debugLog("Call record not found for voicemail", { callSid }, "warn");
-      return notFound("Call record");
+      if (isAsyncStatusCallback) return notFound("Call record");
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("Thank you for your message. Goodbye.");
+      twiml.hangup();
+      return twimlResponse(twiml);
     }
 
     debugLog("Voicemail saved successfully", {
@@ -89,7 +122,14 @@ export async function POST(req: NextRequest) {
       recordingUrl: recordingUrl || "",
     });
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    if (isAsyncStatusCallback) {
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
+
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("Thank you for your message. Goodbye.");
+    twiml.hangup();
+    return twimlResponse(twiml);
   } catch (error) {
     debugLog("Voicemail callback failed", { error }, "error");
     return internalError("Voicemail processing failed");
@@ -139,9 +179,8 @@ export async function GET(req: NextRequest) {
       Call.countDocuments(query),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data: voicemails,
+    return successResponse({
+      voicemails,
       pagination: {
         page,
         limit,
@@ -188,7 +227,7 @@ export async function PATCH(req: NextRequest) {
       return notFound("Voicemail");
     }
 
-    return NextResponse.json({ success: true, data: updatedCall });
+    return successResponse({ call: updatedCall });
   } catch (error) {
     debugLog("Voicemail mark listened failed", { error }, "error");
     return internalError("Failed to update voicemail");

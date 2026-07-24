@@ -10,6 +10,8 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,6 +24,17 @@ export async function POST(req: NextRequest) {
     if (session.user.role !== "seller" && session.user.role !== "admin") {
       return forbidden("Seller or admin access required");
     }
+
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "twilio-activate",
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     await dbConnect();
 

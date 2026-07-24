@@ -15,11 +15,6 @@ export interface TrackingNumber {
     message: string;
     digit: string;
   }[];
-  leadResponses?: {
-    // Messages and digits for lead verification
-    message: string;
-    digit: string;
-  }[];
   overflowNumber?: string; // Overflow number when no buyers available (before voicemail)
 
   // Seller working hours

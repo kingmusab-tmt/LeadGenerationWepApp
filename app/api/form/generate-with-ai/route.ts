@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const rateLimited = checkSimpleRateLimit(req, {
+  const rateLimited = await checkSimpleRateLimit(req, {
     scope: "form-ai-generate",
     limit: 10,
     windowMs: 24 * 60 * 60 * 1000,

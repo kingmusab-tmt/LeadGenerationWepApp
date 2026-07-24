@@ -3,6 +3,10 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
 import { successResponse, internalError } from "@/lib/api/error-handler";
+import {
+  TIER_LIMIT_PRESETS,
+  buildSubscriptionLimitsFromTier,
+} from "@/lib/subscriptionLimitsService";
 
 /**
  * GET /api/subscriptions/check
@@ -47,9 +51,15 @@ export async function GET() {
         // Subscription has expired, update the user's subscription status
         isSubscriptionActive = false;
 
-        // Update subscription status in the database
+        // Revoke access along with the active flag. subscriptionLimits is
+        // the only thing checkFeatureAccess/checkAndIncrementUsage read —
+        // without resetting it here, an expired trial or cancelled paid
+        // plan would keep its full feature/usage access forever.
         await User.findByIdAndUpdate(session.user.id, {
           "subscription.isSubscriptionActive": false,
+          "subscription.isTrial": false,
+          "subscription.subscriptionLimits":
+            buildSubscriptionLimitsFromTier(TIER_LIMIT_PRESETS.free),
         });
       }
     }

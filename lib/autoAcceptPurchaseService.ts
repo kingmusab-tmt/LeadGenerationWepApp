@@ -265,9 +265,14 @@ async function autoPurchaseLead(
       };
     }
 
-    // 2. Deduct units from buyer
-    const updatedBuyer = await Buyer.findByIdAndUpdate(
-      buyer._id,
+    // 2. Deduct units from buyer. The check above reads a `buyer` fetched
+    // before this transaction started, so it can be stale if two leads
+    // become auto-purchasable for the same buyer within milliseconds of
+    // each other — guard the actual write with a walletUnit >= cost
+    // condition so a second concurrent call can't drive the balance
+    // negative even if it raced past the earlier check.
+    const updatedBuyer = await Buyer.findOneAndUpdate(
+      { _id: buyer._id, walletUnit: { $gte: lead.unit || 0 } },
       {
         $inc: {
           walletUnit: -(lead.unit || 0),
@@ -285,6 +290,14 @@ async function autoPurchaseLead(
       },
       { session, new: true },
     );
+
+    if (!updatedBuyer) {
+      await session.abortTransaction();
+      return {
+        success: false,
+        error: "Insufficient wallet balance",
+      };
+    }
 
     // 3. Add units to seller
     await User.findByIdAndUpdate(

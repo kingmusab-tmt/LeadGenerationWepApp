@@ -4,24 +4,13 @@
  */
 
 import mongoose, { Schema, Model, Document } from "mongoose";
+import {
+  CANCELLATION_REASONS,
+  CancellationReason,
+} from "@/lib/cancellationReasons";
 
-/**
- * Cancellation Reason Categories
- * Pre-defined reasons for tracking and analytics
- */
-export const CANCELLATION_REASONS = [
-  "too_expensive",
-  "not_using_enough",
-  "missing_features",
-  "switching_competitor",
-  "technical_issues",
-  "poor_support",
-  "business_closed",
-  "temporary_pause",
-  "other",
-] as const;
-
-export type CancellationReason = (typeof CANCELLATION_REASONS)[number];
+export { CANCELLATION_REASONS };
+export type { CancellationReason };
 
 /**
  * Cancellation Feedback Interface

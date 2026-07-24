@@ -23,6 +23,7 @@ import {
   Add as AddIcon,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface PhoneRecipient {
   phone: string;
@@ -42,6 +43,7 @@ export default function SmsRecipientPicker({
   onChange,
   disabled = false,
 }: SmsRecipientPickerProps) {
+  const terms = useDashboardTerms();
   const [recipientSource, setRecipientSource] = useState<string>("");
   const [availableBuyers, setAvailableBuyers] = useState<PhoneRecipient[]>([]);
   const [availableLeads, setAvailableLeads] = useState<PhoneRecipient[]>([]);
@@ -171,9 +173,9 @@ export default function SmsRecipientPicker({
             label="Add From"
             disabled={disabled}
           >
-            <MenuItem value="buyers">Lead Buyers</MenuItem>
+            <MenuItem value="buyers">{terms.leadBuyers}</MenuItem>
             <MenuItem value="leads">Leads</MenuItem>
-            <MenuItem value="both">Both (Buyers + Leads)</MenuItem>
+            <MenuItem value="both">Both ({terms.buyers} + Leads)</MenuItem>
           </Select>
         </FormControl>
 
@@ -187,7 +189,7 @@ export default function SmsRecipientPicker({
           >
             Add All{" "}
             {recipientSource === "buyers"
-              ? "Buyers"
+              ? terms.buyers
               : recipientSource === "leads"
                 ? "Leads"
                 : ""}
@@ -217,7 +219,7 @@ export default function SmsRecipientPicker({
             >
               No{" "}
               {recipientSource === "buyers"
-                ? "lead buyers"
+                ? terms.leadBuyers.toLowerCase()
                 : recipientSource === "leads"
                   ? "leads"
                   : "recipients"}{" "}
@@ -266,7 +268,7 @@ export default function SmsRecipientPicker({
                   secondary={
                     <Typography variant="caption" color="text.secondary">
                       {r.phone} &middot;{" "}
-                      {r.type === "buyer" ? "Lead Buyer" : "Lead"}
+                      {r.type === "buyer" ? terms.leadBuyer : "Lead"}
                     </Typography>
                   }
                 />

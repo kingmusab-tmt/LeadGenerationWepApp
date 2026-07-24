@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
 import {
@@ -105,7 +105,7 @@ export default function StripeOnboarding({
     } catch (err) {
       console.error("Failed to handle onboarding redirect:", err);
     }
-  }, [userEmail]);
+  }, [router, userEmail]);
 
   const createConnectedAccount = async () => {
     setLoading(true);
@@ -181,7 +181,7 @@ export default function StripeOnboarding({
     }
   };
 
-  const handleNextValidation = async (): Promise<boolean> => {
+  const handleNextValidation = useCallback(async (): Promise<boolean> => {
     if (loading || dashboardLoading) {
       setError("Please wait for Stripe status checks to complete.");
       return false;
@@ -199,18 +199,17 @@ export default function StripeOnboarding({
     }
 
     return true;
-  };
-
-  useEffect(() => {
-    if (!onSaveHandlerReady) return;
-    onSaveHandlerReady(handleNextValidation);
   }, [
-    onSaveHandlerReady,
     loading,
     dashboardLoading,
     accountStatus?.chargesEnabled,
     accountStatus?.payoutsEnabled,
   ]);
+
+  useEffect(() => {
+    if (!onSaveHandlerReady) return;
+    onSaveHandlerReady(handleNextValidation);
+  }, [onSaveHandlerReady, handleNextValidation]);
 
   useEffect(() => {
     if (!onConnectionStatusChange) return;

@@ -15,6 +15,8 @@ import {
   notFound,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,17 @@ export async function POST(
     if (!session?.user) {
       return unauthorized("Authentication required");
     }
+
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "email-campaigns-actions",
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
@@ -76,8 +89,11 @@ export async function POST(
       const body = await req.json();
       const { testEmail } = body;
 
-      if (!testEmail) {
-        return badRequest("Test email address required");
+      if (
+        typeof testEmail !== "string" ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)
+      ) {
+        return badRequest("A valid test email address is required");
       }
 
       const result = await emailMarketingEngine.sendTestEmail(id, testEmail);
@@ -131,6 +147,34 @@ export async function POST(
           sent: result.sent,
           failed: result.failed,
         },
+        { status: 200 },
+      );
+    }
+
+    // ==================== DECLARE A/B WINNER ====================
+    // A record-keeping annotation only — there is no automated second-phase
+    // send to "the rest" of the list (that would need a real scheduler,
+    // which doesn't exist). This is deliberately not gated by campaign
+    // status: declaring a winner only makes sense once you've seen results,
+    // which is normally after the campaign has already completed sending —
+    // exactly when the regular PUT route refuses further edits.
+    if (action === "declare-winner") {
+      if (!campaign.abTesting?.enabled) {
+        return badRequest("A/B testing is not enabled for this campaign");
+      }
+
+      const body = await req.json();
+      const { winningVariant } = body;
+      if (winningVariant !== "A" && winningVariant !== "B") {
+        return badRequest("winningVariant must be 'A' or 'B'");
+      }
+
+      await EmailCampaign.findByIdAndUpdate(id, {
+        "abTesting.winningVariant": winningVariant,
+      });
+
+      return NextResponse.json(
+        { message: `Variant ${winningVariant} recorded as the winner` },
         { status: 200 },
       );
     }

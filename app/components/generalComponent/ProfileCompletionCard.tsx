@@ -6,6 +6,7 @@ import {
   getSellerOnboardingCompletion,
   SellerOnboardingUser,
 } from "@/lib/sellerOnboarding";
+import { useDashboardTerms } from "@/app/hooks";
 
 /**
  * Surfaces the seller profile-completeness score that
@@ -20,6 +21,7 @@ export default function ProfileCompletionCard({
   user?: SellerOnboardingUser | null;
 }) {
   const router = useRouter();
+  const terms = useDashboardTerms();
   const { completed, total, percent, complete } =
     getSellerOnboardingCompletion(user);
 
@@ -50,8 +52,8 @@ export default function ProfileCompletionCard({
         />
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Typography variant="body2" color="text.secondary">
-            A complete business profile builds trust with buyers and shows up
-            better in the marketplace.
+            A complete business profile builds trust with {terms.buyersLower}{" "}
+            and shows up better in the marketplace.
           </Typography>
           <Button
             variant="outlined"

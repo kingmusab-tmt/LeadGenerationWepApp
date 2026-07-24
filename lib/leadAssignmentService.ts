@@ -46,6 +46,7 @@ interface SellerAssignmentSettings {
   autoAssignLeads?: boolean;
   maxAutoAssignPerDay?: number;
   currentAutoAssignedToday?: number;
+  lastAutoAssignResetDate?: Date | string;
   distributionMode?: "automatic" | "marketplace" | "both";
   aiQualityThreshold?: number;
   industryRoundRobinIndex?: Map<string, number>;
@@ -847,7 +848,7 @@ export async function processLeadDistribution(
     try {
       seller = (await User.findById(sellerId)
         .select(
-          "autoAssignLeads maxAutoAssignPerDay currentAutoAssignedToday distributionMode aiQualityThreshold industryRoundRobinIndex lastAssignedIndex",
+          "autoAssignLeads maxAutoAssignPerDay currentAutoAssignedToday lastAutoAssignResetDate distributionMode aiQualityThreshold industryRoundRobinIndex lastAssignedIndex",
         )
         .lean()) as SellerAssignmentSettings | null;
     } catch {
@@ -870,12 +871,14 @@ export async function processLeadDistribution(
       // both: auto-assign only if AI spam/quality score meets threshold (lower is better)
       const aiScore =
         typeof lead.aiQualityScore === "number" ? lead.aiQualityScore : null;
-      if (aiScore !== null) {
-        return aiScore <= aiQualityThreshold;
+      if (aiScore === null) {
+        // No numeric score to compare against the seller's threshold — every
+        // current lead-creation path sets one, so this shouldn't happen, but
+        // guessing "Medium passes" would silently ignore whatever threshold
+        // the seller configured. Fall back to marketplace instead.
+        return false;
       }
-      // Fallback: use qualityLevel if AI score absent
-      const qualityLevel = lead.qualityLevel || "Medium";
-      return qualityLevel === "High" || qualityLevel === "Medium";
+      return aiScore <= aiQualityThreshold;
     })();
 
     if (!shouldAutoAssign) {
@@ -928,16 +931,69 @@ export async function processLeadDistribution(
 
     // Get seller's auto-assignment limit
     const maxAutoAssignPerDay = seller?.maxAutoAssignPerDay || 50;
-    const currentAutoAssignedToday = seller?.currentAutoAssignedToday || 0;
+
+    // currentAutoAssignedToday is a running counter with no dedicated reset
+    // job — reset it lazily here the first time it's checked on a new UTC
+    // day, using lastAutoAssignResetDate as the watermark. Without this the
+    // counter never goes back to 0 and auto-assignment permanently stops
+    // once a seller crosses maxAutoAssignPerDay lifetime, not per day.
+    const lastReset = seller?.lastAutoAssignResetDate
+      ? new Date(seller.lastAutoAssignResetDate)
+      : null;
+    const now = new Date();
+    const isSameUtcDay =
+      lastReset &&
+      lastReset.getUTCFullYear() === now.getUTCFullYear() &&
+      lastReset.getUTCMonth() === now.getUTCMonth() &&
+      lastReset.getUTCDate() === now.getUTCDate();
+
+    let currentAutoAssignedToday = seller?.currentAutoAssignedToday || 0;
+    if (!isSameUtcDay) {
+      currentAutoAssignedToday = 0;
+      try {
+        await User.findByIdAndUpdate(sellerId, {
+          currentAutoAssignedToday: 0,
+          lastAutoAssignResetDate: now,
+        });
+      } catch (error) {
+        result.errors.push({
+          step: "reset_daily_count",
+          error: String(error),
+        });
+      }
+    }
 
     if (currentAutoAssignedToday >= maxAutoAssignPerDay) {
       console.log(
-        `⚠️ Seller ${sellerId} has reached daily auto-assignment limit`,
+        `⚠️ Seller ${sellerId} has reached daily auto-assignment limit. Moving lead to marketplace.`,
       );
       result.errors.push({
         step: "auto_assign",
         error: "Seller has reached daily auto-assignment limit",
       });
+
+      // Previously the lead was just left in whatever status it already had
+      // — neither assigned nor marketplace-listed — so it silently vanished
+      // once a seller hit their cap. Route it to marketplace instead, same
+      // as the !shouldAutoAssign path above.
+      try {
+        const marketplaceResult = await makeLeadAvailableInMarketplace(
+          lead,
+          "fallback",
+        );
+        console.log(
+          `📢 Lead ${lead._id} made available in marketplace (daily limit reached). Notified ${marketplaceResult.notificationResult?.notifiedBuyers?.length || 0} buyers.`,
+        );
+      } catch (error) {
+        console.error(
+          "Error making lead available in marketplace after daily limit:",
+          error,
+        );
+        result.errors.push({
+          step: "marketplace_availability",
+          error: String(error),
+        });
+      }
     } else {
       // Choose first matching buyer for assignment
       const primaryBuyer = matchingBuyers[0];

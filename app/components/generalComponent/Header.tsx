@@ -18,6 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import { setTrialIntent } from "@/lib/trialIntent";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import AnalyticsIcon from "@mui/icons-material/Analytics";
@@ -507,14 +508,7 @@ const Header = React.memo(function Header() {
                     color="primary"
                     component={Link}
                     href="/auth/sign-in?trial=true"
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        sessionStorage.setItem("trialIntent", "true");
-                        import("@/lib/cookieUtils")
-                          .then((cu) => cu.setCookie("trialIntent", "true", 10))
-                          .catch(() => {});
-                      }
-                    }}
+                    onClick={() => setTrialIntent()}
                     sx={{
                       textTransform: "none",
                       fontWeight: 700,
@@ -662,12 +656,7 @@ const Header = React.memo(function Header() {
                     component={Link}
                     href="/auth/sign-in?trial=true"
                     onClick={() => {
-                      if (typeof window !== "undefined") {
-                        sessionStorage.setItem("trialIntent", "true");
-                        import("@/lib/cookieUtils")
-                          .then((cu) => cu.setCookie("trialIntent", "true", 10))
-                          .catch(() => {});
-                      }
+                      setTrialIntent();
                       handleMenuClose();
                     }}
                   >

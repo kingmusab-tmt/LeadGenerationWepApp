@@ -34,6 +34,7 @@ import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CloseIcon from "@mui/icons-material/Close";
 import { formatDate, formatDuration } from "@/lib/formatUtils";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface Call {
   _id: string;
@@ -60,6 +61,10 @@ interface Call {
 
 const PAGE_SIZE = 15;
 
+// Secondary columns are hidden below the `md` breakpoint so reviewing recent
+// calls on a phone doesn't require scrolling a 10-column table sideways.
+const secondaryColumnSx = { display: { xs: "none", md: "table-cell" } };
+
 const STATUS_COLORS: Record<
   string,
   "success" | "error" | "warning" | "info" | "default"
@@ -84,6 +89,7 @@ const PAYMENT_COLORS: Record<
 };
 
 export default function LeadTracking() {
+  const terms = useDashboardTerms();
   const [allCalls, setAllCalls] = useState<Call[]>([]);
   const [filteredCalls, setFilteredCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +99,9 @@ export default function LeadTracking() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadedPage, setLoadedPage] = useState(1);
+  const [totalCallsOnServer, setTotalCallsOnServer] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -121,12 +130,20 @@ export default function LeadTracking() {
     if (!sellerId) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/calls/tracking");
+      const res = await fetch("/api/calls/tracking?page=1&limit=200");
       const data = await res.json();
       const calls = Array.isArray(data)
         ? data
-        : (data?.data ?? data?.calls ?? []);
+        : Array.isArray(data?.data?.calls)
+          ? data.data.calls
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.calls)
+              ? data.calls
+              : [];
       setAllCalls(calls);
+      setLoadedPage(1);
+      setTotalCallsOnServer(data?.data?.pagination?.total ?? calls.length);
     } catch {
       setSnackbar({
         open: true,
@@ -137,6 +154,37 @@ export default function LeadTracking() {
       setLoading(false);
     }
   }, [sellerId]);
+
+  // The API caps a single page at 200 rows — without this, any seller with
+  // more than 200 total calls would have older history (and any filters that
+  // land outside the most recent 200) silently disappear with no indication
+  // that more data exists.
+  const loadMoreCalls = useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      const nextPage = loadedPage + 1;
+      const res = await fetch(
+        `/api/calls/tracking?page=${nextPage}&limit=200`,
+      );
+      const data = await res.json();
+      const calls: Call[] = Array.isArray(data?.data?.calls)
+        ? data.data.calls
+        : [];
+      setAllCalls((prev) => [...prev, ...calls]);
+      setLoadedPage(nextPage);
+      setTotalCallsOnServer(data?.data?.pagination?.total ?? totalCallsOnServer);
+    } catch {
+      setSnackbar({
+        open: true,
+        message: "Failed to load more calls.",
+        severity: "error",
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadedPage, totalCallsOnServer]);
+
+  const hasMoreCalls = allCalls.length < totalCallsOnServer;
 
   useEffect(() => {
     fetchCalls();
@@ -196,7 +244,7 @@ export default function LeadTracking() {
 
     if (recordingSid) {
       setCurrentAudio({
-        url: `/api/recordings/proxy?recordingSid=${recordingSid}&format=mp3`,
+        url: `/api/calls/tracking/recordingproxy?recordingSid=${recordingSid}&format=mp3`,
         callSid: callSid || "Unknown",
       });
     } else {
@@ -220,7 +268,7 @@ export default function LeadTracking() {
       "From",
       "To",
       "Status",
-      "Buyer",
+      terms.buyer,
       "Industry",
       "Duration (s)",
       "Units Charged",
@@ -338,12 +386,17 @@ export default function LeadTracking() {
 
         <Box sx={{ display: "flex", gap: 0.5, ml: "auto" }}>
           <Tooltip title="Refresh">
-            <IconButton size="small" onClick={fetchCalls} disabled={loading}>
+            <IconButton
+              aria-label="Refresh calls"
+              size="small"
+              onClick={fetchCalls}
+              disabled={loading}
+            >
               <RefreshIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title="Export CSV">
-            <IconButton size="small" onClick={exportCSV}>
+            <IconButton aria-label="Export calls as CSV" size="small" onClick={exportCSV}>
               <FileDownloadIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -372,6 +425,22 @@ export default function LeadTracking() {
             Clear Filters
           </Button>
         )}
+        {hasMoreCalls && (
+          <>
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+              Showing {allCalls.length} of {totalCallsOnServer} calls — filters
+              only apply to loaded calls.
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={loadMoreCalls}
+              disabled={loadingMore}
+            >
+              {loadingMore ? "Loading…" : "Load Older Calls"}
+            </Button>
+          </>
+        )}
       </Box>
 
       {/* Table */}
@@ -383,11 +452,17 @@ export default function LeadTracking() {
               <TableCell sx={{ fontWeight: 700 }}>From</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>To</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Buyer</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Industry</TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                {terms.buyer}
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                Industry
+              </TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Duration</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Cost</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Payment</TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                Payment
+              </TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Recording</TableCell>
             </TableRow>
           </TableHead>
@@ -416,8 +491,12 @@ export default function LeadTracking() {
                       variant="outlined"
                     />
                   </TableCell>
-                  <TableCell>{call.buyerName || "N/A"}</TableCell>
-                  <TableCell>{call.industry || "N/A"}</TableCell>
+                  <TableCell sx={secondaryColumnSx}>
+                    {call.buyerName || "N/A"}
+                  </TableCell>
+                  <TableCell sx={secondaryColumnSx}>
+                    {call.industry || "N/A"}
+                  </TableCell>
                   <TableCell>
                     {call.callDuration
                       ? formatDuration(call.callDuration)
@@ -432,7 +511,7 @@ export default function LeadTracking() {
                       "—"
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={secondaryColumnSx}>
                     {call.paymentStatus ? (
                       <Chip
                         label={call.paymentStatus}
@@ -448,6 +527,7 @@ export default function LeadTracking() {
                     {call.recordingUrl && call.recordingUrl !== "No Record" ? (
                       <Tooltip title="Play recording">
                         <IconButton
+                          aria-label={`Play recording for call from ${call.from}`}
                           size="small"
                           color="primary"
                           onClick={() =>
@@ -473,7 +553,9 @@ export default function LeadTracking() {
                 <TableCell colSpan={10} sx={{ textAlign: "center", py: 4 }}>
                   <Typography color="text.secondary">
                     {search || statusFilter !== "all" || dateFrom || dateTo
-                      ? "No calls match your filters"
+                      ? hasMoreCalls
+                        ? "No calls match your filters among the calls loaded so far — click \"Load Older Calls\" above to search further back."
+                        : "No calls match your filters"
                       : "No call history available"}
                   </Typography>
                 </TableCell>
@@ -516,6 +598,7 @@ export default function LeadTracking() {
         >
           <Typography fontWeight={600}>Call Recording</Typography>
           <IconButton
+            aria-label="Close"
             size="small"
             onClick={() => {
               setAudioDialogOpen(false);
@@ -548,7 +631,7 @@ export default function LeadTracking() {
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={4000}
+        autoHideDuration={snackbar.severity === "error" ? 6000 : 4000}
         onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
       >
         <Alert

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   Button,
   Select,
@@ -54,6 +55,8 @@ import ScheduledCallbacksPanel from "./scheduledCallbacksPanel";
 import { TrackingNumber } from "@/types/trackingNumbers";
 import NextLink from "next/link";
 import { formatDuration } from "@/lib/formatUtils";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -153,8 +156,50 @@ const STATUS_COLORS: Record<
   insufficient_balance: "error",
 };
 
+const TAB_COUNT = 7;
+
+// Pure parser (no closure over searchParams) so both the one-time useState
+// initializer and the searchParams-change effect always read whatever value
+// they're actually given, instead of one of them working off a stale
+// snapshot from mount.
+function parseTabParam(raw: string | null): number {
+  const parsed = raw !== null ? parseInt(raw, 10) : 0;
+  return Number.isInteger(parsed) && parsed >= 0 && parsed < TAB_COUNT
+    ? parsed
+    : 0;
+}
+
 export default function CallPage({ sellerId }: { sellerId: string }) {
-  const [activeTab, setActiveTab] = useState(0);
+  const terms = useDashboardTerms();
+  const fetchWithCSRF = useCSRFFetch();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Tab index is persisted in the URL (?tab=N) rather than plain component
+  // state, so a full page reload — or a remount triggered by anything else
+  // in the tree (e.g. a session/user refresh) — restores the same tab
+  // instead of always bouncing back to Overview.
+  const [activeTab, setActiveTabState] = useState(() =>
+    parseTabParam(searchParams.get("tab")),
+  );
+
+  const setActiveTab = useCallback(
+    (index: number) => {
+      setActiveTabState(index);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", String(index));
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  // Keep state in sync if the URL's tab param changes from outside this
+  // component (e.g. browser back/forward navigation).
+  useEffect(() => {
+    const urlTab = parseTabParam(searchParams.get("tab"));
+    setActiveTabState((current) => (current === urlTab ? current : urlTab));
+  }, [searchParams]);
   const [numbers, setNumbers] = useState<TrackingNumber[]>([]);
   const [twilioActivated, setTwilioActivated] = useState(false);
   const [twilioToggleLoading, setTwilioToggleLoading] = useState(false);
@@ -163,6 +208,13 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
   const [industry, setIndustry] = useState("");
   const [customIndustry, setCustomIndustry] = useState("");
   const [editingNumber, setEditingNumber] = useState<TrackingNumber | null>(
+    null,
+  );
+  // Tracks unsaved edits in the Forwarding tab's form so switching away from
+  // it (the form unmounts on tab change, discarding local state) can be
+  // guarded with a confirmation instead of silently losing the seller's work.
+  const [forwardingDirty, setForwardingDirty] = useState(false);
+  const [pendingTabChange, setPendingTabChange] = useState<number | null>(
     null,
   );
   const areaCode = city ? cityAreaCodes[city] : "";
@@ -234,7 +286,8 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       const twilioStatusResponse = await fetch(
         `/api/calls/twilio/twiliostatus?sellerId=${sellerId}`,
       );
-      const twilioStatusData = await twilioStatusResponse.json();
+      const twilioStatusBody = await twilioStatusResponse.json();
+      const twilioStatusData = twilioStatusBody?.data ?? twilioStatusBody;
       setTwilioActivated(twilioStatusData.twilioActivated ?? false);
 
       if (twilioStatusData.subscriptionLimits) {
@@ -278,7 +331,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     setTwilioToggleLoading(true);
 
     try {
-      const response = await fetch("/api/calls/twilio/activateTwilio", {
+      const response = await fetchWithCSRF("/api/calls/twilio/activateTwilio", {
         method: "POST",
         body: JSON.stringify({ sellerId, action }),
         headers: { "Content-Type": "application/json" },
@@ -343,7 +396,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
     };
 
     try {
-      const response = await fetch("/api/calls/twilio/register_number", {
+      const response = await fetchWithCSRF("/api/calls/twilio/register_number", {
         method: "POST",
         body: JSON.stringify(payload),
         headers: { "Content-Type": "application/json" },
@@ -362,7 +415,12 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
         throw new Error(errorData.message || "Failed to request number");
       }
 
-      const data = await response.json();
+      const responseBody = await response.json();
+      // The route wraps its payload as { success, data: {...} } — reading
+      // fields off the top-level body here previously produced `undefined`
+      // for phoneNumber/currentCount/maxAllowed, corrupting local state
+      // until the next full refetch.
+      const data = responseBody?.data ?? responseBody;
       const newNumber: TrackingNumber = {
         phoneNumber: data.phoneNumber,
         industry: selectedIndustry,
@@ -401,11 +459,16 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
 
   const removeNumber = async (phoneNumber: string) => {
     try {
-      await fetch("/api/calls/twilio/removeNumber", {
+      const response = await fetchWithCSRF("/api/calls/twilio/removeNumber", {
         method: "POST",
         body: JSON.stringify({ sellerId, phoneNumber }),
         headers: { "Content-Type": "application/json" },
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || "Failed to remove number");
+      }
 
       setNumbers((prev) =>
         prev.filter((num) => num.phoneNumber !== phoneNumber),
@@ -415,10 +478,11 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
         message: "Number removed successfully.",
         severity: "success",
       });
-    } catch {
+    } catch (error) {
       setSnackbar({
         open: true,
-        message: "Failed to remove number.",
+        message:
+          error instanceof Error ? error.message : "Failed to remove number.",
         severity: "error",
       });
     }
@@ -522,7 +586,13 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       >
         <Tabs
           value={activeTab}
-          onChange={(_e, v) => setActiveTab(v)}
+          onChange={(_e, v) => {
+            if (activeTab === 2 && forwardingDirty && v !== 2) {
+              setPendingTabChange(v);
+              return;
+            }
+            setActiveTab(v);
+          }}
           variant="scrollable"
           scrollButtons="auto"
           sx={{
@@ -1229,13 +1299,27 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                   numbers={numbers}
                   sellerId={sellerId}
                   initialValues={editingNumber}
+                  onDirtyChange={setForwardingDirty}
                   onUpdateForwarding={async (payload) => {
                     try {
-                      await fetch("/api/calls/twilio/updateForwarding", {
-                        method: "POST",
-                        body: JSON.stringify(payload),
-                        headers: { "Content-Type": "application/json" },
-                      });
+                      const response = await fetchWithCSRF(
+                        "/api/calls/twilio/updateForwarding",
+                        {
+                          method: "POST",
+                          body: JSON.stringify(payload),
+                          headers: { "Content-Type": "application/json" },
+                        },
+                      );
+
+                      if (!response.ok) {
+                        const errorData = await response
+                          .json()
+                          .catch(() => null);
+                        throw new Error(
+                          errorData?.error || "Failed to update forwarding",
+                        );
+                      }
+
                       setSnackbar({
                         open: true,
                         message: "Forwarding updated successfully.",
@@ -1243,12 +1327,16 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                       });
                       fetchUpdatedNumbers();
                       setEditingNumber(null);
-                    } catch {
+                    } catch (error) {
                       setSnackbar({
                         open: true,
-                        message: "Failed to update forwarding.",
+                        message:
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to update forwarding.",
                         severity: "error",
                       });
+                      throw error;
                     }
                   }}
                 />
@@ -1273,8 +1361,8 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                   color="text.secondary"
                   sx={{ mb: 2 }}
                 >
-                  View incoming call logs including status, duration, buyer
-                  routing, and recordings.
+                  View incoming call logs including status, duration,{" "}
+                  {terms.buyerLower} routing, and recordings.
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Box sx={{ overflowX: "auto" }}>
@@ -1296,8 +1384,8 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                   color="text.secondary"
                   sx={{ mb: 2 }}
                 >
-                  Review and approve or reject refund requests from buyers who
-                  reported bad call quality.
+                  Review and approve or reject refund requests from{" "}
+                  {terms.buyersLower} who reported bad call quality.
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <SellerRefundReview />
@@ -1324,6 +1412,38 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
           </TabPanel>
         </Box>
       </Paper>
+
+      {/* Unsaved Forwarding Changes Dialog */}
+      <Dialog
+        open={pendingTabChange !== null}
+        onClose={() => setPendingTabChange(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Discard Unsaved Changes?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            You have unsaved changes in the Forwarding tab. Leaving now will
+            discard them.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingTabChange(null)}>
+            Keep Editing
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setForwardingDirty(false);
+              setActiveTab(pendingTabChange as number);
+              setPendingTabChange(null);
+            }}
+          >
+            Discard Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Limit Reached Dialog */}
       <Dialog
@@ -1358,7 +1478,11 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={6000}
+        autoHideDuration={
+          snackbar.severity === "error" || snackbar.severity === "warning"
+            ? 6000
+            : 4000
+        }
         onClose={handleCloseSnackbar}
       >
         <Alert

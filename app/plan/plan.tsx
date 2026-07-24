@@ -261,8 +261,10 @@ export default function PricingSection() {
         const responseData = await response.json();
 
         if (!response.ok) {
-          // Handle specific error for used trial
-          if (response.status === 400 && responseData.error) {
+          // Handle specific errors inline (e.g. 409 "trial already used" from
+          // /api/subscriptions/trial/start, or 400 validation failures) —
+          // anything else falls through to the generic catch below.
+          if (responseData.error) {
             console.error("[Plan Page] Trial error:", responseData.error);
             setApiError(responseData.error);
             setShowErrorSnackbar(true);

@@ -440,11 +440,11 @@ const AccountSettings = () => {
   const isProfileLoading = userLoading || !editableUser;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
-          <SettingsIcon sx={{ fontSize: 32, color: "primary.main" }} />
-          <Typography variant="h4" component="h1" fontWeight="600">
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Box sx={{ mb: 2.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 0.5 }}>
+          <SettingsIcon sx={{ fontSize: 28, color: "primary.main" }} />
+          <Typography variant="h5" component="h1" fontWeight="600">
             Settings
           </Typography>
         </Box>
@@ -507,39 +507,39 @@ const AccountSettings = () => {
             <CircularProgress />
           </Box>
         ) : (
-          <Box sx={{ p: 4 }}>
+          <Box sx={{ p: 3 }}>
             {tabValue === 0 && (
               <Box>
                 <Card
                   elevation={0}
                   sx={{ mb: 3, border: "1px solid", borderColor: "divider" }}
                 >
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: 2.5 }}>
                     <Typography variant="h6" gutterBottom fontWeight="600">
                       Profile Information
                     </Typography>
                     <Typography
                       variant="body2"
                       color="text.secondary"
-                      sx={{ mb: 3 }}
+                      sx={{ mb: 2 }}
                     >
                       Update your account profile information and contact
                       details
                     </Typography>
-                    <Divider sx={{ mb: 3 }} />
+                    <Divider sx={{ mb: 2.5 }} />
 
-                    <Grid container spacing={3}>
-                      <Grid size={{ xs: 12, md: 4 }}>
+                    <Grid container spacing={2.5}>
+                      <Grid size={{ xs: 12, md: 3 }}>
                         <Box
                           sx={{
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
-                            gap: 2,
+                            gap: 1.5,
                           }}
                         >
                           <Avatar
-                            sx={{ width: 120, height: 120, boxShadow: 2 }}
+                            sx={{ width: 96, height: 96, boxShadow: 2 }}
                             src={editableUser?.image}
                             alt="Profile"
                           />
@@ -551,9 +551,9 @@ const AccountSettings = () => {
                           />
                         </Box>
                       </Grid>
-                      <Grid size={{ xs: 12, md: 8 }}>
-                        <Grid container spacing={2.5}>
-                          <Grid size={{ xs: 12 }}>
+                      <Grid size={{ xs: 12, md: 9 }}>
+                        <Grid container spacing={2}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Full Name"
@@ -568,7 +568,7 @@ const AccountSettings = () => {
                               placeholder="Enter your full name"
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Phone Number"
@@ -584,7 +584,7 @@ const AccountSettings = () => {
                               placeholder="+1234567890"
                             />
                           </Grid>
-                          <Grid size={{ xs: 12 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Company Name"
@@ -599,7 +599,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Business Email"
@@ -614,7 +614,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Business Phone"
@@ -629,7 +629,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Business Website"
@@ -644,7 +644,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Industry / Niche"
@@ -659,7 +659,33 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                            <TextField
+                              select
+                              fullWidth
+                              label="Billing Currency"
+                              name="billingCurrency"
+                              value={editableUser?.billingCurrency || "usd"}
+                              onChange={handleInputChange}
+                              disabled={saving}
+                              helperText="Applies at next checkout"
+                            >
+                              <MenuItem value="usd">USD ($)</MenuItem>
+                              <MenuItem value="gbp">GBP (£)</MenuItem>
+                              <MenuItem value="cad">CAD (C$)</MenuItem>
+                            </TextField>
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                            <TextField
+                              fullWidth
+                              label="Email Address"
+                              name="email"
+                              value={editableUser?.email || ""}
+                              disabled
+                              helperText="Cannot be changed"
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Address Line 1"
@@ -676,7 +702,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Address Line 2"
@@ -689,7 +715,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="City"
@@ -699,7 +725,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="State"
@@ -709,7 +735,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Country"
@@ -721,7 +747,7 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <TextField
                               fullWidth
                               label="Postal Code"
@@ -733,27 +759,11 @@ const AccountSettings = () => {
                               disabled={saving}
                             />
                           </Grid>
-                          <Grid size={{ xs: 12, sm: 6 }}>
-                            <TextField
-                              select
-                              fullWidth
-                              label="Billing Currency"
-                              name="billingCurrency"
-                              value={editableUser?.billingCurrency || "usd"}
-                              onChange={handleInputChange}
-                              disabled={saving}
-                              helperText="Applies to your next checkout — does not change an already-active subscription's currency."
-                            >
-                              <MenuItem value="usd">USD ($)</MenuItem>
-                              <MenuItem value="gbp">GBP (£)</MenuItem>
-                              <MenuItem value="cad">CAD (C$)</MenuItem>
-                            </TextField>
-                          </Grid>
                           <Grid size={{ xs: 12 }}>
                             <TextField
                               fullWidth
                               multiline
-                              minRows={3}
+                              minRows={2}
                               label="Company Description"
                               name="companyDescription"
                               value={editableUser?.companyDescription || ""}
@@ -764,16 +774,6 @@ const AccountSettings = () => {
                                 "Short overview of your company"
                               }
                               disabled={saving}
-                            />
-                          </Grid>
-                          <Grid size={{ xs: 12 }}>
-                            <TextField
-                              fullWidth
-                              label="Email Address"
-                              name="email"
-                              value={editableUser?.email || ""}
-                              disabled
-                              helperText="Email cannot be changed after account creation"
                             />
                           </Grid>
                         </Grid>

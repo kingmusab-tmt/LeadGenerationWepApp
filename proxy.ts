@@ -290,6 +290,9 @@ async function csrfProtection(request: NextRequest) {
     "/api/leads", // Lead create/update/delete, CSV import, exclusive toggle
     "/api/exclusive", // Lead exclusivity toggle
     "/api/calls/feedback", // Buyer/seller call feedback and refund decisions
+    "/api/marketing", // Email/SMS campaign create/update/send (SMS routes had no protection at all)
+    "/api/ai", // AI campaign generation (also unprotected previously)
+    "/api/invoices", // Invoice create/update/void/send
   ];
 
   // Public, unauthenticated endpoints carved out of a broader required-CSRF

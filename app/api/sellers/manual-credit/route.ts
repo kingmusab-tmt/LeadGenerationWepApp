@@ -42,7 +42,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return forbidden("Only sellers can perform this action");
   }
 
-  const rateLimited = checkSimpleRateLimit(req, {
+  const rateLimited = await checkSimpleRateLimit(req, {
     scope: IDEMPOTENCY_SCOPE,
     limit: 15,
     windowMs: 10 * 60 * 1000,

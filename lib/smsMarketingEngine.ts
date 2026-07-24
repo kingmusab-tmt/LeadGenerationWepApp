@@ -50,6 +50,27 @@ class SmsQueueManager {
   static BATCH_SIZE = 100;
   static MAX_ATTEMPTS = 3;
 
+  // A phone's suppression state is whichever of optout/optin happened most
+  // recently for it under this sender — STOP must block all future sends
+  // until a subsequent START reverses it (TCPA requires honoring opt-out
+  // going forward, not just logging it).
+  static async getSuppressedPhones(userId: string): Promise<Set<string>> {
+    const events = await SmsEvent.find({
+      userId,
+      type: { $in: ["optout", "optin"] },
+    })
+      .sort({ createdAt: 1 })
+      .select("phone type")
+      .lean();
+
+    const suppressed = new Set<string>();
+    for (const event of events) {
+      if (event.type === "optout") suppressed.add(event.phone);
+      else suppressed.delete(event.phone);
+    }
+    return suppressed;
+  }
+
   static async enqueueCampaign(campaignId: string) {
     const campaign = await SmsCampaign.findById(campaignId);
     if (!campaign) throw new Error("Campaign not found");
@@ -58,7 +79,15 @@ class SmsQueueManager {
       ? (await SmsSegment.findById(campaign.segmentId))?.recipients || []
       : campaign.recipients;
 
-    const queueDocs = recipients.map((r) => ({
+    const suppressedPhones = await SmsQueueManager.getSuppressedPhones(
+      campaign.userId,
+    );
+    const eligibleRecipients = recipients.filter(
+      (r) => !suppressedPhones.has(r.phone),
+    );
+    const suppressedCount = recipients.length - eligibleRecipients.length;
+
+    const queueDocs = eligibleRecipients.map((r) => ({
       campaignId: campaign._id,
       userId: campaign.userId,
       recipient: r,
@@ -66,17 +95,19 @@ class SmsQueueManager {
       attempts: 0,
     }));
 
-    await SmsQueue.insertMany(queueDocs);
+    if (queueDocs.length > 0) {
+      await SmsQueue.insertMany(queueDocs);
+    }
     await SmsEvent.create({
       campaignId: campaign._id,
       userId: campaign.userId,
       type: "queued",
       phone: "*",
-      meta: { count: recipients.length },
+      meta: { count: eligibleRecipients.length, suppressed: suppressedCount },
     });
 
     await SmsCampaign.findByIdAndUpdate(campaign._id, {
-      $set: { "stats.queued": recipients.length, status: "sending" },
+      $set: { "stats.queued": eligibleRecipients.length, status: "sending" },
     });
   }
 
@@ -96,7 +127,27 @@ class SmsQueueManager {
       .sort({ createdAt: 1 })
       .limit(SmsQueueManager.BATCH_SIZE);
 
+    // Re-check suppression at send time too, not just at enqueue time — a
+    // recipient can text STOP after being queued but before their batch
+    // turn comes up (batches of 100 can span a while on a large campaign).
+    const suppressedPhones = await SmsQueueManager.getSuppressedPhones(userId);
+
     for (const item of batchItems) {
+      if (suppressedPhones.has(item.recipient.phone)) {
+        await SmsQueue.findByIdAndUpdate(item._id, {
+          status: "failed",
+          error: "Recipient opted out before send",
+        });
+        await SmsEvent.create({
+          campaignId: item.campaignId,
+          userId,
+          type: "failed",
+          phone: item.recipient.phone,
+          meta: { reason: "opted_out" },
+        });
+        continue;
+      }
+
       try {
         const text = SmsTemplateEngine.render(
           campaign.textContent,
@@ -223,7 +274,14 @@ class SmsMarketingEngine {
 
   async sendCampaignImmediate(campaignId: string) {
     await dbConnect();
-    await SmsQueueManager.enqueueCampaign(campaignId);
+    // Only enqueue once — "resume" (paused -> sending) calls this same
+    // method, and re-running enqueueCampaign would re-insert the entire
+    // original recipient list as new pending items, duplicate-texting
+    // everyone already sent to on the first pass.
+    const alreadyQueued = await SmsQueue.exists({ campaignId });
+    if (!alreadyQueued) {
+      await SmsQueueManager.enqueueCampaign(campaignId);
+    }
     await SmsQueueManager.processBatch(
       (await SmsCampaign.findById(campaignId))!.userId,
       campaignId,

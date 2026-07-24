@@ -2,14 +2,16 @@ import dbConnect from "@/lib/connectdb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import ScheduledCallback from "@/models/scheduledCallback";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   badRequest,
   forbidden,
   internalError,
   notFound,
+  successResponse,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { requireCsrf } from "@/lib/security/requireCsrf";
 
 /**
  * Scheduled Callbacks API
@@ -32,12 +34,22 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status") || "pending";
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
+    const requestedSellerId = searchParams.get("sellerId");
 
     if (Number.isNaN(page) || Number.isNaN(limit) || page < 1 || limit < 1) {
       return badRequest("page and limit must be positive integers");
     }
 
-    const query: Record<string, unknown> = { sellerId: session.user.id };
+    // Only admins may look up another seller's callbacks — the role check
+    // above previously let admins pass, but the query below always scoped to
+    // the admin's own user ID, so admin access to this endpoint silently
+    // returned nothing (an admin's own ID never matches a seller's records).
+    const targetSellerId =
+      session.user.role === "admin" && requestedSellerId
+        ? requestedSellerId
+        : session.user.id;
+
+    const query: Record<string, unknown> = { sellerId: targetSellerId };
     if (status !== "all") {
       query.status = status;
     }
@@ -51,8 +63,7 @@ export async function GET(req: NextRequest) {
       ScheduledCallback.countDocuments(query),
     ]);
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       callbacks,
       pagination: {
         page,
@@ -79,16 +90,23 @@ export async function PATCH(req: NextRequest) {
       return forbidden("Seller or admin access required");
     }
 
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
     const { callbackId, action, notes } = await req.json();
 
     if (!callbackId || !action) {
       return badRequest("callbackId and action are required");
     }
 
-    const callback = await ScheduledCallback.findOne({
-      _id: callbackId,
-      sellerId: session.user.id,
-    });
+    // A callbackId is already a specific record, so admins may act on any
+    // seller's callback by ID; sellers remain scoped to their own.
+    const callbackQuery: Record<string, unknown> = { _id: callbackId };
+    if (session.user.role !== "admin") {
+      callbackQuery.sellerId = session.user.id;
+    }
+
+    const callback = await ScheduledCallback.findOne(callbackQuery);
 
     if (!callback) {
       return notFound("Callback");
@@ -108,10 +126,7 @@ export async function PATCH(req: NextRequest) {
 
     await callback.save();
 
-    return NextResponse.json({
-      success: true,
-      callback,
-    });
+    return successResponse({ callback });
   } catch (error) {
     console.error("Error updating callback:", error);
     return internalError("Failed to update callback");

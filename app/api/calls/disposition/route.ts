@@ -2,15 +2,19 @@ import dbConnect from "@/lib/connectdb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import Call from "@/models/call";
+import { Buyer } from "@/models/leadbuyers";
 import { invalidateCallCache } from "@/lib/cachedSession";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   badRequest,
   forbidden,
   internalError,
   notFound,
+  successResponse,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 /**
  * Call Disposition API
@@ -27,6 +31,17 @@ export async function PATCH(req: NextRequest) {
     if (session.user.role !== "buyer") {
       return forbidden("Buyer access required");
     }
+
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "call-disposition",
+      limit: 60,
+      windowMs: 10 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     const { callId, disposition, dispositionNotes } = await req.json();
 
@@ -50,14 +65,38 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    // `call.buyerId` references the Buyer collection, not the User collection,
+    // so the buyer profile must be resolved by email first — comparing
+    // directly against session.user.id (a User _id) would never match.
+    const buyerProfile = await Buyer.findOne({ email: session.user.email })
+      .select("_id")
+      .lean();
+    if (!buyerProfile) {
+      return notFound("Buyer profile");
+    }
+
     // Buyer can only update their own calls
     const call = await Call.findOne({
       _id: callId,
-      buyerId: session.user.id,
+      buyerId: buyerProfile._id,
     });
 
     if (!call) {
       return notFound("Call");
+    }
+
+    // "qualified_lead"/"sold" feed the Buyer Performance conversion-rate
+    // calculation (qualifiedLeads + soldLeads) / answeredCalls, where
+    // answeredCalls only counts status === "completed" — allowing these on
+    // a call that never actually connected (no-answer, insufficient
+    // balance, etc.) let conversionRate exceed 100%.
+    if (
+      (disposition === "qualified_lead" || disposition === "sold") &&
+      call.status !== "completed"
+    ) {
+      return badRequest(
+        "Only calls that were answered (completed) can be marked qualified or sold.",
+      );
     }
 
     call.disposition = disposition;
@@ -69,8 +108,7 @@ export async function PATCH(req: NextRequest) {
     // Invalidate cache
     invalidateCallCache(session.user.id);
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       call: {
         _id: call._id,
         disposition: call.disposition,

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useInitializeUser } from "@/app/hooks";
+import { useInitializeUser, useDashboardTerms } from "@/app/hooks";
 import {
   Box,
   Button,
@@ -76,6 +76,7 @@ interface SmsCampaignWithFromNumber extends SmsCampaign {
 
 export default function SmsCampaignsPage() {
   const { currentUser } = useInitializeUser();
+  const terms = useDashboardTerms();
   const { limits, isTrial } = useSubscriptionLimits();
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -889,9 +890,13 @@ export default function SmsCampaignsPage() {
               label="Recipient Source"
             >
               <MenuItem value="leads">Leads</MenuItem>
-              <MenuItem value="buyers">Buyers</MenuItem>
-              <MenuItem value="leadsAndBuyers">Leads and Buyers</MenuItem>
-              <MenuItem value="all">All (Leads, Buyers & Manual)</MenuItem>
+              <MenuItem value="buyers">{terms.buyers}</MenuItem>
+              <MenuItem value="leadsAndBuyers">
+                Leads and {terms.buyers}
+              </MenuItem>
+              <MenuItem value="all">
+                All (Leads, {terms.buyers} & Manual)
+              </MenuItem>
             </Select>
           </FormControl>
           <Box>

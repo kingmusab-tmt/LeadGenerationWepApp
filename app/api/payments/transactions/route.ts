@@ -35,7 +35,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     return unauthorized("Authentication required");
   }
 
-  const rateLimited = checkSimpleRateLimit(req, {
+  const rateLimited = await checkSimpleRateLimit(req, {
     scope: "payments-transactions",
     limit: 60,
     windowMs: 60 * 1000,

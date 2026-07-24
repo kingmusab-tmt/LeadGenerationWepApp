@@ -32,6 +32,11 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import { TrackingNumber } from "@/types/trackingNumbers";
 
+// Secondary boolean/flag columns are hidden below the `md` breakpoint so the
+// table doesn't force full horizontal scrolling to see a phone number's
+// status on mobile — the same values are still visible via "Edit".
+const secondaryColumnSx = { display: { xs: "none", md: "table-cell" } };
+
 interface TrackingNumbersTableProps {
   numbers: TrackingNumber[];
   onRemoveNumber: (phoneNumber: string) => void;
@@ -240,12 +245,24 @@ export default function TrackingNumbersTable({
               <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Industry</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Forwarding</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Response</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Record</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Reconnect</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Caller ID</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Whisper</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Message</TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                Response
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                Record
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                Reconnect
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                Caller ID
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                Whisper
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, ...secondaryColumnSx }}>
+                Message
+              </TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -279,6 +296,7 @@ export default function TrackingNumbersTable({
                       </Typography>
                       <Tooltip title="Copy number">
                         <IconButton
+                          aria-label={`Copy phone number ${num.phoneNumber}`}
                           size="small"
                           onClick={() => handleCopy(num.phoneNumber)}
                         >
@@ -312,38 +330,38 @@ export default function TrackingNumbersTable({
                       variant="outlined"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={secondaryColumnSx}>
                     <Checkbox
                       checked={num.requireResponse}
                       disabled
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={secondaryColumnSx}>
                     <Checkbox checked={num.recordCall} disabled size="small" />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={secondaryColumnSx}>
                     <Checkbox
                       checked={num.reconnectCaller}
                       disabled
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={secondaryColumnSx}>
                     <Checkbox
                       checked={num.passCallerId}
                       disabled
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={secondaryColumnSx}>
                     <Checkbox
                       checked={!!num.callWhisper}
                       disabled
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={secondaryColumnSx}>
                     <Checkbox
                       checked={!!num.welcomeMessage}
                       disabled

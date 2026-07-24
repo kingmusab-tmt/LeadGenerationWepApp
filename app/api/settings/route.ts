@@ -13,6 +13,7 @@ import {
   badRequest,
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
+import { emailMarketingEngine } from "@/lib/emailMarketingEngine";
 
 export async function GET(req: NextRequest) {
   try {
@@ -123,6 +124,16 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return notFound("User");
+    }
+
+    // The email marketing engine caches SMTP transporters per user with no
+    // TTL — without this, a seller who fixes a wrong password (or changes
+    // provider) would keep silently using the old, cached connection until
+    // the process restarts.
+    if (validatedData.emailSettings) {
+      emailMarketingEngine.queueManager.clearTransporterCache(
+        session.user.id,
+      );
     }
 
     return successResponse({

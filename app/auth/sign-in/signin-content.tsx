@@ -7,6 +7,7 @@ import { Box, CircularProgress } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { hasTrialIntent, clearTrialIntent } from "@/lib/trialIntent";
 
 const SignInContent: React.FC = () => {
   const { currentUser, loading: userLoading } = useInitializeUser();
@@ -71,7 +72,7 @@ const SignInContent: React.FC = () => {
 
       if (response.ok) {
         // Clear trial intent
-        sessionStorage.removeItem("trialIntent");
+        clearTrialIntent();
         // Update session to reflect new subscription
         await updateSession();
         return true;
@@ -95,20 +96,7 @@ const SignInContent: React.FC = () => {
     if (startingTrial) return;
 
     // Check for trial intent
-    const trialParam = searchParams.get("trial");
-    let trialIntent =
-      trialParam === "true" || sessionStorage.getItem("trialIntent") === "true";
-    // fallback to cookie if sessionStorage was cleared during redirects
-    if (!trialIntent && typeof window !== "undefined") {
-      // read cookie directly to keep this synchronous in the effect
-      const match = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("trialIntent="));
-      if (match) {
-        const val = match.split("=")[1];
-        if (val === "true") trialIntent = true;
-      }
-    }
+    const trialIntent = hasTrialIntent(searchParams);
 
     // Use session data for faster redirect (JWT token is already available)
     const role = session?.user?.role || currentUser?.role;
@@ -129,7 +117,7 @@ const SignInContent: React.FC = () => {
         isSubActive
       ) {
         // User already has active subscription, clear trial intent and go to dashboard
-        sessionStorage.removeItem("trialIntent");
+        clearTrialIntent();
         void routeSellerBasedOnSubscription("/dashboard/seller/overview");
       } else if (role === "buyer" || role === "staff") {
         router.replace("/dashboard/buyer/overview");
@@ -137,6 +125,7 @@ const SignInContent: React.FC = () => {
         // User doesn't have active subscription
         if (trialIntent) {
           // Start trial for existing user
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: this effect is the post-auth entry point, and starting the trial (which sets a loading flag) must happen as soon as we know the user has trial intent, not in response to a later user action.
           startTrialForExistingUser().then((success) => {
             if (success) {
               void routeSellerBasedOnSubscription("/plan");

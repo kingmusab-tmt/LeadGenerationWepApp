@@ -72,8 +72,15 @@ export async function POST(req: NextRequest) {
       return notFound("User");
     }
 
-    const isPrivilegedTargetRole =
-      role === "staff" || role === "business-admin";
+    // "business-admin" is a self-service signup choice (same tier as
+    // "seller"). "staff" is not self-service — it's meant to be assigned
+    // once a business-admin adds someone as staff, the same way "buyer" is
+    // meant to only apply after a seller pre-registers them (see the
+    // BUYER_PRE_REG_REQUIRED check below). Unlike buyer, there's currently
+    // no auto-assignment path for staff (auth.ts only auto-promotes
+    // "user" -> "buyer" on sign-in) — until that exists, only a platform
+    // admin can grant the "staff" role.
+    const isPrivilegedTargetRole = role === "staff";
     if (isPrivilegedTargetRole && actor.role !== "admin") {
       return forbidden("Only admins can assign privileged roles");
     }

@@ -10,7 +10,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Typography,
   FormControlLabel,
   Checkbox,
   CircularProgress,
@@ -19,6 +18,7 @@ import axios from "@/lib/axiosInstance";
 import { useRouter } from "next/navigation";
 import { Lead } from "@/types/lead";
 import { DEFAULT_LEAD_FORM_FIELDS } from "@/lib/defaultLeadFormFields";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface FormField {
   id: string;
@@ -70,6 +70,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
   setSelectedLead,
 }) => {
   const router = useRouter();
+  const terms = useDashboardTerms();
   const [userForms, setUserForms] = useState<UserForm[]>([]);
   const [selectedForm, setSelectedForm] = useState<UserForm | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,7 +94,10 @@ const LeadForm: React.FC<LeadFormProps> = ({
           return {
             id: formField.id,
             label: formField.label,
-            value: existingField?.value || "",
+            value:
+              existingField?.value !== undefined
+                ? String(existingField.value)
+                : "",
           };
         });
         setFormFields(fields);
@@ -142,7 +146,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
               selectedLead.fields.map((field) => ({
                 id: field.id,
                 label: field.label,
-                value: field.value,
+                value: field.value !== undefined ? String(field.value) : "",
               })),
             );
           }
@@ -173,7 +177,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
     };
 
     fetchForms();
-  }, [open, selectedLead?._id]); // Only depend on open and lead ID
+  }, [initializeFormFields, open, selectedLead, selectedLead?._id]); // Only depend on open and lead ID
 
   // Update form fields when selectedLead changes
   useEffect(() => {
@@ -332,7 +336,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
               }))
             }
           >
-            <MenuItem value="manual">Assign to Specific Buyer</MenuItem>
+            <MenuItem value="manual">Assign to Specific {terms.buyer}</MenuItem>
             <MenuItem value="round_robin">Automatic Round-Robin</MenuItem>
             <MenuItem value="marketplace">List on Marketplace</MenuItem>
           </Select>
@@ -361,7 +365,7 @@ const LeadForm: React.FC<LeadFormProps> = ({
         {isShared && (
           <FormControl fullWidth margin="normal">
             <TextField
-              label="Number of Buyers to Share With"
+              label={`Number of ${terms.buyers} to Share With`}
               type="number"
               value={selectedLead?.shareNumber || 1}
               onChange={(e) =>

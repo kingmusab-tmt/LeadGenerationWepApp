@@ -29,6 +29,7 @@ import {
   useSellerBuyerSearch,
   BuyerOption,
 } from "@/app/hooks/useSellerBuyerSearch";
+import { useDashboardTerms } from "@/app/hooks";
 
 const MAX_DESCRIPTION_LENGTH = 500;
 
@@ -40,6 +41,7 @@ const blurOnWheel = (e: React.WheelEvent<HTMLInputElement>) => {
 
 const ManualCreditPage: React.FC = () => {
   const router = useRouter();
+  const terms = useDashboardTerms();
   const csrfFetch = useCSRFFetch();
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 
@@ -119,7 +121,7 @@ const ManualCreditPage: React.FC = () => {
       title: "Confirm Manual Credit",
       message: `Credit ${credits.toLocaleString()} unit(s) to ${selectedBuyer.name} (${selectedBuyer.company}) for $${cashAmount.toFixed(
         2,
-      )} cash received? The buyer will be emailed with the description below.`,
+      )} cash received? The ${terms.buyerLower} will be emailed with the description below.`,
       confirmText: "Credit Account",
       confirmColor: "primary",
     });
@@ -152,8 +154,8 @@ const ManualCreditPage: React.FC = () => {
         open: true,
         message:
           data.data?.emailSent === false
-            ? "Credits added, but the buyer's notification email failed to send — let them know directly."
-            : "Credits successfully added to buyer's account!",
+            ? `Credits added, but the ${terms.buyerLower}'s notification email failed to send — let them know directly.`
+            : `Credits successfully added to ${terms.buyerLower}'s account!`,
         severity: data.data?.emailSent === false ? "warning" : "success",
       });
 
@@ -206,11 +208,12 @@ const ManualCreditPage: React.FC = () => {
           gutterBottom
           sx={{ mb: 3, fontWeight: "bold", color: "primary.main" }}
         >
-          Manual Credit to Buyer
+          Manual Credit to {terms.buyer}
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          Credit units to a buyer&lsquo;s account when they pay cash directly.
+          Credit units to a {terms.buyerLower}&lsquo;s account when they pay
+          cash directly.
         </Typography>
 
         <Box component="form" onSubmit={handleSubmit}>
@@ -272,8 +275,8 @@ const ManualCreditPage: React.FC = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Lead Buyer"
-                    placeholder="Search for buyer..."
+                    label={terms.leadBuyer}
+                    placeholder={`Search for ${terms.buyerLower}...`}
                     required
                     helperText="Search by name, email, or company"
                     InputProps={{
@@ -303,7 +306,7 @@ const ManualCreditPage: React.FC = () => {
                 onWheel={blurOnWheel}
                 placeholder="Enter amount received"
                 required
-                helperText="Amount of cash collected from the buyer"
+                helperText={`Amount of cash collected from the ${terms.buyerLower}`}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -355,7 +358,7 @@ const ManualCreditPage: React.FC = () => {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Reason for this credit..."
                 required
-                helperText={`Visible to the buyer — ${description.length}/${MAX_DESCRIPTION_LENGTH}`}
+                helperText={`Visible to the ${terms.buyerLower} — ${description.length}/${MAX_DESCRIPTION_LENGTH}`}
                 inputProps={{ maxLength: MAX_DESCRIPTION_LENGTH }}
                 InputProps={{
                   startAdornment: (

@@ -170,6 +170,16 @@ export class EmailQueueManager {
   }
 
   /**
+   * Drop a user's cached SMTP transporter so the next send picks up their
+   * current email settings. Must be called whenever a user's emailSettings
+   * change — otherwise sends silently keep using the old host/credentials
+   * until the process restarts.
+   */
+  clearTransporterCache(userId: string): void {
+    this.transporterManager.clearTransporter(userId);
+  }
+
+  /**
    * Add emails to queue for a campaign
    */
   async addToQueue(campaignId: string, recipients: string[]): Promise<number> {
@@ -200,12 +210,24 @@ export class EmailQueueManager {
       return 0;
     }
 
+    // When A/B testing is on, splitPercentage is the share of recipients
+    // that get the B (test) variant — everyone else gets A (the campaign's
+    // main subject/content). Assigned per-recipient at random rather than
+    // e.g. first-N/last-N, so the split isn't correlated with import order.
+    const abEnabled = campaign.abTesting?.enabled === true;
+    const splitPercentage = campaign.abTesting?.splitPercentage ?? 50;
+
     const queueItems = filteredRecipients.map((email) => ({
       campaignId,
       recipientEmail: email,
       status: "pending",
       attemptCount: 0,
       trackingToken: crypto.randomBytes(16).toString("hex"),
+      variant: abEnabled
+        ? Math.random() * 100 < splitPercentage
+          ? ("B" as const)
+          : ("A" as const)
+        : undefined,
     }));
 
     const result = await EmailQueue.insertMany(queueItems);
@@ -242,14 +264,23 @@ export class EmailQueueManager {
 
     for (const queueItem of pendingEmails) {
       try {
+        // A/B recipients get the B variant's own subject/content when one
+        // was configured; everything else (including all "A" recipients)
+        // uses the campaign's main subject/content.
+        const useVariantB =
+          campaign.abTesting?.enabled === true && queueItem.variant === "B";
+        const baseSubject =
+          (useVariantB && campaign.abTesting?.variantSubject) ||
+          campaign.subject;
+        const baseContent =
+          (useVariantB && campaign.abTesting?.variantContent) ||
+          campaign.htmlContent;
+
         // Render email content
-        let htmlContent = EmailTemplateEngine.renderTemplate(
-          campaign.htmlContent,
-          {
-            recipientEmail: queueItem.recipientEmail,
-            ...queueItem.personalizationData,
-          },
-        );
+        let htmlContent = EmailTemplateEngine.renderTemplate(baseContent, {
+          recipientEmail: queueItem.recipientEmail,
+          ...queueItem.personalizationData,
+        });
 
         // Add tracking
         if (campaign.trackingPixel) {
@@ -278,7 +309,7 @@ export class EmailQueueManager {
         const mailOptions = {
           from: `${campaign.fromName} <${campaign.fromEmail}>`,
           to: queueItem.recipientEmail,
-          subject: campaign.subject,
+          subject: baseSubject,
           html: htmlContent,
           text: campaign.textContent || "",
           replyTo: campaign.replyTo || campaign.fromEmail,
@@ -334,10 +365,14 @@ export class EmailQueueManager {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    // Update campaign statistics
+    // Update campaign statistics. "unsubscribed" and "bounced" are terminal
+    // states too (set when a recipient unsubscribes mid-campaign, or by a
+    // future bounce handler) — omitting them here meant a campaign with even
+    // one such recipient could never reach totalRecipients and would stay
+    // "sending" forever.
     const completedCount = await EmailQueue.countDocuments({
       campaignId,
-      status: { $in: ["sent", "failed"] },
+      status: { $in: ["sent", "failed", "unsubscribed", "bounced"] },
     });
 
     if (completedCount >= campaign.totalRecipients) {
@@ -505,6 +540,48 @@ export class EmailAnalyticsEngine {
 
     const total = campaign.totalRecipients;
     const analytics = campaign.analytics;
+    // Rates are only meaningful relative to what was actually sent, not the
+    // full recipient list — a campaign still mid-send or with failures
+    // would otherwise show an understated rate.
+    const sentBase = analytics.sent || 0;
+
+    let variantStats:
+      | {
+          A: { sent: number; opened: number; clicked: number };
+          B: { sent: number; opened: number; clicked: number };
+          winningVariant?: "A" | "B";
+        }
+      | undefined;
+
+    if (campaign.abTesting?.enabled) {
+      const [aStats, bStats] = await Promise.all(
+        (["A", "B"] as const).map(async (variant) => {
+          const [sent, opened, clicked] = await Promise.all([
+            EmailQueue.countDocuments({
+              campaignId,
+              variant,
+              status: { $in: ["sent", "failed"] },
+            }),
+            EmailQueue.countDocuments({
+              campaignId,
+              variant,
+              openedAt: { $ne: null },
+            }),
+            EmailQueue.countDocuments({
+              campaignId,
+              variant,
+              clickedAt: { $ne: null },
+            }),
+          ]);
+          return { sent, opened, clicked };
+        }),
+      );
+      variantStats = {
+        A: aStats,
+        B: bStats,
+        winningVariant: campaign.abTesting.winningVariant,
+      };
+    }
 
     return {
       total,
@@ -512,15 +589,21 @@ export class EmailAnalyticsEngine {
       delivered: analytics.delivered,
       opened: analytics.opened,
       openRate:
-        total > 0 ? ((analytics.opened / total) * 100).toFixed(2) + "%" : "0%",
+        sentBase > 0
+          ? ((analytics.opened / sentBase) * 100).toFixed(2) + "%"
+          : "0%",
       clicked: analytics.clicked,
       clickRate:
-        total > 0 ? ((analytics.clicked / total) * 100).toFixed(2) + "%" : "0%",
+        sentBase > 0
+          ? ((analytics.clicked / sentBase) * 100).toFixed(2) + "%"
+          : "0%",
       unsubscribed: analytics.unsubscribed,
       bounced: analytics.bounced,
       complained: analytics.complained,
       conversions: analytics.conversions,
       revenue: analytics.revenue || 0,
+      goals: campaign.goals,
+      variantStats,
     };
   }
 
@@ -553,73 +636,15 @@ export class EmailAnalyticsEngine {
   }
 }
 
-// ==================== SCHEDULER ====================
-
-export class EmailScheduler {
-  private jobs: Map<string, NodeJS.Timeout> = new Map();
-
-  /**
-   * Schedule campaign for sending
-   */
-  scheduleOnce(campaignId: string, scheduledTime: Date): void {
-    const now = new Date();
-    const delay = scheduledTime.getTime() - now.getTime();
-
-    if (delay <= 0) {
-      console.warn(`Scheduled time is in the past for campaign ${campaignId}`);
-      return;
-    }
-
-    const timeout = setTimeout(async () => {
-      try {
-        await dbConnect();
-        await EmailCampaign.findByIdAndUpdate(campaignId, {
-          status: "sending",
-        });
-
-        const queueManager = new EmailQueueManager();
-        await queueManager.processQueue(campaignId);
-
-        this.jobs.delete(campaignId);
-      } catch (error) {
-        console.error(`Failed to send campaign ${campaignId}:`, error);
-      }
-    }, delay);
-
-    this.jobs.set(campaignId, timeout);
-  }
-
-  /**
-   * Schedule recurring campaign
-   */
-  scheduleRecurring(campaignId: string, cronExpression: string): void {
-    // Using a simple implementation, in production use node-cron
-    console.log(
-      `Recurring campaign ${campaignId} scheduled with cron: ${cronExpression}`,
-    );
-    // TODO: Implement using node-cron or similar
-  }
-
-  /**
-   * Cancel scheduled campaign
-   */
-  cancelSchedule(campaignId: string): boolean {
-    const timeout = this.jobs.get(campaignId);
-    if (timeout) {
-      clearTimeout(timeout);
-      this.jobs.delete(campaignId);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Get all scheduled jobs
-   */
-  getScheduledJobs(): string[] {
-    return Array.from(this.jobs.keys());
-  }
-}
+// NOTE: this file previously had an EmailScheduler class here for
+// "scheduled"/"recurring" campaigns. It was never actually wired up to
+// anything (nothing called scheduleOnce/scheduleRecurring), its in-memory
+// setTimeout-based design would have lost every pending job on a server
+// restart anyway, and the API layer never accepts a `schedule` field from
+// clients (see createEmailCampaignSchema) — so it was dead code advertising
+// a feature that couldn't work. Removed rather than left as a false signal;
+// real scheduled sending needs a persisted job + a durable trigger (e.g. a
+// cron sweep for due campaigns), not an in-process timer.
 
 // ==================== MAIN EMAIL MARKETING ENGINE ====================
 
@@ -627,12 +652,10 @@ export class EmailMarketingEngine {
   templateEngine = EmailTemplateEngine;
   queueManager: EmailQueueManager;
   analyticsEngine: EmailAnalyticsEngine;
-  scheduler: EmailScheduler;
 
   constructor() {
     this.queueManager = new EmailQueueManager();
     this.analyticsEngine = new EmailAnalyticsEngine();
-    this.scheduler = new EmailScheduler();
   }
 
   /**
@@ -657,15 +680,6 @@ export class EmailMarketingEngine {
         };
       }
 
-      if (campaign.status !== "draft" && campaign.status !== "scheduled") {
-        return {
-          success: false,
-          sent: 0,
-          failed: 0,
-          message: `Campaign status is ${campaign.status}`,
-        };
-      }
-
       // Validate recipients exist
       if (!campaign.recipientEmails || campaign.recipientEmails.length === 0) {
         return {
@@ -676,12 +690,30 @@ export class EmailMarketingEngine {
         };
       }
 
-      // Update status
-      await EmailCampaign.findByIdAndUpdate(campaignId, {
-        status: "sending",
-        sentAt: new Date(),
-        totalRecipients: campaign.recipientEmails.length,
-      });
+      // Atomically claim the campaign for sending — reading the status and
+      // then writing it in two separate steps (as this used to do) is a
+      // TOCTOU race: two near-simultaneous "send" requests could both see
+      // status "draft" before either write landed, both queue the full
+      // recipient list, and send every email twice. This update only
+      // succeeds for the request that actually wins the transition.
+      const claimed = await EmailCampaign.findOneAndUpdate(
+        { _id: campaignId, status: { $in: ["draft", "scheduled"] } },
+        {
+          status: "sending",
+          sentAt: new Date(),
+          totalRecipients: campaign.recipientEmails.length,
+        },
+        { new: true },
+      );
+
+      if (!claimed) {
+        return {
+          success: false,
+          sent: 0,
+          failed: 0,
+          message: `Campaign status is ${campaign.status}`,
+        };
+      }
 
       // Add recipients to queue before processing
       await this.queueManager.addToQueue(campaignId, campaign.recipientEmails);

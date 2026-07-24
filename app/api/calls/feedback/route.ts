@@ -18,6 +18,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
+import { requireCsrf } from "@/lib/security/requireCsrf";
 import { callFeedbackSchema } from "@/lib/validation/schemas";
 
 type FeedbackState = {
@@ -48,13 +49,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return unauthorized("Authentication required");
   }
 
-  const rateLimited = checkSimpleRateLimit(req, {
+  const rateLimited = await checkSimpleRateLimit(req, {
     scope: "calls-feedback",
     limit: 20,
     windowMs: 10 * 60 * 1000,
     actorId: session.user.id,
   });
   if (rateLimited) return rateLimited;
+
+  const csrfError = requireCsrf(req, session.user.email);
+  if (csrfError) return csrfError;
 
   const url = new URL(req.url);
   const callId = url.searchParams.get("callId");

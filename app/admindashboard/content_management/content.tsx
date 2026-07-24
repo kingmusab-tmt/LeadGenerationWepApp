@@ -46,7 +46,6 @@ import {
   Description,
   Person,
   Email,
-  Phone,
   CalendarToday,
   Business,
   FlagOutlined,
@@ -114,7 +113,7 @@ const ContentVerification = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     fetchData();

@@ -2,8 +2,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/connectdb";
 import { EmailAnalyticsEngine } from "@/lib/emailMarketingEngine";
+import { EmailQueue, EmailCampaign } from "@/models/emailCampaign";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Every http(s) href actually present in the campaign's own content, so a
+ * click can only ever redirect to a URL the seller genuinely put in that
+ * email — not to an arbitrary destination supplied via the query string.
+ */
+function extractAllowedUrls(html: string): Set<string> {
+  const urls = new Set<string>();
+  const linkRegex = /href="([^"]*)"/g;
+  let match: RegExpExecArray | null;
+  while ((match = linkRegex.exec(html)) !== null) {
+    if (match[1].startsWith("http://") || match[1].startsWith("https://")) {
+      urls.add(match[1]);
+    }
+  }
+  return urls;
+}
+
+const FALLBACK_URL = process.env.NEXTAUTH_URL || "/";
 
 /**
  * GET /api/email/track/click/[token]
@@ -41,6 +61,26 @@ export async function GET(
 
     await dbConnect();
 
+    // Only redirect if this exact URL was actually one of the links in the
+    // campaign this token belongs to — otherwise the token+url pair could be
+    // used as an open redirect through our own domain to anywhere.
+    const queueItem = await EmailQueue.findOne({ trackingToken: token })
+      .select("campaignId")
+      .lean();
+    if (queueItem) {
+      const campaign = await EmailCampaign.findById(queueItem.campaignId)
+        .select("htmlContent")
+        .lean();
+      const allowedUrls = campaign
+        ? extractAllowedUrls(campaign.htmlContent || "")
+        : new Set<string>();
+      if (!allowedUrls.has(originalUrl)) {
+        return NextResponse.redirect(FALLBACK_URL);
+      }
+    } else {
+      return NextResponse.redirect(FALLBACK_URL);
+    }
+
     // Record click
     const analyticsEngine = new EmailAnalyticsEngine();
     await analyticsEngine.recordClick(token, originalUrl);
@@ -49,25 +89,6 @@ export async function GET(
     return NextResponse.redirect(originalUrl);
   } catch (error) {
     console.error("Error tracking click:", error);
-    // Try to redirect to original URL even if tracking fails
-    try {
-      const { searchParams } = new URL(req.url);
-      const encodedUrl = searchParams.get("url");
-      if (encodedUrl) {
-        const originalUrl = Buffer.from(encodedUrl, "base64").toString("utf-8");
-        if (
-          originalUrl.startsWith("http://") ||
-          originalUrl.startsWith("https://")
-        ) {
-          return NextResponse.redirect(originalUrl);
-        }
-      }
-    } catch {
-      // Final fallback
-    }
-    return NextResponse.json(
-      { error: "Failed to track click" },
-      { status: 500 },
-    );
+    return NextResponse.redirect(FALLBACK_URL);
   }
 }

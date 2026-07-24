@@ -26,10 +26,15 @@ export async function POST(req: NextRequest) {
     const to = decodeURIComponent(req.nextUrl.searchParams.get("to") || "");
     const sellerId = req.nextUrl.searchParams.get("sellerId") || "";
     const industry = req.nextUrl.searchParams.get("industry") || "";
+    // Seller-configurable (default "1") — the whisper/no-buyers IVR prompts
+    // the caller with this exact digit, so this handler must check against
+    // it rather than a hardcoded "1", or any seller who customizes it away
+    // from the default would have every callback request silently rejected.
+    const expectedDigit = req.nextUrl.searchParams.get("expectedDigit") || "1";
 
     const twiml = new twilio.twiml.VoiceResponse();
 
-    if (digits === "1") {
+    if (digits === expectedDigit) {
       // Create a scheduled callback
       await createScheduledCallback({
         sellerId,

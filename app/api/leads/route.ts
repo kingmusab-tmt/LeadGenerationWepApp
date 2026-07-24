@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       return forbidden("Only sellers can access lead management.");
     }
 
-    const rateLimited = checkSimpleRateLimit(req, {
+    const rateLimited = await checkSimpleRateLimit(req, {
       scope: "leads-create",
       limit: 30,
       windowMs: 60 * 1000,
@@ -181,7 +181,7 @@ export async function PUT(req: NextRequest) {
       return forbidden("Only sellers can access lead management.");
     }
 
-    const rateLimited = checkSimpleRateLimit(req, {
+    const rateLimited = await checkSimpleRateLimit(req, {
       scope: "leads-update",
       limit: 60,
       windowMs: 60 * 1000,
@@ -284,7 +284,7 @@ export async function DELETE(req: NextRequest) {
       return forbidden("Only sellers can access lead management.");
     }
 
-    const rateLimited = checkSimpleRateLimit(req, {
+    const rateLimited = await checkSimpleRateLimit(req, {
       scope: "leads-delete",
       limit: 30,
       windowMs: 60 * 1000,

@@ -259,53 +259,62 @@ export function extractGeoData(phoneNumber: string): GeoData {
   };
 }
 
+type ServiceLocation = {
+  city?: string;
+  state?: string;
+  country?: string;
+  zipCodes?: string[];
+  radius?: number;
+};
+
+type BuyerWithServiceLocations = {
+  serviceLocations?: ServiceLocation[];
+};
+
 /**
  * Match a caller's area code to a buyer's service locations.
  * Returns true if the buyer services the caller's area.
+ *
+ * `serviceLocations` is stored as an array of individual {city, state, ...}
+ * entries (see models/leadbuyers.ts), not a single object with city/state
+ * arrays — a prior version of this function checked `.city`/`.state`
+ * directly on that array, which are always `undefined` on a JS array, so
+ * every buyer with configured service locations silently matched every
+ * caller regardless of the configured area. This iterates the actual
+ * entries instead.
  */
-export function doesBuyerServiceArea(buyerDoc: any, geoData: GeoData): boolean {
-  if (!buyerDoc?.serviceLocations) return true; // No locations = serves everywhere
+export function doesBuyerServiceArea(
+  buyerDoc: BuyerWithServiceLocations | null | undefined,
+  geoData: GeoData,
+): boolean {
+  const locations = buyerDoc?.serviceLocations;
+  if (!locations || locations.length === 0) return true; // No locations = serves everywhere
 
-  const locations = buyerDoc.serviceLocations;
+  // extractGeoData only resolves 10/11-digit NANP numbers — international
+  // callers (this app explicitly supports UK/Canada sellers) come through
+  // with no areaCode/city/state at all. Treating "couldn't determine" the
+  // same as "doesn't match" silently geo-filtered out every non-NANP caller
+  // whenever a buyer had any service locations configured, regardless of
+  // whether that buyer should legitimately serve them.
+  if (!geoData.areaCode) return true;
 
-  // Check city match
-  if (geoData.city && locations.city) {
-    const buyerCities = Array.isArray(locations.city)
-      ? locations.city
-      : [locations.city];
+  const hasAnyConfiguredCityOrState = locations.some(
+    (loc) => loc.city || loc.state,
+  );
+  if (!hasAnyConfiguredCityOrState) return true; // No specific locations configured
+
+  return locations.some((loc) => {
+    if (geoData.city && loc.city?.toLowerCase() === geoData.city.toLowerCase()) {
+      return true;
+    }
     if (
-      buyerCities.some(
-        (c: string) => c.toLowerCase() === geoData.city!.toLowerCase(),
-      )
+      geoData.state &&
+      loc.state?.toLowerCase() === geoData.state.toLowerCase()
     ) {
       return true;
     }
-  }
-
-  // Check state match
-  if (geoData.state && locations.state) {
-    const buyerStates = Array.isArray(locations.state)
-      ? locations.state
-      : [locations.state];
-    if (
-      buyerStates.some(
-        (s: string) => s.toLowerCase() === geoData.state!.toLowerCase(),
-      )
-    ) {
-      return true;
-    }
-  }
-
-  // Check zipCodes match (if we had zip code info)
-  // For now, if city and state don't match and buyer has locations configured, return false
-  if (
-    (locations.city && locations.city.length > 0) ||
-    (locations.state && locations.state.length > 0)
-  ) {
     return false;
-  }
-
-  return true; // No specific locations configured
+  });
 }
 
 // ─── Concurrent Call Tracking ──────────────────────────────────

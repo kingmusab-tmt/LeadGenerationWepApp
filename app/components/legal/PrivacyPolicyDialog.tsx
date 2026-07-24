@@ -136,7 +136,7 @@ export default function PrivacyPolicyDialog({
         </Typography>
         <Typography variant="body1" paragraph>
           We use cookies and similar technologies to analyze trends, administer
-          the website, and track users' movements around the site.
+          the website, and track users&apos; movements around the site.
         </Typography>
 
         <Typography variant="h6" gutterBottom>

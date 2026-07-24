@@ -135,13 +135,13 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
       </Alert>
 
       <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider" }}>
-        <CardContent sx={{ p: 3 }}>
+        <CardContent sx={{ p: 2.5 }}>
           <Box
             sx={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              mb: 3,
+              mb: 2,
             }}
           >
             <Box>
@@ -162,18 +162,9 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
               />
             )}
           </Box>
-          <Divider sx={{ mb: 3 }} />
+          <Divider sx={{ mb: 2.5 }} />
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-            <TextField
-              label="SMTP Server"
-              fullWidth
-              value={emailSettings.smtpServer}
-              onChange={(e) => handleInputChange("smtpServer", e.target.value)}
-              placeholder="smtp.gmail.com"
-              helperText="Your email provider's SMTP server address"
-            />
-
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Box
               sx={{
                 display: "grid",
@@ -182,12 +173,14 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
               }}
             >
               <TextField
-                label="SMTP Username (Email)"
+                label="SMTP Server"
                 fullWidth
-                value={emailSettings.smtpUser}
-                onChange={(e) => handleInputChange("smtpUser", e.target.value)}
-                placeholder="your-email@example.com"
-                helperText="Email address for authentication"
+                value={emailSettings.smtpServer}
+                onChange={(e) =>
+                  handleInputChange("smtpServer", e.target.value)
+                }
+                placeholder="smtp.gmail.com"
+                helperText="Your email provider's SMTP server address"
               />
               <TextField
                 label="SMTP Port"
@@ -200,31 +193,47 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
               />
             </Box>
 
-            <TextField
-              label="SMTP Password"
-              type={showPassword ? "text" : "password"}
-              fullWidth
-              value={emailSettings.smtpPassword}
-              onChange={(e) =>
-                handleInputChange("smtpPassword", e.target.value)
-              }
-              placeholder="Enter your SMTP password"
-              helperText="Your email account password or app-specific password"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                gap: 2,
               }}
-            />
+            >
+              <TextField
+                label="SMTP Username (Email)"
+                fullWidth
+                value={emailSettings.smtpUser}
+                onChange={(e) => handleInputChange("smtpUser", e.target.value)}
+                placeholder="your-email@example.com"
+                helperText="Email address for authentication"
+              />
+              <TextField
+                label="SMTP Password"
+                type={showPassword ? "text" : "password"}
+                fullWidth
+                value={emailSettings.smtpPassword}
+                onChange={(e) =>
+                  handleInputChange("smtpPassword", e.target.value)
+                }
+                placeholder="Enter your SMTP password"
+                helperText="App-specific password recommended"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
 
-            <Divider sx={{ my: 1 }} />
+            <Divider sx={{ my: 0.5 }} />
 
             <Typography
               variant="subtitle2"
@@ -234,23 +243,33 @@ const EmailSettingsPage: React.FC<EmailSettingsPageProps> = ({
               Sender Information
             </Typography>
 
-            <TextField
-              label="From Email"
-              fullWidth
-              value={emailSettings.fromEmail}
-              onChange={(e) => handleInputChange("fromEmail", e.target.value)}
-              placeholder="noreply@yourdomain.com"
-              helperText="Email address that will appear in the 'From' field"
-            />
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                gap: 2,
+              }}
+            >
+              <TextField
+                label="From Email"
+                fullWidth
+                value={emailSettings.fromEmail}
+                onChange={(e) =>
+                  handleInputChange("fromEmail", e.target.value)
+                }
+                placeholder="noreply@yourdomain.com"
+                helperText="Appears in the 'From' field"
+              />
 
-            <TextField
-              label="From Name"
-              fullWidth
-              value={emailSettings.fromName}
-              onChange={(e) => handleInputChange("fromName", e.target.value)}
-              placeholder="Your Company Name"
-              helperText="Display name that will appear alongside the email"
-            />
+              <TextField
+                label="From Name"
+                fullWidth
+                value={emailSettings.fromName}
+                onChange={(e) => handleInputChange("fromName", e.target.value)}
+                placeholder="Your Company Name"
+                helperText="Display name alongside the email"
+              />
+            </Box>
           </Box>
         </CardContent>
         <Divider />

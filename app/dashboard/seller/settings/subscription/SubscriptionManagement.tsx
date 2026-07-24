@@ -40,7 +40,7 @@ import {
   CANCELLATION_REASON_LABELS,
   CANCELLATION_REASONS,
   CancellationReason,
-} from "@/app/hooks/useSubscriptionCancel";
+} from "@/lib/cancellationReasons";
 
 interface PaymentMethodInfo {
   brand?: string;

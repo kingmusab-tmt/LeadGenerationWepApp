@@ -37,7 +37,7 @@ import {
 } from "recharts";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useInitializeUser } from "@/app/hooks";
+import { useInitializeUser, useDashboardTerms } from "@/app/hooks";
 import {
   MonetizationOn,
   People,
@@ -138,6 +138,7 @@ const COLORS = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"];
 const Overview: React.FC = () => {
   const [overviewData, setOverviewData] = useState(initialOverviewData);
   const { currentUser, loading: userLoading } = useInitializeUser();
+  const terms = useDashboardTerms();
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -453,7 +454,7 @@ const Overview: React.FC = () => {
         {/* Total Lead Buyers */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
           <StatCard
-            label="Total Leads Buyers"
+            label={`Total ${terms.leadBuyers}`}
             value={overviewData.totalLeadBuyers}
             icon={<People color="primary" />}
             trend={overviewData.kpiTrends?.leadVolumeTrend || 0}
@@ -462,7 +463,7 @@ const Overview: React.FC = () => {
         {/* New Lead Buyers */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
           <StatCard
-            label="New Leads Buyers"
+            label={`New ${terms.leadBuyers}`}
             value={overviewData.newLeadBuyers}
             icon={<People color="primary" />}
             trend={overviewData.kpiTrends?.leadVolumeTrend || 0}
@@ -492,7 +493,7 @@ const Overview: React.FC = () => {
         {/* Lead Buyer Credits */}
         <Grid size={{ xs: 6, sm: 6, md: 3 }}>
           <StatCard
-            label="Lead Buyer Credits"
+            label={`${terms.leadBuyer} Credits`}
             value={
               (overviewData.totalLeadBuyerUsedCredits || 0) +
               (overviewData.totalLeadBuyerRemainingCredits || 0)
@@ -596,7 +597,7 @@ const Overview: React.FC = () => {
                 gutterBottom
                 sx={{ display: "flex", alignItems: "center" }}
               >
-                <People sx={{ mr: 1 }} /> Lead Buyer Status
+                <People sx={{ mr: 1 }} /> {terms.leadBuyer} Status
               </Typography>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
@@ -674,7 +675,7 @@ const Overview: React.FC = () => {
                 gutterBottom
                 sx={{ display: "flex", alignItems: "center" }}
               >
-                <Star sx={{ mr: 1 }} /> Top Lead Buyers
+                <Star sx={{ mr: 1 }} /> Top {terms.leadBuyers}
               </Typography>
               <Stack spacing={1}>
                 {topLeadBuyersData.map((buyer, index) => (

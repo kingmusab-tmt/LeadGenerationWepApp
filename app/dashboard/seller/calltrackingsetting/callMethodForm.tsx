@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
 import {
   Select,
@@ -38,11 +38,20 @@ import SmartToyIcon from "@mui/icons-material/SmartToy";
 import AddIcon from "@mui/icons-material/Add";
 import { LEAD_SOURCES } from "@/utils/leadSources";
 import { TrackingNumber } from "@/types/trackingNumbers";
+import { useDashboardTerms } from "@/app/hooks";
+
+// Recording Consent has no seller-facing UI: it's implied by Record Call, and
+// always uses this fixed announcement — not editable per tracking number.
+const DEFAULT_RECORDING_CONSENT_MESSAGE =
+  "This call may be recorded for quality assurance purposes.";
 
 interface CallMethodFormProps {
   numbers: TrackingNumber[];
   initialValues?: TrackingNumber | null;
   sellerId: string;
+  /** Notified whenever the form has unsaved edits, so the parent can warn
+   * before navigating away (e.g. switching tabs) and discarding them. */
+  onDirtyChange?: (dirty: boolean) => void;
   onUpdateForwarding: (payload: {
     sellerId: string;
     phoneNumber: string;
@@ -51,7 +60,6 @@ interface CallMethodFormProps {
     callWhisper: string;
     requireResponse: boolean;
     buyerResponses?: { message: string; digit: string }[];
-    leadResponses?: { message: string; digit: string }[];
     recordCall: boolean;
     reconnectCaller: boolean;
     passCallerId: boolean;
@@ -96,8 +104,10 @@ export default function CallMethodForm({
   numbers,
   sellerId,
   initialValues,
+  onDirtyChange,
   onUpdateForwarding,
 }: CallMethodFormProps) {
+  const terms = useDashboardTerms();
   const safeNumbers = Array.isArray(numbers) ? numbers : [];
 
   const { limits } = useSubscriptionLimits();
@@ -119,9 +129,6 @@ export default function CallMethodForm({
   const [buyerResponses, setBuyerResponses] = useState<
     { message: string; digit: string }[]
   >(initialValues?.buyerResponses || []);
-  const [leadResponses, setLeadResponses] = useState<
-    { message: string; digit: string }[]
-  >(initialValues?.leadResponses || []);
   const [recordCall, setRecordCall] = useState(
     initialValues?.recordCall || false,
   );
@@ -140,10 +147,12 @@ export default function CallMethodForm({
   const [recordingConsent, setRecordingConsent] = useState(
     initialValues?.recordingConsent || false,
   );
-  const [recordingConsentMessage, setRecordingConsentMessage] = useState(
-    initialValues?.recordingConsentMessage ||
-      "This call may be recorded for quality assurance purposes.",
-  );
+  // Recording Consent Announcement has no independent toggle or editable
+  // message — it always mirrors Record Call and always uses the fixed
+  // DEFAULT_RECORDING_CONSENT_MESSAGE.
+  useEffect(() => {
+    setRecordingConsent(recordCall);
+  }, [recordCall]);
   const [missedCallTextBack, setMissedCallTextBack] = useState(
     initialValues?.missedCallTextBack || false,
   );
@@ -206,7 +215,21 @@ export default function CallMethodForm({
   const [workingHoursStart, setWorkingHoursStart] = useState("09:00");
   const [workingHoursEnd, setWorkingHoursEnd] = useState("17:00");
 
+  // Dirty tracking: warns the parent before a tab switch discards edits.
+  // Any change to the tracked fields below marks the form dirty, except the
+  // change caused by programmatically resetting the form itself (loading a
+  // new `initialValues` target, or clearing the form after a successful
+  // save) — `skipNextDirtyCheck` suppresses exactly that one render's effect.
+  const [isDirty, setIsDirty] = useState(false);
+  const skipNextDirtyCheck = useRef(true);
+
   useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  useEffect(() => {
+    skipNextDirtyCheck.current = true;
+    setIsDirty(false);
     if (initialValues) {
       setSelectedNumber(initialValues.phoneNumber || "");
       setForwardingType(initialValues.forwardingType || "direct");
@@ -214,7 +237,6 @@ export default function CallMethodForm({
       setCallWhisper(initialValues.callWhisper || "");
       setRequireResponse(initialValues.requireResponse || false);
       setBuyerResponses(initialValues.buyerResponses || []);
-      setLeadResponses(initialValues.leadResponses || []);
       setRecordCall(initialValues.recordCall || false);
       setReconnectCaller(initialValues.reconnectCaller || false);
       setPassCallerId(initialValues.passCallerId || false);
@@ -227,10 +249,6 @@ export default function CallMethodForm({
       );
       // New feature states
       setRecordingConsent(initialValues.recordingConsent || false);
-      setRecordingConsentMessage(
-        initialValues.recordingConsentMessage ||
-          "This call may be recorded for quality assurance purposes.",
-      );
       setMissedCallTextBack(initialValues.missedCallTextBack || false);
       setMissedCallTextMessage(
         initialValues.missedCallTextMessage ||
@@ -254,10 +272,55 @@ export default function CallMethodForm({
   }, [initialValues]);
 
   useEffect(() => {
+    if (skipNextDirtyCheck.current) {
+      skipNextDirtyCheck.current = false;
+      return;
+    }
+    setIsDirty(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedNumber,
+    forwardingType,
+    welcomeMessage,
+    callWhisper,
+    requireResponse,
+    buyerResponses,
+    recordCall,
+    reconnectCaller,
+    passCallerId,
+    leadSource,
+    overflowNumber,
+    enableWorkingHours,
+    workingHoursStart,
+    workingHoursEnd,
+    recordingConsent,
+    missedCallTextBack,
+    missedCallTextMessage,
+    dncEnabled,
+    dncList,
+    spamFilterEnabled,
+    spamFilterAction,
+    scheduledCallbackEnabled,
+    scheduledCallbackDigit,
+    multiRingEnabled,
+    geoRoutingEnabled,
+    concurrentCallLimit,
+    transcriptionEnabled,
+    aiSummaryEnabled,
+    forwardingNumbers,
+    selectedLeadBuyers,
+  ]);
+
+  useEffect(() => {
     if (forwardingType === "specific_lead") {
       fetch(`/api/calls/twilio/get_lead_buyers?sellerId=${sellerId}`)
         .then((res) => res.json())
-        .then((data: { id: string; name: string }[]) => setLeadBuyers(data))
+        .then((body: unknown) => {
+          const list = Array.isArray(body)
+            ? body
+            : ((body as { data?: unknown })?.data ?? []);
+          setLeadBuyers(list as { id: string; name: string }[]);
+        })
         .catch(() => setLeadBuyers([]));
     }
   }, [forwardingType, sellerId]);
@@ -281,7 +344,9 @@ export default function CallMethodForm({
     }
 
     if (forwardingType === "specific_lead" && selectedLeadBuyers.length === 0) {
-      newErrors.leadBuyers = "Please select at least one lead buyer";
+      newErrors.leadBuyers = `Please select at least one ${
+        terms.isBusinessAdmin ? "staff member" : "lead buyer"
+      }`;
     }
 
     if (requireResponse) {
@@ -291,18 +356,9 @@ export default function CallMethodForm({
         const dErr = validateDigit(r.digit);
         if (dErr) newErrors[`buyerDigit_${i}`] = dErr;
       });
-      leadResponses.forEach((r, i) => {
-        if (!r.message.trim())
-          newErrors[`leadMsg_${i}`] = "Message is required";
-        const dErr = validateDigit(r.digit);
-        if (dErr) newErrors[`leadDigit_${i}`] = dErr;
-      });
 
       // Check duplicate digits
-      const allDigits = [
-        ...buyerResponses.map((r) => r.digit),
-        ...leadResponses.map((r) => r.digit),
-      ].filter(Boolean);
+      const allDigits = buyerResponses.map((r) => r.digit).filter(Boolean);
       const uniqueDigits = new Set(allDigits);
       if (uniqueDigits.size !== allDigits.length) {
         newErrors.duplicateDigits = "Response digits must be unique";
@@ -325,8 +381,6 @@ export default function CallMethodForm({
 
   const addForwardingNumber = () =>
     setForwardingNumbers([...forwardingNumbers, ""]);
-  // const addBuyerResponse = () =>
-  //   setBuyerResponses([...buyerResponses, { message: "", digit: "" }]);
   const toggleRequireResponse = () => {
     const next = !requireResponse;
     setRequireResponse(next);
@@ -357,7 +411,6 @@ export default function CallMethodForm({
         callWhisper,
         requireResponse,
         buyerResponses: requireResponse ? buyerResponses : undefined,
-        leadResponses: requireResponse ? leadResponses : undefined,
         recordCall,
         reconnectCaller,
         passCallerId,
@@ -377,7 +430,9 @@ export default function CallMethodForm({
             : undefined,
         // New feature flags
         recordingConsent,
-        recordingConsentMessage,
+        recordingConsentMessage: recordingConsent
+          ? DEFAULT_RECORDING_CONSENT_MESSAGE
+          : undefined,
         missedCallTextBack,
         missedCallTextMessage,
         dncEnabled,
@@ -396,13 +451,14 @@ export default function CallMethodForm({
       await onUpdateForwarding(payload);
 
       // Reset form
+      skipNextDirtyCheck.current = true;
+      setIsDirty(false);
       setSelectedNumber("");
       setForwardingType("direct");
       setWelcomeMessage("");
       setCallWhisper("");
       setRequireResponse(false);
       setBuyerResponses([]);
-      setLeadResponses([]);
       setRecordCall(false);
       setReconnectCaller(false);
       setPassCallerId(false);
@@ -423,14 +479,9 @@ export default function CallMethodForm({
     const steps: string[] = [];
     steps.push(`1. Incoming call to ${selectedNumber || "[select number]"}`);
     if (welcomeMessage) steps.push(`2. Play welcome: "${welcomeMessage}"`);
-    if (requireResponse && leadResponses.length > 0) {
-      steps.push(
-        `${steps.length + 1}. Lead IVR: ${leadResponses.map((r) => `Press ${r.digit} - ${r.message}`).join(", ")}`,
-      );
-    }
     if (forwardingType === "direct") {
       steps.push(
-        `${steps.length + 1}. Route to next available buyer (round-robin)`,
+        `${steps.length + 1}. Route to next available ${terms.buyerLower} (round-robin)`,
       );
     } else if (forwardingType === "single_multiple") {
       steps.push(
@@ -445,10 +496,12 @@ export default function CallMethodForm({
       );
     }
     if (callWhisper)
-      steps.push(`${steps.length + 1}. Whisper to buyer: "${callWhisper}"`);
+      steps.push(
+        `${steps.length + 1}. Whisper to ${terms.buyerLower}: "${callWhisper}"`,
+      );
     if (requireResponse && buyerResponses.length > 0) {
       steps.push(
-        `${steps.length + 1}. Buyer IVR: ${buyerResponses.map((r) => `Press ${r.digit} - ${r.message}`).join(", ")}`,
+        `${steps.length + 1}. ${terms.buyer} IVR: ${buyerResponses.map((r) => `Press ${r.digit} - ${r.message}`).join(", ")}`,
       );
     }
     if (recordCall) steps.push(`${steps.length + 1}. Call will be recorded`);
@@ -456,7 +509,7 @@ export default function CallMethodForm({
       steps.push(`${steps.length + 1}. Auto-reconnect on no-answer`);
     if (overflowNumber)
       steps.push(
-        `${steps.length + 1}. Overflow to ${overflowNumber} if no buyers available`,
+        `${steps.length + 1}. Overflow to ${overflowNumber} if no ${terms.buyersLower} available`,
       );
     steps.push(`${steps.length + 1}. Voicemail if unanswered`);
     return steps;
@@ -466,7 +519,6 @@ export default function CallMethodForm({
     callWhisper,
     requireResponse,
     buyerResponses,
-    leadResponses,
     forwardingType,
     forwardingNumbers,
     selectedLeadBuyers,
@@ -496,6 +548,7 @@ export default function CallMethodForm({
         <Typography variant="h6">Set Call Forwarding Method</Typography>
         <Tooltip title="Preview call flow">
           <IconButton
+            aria-label="Preview call flow"
             color={showPreview ? "primary" : "default"}
             onClick={() => setShowPreview(!showPreview)}
           >
@@ -524,7 +577,7 @@ export default function CallMethodForm({
               <Chip
                 size="small"
                 icon={<GroupIcon />}
-                label={`Buyers: ${assignedBuyerCount}`}
+                label={`${terms.buyers}: ${assignedBuyerCount}`}
               />
               {recordCall && (
                 <Chip size="small" label="Recording: On" color="info" />
@@ -549,47 +602,72 @@ export default function CallMethodForm({
         </Alert>
       )}
 
-      {/* Phone Number Selection */}
-      <FormControl fullWidth sx={{ mb: 2 }} error={!!errors.selectedNumber}>
-        <InputLabel>Select a Phone Number</InputLabel>
-        <Select
-          value={selectedNumber}
-          onChange={(e) => {
-            setSelectedNumber(e.target.value as string);
-            setErrors((prev) => ({ ...prev, selectedNumber: "" }));
-          }}
-          label="Select a Phone Number"
-        >
-          {safeNumbers.map((num) => (
-            <MenuItem key={num.phoneNumber} value={num.phoneNumber}>
-              {num.phoneNumber} — {num.industry || "No industry"}
-            </MenuItem>
-          ))}
-        </Select>
-        {errors.selectedNumber && (
-          <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
-            {errors.selectedNumber}
-          </Typography>
-        )}
-      </FormControl>
+      {/* Phone Number + Forwarding Type + Lead Source */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <FormControl fullWidth error={!!errors.selectedNumber}>
+          <InputLabel>Select a Phone Number</InputLabel>
+          <Select
+            value={selectedNumber}
+            onChange={(e) => {
+              setSelectedNumber(e.target.value as string);
+              setErrors((prev) => ({ ...prev, selectedNumber: "" }));
+            }}
+            label="Select a Phone Number"
+          >
+            {safeNumbers.map((num) => (
+              <MenuItem key={num.phoneNumber} value={num.phoneNumber}>
+                {num.phoneNumber} — {num.industry || "No industry"}
+              </MenuItem>
+            ))}
+          </Select>
+          {errors.selectedNumber && (
+            <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+              {errors.selectedNumber}
+            </Typography>
+          )}
+        </FormControl>
 
-      {/* Forwarding Type Selection */}
-      <FormControl fullWidth sx={{ mb: 2 }}>
-        <InputLabel>Forwarding Type</InputLabel>
-        <Select
-          value={forwardingType}
-          onChange={(e) => setForwardingType(e.target.value as string)}
-          label="Forwarding Type"
-        >
-          <MenuItem value="direct">Direct to Matching Lead Buyer</MenuItem>
-          <MenuItem value="single_multiple">
-            Direct to Single or Multiple Numbers
-          </MenuItem>
-          <MenuItem value="specific_lead">
-            Direct to Specific Lead Buyers
-          </MenuItem>
-        </Select>
-      </FormControl>
+        <FormControl fullWidth>
+          <InputLabel>Forwarding Type</InputLabel>
+          <Select
+            value={forwardingType}
+            onChange={(e) => setForwardingType(e.target.value as string)}
+            label="Forwarding Type"
+          >
+            <MenuItem value="direct">
+              Direct to Matching {terms.leadBuyer}
+            </MenuItem>
+            <MenuItem value="single_multiple">
+              Direct to Single or Multiple Numbers
+            </MenuItem>
+            <MenuItem value="specific_lead">
+              Direct to Specific {terms.leadBuyers}
+            </MenuItem>
+          </Select>
+        </FormControl>
+
+        <FormControl fullWidth>
+          <InputLabel>Lead Source</InputLabel>
+          <Select
+            value={leadSource}
+            onChange={(e) => setLeadSource(e.target.value as string)}
+            label="Lead Source"
+          >
+            {LEAD_SOURCES.map((source) => (
+              <MenuItem key={source.value} value={source.value}>
+                {source.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
       {/* Forwarding Numbers */}
       {forwardingType === "single_multiple" && (
@@ -621,6 +699,7 @@ export default function CallMethodForm({
               />
               {forwardingNumbers.length > 1 && (
                 <IconButton
+                  aria-label={`Remove forwarding number ${index + 1}`}
                   onClick={() => removeForwardingNumber(index)}
                   color="error"
                   size="small"
@@ -641,7 +720,7 @@ export default function CallMethodForm({
       {forwardingType === "specific_lead" && (
         <Box sx={{ mb: 2 }}>
           <FormControl fullWidth error={!!errors.leadBuyers}>
-            <InputLabel>Select Lead Buyers</InputLabel>
+            <InputLabel>Select {terms.leadBuyers}</InputLabel>
             <Select
               multiple
               value={selectedLeadBuyers}
@@ -650,7 +729,7 @@ export default function CallMethodForm({
                 setSelectedLeadBuyers(selectedIds);
                 setErrors((prev) => ({ ...prev, leadBuyers: "" }));
               }}
-              label="Select Lead Buyers"
+              label={`Select ${terms.leadBuyers}`}
               renderValue={(selected) => (
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                   {(selected as string[]).map((id) => {
@@ -680,7 +759,7 @@ export default function CallMethodForm({
               sx={{ mt: 1, p: 1.5, borderRadius: 1, bgcolor: "action.hover" }}
             >
               <Typography variant="caption" fontWeight={600} gutterBottom>
-                Selected Buyers ({selectedLeadBuyers.length}):
+                Selected {terms.buyers} ({selectedLeadBuyers.length}):
               </Typography>
               <Box
                 sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}
@@ -707,224 +786,88 @@ export default function CallMethodForm({
         </Box>
       )}
 
-      {/* Welcome Message */}
-      <TextField
-        fullWidth
-        label="Welcome Message"
-        value={welcomeMessage}
-        onChange={(e) => setWelcomeMessage(e.target.value)}
-        sx={{ mb: 2 }}
-        multiline
-        maxRows={3}
-        helperText="Text-to-speech message played to the caller"
-      />
-
-      {/* Call Whisper */}
-      <TextField
-        fullWidth
-        label="Call Whisper"
-        value={callWhisper}
-        onChange={(e) => setCallWhisper(e.target.value)}
-        sx={{ mb: 2 }}
-        helperText="Message whispered to the buyer before connecting"
-      />
-
-      {/* Require Response Toggle */}
-      <Box sx={{ mb: 2 }}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={requireResponse}
-              onChange={toggleRequireResponse}
-            />
-          }
-          label="Require Response?"
+      {/* Welcome Message + Call Whisper + Overflow Number */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <TextField
+          fullWidth
+          label="Welcome Message"
+          value={welcomeMessage}
+          onChange={(e) => setWelcomeMessage(e.target.value)}
+          multiline
+          maxRows={3}
+          helperText="Text-to-speech message played to the caller"
         />
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "block", ml: 4 }}
-        >
-          Plays a message to the buyer/lead requiring them to press a digit to
-          accept the call, preventing voicemail pickups.
-        </Typography>
-      </Box>
-
-      {/* Buyer Responses */}
-      {requireResponse && (
-        <Box sx={{ mb: 3, pl: 2, borderLeft: 3, borderColor: "primary.main" }}>
-          <Typography variant="subtitle1" sx={{ mb: 1 }}>
-            Buyer Response Options
-          </Typography>
-          {/* Buyer responses are fixed: Accept (1) and Reject (2) when enabled */}
-
-          {buyerResponses.map((response, index) => (
-            <Box
-              key={index}
-              sx={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 1,
-                mb: 1.5,
-              }}
-            >
-              <TextField
-                fullWidth
-                size="small"
-                label="Message for Buyer"
-                value={response.message}
-                onChange={(e) => {
-                  const updated = [...buyerResponses];
-                  updated[index].message = e.target.value;
-                  setBuyerResponses(updated);
-                }}
-                error={!!errors[`buyerMsg_${index}`]}
-                helperText={errors[`buyerMsg_${index}`]}
-              />
-              <TextField
-                size="small"
-                label="Digit"
-                value={response.digit}
-                onChange={(e) => {
-                  const updated = [...buyerResponses];
-                  updated[index].digit = e.target.value;
-                  setBuyerResponses(updated);
-                }}
-                inputProps={{ maxLength: 1 }}
-                sx={{ width: 80 }}
-                error={!!errors[`buyerDigit_${index}`]}
-                helperText={errors[`buyerDigit_${index}`]}
-              />
-              {/* Deletion disabled for fixed buyer responses */}
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      {/* Lead Responses */}
-      {/* {requireResponse && (
-        <Box
-          sx={{ mb: 3, pl: 2, borderLeft: 3, borderColor: "secondary.main" }}
-        >
-          <Typography variant="subtitle1" sx={{ mb: 1 }}>
-            Lead Response Options
-          </Typography>
-          <Button
-            onClick={addLeadResponse}
-            variant="outlined"
-            size="small"
-            sx={{ mb: 2 }}
-          >
-            Add Message for Lead
-          </Button>
-
-          {leadResponses.map((response, index) => (
-            <Box
-              key={index}
-              sx={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 1,
-                mb: 1.5,
-              }}
-            >
-              <TextField
-                fullWidth
-                size="small"
-                label="Message for Lead"
-                value={response.message}
-                onChange={(e) => {
-                  const updated = [...leadResponses];
-                  updated[index].message = e.target.value;
-                  setLeadResponses(updated);
-                }}
-                error={!!errors[`leadMsg_${index}`]}
-                helperText={errors[`leadMsg_${index}`]}
-              />
-              <TextField
-                size="small"
-                label="Digit"
-                value={response.digit}
-                onChange={(e) => {
-                  const updated = [...leadResponses];
-                  updated[index].digit = e.target.value;
-                  setLeadResponses(updated);
-                }}
-                inputProps={{ maxLength: 1 }}
-                sx={{ width: 80 }}
-                error={!!errors[`leadDigit_${index}`]}
-                helperText={errors[`leadDigit_${index}`]}
-              />
-              <IconButton
-                onClick={() => removeLeadResponse(index)}
-                size="small"
-                color="error"
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          ))}
-        </Box>
-      )} */}
-
-      <Divider sx={{ my: 2 }} />
-
-      {/* Working Hours */}
-      <Box sx={{ mb: 2 }}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={enableWorkingHours}
-              onChange={() => setEnableWorkingHours(!enableWorkingHours)}
-            />
-          }
-          label="Enable Working Hours"
+        <TextField
+          fullWidth
+          label="Call Whisper"
+          value={callWhisper}
+          onChange={(e) => setCallWhisper(e.target.value)}
+          helperText={`Message whispered to the ${terms.buyerLower} before connecting`}
         />
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "block", ml: 4 }}
-        >
-          Restricts incoming calls to your specified time window. Calls outside
-          these hours go to voicemail or overflow.
-        </Typography>
-        {enableWorkingHours && (
-          <Box sx={{ display: "flex", gap: 2, mt: 1, pl: 2 }}>
-            <TextField
-              size="small"
-              type="time"
-              label="Start Time"
-              value={workingHoursStart}
-              onChange={(e) => setWorkingHoursStart(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              error={!!errors.workingHours}
-            />
-            <TextField
-              size="small"
-              type="time"
-              label="End Time"
-              value={workingHoursEnd}
-              onChange={(e) => setWorkingHoursEnd(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              error={!!errors.workingHours}
-            />
-            {errors.workingHours && (
-              <Typography
-                variant="caption"
-                color="error"
-                sx={{ alignSelf: "center" }}
-              >
-                {errors.workingHours}
-              </Typography>
-            )}
-          </Box>
-        )}
+        <TextField
+          fullWidth
+          label="Overflow Number"
+          value={overflowNumber}
+          onChange={(e) => setOverflowNumber(e.target.value)}
+          placeholder="+1234567890"
+          helperText={`If no ${terms.buyersLower} are available, try this before voicemail`}
+          error={!!errors.overflowNumber}
+        />
       </Box>
 
       {/* Toggles */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "1fr 1fr",
+            md: "1fr 1fr 1fr 1fr",
+          },
+          gap: 1,
+          mb: 2,
+        }}
+      >
+        <Tooltip
+          title={`Plays a message to the ${terms.buyerLower}/lead requiring them to press a digit to accept the call, preventing voicemail pickups.`}
+          arrow
+        >
+          <FormControlLabel
+            control={
+              <Switch
+                checked={requireResponse}
+                onChange={toggleRequireResponse}
+              />
+            }
+            label="Require Response?"
+          />
+        </Tooltip>
+        <Tooltip
+          title="Restricts incoming calls to your specified time window. Calls outside these hours go to voicemail or overflow."
+          arrow
+        >
+          <FormControlLabel
+            control={
+              <Switch
+                checked={enableWorkingHours}
+                onChange={() => setEnableWorkingHours(!enableWorkingHours)}
+              />
+            }
+            label="Enable Working Hours"
+          />
+        </Tooltip>
         {limits?.callRecording && (
-          <Box>
+          <Tooltip
+            title="Records the call from the moment it is answered. A consent announcement is played automatically when this is on."
+            arrow
+          >
             <FormControlLabel
               control={
                 <Switch
@@ -934,17 +877,12 @@ export default function CallMethodForm({
               }
               label="Record Call"
             />
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", ml: 4 }}
-            >
-              Records the call from the moment it is answered. Pair with
-              Recording Consent to notify callers.
-            </Typography>
-          </Box>
+          </Tooltip>
         )}
-        <Box>
+        <Tooltip
+          title={`Automatically retries connecting the caller to another available ${terms.buyerLower} if the first attempt goes unanswered.`}
+          arrow
+        >
           <FormControlLabel
             control={
               <Switch
@@ -954,16 +892,11 @@ export default function CallMethodForm({
             }
             label="Auto-Reconnect"
           />
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", ml: 4 }}
-          >
-            Automatically retries connecting the caller to another available
-            buyer if the first attempt goes unanswered.
-          </Typography>
-        </Box>
-        <Box>
+        </Tooltip>
+        <Tooltip
+          title={`Forwards the original caller's phone number to the ${terms.buyerLower} instead of showing the tracking number.`}
+          arrow
+        >
           <FormControlLabel
             control={
               <Switch
@@ -973,44 +906,101 @@ export default function CallMethodForm({
             }
             label="Pass Caller ID"
           />
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", ml: 4 }}
-          >
-            Forwards the original caller&apos;s phone number to the buyer
-            instead of showing the tracking number.
-          </Typography>
-        </Box>
+        </Tooltip>
       </Box>
 
-      {/* Lead Source */}
-      <FormControl fullWidth sx={{ mb: 2 }}>
-        <InputLabel>Lead Source</InputLabel>
-        <Select
-          value={leadSource}
-          onChange={(e) => setLeadSource(e.target.value as string)}
-          label="Lead Source"
-        >
-          {LEAD_SOURCES.map((source) => (
-            <MenuItem key={source.value} value={source.value}>
-              {source.label}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      {/* Buyer Responses */}
+      {requireResponse && (
+        <Box sx={{ mb: 3, pl: 2, borderLeft: 3, borderColor: "primary.main" }}>
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>
+            {terms.buyer} Response Options
+          </Typography>
+          {/* Buyer responses are fixed: Accept (1) and Reject (2) when enabled */}
 
-      {/* Overflow Number */}
-      <TextField
-        fullWidth
-        label="Overflow Number"
-        value={overflowNumber}
-        onChange={(e) => setOverflowNumber(e.target.value)}
-        placeholder="+1234567890"
-        helperText="If no buyers are available, try this number before going to voicemail (e.g., your phone or answering service)"
-        error={!!errors.overflowNumber}
-        sx={{ mb: 2 }}
-      />
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: 1.5,
+            }}
+          >
+            {buyerResponses.map((response, index) => (
+              <Box
+                key={index}
+                sx={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 1,
+                }}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  label={`Message for ${terms.buyer}`}
+                  value={response.message}
+                  onChange={(e) => {
+                    const updated = [...buyerResponses];
+                    updated[index].message = e.target.value;
+                    setBuyerResponses(updated);
+                  }}
+                  error={!!errors[`buyerMsg_${index}`]}
+                  helperText={errors[`buyerMsg_${index}`]}
+                />
+                <TextField
+                  size="small"
+                  label="Digit"
+                  value={response.digit}
+                  onChange={(e) => {
+                    const updated = [...buyerResponses];
+                    updated[index].digit = e.target.value;
+                    setBuyerResponses(updated);
+                  }}
+                  inputProps={{ maxLength: 1 }}
+                  sx={{ width: 80 }}
+                  error={!!errors[`buyerDigit_${index}`]}
+                  helperText={errors[`buyerDigit_${index}`]}
+                />
+                {/* Deletion disabled for fixed buyer responses */}
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      <Divider sx={{ my: 2 }} />
+
+      {/* Working Hours (time range shown only when the toggle above is on) */}
+      {enableWorkingHours && (
+        <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+          <TextField
+            size="small"
+            type="time"
+            label="Start Time"
+            value={workingHoursStart}
+            onChange={(e) => setWorkingHoursStart(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            error={!!errors.workingHours}
+          />
+          <TextField
+            size="small"
+            type="time"
+            label="End Time"
+            value={workingHoursEnd}
+            onChange={(e) => setWorkingHoursEnd(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            error={!!errors.workingHours}
+          />
+          {errors.workingHours && (
+            <Typography
+              variant="caption"
+              color="error"
+              sx={{ alignSelf: "center" }}
+            >
+              {errors.workingHours}
+            </Typography>
+          )}
+        </Box>
+      )}
 
       <Divider sx={{ my: 3 }} />
       <Typography
@@ -1020,40 +1010,15 @@ export default function CallMethodForm({
         <SecurityIcon fontSize="small" /> Call Protection & Compliance
       </Typography>
 
-      {/* Recording Consent */}
-      {limits?.callRecording && (
-        <Accordion disableGutters sx={{ mb: 1 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <FormControlLabel
-              onClick={(e) => e.stopPropagation()}
-              control={
-                <Switch
-                  checked={recordingConsent}
-                  onChange={() => setRecordingConsent(!recordingConsent)}
-                />
-              }
-              label="Recording Consent Announcement"
-            />
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Play a consent message before recording starts (required in many
-              jurisdictions).
-            </Typography>
-            <TextField
-              fullWidth
-              size="small"
-              label="Consent Message"
-              value={recordingConsentMessage}
-              onChange={(e) => setRecordingConsentMessage(e.target.value)}
-              multiline
-              rows={2}
-              disabled={!recordingConsent}
-            />
-          </AccordionDetails>
-        </Accordion>
-      )}
-
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+          gap: 1,
+          mb: 1,
+          alignItems: "start",
+        }}
+      >
       {/* Spam Filter */}
       <Accordion disableGutters sx={{ mb: 1 }}>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -1082,7 +1047,9 @@ export default function CallMethodForm({
               label="Action on Spam"
             >
               <MenuItem value="block">Block (reject the call)</MenuItem>
-              <MenuItem value="warn">Warn (whisper warning to buyer)</MenuItem>
+              <MenuItem value="warn">
+                Warn (whisper warning to {terms.buyerLower})
+              </MenuItem>
             </Select>
           </FormControl>
         </AccordionDetails>
@@ -1139,6 +1106,7 @@ export default function CallMethodForm({
                   <ListItemText primary={num} />
                   <ListItemSecondaryAction>
                     <IconButton
+                      aria-label={`Remove ${num} from DNC list`}
                       edge="end"
                       size="small"
                       onClick={() =>
@@ -1157,6 +1125,7 @@ export default function CallMethodForm({
           </Typography>
         </AccordionDetails>
       </Accordion>
+      </Box>
 
       <Divider sx={{ my: 3 }} />
       <Typography
@@ -1166,6 +1135,15 @@ export default function CallMethodForm({
         <PhoneIcon fontSize="small" /> Call Routing & Fallback
       </Typography>
 
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+          gap: 1,
+          mb: 1,
+          alignItems: "start",
+        }}
+      >
       {/* Missed Call Text-Back */}
       <Accordion disableGutters sx={{ mb: 1 }}>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -1215,8 +1193,10 @@ export default function CallMethodForm({
         </AccordionSummary>
         <AccordionDetails>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            When no buyers are available, offer callers the option to request a
-            callback via IVR.
+            When no {terms.buyersLower} are available, offer callers the
+            option to request a callback via IVR. Requests appear in the
+            Callbacks tab — calling the customer back is a manual step you (or
+            your team) complete from there; it is not dialed automatically.
           </Typography>
           <TextField
             size="small"
@@ -1235,10 +1215,12 @@ export default function CallMethodForm({
       </Accordion>
 
       {/* Multi-Ring */}
-      <Accordion disableGutters sx={{ mb: 1 }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+        <Tooltip
+          title={`Ring all eligible ${terms.buyersLower} at the same time instead of sequentially. The first ${terms.buyerLower} to answer gets the call.`}
+          arrow
+        >
           <FormControlLabel
-            onClick={(e) => e.stopPropagation()}
             control={
               <Switch
                 checked={multiRingEnabled}
@@ -1247,20 +1229,16 @@ export default function CallMethodForm({
             }
             label="Multi-Ring (Simultaneous)"
           />
-        </AccordionSummary>
-        <AccordionDetails>
-          <Typography variant="body2" color="text.secondary">
-            Ring all eligible buyers at the same time instead of sequentially.
-            The first buyer to answer gets the call.
-          </Typography>
-        </AccordionDetails>
-      </Accordion>
+        </Tooltip>
+      </Box>
 
       {/* Geo-Routing */}
-      <Accordion disableGutters sx={{ mb: 1 }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+        <Tooltip
+          title={`Route calls to ${terms.buyersLower} based on the caller's area code and the ${terms.buyerLower}'s configured service locations. ${terms.buyers} without matching service areas will be skipped.`}
+          arrow
+        >
           <FormControlLabel
-            onClick={(e) => e.stopPropagation()}
             control={
               <Switch
                 checked={geoRoutingEnabled}
@@ -1269,15 +1247,8 @@ export default function CallMethodForm({
             }
             label="Geo-Routing"
           />
-        </AccordionSummary>
-        <AccordionDetails>
-          <Typography variant="body2" color="text.secondary">
-            Route calls to buyers based on the caller&apos;s area code and the
-            buyer&apos;s configured service locations. Buyers without matching
-            service areas will be skipped.
-          </Typography>
-        </AccordionDetails>
-      </Accordion>
+        </Tooltip>
+      </Box>
 
       {/* Concurrent Call Limit */}
       <Accordion disableGutters sx={{ mb: 1 }}>
@@ -1288,13 +1259,13 @@ export default function CallMethodForm({
         </AccordionSummary>
         <AccordionDetails>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Limit how many simultaneous calls a single buyer can handle. Set to
-            0 for unlimited.
+            Limit how many simultaneous calls a single {terms.buyerLower} can
+            handle. Set to 0 for unlimited.
           </Typography>
           <TextField
             size="small"
             type="number"
-            label="Max Concurrent Calls per Buyer"
+            label={`Max Concurrent Calls per ${terms.buyer}`}
             value={concurrentCallLimit}
             onChange={(e) =>
               setConcurrentCallLimit(Math.max(0, parseInt(e.target.value) || 0))
@@ -1304,6 +1275,7 @@ export default function CallMethodForm({
           />
         </AccordionDetails>
       </Accordion>
+      </Box>
 
       {limits?.callAIAnalysis && (
         <>
@@ -1314,12 +1286,23 @@ export default function CallMethodForm({
           >
             <SmartToyIcon fontSize="small" /> AI & Analytics
           </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+              gap: 1,
+              mb: 1,
+              alignItems: "start",
+            }}
+          >
 
           {/* Transcription */}
-          <Accordion disableGutters sx={{ mb: 1 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Box sx={{ mb: 1 }}>
+            <Tooltip
+              title="Automatically transcribe recorded calls. Transcriptions appear in call details and can be used for AI analysis. Requires call recording to be enabled."
+              arrow
+            >
               <FormControlLabel
-                onClick={(e) => e.stopPropagation()}
                 control={
                   <Switch
                     checked={transcriptionEnabled}
@@ -1330,26 +1313,21 @@ export default function CallMethodForm({
                 }
                 label="Call Transcription"
               />
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" color="text.secondary">
-                Automatically transcribe recorded calls. Transcriptions appear
-                in call details and can be used for AI analysis. Requires call
-                recording to be enabled.
-              </Typography>
-              {transcriptionEnabled && !recordCall && (
-                <Alert severity="warning" sx={{ mt: 1 }}>
-                  Call recording must be enabled for transcription to work.
-                </Alert>
-              )}
-            </AccordionDetails>
-          </Accordion>
+            </Tooltip>
+            {transcriptionEnabled && !recordCall && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                Call recording must be enabled for transcription to work.
+              </Alert>
+            )}
+          </Box>
 
           {/* AI Summary */}
-          <Accordion disableGutters sx={{ mb: 1 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Box sx={{ mb: 1 }}>
+            <Tooltip
+              title="Uses Google AI to generate call summaries, sentiment analysis, and lead quality scores (A-D grading) from transcriptions. Requires transcription to be enabled."
+              arrow
+            >
               <FormControlLabel
-                onClick={(e) => e.stopPropagation()}
                 control={
                   <Switch
                     checked={aiSummaryEnabled}
@@ -1358,20 +1336,14 @@ export default function CallMethodForm({
                 }
                 label="AI Call Summary & Lead Scoring"
               />
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" color="text.secondary">
-                Uses Google AI to generate call summaries, sentiment analysis,
-                and lead quality scores (A-D grading) from transcriptions.
-                Requires transcription to be enabled.
-              </Typography>
-              {aiSummaryEnabled && !transcriptionEnabled && (
-                <Alert severity="warning" sx={{ mt: 1 }}>
-                  Call transcription must be enabled for AI analysis to work.
-                </Alert>
-              )}
-            </AccordionDetails>
-          </Accordion>
+            </Tooltip>
+            {aiSummaryEnabled && !transcriptionEnabled && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                Call transcription must be enabled for AI analysis to work.
+              </Alert>
+            )}
+          </Box>
+          </Box>
         </>
       )}
 

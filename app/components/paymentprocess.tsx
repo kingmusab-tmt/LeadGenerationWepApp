@@ -5,7 +5,7 @@ import { Box, Button, CircularProgress } from "@mui/material";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 interface PaymentProcessorProps {
-  tier: any;
+  tier: { _id: string; discountedPrice: string | number };
   onSuccess: () => void;
   onError: (message: string) => void;
 }
@@ -19,7 +19,9 @@ export const PaymentProcessor = ({
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
 
-  const yearlyAmount = (parseFloat(tier.discountedPrice) * 12).toFixed(2);
+  const yearlyAmount = (
+    parseFloat(String(tier.discountedPrice)) * 12
+  ).toFixed(2);
 
   const handleStripePayment = async () => {
     if (!stripe || !elements) {

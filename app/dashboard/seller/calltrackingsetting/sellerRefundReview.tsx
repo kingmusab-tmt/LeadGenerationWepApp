@@ -34,6 +34,8 @@ import SearchIcon from "@mui/icons-material/Search";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { formatDuration, formatDate } from "@/lib/formatUtils";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface RefundCall {
   _id: string;
@@ -59,6 +61,8 @@ interface RefundCall {
 }
 
 export default function SellerRefundReview() {
+  const terms = useDashboardTerms();
+  const fetchWithCSRF = useCSRFFetch();
   const [calls, setCalls] = useState<RefundCall[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -84,22 +88,61 @@ export default function SellerRefundReview() {
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
 
+  // Fetches every page for a given paymentStatus filter so pending refunds
+  // can never be silently hidden behind a seller's older call history — a
+  // single recency-windowed fetch previously meant sellers with more than
+  // ~200 total calls could lose visibility into old pending refund requests
+  // indefinitely (they'd never appear to be approved/rejected).
+  const fetchAllByPaymentStatus = useCallback(
+    async (paymentStatus: string, maxPages = 20): Promise<RefundCall[]> => {
+      const results: RefundCall[] = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const res = await fetch(
+          `/api/calls/tracking?paymentStatus=${paymentStatus}&page=${page}&limit=200`,
+        );
+        const data = await res.json();
+        const calls: RefundCall[] = Array.isArray(data?.data?.calls)
+          ? data.data.calls
+          : [];
+        results.push(...calls);
+        totalPages = data?.data?.pagination?.pages || 1;
+        page += 1;
+      } while (page <= totalPages && page <= maxPages);
+      return results;
+    },
+    [],
+  );
+
   const fetchRefundCalls = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/calls/tracking");
-      const data = await res.json();
-      const allCalls: RefundCall[] = data?.data ?? data?.calls ?? [];
+      const [pending, refunded, recent] = await Promise.all([
+        fetchAllByPaymentStatus("pending_refund"),
+        fetchAllByPaymentStatus("refunded"),
+        fetch("/api/calls/tracking?limit=200")
+          .then((r) => r.json())
+          .then((data) =>
+            Array.isArray(data?.data?.calls) ? (data.data.calls as RefundCall[]) : [],
+          ),
+      ]);
 
-      // Filter to calls that have refund-related status
-      const refundCalls = allCalls.filter(
-        (c: RefundCall) =>
+      // Merge and de-duplicate by _id — `recent` covers rejected refunds
+      // (feedback.sellerApproved === false, paymentStatus stays "paid")
+      // within the recency window, while pending/refunded are complete.
+      const byId = new Map<string, RefundCall>();
+      for (const c of [...pending, ...refunded, ...recent]) {
+        if (
           c.paymentStatus === "pending_refund" ||
           c.paymentStatus === "refunded" ||
-          c.feedback?.buyerRating === false,
-      );
+          c.feedback?.buyerRating === false
+        ) {
+          byId.set(c._id, c);
+        }
+      }
 
-      setCalls(refundCalls);
+      setCalls(Array.from(byId.values()));
     } catch {
       setSnackbar({
         open: true,
@@ -109,7 +152,7 @@ export default function SellerRefundReview() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchAllByPaymentStatus]);
 
   useEffect(() => {
     fetchRefundCalls();
@@ -155,7 +198,7 @@ export default function SellerRefundReview() {
     setSubmitting(true);
 
     try {
-      const res = await fetch(
+      const res = await fetchWithCSRF(
         `/api/calls/feedback?callId=${reviewDialog.call._id}`,
         {
           method: "POST",
@@ -174,7 +217,7 @@ export default function SellerRefundReview() {
         open: true,
         message:
           reviewDialog.action === "approve"
-            ? "Refund approved — units returned to buyer"
+            ? `Refund approved — units returned to ${terms.buyerLower}`
             : "Refund request rejected",
         severity: "success",
       });
@@ -248,7 +291,11 @@ export default function SellerRefundReview() {
         />
 
         <Tooltip title="Refresh">
-          <IconButton onClick={fetchRefundCalls} size="small">
+          <IconButton
+            aria-label="Refresh refund requests"
+            onClick={fetchRefundCalls}
+            size="small"
+          >
             <RefreshIcon />
           </IconButton>
         </Tooltip>
@@ -276,7 +323,7 @@ export default function SellerRefundReview() {
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               {filter === "pending"
-                ? "When buyers report bad calls, refund requests will appear here for your review."
+                ? `When ${terms.buyersLower} report bad calls, refund requests will appear here for your review.`
                 : "Try changing your filter or search criteria."}
             </Typography>
           </CardContent>
@@ -288,7 +335,7 @@ export default function SellerRefundReview() {
               <TableRow>
                 <TableCell>Date</TableCell>
                 <TableCell>Caller</TableCell>
-                <TableCell>Buyer</TableCell>
+                <TableCell>{terms.buyer}</TableCell>
                 <TableCell>Industry</TableCell>
                 <TableCell align="center">Duration</TableCell>
                 <TableCell align="center">Units</TableCell>
@@ -360,6 +407,7 @@ export default function SellerRefundReview() {
                       call.recordingUrl !== "No Record" ? (
                         <Tooltip title="Play recording">
                           <IconButton
+                            aria-label={`Play recording for call from ${call.from}`}
                             size="small"
                             onClick={() =>
                               setRecordingDialog({
@@ -388,6 +436,7 @@ export default function SellerRefundReview() {
                         >
                           <Tooltip title="Approve refund">
                             <IconButton
+                              aria-label={`Approve refund for call from ${call.from}`}
                               size="small"
                               color="success"
                               onClick={() => handleReviewOpen(call, "approve")}
@@ -397,6 +446,7 @@ export default function SellerRefundReview() {
                           </Tooltip>
                           <Tooltip title="Reject refund">
                             <IconButton
+                              aria-label={`Reject refund for call from ${call.from}`}
                               size="small"
                               color="error"
                               onClick={() => handleReviewOpen(call, "reject")}
@@ -457,7 +507,7 @@ export default function SellerRefundReview() {
               </Typography>
               {reviewDialog.call.feedback?.buyerRating === false && (
                 <Chip
-                  label="Buyer rated this call as bad"
+                  label={`${terms.buyer} rated this call as bad`}
                   size="small"
                   color="error"
                   variant="outlined"
@@ -491,7 +541,7 @@ export default function SellerRefundReview() {
               sx={{ mt: 1, display: "block" }}
             >
               This will refund {reviewDialog.call?.unitsCharged || 0} units back
-              to the buyer&apos;s wallet.
+              to the {terms.buyerLower}&apos;s wallet.
             </Typography>
           )}
         </DialogContent>
@@ -543,7 +593,7 @@ export default function SellerRefundReview() {
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={6000}
+        autoHideDuration={snackbar.severity === "error" ? 6000 : 4000}
         onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
       >
         <Alert

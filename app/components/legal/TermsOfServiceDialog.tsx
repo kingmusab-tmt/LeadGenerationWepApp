@@ -31,9 +31,10 @@ export default function TermsOfServiceDialog({
           1. Acceptance of Terms
         </Typography>
         <Typography variant="body1" paragraph>
-          By accessing or using our lead management platform ("Service"), you
-          agree to be bound by these Terms of Service ("Terms"). If you disagree
-          with any part of the terms, you may not access the Service.
+          By accessing or using our lead management platform
+          (&quote;Service&quote;), you agree to be bound by these Terms of
+          Service (&quote;Terms&quote;). If you disagree with any part of the
+          terms, you may not access the Service.
         </Typography>
 
         <Typography variant="h6" gutterBottom>

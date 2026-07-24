@@ -8,6 +8,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import {
   badRequest,
+  forbidden,
   internalError,
   notFound,
   unauthorized,
@@ -28,6 +29,14 @@ import {
 } from "@/models/cancellationFeedback";
 import connectDB from "@/lib/connectdb";
 import { User } from "@/models/userModel";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
+
+// Subscription management is only meaningful for seller-type accounts —
+// business-admin accounts use this same seller dashboard/settings surface,
+// and admin needs override access for support. Everything else (buyer,
+// user, staff) has no business mutating a subscription document.
+const SUBSCRIPTION_ROLES = ["seller", "business-admin", "admin"];
 
 type StripeSubscriptionLike = {
   id?: string;
@@ -59,6 +68,10 @@ export async function GET() {
 
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
+    }
+
+    if (!SUBSCRIPTION_ROLES.includes(session.user.role || "")) {
+      return forbidden("Seller access required");
     }
 
     await connectDB();
@@ -117,31 +130,34 @@ export async function GET() {
       }
     }
 
-    // Priority 1: Use subscriptionRenewalPrice from database (set during checkout)
+    // Fetch the subscription's tier once and reuse it below — it was
+    // previously looked up twice (once for the renewal-price fallback,
+    // once for tierDetails) in the same request.
+    const tierDoc = user.subscription?.subscriptionTierId
+      ? await Tier.findById(user.subscription.subscriptionTierId).lean()
+      : null;
+
+    // Priority 1: Use subscriptionRenewalPrice from database (set during
+    // checkout/renewal as tier.renewalPrice × durationMonths, so it's
+    // already the correct total for whatever billing interval is active —
+    // no further scaling needed here).
     if (user.subscription?.subscriptionRenewalPrice) {
       renewalAmount = user.subscription.subscriptionRenewalPrice;
     }
-    // Priority 2: Fallback to tier's renewalPrice if available
-    else if (user.subscription?.subscriptionTierId) {
-      const tier = await Tier.findById(
-        user.subscription.subscriptionTierId,
-      ).lean();
-      if (tier && tier.renewalPrice) {
-        renewalAmount = parseFloat(tier.renewalPrice);
-      }
+    // Priority 2: Fallback to tier's renewalPrice if available. Unlike
+    // subscriptionRenewalPrice, tier.renewalPrice is the raw monthly rate,
+    // so annual billers need it scaled by 12 to match the same convention.
+    else if (tierDoc && tierDoc.renewalPrice) {
+      const monthlyRate = parseFloat(tierDoc.renewalPrice);
+      renewalAmount =
+        user.subscription?.billingInterval === "year"
+          ? monthlyRate * 12
+          : monthlyRate;
     }
-    // Priority 3: Fall back to subscription price from database
+    // Priority 3: Fall back to subscription price from database (also
+    // already stored as the correct total for the active billing interval).
     if (renewalAmount === null && user.subscription?.subscriptionPrice) {
       renewalAmount = user.subscription.subscriptionPrice;
-    }
-
-    // Adjust renewal amount based on billing interval
-    // renewalPrice is stored as a yearly price, but monthly subscribers should see monthly price
-    if (
-      renewalAmount !== null &&
-      user.subscription?.billingInterval === "month"
-    ) {
-      renewalAmount = renewalAmount / 12;
     }
 
     // If no payment method from subscription, try to get from customer
@@ -162,19 +178,13 @@ export async function GET() {
     }
 
     // Get tier details for tier name and features
-    let tierDetails = null;
-    if (user.subscription?.subscriptionTierId) {
-      const tier = await Tier.findById(
-        user.subscription.subscriptionTierId,
-      ).lean();
-      if (tier) {
-        tierDetails = {
-          name: tier.name,
-          description: tier.description,
-          features: tier.features || [],
-        };
-      }
-    }
+    const tierDetails = tierDoc
+      ? {
+          name: tierDoc.name,
+          description: tierDoc.description,
+          features: tierDoc.features || [],
+        }
+      : null;
 
     const sub = stripeSubscription as StripeSubscriptionLike | null;
     const subscriptionRaw = user.subscription as unknown;
@@ -230,6 +240,21 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
     }
+
+    if (!SUBSCRIPTION_ROLES.includes(session.user.role || "")) {
+      return forbidden("Seller access required");
+    }
+
+    const csrfError = requireCsrf(request, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(request, {
+      scope: "subscriptions-manage",
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     const body = await request.json();
     const { action, ...params } = body;

@@ -18,8 +18,10 @@ import {
   Info as InfoIcon,
 } from "@mui/icons-material";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { useDashboardTerms } from "@/app/hooks";
 
 const TawkSetupForm = () => {
+  const terms = useDashboardTerms();
   const [form, setForm] = useState({
     tawkPropertyId: "",
     tawkWidgetId: "",
@@ -108,8 +110,9 @@ const TawkSetupForm = () => {
   return (
     <Box sx={{ mt: -2 }}>
       <Alert severity="info" icon={<InfoIcon />} sx={{ mb: 3 }}>
-        Configure Tawk.to live chat widget for your seller dashboard. Get your
-        Property ID and Widget ID from your Tawk.to account settings.
+        Configure Tawk.to live chat widget for your {terms.org.toLowerCase()}{" "}
+        dashboard. Get your Property ID and Widget ID from your Tawk.to
+        account settings.
       </Alert>
 
       <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider" }}>

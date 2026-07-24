@@ -2,11 +2,39 @@ import dbConnect from "@/lib/connectdb";
 import Call from "@/models/call";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { PipelineStage } from "mongoose";
 import {
   successResponse,
   unauthorized,
   internalError,
 } from "@/lib/api/error-handler";
+
+type SummaryFacetRow = {
+  totalCalls: number;
+  completedCalls: number;
+  noAnswerCalls: number;
+  failedCalls: number;
+  forwardedCalls: number;
+  totalUnitsCharged: number;
+  refundedCalls: number;
+  pendingRefundCalls: number;
+  durationSum: number;
+  durationCount: number;
+};
+
+type BucketRow = { _id: string | number; count: number };
+
+type RecentActivityRow = {
+  _id: unknown;
+  from: string;
+  to: string;
+  status: string;
+  callDuration?: number;
+  industry?: string;
+  createdAt: Date;
+  unitsCharged?: number;
+  paymentStatus?: string;
+};
 
 export async function GET() {
   try {
@@ -18,130 +46,217 @@ export async function GET() {
     }
     const sellerId = session.user.id;
 
-    const calls = await Call.find({ userId: sellerId }).sort({ createdAt: -1 });
-
-    const totalCalls = calls.length;
-    const completedCalls = calls.filter((c) => c.status === "completed").length;
-    const noAnswerCalls = calls.filter((c) => c.status === "no-answer").length;
-    const failedCalls = calls.filter(
-      (c) => c.status === "failed" || c.status === "insufficient_balance",
-    ).length;
-    const forwardedCalls = calls.filter((c) => c.status === "forwarded").length;
-
-    // Answer rate
-    const answerRate =
-      totalCalls > 0 ? Math.round((completedCalls / totalCalls) * 100) : 0;
-
-    // Average duration (only completed calls with duration)
-    const callsWithDuration = calls.filter(
-      (c) => c.status === "completed" && c.callDuration && c.callDuration > 0,
-    );
-    const avgDuration =
-      callsWithDuration.length > 0
-        ? Math.round(
-            callsWithDuration.reduce(
-              (sum, c) => sum + (c.callDuration || 0),
-              0,
-            ) / callsWithDuration.length,
-          )
-        : 0;
-
-    // Total units charged
-    const totalUnitsCharged = calls.reduce(
-      (sum, c) => sum + (c.unitsCharged || 0),
-      0,
-    );
-
-    // Total revenue from calls (units)
-    const totalRevenue = totalUnitsCharged;
-
-    // Refund stats
-    const refundedCalls = calls.filter(
-      (c) => c.paymentStatus === "refunded",
-    ).length;
-    const pendingRefundCalls = calls.filter(
-      (c) => c.paymentStatus === "pending_refund",
-    ).length;
-
-    // Calls per day (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentCalls = calls.filter(
-      (c) => new Date(c.createdAt) >= thirtyDaysAgo,
+
+    // A single $facet aggregation replaces the previous approach of loading
+    // every call the seller has ever received into Node memory and
+    // filtering/reducing it in JavaScript — that doesn't scale past a few
+    // thousand calls and re-runs on every Overview-tab load.
+    const pipeline: PipelineStage[] = [
+      { $match: { userId: sellerId } },
+      {
+        $facet: {
+          summary: [
+            {
+              $group: {
+                _id: null,
+                totalCalls: { $sum: 1 },
+                completedCalls: {
+                  $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+                },
+                noAnswerCalls: {
+                  $sum: { $cond: [{ $eq: ["$status", "no-answer"] }, 1, 0] },
+                },
+                failedCalls: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $in: [
+                          "$status",
+                          ["failed", "insufficient_balance"],
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                forwardedCalls: {
+                  $sum: { $cond: [{ $eq: ["$status", "forwarded"] }, 1, 0] },
+                },
+                totalUnitsCharged: { $sum: { $ifNull: ["$unitsCharged", 0] } },
+                refundedCalls: {
+                  $sum: {
+                    $cond: [{ $eq: ["$paymentStatus", "refunded"] }, 1, 0],
+                  },
+                },
+                pendingRefundCalls: {
+                  $sum: {
+                    $cond: [
+                      { $eq: ["$paymentStatus", "pending_refund"] },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                durationSum: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ["$status", "completed"] },
+                          { $gt: [{ $ifNull: ["$callDuration", 0] }, 0] },
+                        ],
+                      },
+                      "$callDuration",
+                      0,
+                    ],
+                  },
+                },
+                durationCount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ["$status", "completed"] },
+                          { $gt: [{ $ifNull: ["$callDuration", 0] }, 0] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+          dailyData: [
+            { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+            {
+              $group: {
+                _id: {
+                  $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+                },
+                count: { $sum: 1 },
+              },
+            },
+          ],
+          callsByStatus: [
+            { $group: { _id: "$status", count: { $sum: 1 } } },
+          ],
+          callsByIndustry: [
+            {
+              $group: {
+                _id: { $ifNull: ["$industry", "Unknown"] },
+                count: { $sum: 1 },
+              },
+            },
+          ],
+          recentActivity: [
+            { $sort: { createdAt: -1 } },
+            { $limit: 10 },
+            {
+              $project: {
+                _id: 1,
+                from: 1,
+                to: 1,
+                status: 1,
+                callDuration: 1,
+                industry: 1,
+                createdAt: 1,
+                unitsCharged: 1,
+                paymentStatus: 1,
+              },
+            },
+          ],
+          peakHour: [
+            {
+              $group: {
+                _id: { $hour: "$createdAt" },
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { count: -1 } },
+            { $limit: 1 },
+          ],
+        },
+      },
+    ];
+
+    const [result] = await Call.aggregate<{
+      summary: SummaryFacetRow[];
+      dailyData: BucketRow[];
+      callsByStatus: BucketRow[];
+      callsByIndustry: BucketRow[];
+      recentActivity: RecentActivityRow[];
+      peakHour: BucketRow[];
+    }>(pipeline);
+
+    const summaryRow = result?.summary?.[0];
+    const totalCalls = summaryRow?.totalCalls ?? 0;
+    const completedCalls = summaryRow?.completedCalls ?? 0;
+    const durationSum = summaryRow?.durationSum ?? 0;
+    const durationCount = summaryRow?.durationCount ?? 0;
+    const totalUnitsCharged = summaryRow?.totalUnitsCharged ?? 0;
+
+    // Fill in missing days so the chart always shows a full 30-day window
+    const dailyByDate = new Map(
+      (result?.dailyData ?? []).map((d) => [String(d._id), d.count]),
     );
-
-    const callsByDay: Record<string, number> = {};
-    recentCalls.forEach((c) => {
-      const day = new Date(c.createdAt).toISOString().split("T")[0];
-      callsByDay[day] = (callsByDay[day] || 0) + 1;
-    });
-
-    // Fill in missing days
     const dailyData: { date: string; count: number }[] = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = d.toISOString().split("T")[0];
-      dailyData.push({ date: key, count: callsByDay[key] || 0 });
+      dailyData.push({ date: key, count: dailyByDate.get(key) || 0 });
     }
 
-    // Calls by status
     const callsByStatus: Record<string, number> = {};
-    calls.forEach((c) => {
-      callsByStatus[c.status] = (callsByStatus[c.status] || 0) + 1;
-    });
+    for (const row of result?.callsByStatus ?? []) {
+      callsByStatus[String(row._id)] = row.count;
+    }
 
-    // Calls by industry
     const callsByIndustry: Record<string, number> = {};
-    calls.forEach((c) => {
-      const industry = c.industry || "Unknown";
-      callsByIndustry[industry] = (callsByIndustry[industry] || 0) + 1;
-    });
+    for (const row of result?.callsByIndustry ?? []) {
+      callsByIndustry[String(row._id)] = row.count;
+    }
 
-    // Recent activity (last 10 calls)
-    const recentActivity = calls.slice(0, 10).map((c) => ({
-      _id: c._id,
-      from: c.from,
-      to: c.to,
-      status: c.status,
-      callDuration: c.callDuration,
-      industry: c.industry,
-      createdAt: c.createdAt,
-      unitsCharged: c.unitsCharged,
-      paymentStatus: c.paymentStatus,
-    }));
-
-    // Peak hours
-    const callsByHour: Record<number, number> = {};
-    calls.forEach((c) => {
-      const hour = new Date(c.createdAt).getHours();
-      callsByHour[hour] = (callsByHour[hour] || 0) + 1;
-    });
-    const peakHour = Object.entries(callsByHour).sort(
-      ([, a], [, b]) => b - a,
-    )[0];
+    const peakHourRow = result?.peakHour?.[0];
 
     return successResponse({
       summary: {
         totalCalls,
         completedCalls,
-        noAnswerCalls,
-        failedCalls,
-        forwardedCalls,
-        answerRate,
-        avgDuration,
+        noAnswerCalls: summaryRow?.noAnswerCalls ?? 0,
+        failedCalls: summaryRow?.failedCalls ?? 0,
+        forwardedCalls: summaryRow?.forwardedCalls ?? 0,
+        answerRate:
+          totalCalls > 0 ? Math.round((completedCalls / totalCalls) * 100) : 0,
+        avgDuration:
+          durationCount > 0 ? Math.round(durationSum / durationCount) : 0,
         totalUnitsCharged,
-        totalRevenue,
-        refundedCalls,
-        pendingRefundCalls,
-        peakHour: peakHour
-          ? { hour: parseInt(peakHour[0]), count: peakHour[1] }
+        totalRevenue: totalUnitsCharged,
+        refundedCalls: summaryRow?.refundedCalls ?? 0,
+        pendingRefundCalls: summaryRow?.pendingRefundCalls ?? 0,
+        peakHour: peakHourRow
+          ? { hour: Number(peakHourRow._id), count: peakHourRow.count }
           : null,
       },
       dailyData,
       callsByStatus,
       callsByIndustry,
-      recentActivity,
+      recentActivity: (result?.recentActivity ?? []).map((c) => ({
+        _id: c._id,
+        from: c.from,
+        to: c.to,
+        status: c.status,
+        callDuration: c.callDuration,
+        industry: c.industry,
+        createdAt: c.createdAt,
+        unitsCharged: c.unitsCharged,
+        paymentStatus: c.paymentStatus,
+      })),
     });
   } catch (error) {
     console.error("Error fetching call analytics:", error);

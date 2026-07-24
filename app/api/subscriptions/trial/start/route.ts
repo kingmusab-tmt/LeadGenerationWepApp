@@ -1,3 +1,4 @@
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
@@ -5,6 +6,7 @@ import { User } from "@/models";
 import {
   successResponse,
   unauthorized,
+  forbidden,
   conflict,
   notFound,
   internalError,
@@ -17,22 +19,31 @@ import {
   TIER_LIMIT_PRESETS,
   buildSubscriptionLimitsFromTier,
 } from "@/lib/subscriptionLimitsService";
+import { requireCsrf } from "@/lib/security/requireCsrf";
 
 // Trial configuration
 const TRIAL_DURATION_DAYS = 14;
 const TRIAL_PLAN_NAME = "14-Day Free Trial";
+const SUBSCRIPTION_ROLES = ["seller", "business-admin", "admin"];
 
 /**
  * POST /api/subscriptions/trial/start
  * Start a 14-day free trial for the user
  * Provides professional-tier features for testing
  */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
     }
+
+    if (!SUBSCRIPTION_ROLES.includes(session.user.role || "")) {
+      return forbidden("Seller access required");
+    }
+
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
 
     await dbConnect();
 
@@ -142,6 +153,10 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return unauthorized("Authentication required");
+    }
+
+    if (!SUBSCRIPTION_ROLES.includes(session.user.role || "")) {
+      return forbidden("Seller access required");
     }
 
     await dbConnect();

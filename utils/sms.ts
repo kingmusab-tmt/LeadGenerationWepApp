@@ -1,11 +1,15 @@
 // Twilio SMS Notification Utility
 // Description: This utility function sends an SMS notification to a lead buyer when a new lead is assigned to them. It uses the Twilio API for sending SMS messages.
 import twilio from "twilio";
+import { Types } from "mongoose";
 import { Buyer } from "@/models/leadbuyers";
 import { User } from "@/models";
 import { env } from "@/lib/env";
 
-export const sendSmsNotification = async (buyer: any, lead: any) => {
+export const sendSmsNotification = async (
+  buyer: Types.ObjectId | string,
+  lead: { name?: string },
+) => {
   try {
     const leadbuyer = await Buyer.findById(buyer);
     // Fetch seller details
@@ -20,6 +24,9 @@ export const sendSmsNotification = async (buyer: any, lead: any) => {
     if (!accountSid || !authToken || !fromNumber) {
       throw new Error("Twilio SMS configuration is incomplete");
     }
+    if (!leadbuyer?.phone) {
+      throw new Error("Buyer has no phone number on file");
+    }
 
     // Initialize Twilio client
     const client = twilio(accountSid, authToken);
@@ -28,7 +35,7 @@ export const sendSmsNotification = async (buyer: any, lead: any) => {
     await client.messages.create({
       body: `You have been assigned a new lead: ${lead.name}`,
       from: fromNumber,
-      to: leadbuyer?.phone || buyer.phone,
+      to: leadbuyer.phone,
     });
 
     //(`SMS sent to ${buyer.name} about lead ${lead.name}`);

@@ -21,6 +21,7 @@ import {
 import { Delete as DeleteIcon, Add as AddIcon } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface LineItem {
   description: string;
@@ -31,6 +32,7 @@ interface LineItem {
 
 export default function NewInvoicePage() {
   const router = useRouter();
+  const fetchWithCSRF = useCSRFFetch();
   const [loading, setLoading] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { description: "", quantity: 1, unitPrice: 0, total: 0 },
@@ -97,7 +99,7 @@ export default function NewInvoicePage() {
 
       setLoading(true);
 
-      const res = await fetch("/api/invoices", {
+      const res = await fetchWithCSRF("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

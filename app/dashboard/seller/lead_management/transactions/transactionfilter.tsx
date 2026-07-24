@@ -15,6 +15,7 @@ import {
   TextField,
 } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface TransactionFilters {
   type: string;
@@ -37,6 +38,7 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
   isMobile: isMobileProp,
 }) => {
   const theme = useTheme();
+  const terms = useDashboardTerms();
   const isMobileFallback = useMediaQuery(theme.breakpoints.down("sm"));
   const isMobile = isMobileProp ?? isMobileFallback;
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
@@ -92,8 +94,8 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
           <MenuItem value="lead_purchase">Lead Purchase</MenuItem>
           <MenuItem value="call_purchase">Call Purchase</MenuItem>
           <MenuItem value="units_purchase">Units Purchase</MenuItem>
-          <MenuItem value="seller_income">Seller Income</MenuItem>
-          <MenuItem value="seller_payout">Seller Payout</MenuItem>
+          <MenuItem value="seller_income">{terms.org} Income</MenuItem>
+          <MenuItem value="seller_payout">{terms.org} Payout</MenuItem>
           <MenuItem value="refund">Refund</MenuItem>
           <MenuItem value="admin_adjustment">Admin Adjustment</MenuItem>
           <MenuItem value="subscription_payment">Subscription Payment</MenuItem>

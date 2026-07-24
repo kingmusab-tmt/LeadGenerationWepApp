@@ -47,6 +47,7 @@ export interface ITransaction extends Document {
     transferVerified?: boolean;
     transferAmount?: number;
     checkoutSessionId?: string;
+    callId?: string; // For call_purchase (Twilio CallSid) — dedup key against duplicate billing-webhook retries
     sellerAccountId?: string;
     creditsApplied?: boolean;
     refunded?: boolean;
@@ -137,6 +138,9 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
         type: Number,
       },
       checkoutSessionId: {
+        type: String,
+      },
+      callId: {
         type: String,
       },
       sellerId: {
@@ -233,6 +237,16 @@ TransactionSchema.index(
     partialFilterExpression: {
       type: "units_purchase",
       "metadata.checkoutSessionId": { $exists: true },
+    },
+  },
+);
+TransactionSchema.index(
+  { type: 1, "metadata.callId": 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      type: "call_purchase",
+      "metadata.callId": { $exists: true },
     },
   },
 );

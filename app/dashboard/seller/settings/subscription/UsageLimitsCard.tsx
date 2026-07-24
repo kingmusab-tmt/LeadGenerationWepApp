@@ -17,6 +17,7 @@ import {
   Cancel as CancelIcon,
   Warning as WarningIcon,
 } from "@mui/icons-material";
+import { useDashboardTerms } from "@/app/hooks";
 
 interface UsageItem {
   label: string;
@@ -152,6 +153,7 @@ export default function UsageLimitsCard({
   limits,
   loading = false,
 }: UsageLimitsCardProps) {
+  const terms = useDashboardTerms();
   if (loading) {
     return (
       <Card>
@@ -193,7 +195,7 @@ export default function UsageLimitsCard({
       limit: limits.forms || 0,
     },
     {
-      label: "Buyers",
+      label: terms.buyers,
       used: usage.buyers || 0,
       limit: limits.buyers || 0,
     },

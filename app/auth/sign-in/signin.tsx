@@ -18,6 +18,7 @@ import {
 import { FcGoogle } from "react-icons/fc";
 import Image from "next/image";
 import backgroundImage from "@/public/images/bg2 (1).jpg";
+import { setTrialIntent, hasTrialIntent } from "@/lib/trialIntent";
 import Logo from "@/public/images/5ae9cfb6c909a_thumb900.webp";
 import TermsOfServiceDialog from "@/app/components/legal/TermsOfServiceDialog";
 import PrivacyPolicyDialog from "@/app/components/legal/PrivacyPolicyDialog";
@@ -38,17 +39,15 @@ export const SignInPage: React.FC<SignInPageProps> = () => {
   const [trialIntent] = useState(() => {
     if (typeof window === "undefined") return false;
 
-    const trialParam = searchParams.get("trial");
-    if (trialParam === "true") {
-      sessionStorage.setItem("trialIntent", "true");
-      // dynamic import to avoid SSR issues; ignore failures
-      import("@/lib/cookieUtils")
-        .then((cu) => cu.setCookie("trialIntent", "true", 10))
-        .catch(() => {});
+    if (searchParams.get("trial") === "true") {
+      // Persist it durably in case the user reloads or navigates before
+      // signing in — the cookie is what actually survives the OAuth
+      // redirect round-trip.
+      setTrialIntent();
       return true;
     }
 
-    return sessionStorage.getItem("trialIntent") === "true";
+    return hasTrialIntent();
   });
 
   const handleGoogleSignIn = () => {

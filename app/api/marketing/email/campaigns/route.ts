@@ -19,6 +19,9 @@ import {
 } from "@/lib/api/error-handler";
 import { ZodError } from "zod";
 import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
+import { sanitizeEmailHtml } from "@/lib/sanitizeEmailHtml";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +101,17 @@ export async function POST(req: NextRequest) {
       return unauthorized();
     }
 
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "email-campaigns-create",
+      limit: 30,
+      windowMs: 10 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
+
     // Validate request body
     let validatedData;
     try {
@@ -130,13 +144,25 @@ export async function POST(req: NextRequest) {
       userId: session.user.id,
       name: validatedData.name,
       subject: validatedData.subject,
-      htmlContent: validatedData.htmlContent || validatedData.body || "",
+      htmlContent: sanitizeEmailHtml(
+        validatedData.htmlContent || validatedData.body || "",
+      ),
+      textContent: validatedData.textContent || "",
       fromEmail: validatedData.fromEmail || "",
+      fromName: validatedData.fromName || "",
+      replyTo: validatedData.replyTo,
       recipientEmails,
       totalRecipients: recipientEmails.length,
       status: "draft",
-      schedule: validatedData.schedule || { type: "immediate" },
+      schedule: { type: "immediate" },
       tags: validatedData.tags || [],
+      goals: validatedData.goals,
+      abTesting: validatedData.abTesting && {
+        ...validatedData.abTesting,
+        variantContent: validatedData.abTesting.variantContent
+          ? sanitizeEmailHtml(validatedData.abTesting.variantContent)
+          : validatedData.abTesting.variantContent,
+      },
       createdAt: new Date(),
     });
 

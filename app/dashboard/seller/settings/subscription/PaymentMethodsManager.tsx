@@ -416,6 +416,7 @@ function PaymentMethodsContent() {
                         onClick={() => handleSetDefault(method.id)}
                         disabled={actionLoading === method.id}
                         title="Set as default"
+                        aria-label={`Set card ending in ${method.last4} as default`}
                       >
                         {actionLoading === method.id ? (
                           <CircularProgress size={20} />
@@ -435,6 +436,11 @@ function PaymentMethodsContent() {
                         method.isDefault
                           ? "Cannot delete default card"
                           : "Remove card"
+                      }
+                      aria-label={
+                        method.isDefault
+                          ? "Cannot delete default card"
+                          : `Remove card ending in ${method.last4}`
                       }
                     >
                       <DeleteIcon />

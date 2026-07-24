@@ -37,8 +37,16 @@ export const TrackingNumberSchema = {
   reconnectCaller: { type: Boolean, default: false }, // Reconnect caller toggle
   passCallerId: { type: Boolean, default: false }, // Pass caller ID toggle
   leadSource: { type: String, default: "" }, // Source of the call
-  welcomeMessage: { type: String, default: "" }, // Welcome message
-  callWhisper: { type: String, default: "" }, // Call whisper message
+  welcomeMessage: {
+    type: String,
+    default: "",
+    maxlength: [500, "Welcome message cannot exceed 500 characters"],
+  }, // Welcome message
+  callWhisper: {
+    type: String,
+    default: "",
+    maxlength: [500, "Call whisper cannot exceed 500 characters"],
+  }, // Call whisper message
   requireResponse: { type: Boolean, default: false }, // Require response toggle
   overflowNumber: { type: String, default: "" }, // Overflow number (ring before voicemail)
 
@@ -52,6 +60,7 @@ export const TrackingNumberSchema = {
   recordingConsentMessage: {
     type: String,
     default: "This call may be recorded for quality and training purposes.",
+    maxlength: [500, "Recording consent message cannot exceed 500 characters"],
   },
 
   // Missed call text-back
@@ -60,11 +69,18 @@ export const TrackingNumberSchema = {
     type: String,
     default:
       "Sorry we missed your call! A representative will call you back shortly.",
+    maxlength: [500, "Missed call text message cannot exceed 500 characters"],
   },
 
   // DNC & Spam
   dncEnabled: { type: Boolean, default: false },
-  dncList: [{ type: String }],
+  dncList: {
+    type: [{ type: String }],
+    validate: {
+      validator: (v: string[]) => !v || v.length <= 500,
+      message: "DNC list cannot exceed 500 numbers",
+    },
+  },
   spamFilterEnabled: { type: Boolean, default: false },
   spamFilterAction: {
     type: String,
@@ -89,7 +105,13 @@ export const TrackingNumberSchema = {
   transcriptionEnabled: { type: Boolean, default: false },
   aiSummaryEnabled: { type: Boolean, default: false },
 
-  forwardingNumbers: [{ type: String }], // Forwarding numbers (for "single_multiple")
+  forwardingNumbers: {
+    type: [{ type: String }],
+    validate: {
+      validator: (v: string[]) => !v || v.length <= 10,
+      message: "Cannot have more than 10 forwarding numbers",
+    },
+  }, // Forwarding numbers (for "single_multiple")
   buyerResponses: [
     {
       message: {
@@ -102,18 +124,6 @@ export const TrackingNumberSchema = {
       },
     },
   ], // Messages and digits for buyer verification
-  leadResponses: [
-    {
-      message: {
-        type: String,
-        required: [true, "Lead response message is required"],
-      },
-      digit: {
-        type: String,
-        required: [true, "Lead response digit is required"],
-      },
-    },
-  ], // Messages and digits for lead verification
   leadBuyers: [
     {
       id: { type: String, required: [true, "Buyer ID is required"] }, // Lead buyer ID

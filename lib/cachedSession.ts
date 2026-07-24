@@ -1,11 +1,21 @@
 import dbConnect from "@/lib/connectdb";
 import { User } from "@/models";
+// Role/subscription session state is privilege-bearing and must be visible
+// consistently across every instance the moment it's invalidated — an
+// in-memory Map only clears the instance that served the invalidating
+// request, so a suspended/demoted user could keep acting on stale
+// privileges on every other instance until the (up to 24h) TTL expired.
+// lib/redis.ts already implements this exact API against Redis; it just
+// wasn't wired in anywhere before this.
 import {
   getSessionCache,
   setSessionCache,
   deleteSessionCache,
   invalidateUserCache,
-} from "@/lib/memoryCache";
+} from "@/lib/redis";
+// Non-privilege list/detail caches (leads, forms, buyers, calls,
+// notifications) below are unaffected by this and intentionally stay on
+// the in-memory cache — they only affect UI freshness, not authorization.
 import memoryCache from "@/lib/memoryCache";
 
 type SessionTokenLike = {
@@ -117,10 +127,7 @@ export async function getCachedSession(
  */
 export async function invalidateSessionCache(userEmail: string) {
   try {
-    // Delete the session cache - deleteSessionCache adds "session:" prefix
     await deleteSessionCache(userEmail);
-    // Also try pattern match just in case
-    memoryCache.deletePattern(`session:${userEmail}*`);
     console.log("[Cache] Invalidated session cache for:", userEmail);
   } catch (error) {
     console.error("[Auth] Failed to invalidate session cache:", error);
@@ -130,24 +137,20 @@ export async function invalidateSessionCache(userEmail: string) {
 /**
  * Invalidate all sessions for a user by ID
  * Used when user data changes (role, subscription, etc.)
+ *
+ * The cache is keyed by email (one entry per user, not one per login), so
+ * "all sessions" is just that one deterministic key — no need to scan
+ * every cached session and inspect its contents.
  */
 export async function invalidateAllUserSessions(userId: string) {
   try {
-    // Find and delete all sessions that belong to this user
-    const sessionKeys = memoryCache.keys(`session:*`);
-    let invalidatedCount = 0;
-
-    for (const key of sessionKeys) {
-      const sessionData = memoryCache.get<CachedSessionData>(key);
-      if (sessionData?.id === userId) {
-        memoryCache.delete(key);
-        invalidatedCount++;
-      }
+    await dbConnect();
+    const user = await User.findById(userId).select("email").lean();
+    if (!user?.email) {
+      return;
     }
-
-    console.log(
-      `[Cache] Invalidated ${invalidatedCount} sessions for user: ${userId}`,
-    );
+    await deleteSessionCache(user.email);
+    console.log(`[Cache] Invalidated session for user: ${userId} (${user.email})`);
   } catch (error) {
     console.error("[Auth] Failed to invalidate all user sessions:", error);
   }
@@ -186,10 +189,6 @@ export async function forceRefreshUserSession(
         deleteSessionCache(userEmail),
         invalidateUserCache(userId),
       ]);
-
-      // Also clear by pattern for any edge cases
-      memoryCache.deletePattern(`session:${userEmail}*`);
-      memoryCache.deletePattern(`user:${userId}*`);
 
       // Immediately repopulate cache with fresh data
       const sessionData = {
@@ -245,35 +244,21 @@ export async function invalidateSessionWithConfirmation(
   userId: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Clear session cache
     await deleteSessionCache(userEmail);
-
-    // Clear by pattern
-    memoryCache.deletePattern(`session:${userEmail}*`);
-
-    // Invalidate all sessions for this user
-    const sessionKeys = memoryCache.keys(`session:*`);
-    for (const key of sessionKeys) {
-      const sessionData = memoryCache.get<CachedSessionData>(key);
-      if (sessionData?.id === userId) {
-        memoryCache.deletePattern(key);
-      }
-    }
-
-    // Invalidate user cache
     await invalidateUserCache(userId);
 
-    // Verify cache is cleared
-    const cachedSession = await getSessionCache(userEmail);
+    // Verify cache is actually cleared before reporting success — retry
+    // once if a delete/read raced (e.g. against a concurrent repopulate).
+    let cachedSession = await getSessionCache(userEmail);
     if (cachedSession) {
-      // Cache not cleared - force delete
-      memoryCache.deletePattern(`*${userEmail}*`);
+      await deleteSessionCache(userEmail);
+      cachedSession = await getSessionCache(userEmail);
     }
 
     console.log(
       `[Cache] Confirmed session invalidation for: ${userEmail} (${userId})`,
     );
-    return { success: true };
+    return { success: !cachedSession };
   } catch (error: unknown) {
     console.error("[Cache] Session invalidation confirmation failed:", error);
     return { success: false, error: getErrorMessage(error) };

@@ -13,6 +13,8 @@ import {
 } from "@/lib/api/error-handler";
 import { env } from "@/lib/env";
 import { resolveTwilioCountryCode, countryUsesAreaCode } from "@/lib/twilioCountry";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 // Initialize Twilio client with system credentials
 const SYSTEM_TWILIO_ACCOUNT_SID = env.TWILIO_ACCOUNT_SID;
@@ -62,10 +64,36 @@ export async function POST(req: NextRequest) {
       return forbidden("Seller or admin access required");
     }
 
+    const csrfError = requireCsrf(req, userSession.user.email);
+    if (csrfError) return csrfError;
+
+    // This purchases a real, billable Twilio number per call — keep the
+    // ceiling low regardless of the subscription-limit check.
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "twilio-register-number",
+      limit: 10,
+      windowMs: 10 * 60 * 1000,
+      actorId: userSession.user.id,
+    });
+    if (rateLimited) return rateLimited;
+
     await dbConnect();
 
-    const { sellerId, areaCode, industry, method, twilioNumber, purpose } =
-      await req.json();
+    const {
+      sellerId,
+      areaCode,
+      industry: rawIndustry,
+      method,
+      twilioNumber,
+      purpose,
+    } = await req.json();
+
+    // Normalize free-text industry (the "Other, specify below" UI path sends
+    // arbitrary text) so stray whitespace/casing/length doesn't fragment the
+    // Analytics and Buyer Performance groupings, which group calls by exact
+    // string match on this field.
+    const industry =
+      typeof rawIndustry === "string" ? rawIndustry.trim().slice(0, 100) : "";
 
     // Only admins may target another seller via sellerId
     const userId =
@@ -135,6 +163,12 @@ export async function POST(req: NextRequest) {
     }
 
     let purchasedNumber: string;
+    // Track which client + SID actually purchased a number (not set for the
+    // "Manual + already-owned twilioNumber" branch, which purchases nothing)
+    // so a lost race against the limit check below can release the number
+    // instead of leaving the seller billed for one they can't use.
+    let purchasingClient: ReturnType<typeof twilio> | undefined;
+    let purchasedSid: string | undefined;
 
     if (method === "Manual") {
       if (twilioNumber) {
@@ -173,6 +207,8 @@ export async function POST(req: NextRequest) {
           statusCallbackMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
+        purchasingClient = userClient;
+        purchasedSid = purchased.sid;
       } else {
         return badRequest(
           "Either areaCode or twilioNumber must be provided for Manual method.",
@@ -213,6 +249,8 @@ export async function POST(req: NextRequest) {
           smsMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
+        purchasingClient = systemClient;
+        purchasedSid = purchased.sid;
       } else {
         // For call tracking, use user credentials if available
         let clientToUse = systemClient;
@@ -246,50 +284,91 @@ export async function POST(req: NextRequest) {
           statusCallbackMethod: "POST",
         });
         purchasedNumber = purchased.phoneNumber;
+        purchasingClient = clientToUse;
+        purchasedSid = purchased.sid;
       }
     } else {
       return badRequest("Invalid method. Must be 'Manual' or 'Automatic'.");
     }
 
-    // Add the purchased number to the seller's tracking numbers
-    const dbSession = await User.startSession();
-    dbSession.startTransaction();
-    try {
-      (user.trackingNumbers as unknown as TrackingNumberRecord[]).push({
-        phoneNumber: purchasedNumber,
-        purpose: purpose || "call",
-        industry,
-        forwardingType: "direct",
-        method,
-        recordCall: false,
-        reconnectCaller: false,
-        passCallerId: false,
-        leadSource: "",
-        welcomeMessage: "",
-        callWhisper: "",
-        requireResponse: false,
-        forwardingNumbers: [],
-        leadBuyers: [],
-      });
-      await user.save({ session: dbSession });
-      await dbSession.commitTransaction();
-    } catch (error) {
-      await dbSession.abortTransaction();
-      throw error;
-    } finally {
-      dbSession.endSession();
+    // Atomically add the number only if the seller is still under their
+    // limit at write time. The initial check above can be stale by the time
+    // the Twilio purchase call above completes, so re-verify the count as
+    // part of the write itself (findOneAndUpdate with $expr) rather than
+    // trusting the earlier read — this closes the race where two concurrent
+    // requests both pass the early check and both push a number.
+    const updatedUser = await User.findOneAndUpdate(
+      {
+        _id: userId,
+        $expr: {
+          $lt: [
+            { $size: { $ifNull: ["$trackingNumbers", []] } },
+            maxAllowed,
+          ],
+        },
+      },
+      {
+        $push: {
+          trackingNumbers: {
+            phoneNumber: purchasedNumber,
+            purpose: purpose || "call",
+            industry,
+            forwardingType: "direct",
+            method,
+            recordCall: false,
+            reconnectCaller: false,
+            passCallerId: false,
+            leadSource: "",
+            welcomeMessage: "",
+            callWhisper: "",
+            requireResponse: false,
+            forwardingNumbers: [],
+            leadBuyers: [],
+          },
+        },
+      },
+      { new: true },
+    ).select("trackingNumbers");
+
+    if (!updatedUser) {
+      // Lost the race — release the number we just purchased so the seller
+      // isn't billed for a Twilio number they can't use.
+      if (purchasingClient && purchasedSid) {
+        try {
+          await purchasingClient.incomingPhoneNumbers(purchasedSid).remove();
+        } catch (releaseError) {
+          console.error(
+            "Failed to release unused Twilio number after limit race:",
+            releaseError,
+          );
+        }
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "You've reached your Twilio number limit.",
+          limitReached: true,
+          currentCount: maxAllowed,
+          maxAllowed,
+          message: `Your current plan allows for ${maxAllowed} Twilio numbers. Please upgrade your subscription to add more numbers.`,
+        },
+        { status: 403 },
+      );
     }
+
+    const newCount = Array.isArray(updatedUser.trackingNumbers)
+      ? updatedUser.trackingNumbers.length
+      : currentTwilioNumbers + 1;
 
     return NextResponse.json(
       {
         success: true,
         data: {
           phoneNumber: purchasedNumber,
-          currentCount: currentTwilioNumbers + 1,
+          currentCount: newCount,
           maxAllowed: maxAllowed,
-          message: `You've used ${
-            currentTwilioNumbers + 1
-          } of ${maxAllowed} allowed Twilio numbers.`,
+          message: `You've used ${newCount} of ${maxAllowed} allowed Twilio numbers.`,
         },
       },
       { status: 200 },

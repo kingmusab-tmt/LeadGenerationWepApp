@@ -7,10 +7,13 @@ import { authOptions } from "@/auth";
 import { env } from "@/lib/env";
 import {
   badRequest,
+  forbidden,
   internalError,
   notFound,
   unauthorized,
 } from "@/lib/api/error-handler";
+import { requireCsrf } from "@/lib/security/requireCsrf";
+import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
 type TrackingNumberRecord = {
   phoneNumber?: string;
@@ -26,6 +29,21 @@ export async function POST(req: NextRequest) {
     if (!session || !session.user?.id) {
       return unauthorized("Unauthorized. Please log in.");
     }
+
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return forbidden("Seller or admin access required");
+    }
+
+    const csrfError = requireCsrf(req, session.user.email);
+    if (csrfError) return csrfError;
+
+    const rateLimited = await checkSimpleRateLimit(req, {
+      scope: "twilio-remove-number",
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+      actorId: session.user.id,
+    });
+    if (rateLimited) return rateLimited;
 
     let body: { phoneNumber?: string };
     try {
@@ -89,12 +107,14 @@ export async function POST(req: NextRequest) {
       await client.incomingPhoneNumbers(twilioNumber.sid).remove();
     }
 
-    // Remove the number from the user's trackingNumbers array
-    const updatedTrackingNumbers = trackingNumbers.filter(
-      (num) => num.phoneNumber !== phoneNumber,
+    // Remove the number with an atomic $pull rather than re-saving the whole
+    // document — a full-document save here would silently clobber any other
+    // tracking-number edit (e.g. updateForwarding) that landed on the same
+    // user document between our read above and this write.
+    await User.updateOne(
+      { _id: session.user.id },
+      { $pull: { trackingNumbers: { phoneNumber } } },
     );
-    user.trackingNumbers = updatedTrackingNumbers as [];
-    await user.save();
 
     return NextResponse.json(
       { success: true, data: { message: "Number removed" } },
