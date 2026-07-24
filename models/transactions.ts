@@ -230,6 +230,7 @@ TransactionSchema.index({ "metadata.buyerId": 1 }); // PHASE 1: Index on buyerId
 TransactionSchema.index({ "metadata.leadId": 1 }); // PHASE 1: Index on leadId for faster queries
 TransactionSchema.index({ "metadata.tierId": 1 }); // PHASE 1: Index on tierId for faster queries
 TransactionSchema.index({ relatedInvoices: 1 }); // PHASE 3: Index on relatedInvoices for faster queries
+TransactionSchema.index({ createdAt: -1 }); // Sort/range field for admin financial listing + overview revenue trend
 TransactionSchema.index(
   { type: 1, "metadata.checkoutSessionId": 1 },
   {

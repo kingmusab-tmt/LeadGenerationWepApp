@@ -1,31 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/connectdb";
-import HelpVideo from "@/models/helpVideo";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
-import {
-  badRequest,
-  forbidden,
-  internalError,
-  notFound,
-} from "@/lib/api/error-handler";
+import dbConnect from "@/lib/connectdb";
+import HelpVideo from "@/models/helpVideo";
+import { requireAdmin } from "@/lib/api/adminAuth";
+import { badRequest, internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
 
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user?.role !== "admin") {
-    return forbidden("Forbidden: Admin access required");
-  }
-  return null;
-}
-
 /**
  * GET /api/help/videos
- * Returns list of help videos, optionally filtered by targetAudience
+ * Returns help videos, optionally filtered by targetAudience.
+ * Canonical implementation — this used to be duplicated by
+ * /api/support/help/videos with divergent auth (that one required a
+ * session on GET, this one required nothing at all) and validation. Both
+ * the admin help-management page and the buyer/seller help pages read
+ * from this one now.
  */
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return unauthorized("Authentication required");
+    }
+
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
@@ -54,8 +52,8 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const authResponse = await requireAdmin();
-    if (authResponse) return authResponse;
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     await dbConnect();
 
@@ -89,8 +87,8 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const authResponse = await requireAdmin();
-    if (authResponse) return authResponse;
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     await dbConnect();
 
@@ -135,8 +133,8 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const authResponse = await requireAdmin();
-    if (authResponse) return authResponse;
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     await dbConnect();
 

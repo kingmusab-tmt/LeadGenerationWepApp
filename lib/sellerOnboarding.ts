@@ -143,6 +143,63 @@ export const getSellerOnboardingState = (email?: string) => {
   return readOnboardingState(email);
 };
 
+// Fire-and-forget persistence to the server — see the matching comment in
+// lib/buyerOnboarding.ts for why this stays synchronous/localStorage-first.
+const persistStepToServer = (
+  step: SellerOnboardingStep,
+  action: "complete" | "skip",
+): void => {
+  if (typeof window === "undefined") return;
+  fetch("/api/sellers/onboarding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ step, action }),
+  }).catch((error) => {
+    console.warn("[SellerOnboarding] Failed to persist step to server:", error);
+  });
+};
+
+/**
+ * Pull server-side onboarding progress into localStorage — see
+ * hydrateBuyerOnboardingFromServer in lib/buyerOnboarding.ts for the same
+ * pattern and rationale.
+ */
+export const hydrateSellerOnboardingFromServer = async (
+  email: string | undefined,
+): Promise<void> => {
+  if (typeof window === "undefined" || !email) return;
+
+  try {
+    const response = await fetch("/api/sellers/onboarding");
+    if (!response.ok) return;
+
+    const server = (await response.json()) as {
+      completedSteps?: unknown;
+      skippedSteps?: unknown;
+    };
+    const serverCompleted = sanitizeSellerSteps(server.completedSteps);
+    const serverSkipped = sanitizeSellerSteps(server.skippedSteps);
+
+    const local = readOnboardingState(email);
+    const mergedCompleted = Array.from(
+      new Set([...local.completedSteps, ...serverCompleted]),
+    );
+    const mergedSkipped = Array.from(
+      new Set([...local.skippedSteps, ...serverSkipped]),
+    ).filter((step) => !mergedCompleted.includes(step));
+
+    writeOnboardingState(email, {
+      completedSteps: mergedCompleted,
+      skippedSteps: mergedSkipped,
+    });
+  } catch (error) {
+    console.warn(
+      "[SellerOnboarding] Failed to hydrate progress from server:",
+      error,
+    );
+  }
+};
+
 export const markSellerOnboardingStepCompleted = (
   email: string | undefined,
   step: SellerOnboardingStep,
@@ -151,6 +208,7 @@ export const markSellerOnboardingStepCompleted = (
   const completedSteps = Array.from(new Set([...state.completedSteps, step]));
   const skippedSteps = state.skippedSteps.filter((s) => s !== step);
   writeOnboardingState(email, { completedSteps, skippedSteps });
+  persistStepToServer(step, "complete");
 };
 
 export const markSellerOnboardingStepSkipped = (
@@ -163,6 +221,7 @@ export const markSellerOnboardingStepSkipped = (
     completedSteps: state.completedSteps,
     skippedSteps,
   });
+  persistStepToServer(step, "skip");
 };
 
 export const isSellerOnboardingFlowComplete = (email?: string): boolean => {

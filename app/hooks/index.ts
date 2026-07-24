@@ -30,9 +30,6 @@ export { useConfirm } from "./useConfirm";
 export { useUsageTracking, USAGE_KEYS } from "./useUsageTracking";
 export type { UsageKey } from "./useUsageTracking";
 
-// Dashboard reducer injection helper
-export { useDashboardReducers } from "./useDashboardReducers";
-
 // Navigation hooks and provider
 export { useNavigation, useNavigationRouter } from "./useNavigation";
 export { NavigationProvider, NavigationContext } from "./useNavigationProvider";

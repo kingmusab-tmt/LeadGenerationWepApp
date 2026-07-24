@@ -7,6 +7,10 @@ export interface ResolvedRecipient {
   name: string;
   company: string;
   type: "lead" | "buyer";
+  // Tracking only — see models/leads.ts / models/leadbuyers.ts. Surfaced so
+  // the recipient picker can show/filter by it; sending is not gated on
+  // this yet.
+  emailConsent: boolean;
 }
 
 type LeadFieldDoc = { label?: string; id?: string; value?: unknown };
@@ -17,6 +21,7 @@ type LeadDoc = {
   industry?: string;
   qualityLevel?: "High" | "Medium" | "Low";
   fields?: LeadFieldDoc[];
+  marketingConsent?: { email?: { granted?: boolean } };
 };
 type BuyerDoc = {
   email?: string;
@@ -24,6 +29,7 @@ type BuyerDoc = {
   company?: string;
   industry?: string;
   isActive?: boolean;
+  marketingConsent?: { email?: { granted?: boolean } };
 };
 
 const emailFieldRegex = /email|e-mail/i;
@@ -79,12 +85,19 @@ export async function resolveSegmentRecipients(
       name: 1,
       company: 1,
       fields: 1,
+      marketingConsent: 1,
     }).lean<LeadDoc[]>();
 
     for (const lead of leads) {
       const { email, name } = extractLeadEmailAndName(lead);
       if (email) {
-        recipients.push({ email, name, company: lead.company || "", type: "lead" });
+        recipients.push({
+          email,
+          name,
+          company: lead.company || "",
+          type: "lead",
+          emailConsent: !!lead.marketingConsent?.email?.granted,
+        });
       }
     }
   }
@@ -102,6 +115,7 @@ export async function resolveSegmentRecipients(
       email: 1,
       name: 1,
       company: 1,
+      marketingConsent: 1,
     }).lean<BuyerDoc[]>();
 
     for (const buyer of buyers) {
@@ -111,6 +125,7 @@ export async function resolveSegmentRecipients(
           name: buyer.name || "",
           company: buyer.company || "",
           type: "buyer",
+          emailConsent: !!buyer.marketingConsent?.email?.granted,
         });
       }
     }

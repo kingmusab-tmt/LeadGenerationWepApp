@@ -234,6 +234,10 @@ const UserSchema: Schema = new Schema<IUser>(
     apiSettings: ApiSettingsSchema,
     stripeAccountId: { type: String },
     stripeOnboarded: { type: Boolean, default: false },
+    onboardingProgress: {
+      completedSteps: { type: [String], default: [] },
+      skippedSteps: { type: [String], default: [] },
+    },
     tosAcceptance: {
       accepted: { type: Boolean, default: false },
       acceptedAt: { type: Date },

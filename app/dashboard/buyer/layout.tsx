@@ -40,15 +40,16 @@ import { handleSignOut } from "@/lib/signOutServerAction";
 import { useInitializeUser } from "@/app/hooks";
 import DarkModeToggle from "@/app/components/generalComponent/darkmodetoggle";
 import NotificationBell from "@/app/components/generalComponent/NotificationBell";
-import { isBuyerOnboardingFlowComplete } from "@/lib/buyerOnboarding";
-import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
+import {
+  hydrateBuyerOnboardingFromServer,
+  isBuyerOnboardingFlowComplete,
+} from "@/lib/buyerOnboarding";
 
 interface UserDashboardProps {
   children: React.ReactNode;
 }
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
-  useDashboardReducers();
   const { currentUser, loading: userLoading } = useInitializeUser();
   const { status } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -66,6 +67,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       router.replace("/auth/sign-in");
     }
   }, [status, userLoading, currentUser, router]);
+
+  // Onboarding progress used to live only in this browser's localStorage —
+  // pull the server's copy in before the gating check below runs, so a new
+  // device/browser (or cleared storage) sees real progress instead of
+  // looking like onboarding was never started.
+  const [onboardingHydrated, setOnboardingHydrated] = useState(false);
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    let cancelled = false;
+    hydrateBuyerOnboardingFromServer(currentUser.email).finally(() => {
+      if (!cancelled) setOnboardingHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.email]);
 
   useEffect(() => {
     if (status === "loading" || userLoading || !currentUser) return;
@@ -87,6 +104,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       return;
     }
 
+    if (!onboardingHydrated) return;
+
     const onboardingFlowComplete = isBuyerOnboardingFlowComplete(
       currentUser.email,
     );
@@ -98,7 +117,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     if (!isOnOnboardingPage && !onboardingFlowComplete) {
       router.replace("/buyer-onboarding");
     }
-  }, [status, userLoading, currentUser, pathname, router]);
+  }, [status, userLoading, currentUser, pathname, router, onboardingHydrated]);
 
   const avatarSrc = currentUser?.image || "";
   const displayName = currentUser?.name || "User";

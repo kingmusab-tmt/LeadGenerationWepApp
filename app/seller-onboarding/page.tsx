@@ -40,6 +40,7 @@ import {
   SELLER_ONBOARDING_STEPS,
   SellerOnboardingStep,
   getSellerOnboardingState,
+  hydrateSellerOnboardingFromServer,
   markSellerOnboardingStepCompleted,
   markSellerOnboardingStepSkipped,
   isSellerOnboardingFlowComplete,
@@ -238,9 +239,13 @@ const SellerOnboardingPage = () => {
     const email = currentUser?.email;
     if (!email) return;
 
-    const state = getSellerOnboardingState(email);
-    setCompletedSteps(state.completedSteps);
-    setSkippedSteps(state.skippedSteps);
+    // Pick up any progress recorded server-side (e.g. from another device
+    // or browser) before reading local state.
+    hydrateSellerOnboardingFromServer(email).then(() => {
+      const state = getSellerOnboardingState(email);
+      setCompletedSteps(state.completedSteps);
+      setSkippedSteps(state.skippedSteps);
+    });
   }, [currentUser?.email]);
 
   useEffect(() => {

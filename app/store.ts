@@ -1,80 +1,20 @@
 // app/store.ts
-import {
-  combineReducers,
-  configureStore,
-  type Reducer,
-} from "@reduxjs/toolkit";
+import { configureStore } from "@reduxjs/toolkit";
 import userReducer from "@/lib/userSlice";
 import uiReducer from "@/lib/uiSlice";
 
-// Only user + ui slices are needed globally (auth state, notifications).
-// Dashboard-heavy slices are injected lazily when their pages load.
+// formBuilder/leads/buyers/campaigns/analytics slices used to be injected
+// lazily here for dashboard pages, but had zero real selectors/dispatches
+// anywhere in the app — every dashboard screen manages its own state with
+// local useState/useEffect instead. Removed rather than kept "in case",
+// along with the dynamic-import injection machinery that existed only to
+// wire them in.
 export const store = configureStore({
   reducer: {
     user: userReducer,
     ui: uiReducer,
-    // Placeholders — will be replaced by real reducers via injectDashboardReducers()
-    formBuilder: (state = {}) => state,
-    leads: (state = {}) => state,
-    buyers: (state = {}) => state,
-    campaigns: (state = {}) => state,
-    analytics: (state = {}) => state,
   },
 });
 
-let dashboardReducersInjected = false;
-
-/**
- * Call this once from any dashboard layout/page to swap in the real slices.
- * Subsequent calls are no-ops.
- */
-export async function injectDashboardReducers() {
-  if (dashboardReducersInjected) return;
-  dashboardReducersInjected = true;
-
-  const [
-    { default: formBuilderReducer },
-    { default: leadsReducer },
-    { default: buyersReducer },
-    { default: campaignsReducer },
-    { default: analyticsReducer },
-  ] = await Promise.all([
-    import("@/lib/formBuilderSlice"),
-    import("@/lib/leadsSlice"),
-    import("@/lib/buyersSlice"),
-    import("@/lib/campaignsSlice"),
-    import("@/lib/analyticsSlice"),
-  ]);
-
-  store.replaceReducer(
-    combineReducers({
-      user: userReducer,
-      ui: uiReducer,
-      formBuilder: formBuilderReducer,
-      leads: leadsReducer,
-      buyers: buyersReducer,
-      campaigns: campaignsReducer,
-      analytics: analyticsReducer,
-    }) as unknown as Reducer<ReturnType<typeof store.getState>>,
-  );
-}
-
-/**
- * Dynamic type for lazy-loaded dashboard reducers.
- * Allows type-safe access to injected slices.
- */
-type DashboardReducers = {
-  formBuilder?: ReturnType<typeof import("@/lib/formBuilderSlice").default>;
-  leads?: ReturnType<typeof import("@/lib/leadsSlice").default>;
-  buyers?: ReturnType<typeof import("@/lib/buyersSlice").default>;
-  campaigns?: ReturnType<typeof import("@/lib/campaignsSlice").default>;
-  analytics?: ReturnType<typeof import("@/lib/analyticsSlice").default>;
-};
-
-// Define the RootState type — keep it matching the full shape so selectors work everywhere
-export type RootState = {
-  user: ReturnType<typeof userReducer>;
-  ui: ReturnType<typeof uiReducer>;
-} & DashboardReducers;
-
+export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

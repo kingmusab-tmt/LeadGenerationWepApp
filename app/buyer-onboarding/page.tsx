@@ -37,6 +37,7 @@ import {
   BUYER_ONBOARDING_STEPS,
   BuyerOnboardingStep,
   getBuyerOnboardingState,
+  hydrateBuyerOnboardingFromServer,
   markBuyerOnboardingStepCompleted,
   markBuyerOnboardingStepSkipped,
   isBuyerOnboardingFlowComplete,
@@ -97,6 +98,15 @@ const BuyerOnboardingPage = () => {
     (revision: number) => revision + 1,
     0,
   );
+
+  // Pick up any progress recorded server-side (e.g. from another device or
+  // browser) before this page's first synchronous read below.
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    hydrateBuyerOnboardingFromServer(currentUser.email).then(() => {
+      bumpOnboardingStateRevision();
+    });
+  }, [currentUser?.email]);
 
   const activeStep = BUYER_ONBOARDING_STEPS[tabValue];
 

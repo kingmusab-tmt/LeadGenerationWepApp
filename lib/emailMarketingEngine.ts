@@ -240,7 +240,7 @@ export class EmailQueueManager {
   async processQueue(
     campaignId: string,
     batchSize: number = 100,
-  ): Promise<{ sent: number; failed: number }> {
+  ): Promise<{ sent: number; failed: number; bounced: number }> {
     await dbConnect();
 
     const campaign = await EmailCampaign.findById(campaignId);
@@ -261,6 +261,7 @@ export class EmailQueueManager {
 
     let sent = 0;
     let failed = 0;
+    let bounced = 0;
 
     for (const queueItem of pendingEmails) {
       try {
@@ -321,24 +322,55 @@ export class EmailQueueManager {
 
         const info = (await transporter.sendMail(mailOptions)) as {
           messageId?: string;
+          accepted?: Array<string | { address: string }>;
+          rejected?: Array<string | { address: string }>;
+          response?: string;
         };
 
-        // Update queue item
-        await EmailQueue.findByIdAndUpdate(queueItem._id, {
-          status: "sent",
-          messageId: info.messageId,
-          lastAttempt: new Date(),
+        // SMTP can accept the connection but reject an individual recipient
+        // within the same transaction (invalid mailbox, full mailbox, etc.)
+        // — nodemailer surfaces that via `rejected` without throwing, so a
+        // successful sendMail() call is not the same as actual delivery.
+        // This was previously ignored entirely; every send was recorded as
+        // "sent" regardless of what the SMTP server actually accepted.
+        const wasRejected = (info.rejected || []).some((r) => {
+          const address = typeof r === "string" ? r : r.address;
+          return address?.toLowerCase() === queueItem.recipientEmail.toLowerCase();
         });
 
-        // Record event
-        await EmailTrackingEvent.create({
-          queueId: queueItem._id,
-          campaignId,
-          eventType: "sent",
-          timestamp: new Date(),
-        });
+        if (wasRejected) {
+          await EmailQueue.findByIdAndUpdate(queueItem._id, {
+            status: "bounced",
+            error: info.response || "Recipient rejected by mail server",
+            lastAttempt: new Date(),
+          });
 
-        sent++;
+          await EmailTrackingEvent.create({
+            queueId: queueItem._id,
+            campaignId,
+            eventType: "bounced",
+            timestamp: new Date(),
+          });
+
+          bounced++;
+        } else {
+          // Update queue item
+          await EmailQueue.findByIdAndUpdate(queueItem._id, {
+            status: "sent",
+            messageId: info.messageId,
+            lastAttempt: new Date(),
+          });
+
+          // Record event
+          await EmailTrackingEvent.create({
+            queueId: queueItem._id,
+            campaignId,
+            eventType: "sent",
+            timestamp: new Date(),
+          });
+
+          sent++;
+        }
       } catch (error) {
         failed++;
 
@@ -382,7 +414,7 @@ export class EmailQueueManager {
       });
     }
 
-    return { sent, failed };
+    return { sent, failed, bounced };
   }
 
   /**
@@ -721,16 +753,19 @@ export class EmailMarketingEngine {
       // Process queue
       const result = await this.queueManager.processQueue(campaignId);
 
-      // Update analytics.sent on the campaign
+      // Update analytics on the campaign
       await EmailCampaign.findByIdAndUpdate(campaignId, {
-        $inc: { "analytics.sent": result.sent },
+        $inc: {
+          "analytics.sent": result.sent,
+          "analytics.bounced": result.bounced,
+        },
       });
 
       return {
         success: true,
         sent: result.sent,
         failed: result.failed,
-        message: `Campaign sent to ${result.sent} recipients`,
+        message: `Campaign sent to ${result.sent} recipients${result.bounced ? `, ${result.bounced} bounced` : ""}`,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";

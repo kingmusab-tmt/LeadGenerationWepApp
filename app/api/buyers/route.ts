@@ -379,8 +379,27 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   }
   if (data.preferredDistribution !== undefined)
     updateFields.preferredDistribution = data.preferredDistribution;
-  if (data.notificationPreferences !== undefined)
+  if (data.notificationPreferences !== undefined) {
     updateFields.notificationPreferences = data.notificationPreferences;
+    // Tracking only — see models/leadbuyers.ts. Piggybacks on the
+    // preference toggle the buyer already controls here rather than adding
+    // a separate consent UI: choosing to receive Email/SMS notifications is
+    // treated as marketing consent for that channel, and unchecking it is
+    // treated as withdrawing it.
+    const now = new Date();
+    updateFields.marketingConsent = {
+      email: {
+        granted: data.notificationPreferences.includes("Email"),
+        grantedAt: now,
+        source: "settings_preference",
+      },
+      sms: {
+        granted: data.notificationPreferences.includes("SMS"),
+        grantedAt: now,
+        source: "settings_preference",
+      },
+    };
+  }
   if (data.workingHours !== undefined) updateFields.workingHours = data.workingHours;
   if (data.timezone !== undefined) updateFields.timezone = data.timezone;
   if (data.maxLeadsPerDay !== undefined)

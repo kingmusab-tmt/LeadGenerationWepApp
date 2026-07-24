@@ -111,6 +111,14 @@ export interface IUser extends Document {
   stripeOnboarded?: boolean;
   stripeCustomerId?: string;
 
+  // Server-side source of truth for the seller-onboarding wizard (see
+  // lib/sellerOnboarding.ts) — completion was previously tracked only in
+  // browser localStorage.
+  onboardingProgress?: {
+    completedSteps: string[];
+    skippedSteps: string[];
+  };
+
   tosAcceptance?: {
     accepted: boolean;
     acceptedAt?: Date;

@@ -46,6 +46,7 @@
     "nodemailer": "^7.0.12",
     "notistack": "^3.0.2",
     "papaparse": "^5.5.2",
+    "pdf-lib": "^1.17.1",
     "react": "^19.2.3",
     "react-color": "^2.19.3",
     "react-dnd": "^16.0.1",

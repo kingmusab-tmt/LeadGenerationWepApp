@@ -287,6 +287,45 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     (f) => f.label.toLowerCase() === "company",
   );
 
+  // Tracking only, not yet a send gate (see lib/emailSegmentResolver.ts /
+  // lib/smsMarketingEngine.ts) — a checkbox-type field isn't distinguishable
+  // from the submitted id/label/value payload alone, so this is a best-effort
+  // heuristic on the label wording, matching the pattern already used above
+  // for industry/location detection. Forms without a consent-worded field
+  // simply record no consent, which is honest (none was actually captured).
+  const CONSENT_LABEL_PATTERN = /consent|agree|opt.?in|contact me|marketing/i;
+  const AFFIRMATIVE_VALUES = new Set(["true", "yes", "on", "checked", "1"]);
+  const isAffirmativeValue = (value: unknown): boolean => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string")
+      return AFFIRMATIVE_VALUES.has(value.toLowerCase());
+    return false;
+  };
+  const consentField = data.fields.find((f) =>
+    CONSENT_LABEL_PATTERN.test(f.label),
+  );
+  const consentGranted = consentField
+    ? isAffirmativeValue(consentField.value)
+    : false;
+  const marketingConsent = consentField
+    ? {
+        email: emailField?.value
+          ? {
+              granted: consentGranted,
+              grantedAt: consentGranted ? new Date() : undefined,
+              source: "form_checkbox",
+            }
+          : undefined,
+        sms: phoneField?.value
+          ? {
+              granted: consentGranted,
+              grantedAt: consentGranted ? new Date() : undefined,
+              source: "form_checkbox",
+            }
+          : undefined,
+      }
+    : undefined;
+
   const lead = new Lead({
     formId: formObjectId,
     userId: formOwnerId,
@@ -302,6 +341,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     ipAddress: clientIp,
     location: Object.keys(locationData).length > 0 ? locationData : undefined,
     industry: industry || undefined,
+    marketingConsent,
   });
 
   await lead.save();

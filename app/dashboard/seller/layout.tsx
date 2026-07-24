@@ -51,8 +51,10 @@ import NotificationBell from "@/app/components/generalComponent/NotificationBell
 import { useInitializeUser, useDashboardTerms } from "@/app/hooks";
 import { useSession } from "next-auth/react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
-import { isSellerOnboardingFlowComplete } from "@/lib/sellerOnboarding";
-import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
+import {
+  hydrateSellerOnboardingFromServer,
+  isSellerOnboardingFlowComplete,
+} from "@/lib/sellerOnboarding";
 import SubscriptionExpiryModal from "./components/SubscriptionExpiryModal";
 
 interface UserDashboardProps {
@@ -158,7 +160,6 @@ const getLocalDateKey = (date: Date) =>
   ].join("-");
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
-  useDashboardReducers();
   const { currentUser, loading: userLoading } = useInitializeUser();
   const terms = useDashboardTerms();
   const { status } = useSession();
@@ -194,6 +195,22 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     }
   }, [userLoading, currentUser, status, router]);
 
+  // Onboarding progress used to live only in this browser's localStorage —
+  // pull the server's copy in before the gating check below runs, so a new
+  // device/browser (or cleared storage) sees real progress instead of
+  // looking like onboarding was never started.
+  const [onboardingHydrated, setOnboardingHydrated] = useState(false);
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    let cancelled = false;
+    hydrateSellerOnboardingFromServer(currentUser.email).finally(() => {
+      if (!cancelled) setOnboardingHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.email]);
+
   useEffect(() => {
     if (status === "loading" || userLoading || limitsLoading || !currentUser)
       return;
@@ -211,6 +228,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       return;
     }
 
+    if (!onboardingHydrated) return;
+
     const onboardingFlowComplete = isSellerOnboardingFlowComplete(
       currentUser.email,
     );
@@ -222,7 +241,15 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     if (!isOnOnboardingPage && !onboardingFlowComplete) {
       router.replace("/dashboard/seller/onboarding");
     }
-  }, [status, userLoading, limitsLoading, currentUser, pathname, router]);
+  }, [
+    status,
+    userLoading,
+    limitsLoading,
+    currentUser,
+    pathname,
+    router,
+    onboardingHydrated,
+  ]);
 
   useEffect(() => {
     if (status === "loading" || userLoading || limitsLoading) {

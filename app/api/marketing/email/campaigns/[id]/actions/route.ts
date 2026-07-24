@@ -134,18 +134,22 @@ export async function POST(
       // Continue processing remaining queue items
       const result = await emailMarketingEngine.queueManager.processQueue(id);
 
-      // Update analytics.sent
-      if (result.sent > 0) {
+      // Update analytics
+      if (result.sent > 0 || result.bounced > 0) {
         await EmailCampaign.findByIdAndUpdate(id, {
-          $inc: { "analytics.sent": result.sent },
+          $inc: {
+            "analytics.sent": result.sent,
+            "analytics.bounced": result.bounced,
+          },
         });
       }
 
       return NextResponse.json(
         {
-          message: `Campaign resumed. Sent ${result.sent} remaining emails.`,
+          message: `Campaign resumed. Sent ${result.sent} remaining emails.${result.bounced ? ` ${result.bounced} bounced.` : ""}`,
           sent: result.sent,
           failed: result.failed,
+          bounced: result.bounced,
         },
         { status: 200 },
       );

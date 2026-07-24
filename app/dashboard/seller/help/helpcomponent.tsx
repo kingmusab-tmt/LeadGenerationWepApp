@@ -75,8 +75,8 @@ const HelpSection = () => {
         setLoading(true);
         const [videosResponse, faqsResponse, userTawkinformation] =
           await Promise.all([
-            axios.get("/api/support/help/videos"),
-            axios.get("/api/support/help/faqs"),
+            axios.get("/api/help/videos?targetAudience=seller"),
+            axios.get("/api/help/faqs?targetAudience=seller"),
             axios.get("/api/settings/sellerlivechat"),
           ]);
 

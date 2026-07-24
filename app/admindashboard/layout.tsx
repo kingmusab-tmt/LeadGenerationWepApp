@@ -37,7 +37,6 @@ import { useMediaQuery } from "@mui/material";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
-import { useDashboardReducers } from "@/app/hooks/useDashboardReducers";
 import DarkModeToggle from "@/app/components/generalComponent/darkmodetoggle";
 
 const navItems = [
@@ -63,7 +62,6 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ children }) => {
-  useDashboardReducers();
   const { status, data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);

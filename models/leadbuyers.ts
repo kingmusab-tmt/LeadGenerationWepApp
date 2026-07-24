@@ -157,6 +157,20 @@ export interface IBuyer extends Document {
     purchaseType: "assigned" | "marketplace";
   }[];
   processedCreditSessionIds: string[];
+  // Server-side source of truth for the buyer-onboarding wizard (see
+  // lib/buyerOnboarding.ts) — completion was previously tracked only in
+  // browser localStorage, so it reset on a new device/browser or cleared
+  // storage even though the underlying settings had already been saved.
+  onboardingProgress?: {
+    completedSteps: string[];
+    skippedSteps: string[];
+  };
+  // Tracking only — not enforced as a send gate yet (see
+  // lib/emailSegmentResolver.ts / lib/smsMarketingEngine.ts).
+  marketingConsent?: {
+    email?: { granted: boolean; grantedAt?: Date; source?: string };
+    sms?: { granted: boolean; grantedAt?: Date; source?: string };
+  };
 }
 
 export interface IBuyerCriteriaSet {
@@ -478,6 +492,22 @@ const BuyerSchema: Schema = new Schema({
       type: String,
     },
   ],
+  onboardingProgress: {
+    completedSteps: { type: [String], default: [] },
+    skippedSteps: { type: [String], default: [] },
+  },
+  marketingConsent: {
+    email: {
+      granted: { type: Boolean, default: false },
+      grantedAt: { type: Date },
+      source: { type: String },
+    },
+    sms: {
+      granted: { type: Boolean, default: false },
+      grantedAt: { type: Date },
+      source: { type: String },
+    },
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

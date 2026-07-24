@@ -30,6 +30,7 @@ interface Recipient {
   name: string;
   company: string;
   type: "buyer" | "lead" | "manual";
+  emailConsent?: boolean;
 }
 
 interface Segment {
@@ -61,6 +62,7 @@ export default function RecipientPicker({
   const [segmentsFetched, setSegmentsFetched] = useState(false);
   const [selectedSegmentId, setSelectedSegmentId] = useState("");
   const [applyingSegment, setApplyingSegment] = useState(false);
+  const [consentedOnly, setConsentedOnly] = useState(false);
 
   // Parse current value into selected list on mount
   useEffect(() => {
@@ -205,11 +207,14 @@ export default function RecipientPicker({
 
   // Get display list based on current source filter
   const getVisibleRecipients = () => {
-    if (recipientSource === "buyers") return availableBuyers;
-    if (recipientSource === "leads") return availableLeads;
-    if (recipientSource === "both")
-      return [...availableBuyers, ...availableLeads];
-    return [];
+    const list = (() => {
+      if (recipientSource === "buyers") return availableBuyers;
+      if (recipientSource === "leads") return availableLeads;
+      if (recipientSource === "both")
+        return [...availableBuyers, ...availableLeads];
+      return [];
+    })();
+    return consentedOnly ? list.filter((r) => r.emailConsent) : list;
   };
 
   return (
@@ -253,6 +258,21 @@ export default function RecipientPicker({
 
         {loadingRecipients && <CircularProgress size={20} />}
       </Box>
+
+      {recipientSource && fetched && (
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+          <Checkbox
+            checked={consentedOnly}
+            onChange={(e) => setConsentedOnly(e.target.checked)}
+            size="small"
+            disabled={disabled}
+            sx={{ p: 0.5 }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            Show marketing-consented recipients only
+          </Typography>
+        </Box>
+      )}
 
       {/* Saved Segments */}
       {segments.length > 0 && (
@@ -365,6 +385,13 @@ export default function RecipientPicker({
                       {r.type === "buyer" ? terms.leadBuyer : "Lead"}
                     </Typography>
                   }
+                />
+                <Chip
+                  label={r.emailConsent ? "Consented" : "Not recorded"}
+                  size="small"
+                  color={r.emailConsent ? "success" : "default"}
+                  variant="outlined"
+                  sx={{ ml: 1, flexShrink: 0 }}
                 />
               </Box>
             ))

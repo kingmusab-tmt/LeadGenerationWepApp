@@ -69,6 +69,15 @@ export interface ILead extends Document {
     zipCode?: string;
     address?: string;
   };
+  // Tracking only — not enforced as a send gate yet (see
+  // lib/emailSegmentResolver.ts / lib/smsMarketingEngine.ts). Captured from
+  // an explicit consent-worded checkbox field on the submitting form, if
+  // the seller included one; absent for leads collected before this field
+  // existed or via forms with no such checkbox.
+  marketingConsent?: {
+    email?: { granted: boolean; grantedAt?: Date; source?: string };
+    sms?: { granted: boolean; grantedAt?: Date; source?: string };
+  };
 }
 
 const LeadSchema = new Schema<ILead>(
@@ -89,6 +98,18 @@ const LeadSchema = new Schema<ILead>(
     },
 
     leadSource: { type: String },
+    marketingConsent: {
+      email: {
+        granted: { type: Boolean, default: false },
+        grantedAt: { type: Date },
+        source: { type: String },
+      },
+      sms: {
+        granted: { type: Boolean, default: false },
+        grantedAt: { type: Date },
+        source: { type: String },
+      },
+    },
     shared: { type: Boolean, default: false },
     soldCount: { type: Number, default: 0 },
     shareNumber: { type: Number, default: 1 },
@@ -195,6 +216,7 @@ LeadSchema.index({ status: 1 }); // Status-based lead filters
 LeadSchema.index({ "assignedTo.buyerId": 1 }); // Buyer assignment lookup queries
 LeadSchema.index({ "soldTo.buyerId": 1 }); // Sold lead lookup queries
 LeadSchema.index({ userId: 1, status: 1 }); // Common seller lead list queries
+LeadSchema.index({ status: 1, exclusive: 1 }); // Marketplace availability query (leads/available)
 
 export const Lead: Model<ILead> =
   mongoose.models.Lead || mongoose.model<ILead>("Lead", LeadSchema);

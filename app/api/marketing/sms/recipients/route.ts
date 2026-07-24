@@ -12,6 +12,7 @@ type BuyerRecipientDoc = {
   phone?: string;
   name?: string;
   company?: string;
+  marketingConsent?: { sms?: { granted?: boolean } };
 };
 
 type LeadFieldDoc = {
@@ -25,6 +26,7 @@ type LeadRecipientDoc = {
   name?: string;
   company?: string;
   fields?: LeadFieldDoc[];
+  marketingConsent?: { sms?: { granted?: boolean } };
 };
 
 /**
@@ -51,12 +53,14 @@ export async function GET(req: NextRequest) {
         name: string;
         company: string;
         type: string;
+        smsConsent: boolean;
       }>;
       leads: Array<{
         phone: string;
         name: string;
         company: string;
         type: string;
+        smsConsent: boolean;
       }>;
     } = { buyers: [], leads: [] };
 
@@ -64,7 +68,7 @@ export async function GET(req: NextRequest) {
     if (source === "buyers" || source === "both") {
       const buyers = await Buyer.find(
         { registeredWith: session.user.id, isActive: true },
-        { phone: 1, name: 1, company: 1 },
+        { phone: 1, name: 1, company: 1, marketingConsent: 1 },
       ).lean<BuyerRecipientDoc[]>();
 
       results.buyers = buyers
@@ -77,6 +81,7 @@ export async function GET(req: NextRequest) {
           name: b.name || "",
           company: b.company || "",
           type: "buyer",
+          smsConsent: !!b.marketingConsent?.sms?.granted,
         }));
     }
 
@@ -84,7 +89,7 @@ export async function GET(req: NextRequest) {
     if (source === "leads" || source === "both") {
       const leads = await Lead.find(
         { userId: session.user.id },
-        { phone: 1, name: 1, company: 1, fields: 1 },
+        { phone: 1, name: 1, company: 1, fields: 1, marketingConsent: 1 },
       ).lean<LeadRecipientDoc[]>();
 
       const phoneRegex = /phone|phone\s*number|mobile|cell/i;
@@ -117,6 +122,7 @@ export async function GET(req: NextRequest) {
             name,
             company: l.company || "",
             type: "lead",
+            smsConsent: !!l.marketingConsent?.sms?.granted,
           };
         })
         .filter((l) => Boolean(l.phone));

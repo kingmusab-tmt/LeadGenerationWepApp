@@ -82,6 +82,12 @@ const envSchema = z.object({
   GOOGLE_AI_STUDIO_KEY: z.string().optional(),
   API_BASE_URL: z.string().url().optional(),
 
+  // Shared secret for the marketing-queue cron endpoint (see
+  // app/api/cron/process-marketing-queues/route.ts) — required to actually
+  // trigger it, but optional here so its absence doesn't break env
+  // validation for deployments that haven't set up scheduling yet.
+  CRON_SECRET: z.string().optional(),
+
   // Frontend public keys
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
   NEXT_PUBLIC_TAWKPROPERTYID: z.string().optional(),
