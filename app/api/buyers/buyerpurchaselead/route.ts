@@ -59,12 +59,18 @@ export async function POST(req: NextRequest) {
       // Atomically claim a slot on the lead — the status/soldCount
       // condition here is re-checked against the live document so two
       // concurrent purchases of the same (possibly shared) lead can't both
-      // succeed past the point where it's actually sold out.
+      // succeed past the point where it's actually sold out. The
+      // soldTo.buyerId exclusion additionally makes this buyer's own claim
+      // a one-time thing: without it, a shared lead with capacity
+      // remaining would let a double-click or retried request charge the
+      // same buyer for the same lead more than once, since neither the
+      // status nor the soldCount condition alone rules out a repeat buyer.
       const claimedLead = await Lead.findOneAndUpdate(
         {
           _id: leadId,
           status: "available",
           $expr: { $lt: ["$soldCount", "$shareNumber"] },
+          "soldTo.buyerId": { $ne: buyer._id.toString() },
         },
         {
           $inc: { soldCount: 1 },
@@ -77,7 +83,18 @@ export async function POST(req: NextRequest) {
 
       if (!claimedLead) {
         await mongoSession.abortTransaction();
-        return badRequest("Lead is no longer available");
+        // Purely informational re-read (outside the now-aborted
+        // transaction) to give a clearer error than "no longer available"
+        // when the real reason is that this buyer already owns it.
+        const alreadyPurchased = await Lead.exists({
+          _id: leadId,
+          "soldTo.buyerId": buyer._id.toString(),
+        });
+        return badRequest(
+          alreadyPurchased
+            ? "You have already purchased this lead"
+            : "Lead is no longer available",
+        );
       }
 
       if (claimedLead.soldCount >= claimedLead.shareNumber) {

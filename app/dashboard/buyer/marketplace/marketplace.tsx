@@ -115,15 +115,20 @@ const BuyerLeads: React.FC = () => {
       setTotalLeads(refreshedResponse.data.pagination.total);
     } catch (error: unknown) {
       console.error("Error purchasing lead:", error);
+      // The API's error helper responds with { error: "..." }, not
+      // { message: "..." } — this previously only ever checked .message,
+      // so every real reason (insufficient balance, lead no longer
+      // available, etc.) silently fell through to the generic fallback.
+      const responseData =
+        typeof error === "object" && error !== null && "response" in error
+          ? (
+              error as {
+                response?: { data?: { error?: string; message?: string } };
+              }
+            ).response?.data
+          : undefined;
       const errorMessage =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { message?: string } } })
-          .response?.data?.message === "string"
-          ? (error as { response?: { data?: { message?: string } } }).response
-              ?.data?.message || "Failed to purchase lead."
-          : "Failed to purchase lead.";
+        responseData?.error || responseData?.message || "Failed to purchase lead.";
       showSnackbar(errorMessage, "error");
     } finally {
       setPurchaseLoading(false);

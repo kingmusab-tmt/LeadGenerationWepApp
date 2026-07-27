@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Box,
@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
+import { useCSRFFetch } from "@/app/hooks/useCSRF";
 
 interface StripePayoutFormData {
   amount: number;
@@ -29,6 +30,19 @@ export default function StripePayout() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
+  const csrfFetch = useCSRFFetch();
+
+  // Identifies this specific payout request to the server (see
+  // Idempotency-Key header below) so a double-click or retried request
+  // can't move money twice. Reusing the key on a plain resubmit is the
+  // point — it's what lets the server recognize "same request again"; only
+  // changing the amount/currency should count as a genuinely new payout.
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() =>
+    crypto.randomUUID(),
+  );
+  useEffect(() => {
+    setIdempotencyKey(crypto.randomUUID());
+  }, [formData.amount, formData.currency]);
 
   const handleChange = (
     e:
@@ -49,10 +63,11 @@ export default function StripePayout() {
     setSuccess(false);
 
     try {
-      const response = await fetch("/api/payments/payout/stripe", {
+      const response = await csrfFetch("/api/payments/payout/stripe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify(formData),
       });
@@ -60,11 +75,12 @@ export default function StripePayout() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to process payout");
+        throw new Error(data.error || data.message || "Failed to process payout");
       }
 
       setSuccess(true);
       setFormData({ amount: 0, currency: "usd" });
+      setIdempotencyKey(crypto.randomUUID());
       router.refresh();
     } catch (err) {
       setError(
