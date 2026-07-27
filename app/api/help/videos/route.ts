@@ -4,6 +4,7 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import HelpVideo from "@/models/helpVideo";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { recordAuditLog } from "@/lib/auditLog";
 import { badRequest, internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { error } = await requireAdmin();
+    const { error, session } = await requireAdmin();
     if (error) return error;
 
     await dbConnect();
@@ -74,6 +75,15 @@ export async function POST(req: NextRequest) {
       targetAudience: targetAudience || "both",
     });
 
+    await recordAuditLog({
+      actor: session!.user,
+      action: "help.video.created",
+      targetType: "HelpVideo",
+      targetId: String(newVideo._id),
+      summary: `Created help video "${title}"`,
+      req,
+    });
+
     return NextResponse.json(newVideo, { status: 201 });
   } catch (error) {
     console.error("Error creating help video:", error);
@@ -87,7 +97,7 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const { error } = await requireAdmin();
+    const { error, session } = await requireAdmin();
     if (error) return error;
 
     await dbConnect();
@@ -120,6 +130,15 @@ export async function PUT(req: NextRequest) {
       return notFound("Video");
     }
 
+    await recordAuditLog({
+      actor: session!.user,
+      action: "help.video.updated",
+      targetType: "HelpVideo",
+      targetId: id,
+      summary: `Updated help video "${updatedVideo.title}"`,
+      req,
+    });
+
     return NextResponse.json(updatedVideo, { status: 200 });
   } catch (error) {
     console.error("Error updating help video:", error);
@@ -133,7 +152,7 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { error } = await requireAdmin();
+    const { error, session } = await requireAdmin();
     if (error) return error;
 
     await dbConnect();
@@ -150,6 +169,15 @@ export async function DELETE(req: NextRequest) {
     if (!deletedVideo) {
       return notFound("Video");
     }
+
+    await recordAuditLog({
+      actor: session!.user,
+      action: "help.video.deleted",
+      targetType: "HelpVideo",
+      targetId: id,
+      summary: `Deleted help video "${deletedVideo.title}"`,
+      req,
+    });
 
     return NextResponse.json(
       { message: "Video deleted successfully" },

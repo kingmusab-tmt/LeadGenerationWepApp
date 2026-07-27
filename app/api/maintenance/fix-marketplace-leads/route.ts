@@ -23,6 +23,16 @@ export async function POST() {
         { status: 401 },
       );
     }
+    // Scoped to the caller's own leads below, but that alone doesn't stop
+    // any authenticated buyer from hitting a lead-maintenance endpoint —
+    // restrict it to the roles that can actually own leads, matching every
+    // other route under /api/leads.
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "Forbidden" },
+        { status: 403 },
+      );
+    }
 
     const userId = session.user.id;
 
@@ -94,6 +104,12 @@ export async function GET() {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 },
+      );
+    }
+    if (session.user.role !== "seller" && session.user.role !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "Forbidden" },
+        { status: 403 },
       );
     }
 

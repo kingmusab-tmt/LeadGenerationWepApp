@@ -4,6 +4,7 @@ import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import FAQ from "@/models/FAQ";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { recordAuditLog } from "@/lib/auditLog";
 import { badRequest, internalError, notFound, unauthorized } from "@/lib/api/error-handler";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { error } = await requireAdmin();
+    const { error, session } = await requireAdmin();
     if (error) return error;
 
     await dbConnect();
@@ -68,6 +69,15 @@ export async function POST(req: NextRequest) {
       targetAudience: targetAudience || "both",
     });
 
+    await recordAuditLog({
+      actor: session!.user,
+      action: "help.faq.created",
+      targetType: "FAQ",
+      targetId: String(newFaq._id),
+      summary: `Created FAQ "${question}"`,
+      req,
+    });
+
     return NextResponse.json(newFaq, { status: 201 });
   } catch (error) {
     console.error("Error creating FAQ:", error);
@@ -81,7 +91,7 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const { error } = await requireAdmin();
+    const { error, session } = await requireAdmin();
     if (error) return error;
 
     await dbConnect();
@@ -111,6 +121,15 @@ export async function PUT(req: NextRequest) {
       return notFound("FAQ");
     }
 
+    await recordAuditLog({
+      actor: session!.user,
+      action: "help.faq.updated",
+      targetType: "FAQ",
+      targetId: id,
+      summary: `Updated FAQ "${updatedFaq.question}"`,
+      req,
+    });
+
     return NextResponse.json(updatedFaq, { status: 200 });
   } catch (error) {
     console.error("Error updating FAQ:", error);
@@ -124,7 +143,7 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { error } = await requireAdmin();
+    const { error, session } = await requireAdmin();
     if (error) return error;
 
     await dbConnect();
@@ -141,6 +160,15 @@ export async function DELETE(req: NextRequest) {
     if (!deletedFaq) {
       return notFound("FAQ");
     }
+
+    await recordAuditLog({
+      actor: session!.user,
+      action: "help.faq.deleted",
+      targetType: "FAQ",
+      targetId: id,
+      summary: `Deleted FAQ "${deletedFaq.question}"`,
+      req,
+    });
 
     return NextResponse.json(
       { message: "FAQ deleted successfully" },

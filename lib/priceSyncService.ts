@@ -11,6 +11,7 @@
 
 import Stripe from "stripe";
 import { Tier, ITier } from "@/models/tier";
+import { PriceAuditLog } from "@/models/priceAuditLog";
 import connectDB from "./connectdb";
 import { sendNotification } from "./notificationService";
 import { resolveTierPrice, type SupportedCurrency } from "./currency";
@@ -56,28 +57,29 @@ interface PriceAuditEntry {
   resolved: boolean;
 }
 
-// In-memory audit log (in production, store in MongoDB)
-const priceAuditLog: PriceAuditEntry[] = [];
-
 /**
- * Log a price audit entry
+ * Log a price audit entry. Durable (Mongo-backed) rather than in-memory —
+ * this is billing-compliance history, so it needs to survive a restart and
+ * be visible across every serverless instance, not just the one that
+ * happened to handle a given request. Best-effort like the rest of this
+ * app's audit logging: a write failure here must never break the actual
+ * price validation/sync operation it's describing.
  */
-function logPriceAudit(entry: Omit<PriceAuditEntry, "timestamp">): void {
-  const fullEntry: PriceAuditEntry = {
-    ...entry,
-    timestamp: new Date(),
-  };
-  priceAuditLog.push(fullEntry);
-
-  // Keep only last 1000 entries in memory
-  if (priceAuditLog.length > 1000) {
-    priceAuditLog.shift();
-  }
-
-  // Log to console for monitoring
+async function logPriceAudit(
+  entry: Omit<PriceAuditEntry, "timestamp">,
+): Promise<void> {
+  // Log to console for monitoring regardless of whether the durable write
+  // below succeeds.
   console.log(
     `[PRICE_AUDIT] ${entry.action.toUpperCase()}: ${entry.tierName} - ${entry.details}`,
   );
+
+  try {
+    await connectDB();
+    await PriceAuditLog.create(entry);
+  } catch (error) {
+    console.error("[PriceSync] Failed to record price audit entry:", error);
+  }
 }
 
 /**
@@ -130,7 +132,7 @@ export async function validateTierPrice(
       : parseFloat(tier.price);
 
   if (!stripePriceId) {
-    logPriceAudit({
+    await logPriceAudit({
       tierId,
       tierName: tier.name,
       action: "validation",
@@ -157,7 +159,7 @@ export async function validateTierPrice(
   const stripePrice = await getStripePriceAmount(stripePriceId);
 
   if (stripePrice === null) {
-    logPriceAudit({
+    await logPriceAudit({
       tierId,
       tierName: tier.name,
       action: "mismatch",
@@ -184,7 +186,7 @@ export async function validateTierPrice(
   const discrepancy = Math.abs(localPrice - stripePrice);
   const valid = discrepancy < 0.01; // Allow 1 cent tolerance
 
-  logPriceAudit({
+  await logPriceAudit({
     tierId,
     tierName: tier.name,
     action: valid ? "validation" : "mismatch",
@@ -322,7 +324,7 @@ export async function createStripePriceForTier(
     }
     await tier.save();
 
-    logPriceAudit({
+    await logPriceAudit({
       tierId: tierId,
       tierName: tier.name,
       action: "sync",
@@ -450,7 +452,7 @@ export async function createOrGetStripeCoupon(
         },
       });
 
-      logPriceAudit({
+      await logPriceAudit({
         tierId: "system",
         tierName: "System",
         action: "coupon_created",
@@ -517,7 +519,7 @@ export async function getCouponForTierDiscount(
           ? `${durationInMonths} months`
           : "forever";
 
-    logPriceAudit({
+    await logPriceAudit({
       tierId,
       tierName: tier.name,
       action: "coupon_applied",
@@ -644,32 +646,37 @@ export async function syncTierPricesWithStripe(tierId: string): Promise<{
 /**
  * Get price audit log entries
  */
-export function getPriceAuditLog(options?: {
+export async function getPriceAuditLog(options?: {
   tierId?: string;
   action?: PriceAuditEntry["action"];
   onlyUnresolved?: boolean;
   limit?: number;
-}): PriceAuditEntry[] {
-  let filtered = [...priceAuditLog];
+}): Promise<PriceAuditEntry[]> {
+  await connectDB();
 
-  if (options?.tierId) {
-    filtered = filtered.filter((e) => e.tierId === options.tierId);
-  }
-  if (options?.action) {
-    filtered = filtered.filter((e) => e.action === options.action);
-  }
-  if (options?.onlyUnresolved) {
-    filtered = filtered.filter((e) => !e.resolved);
-  }
+  const filter: Record<string, unknown> = {};
+  if (options?.tierId) filter.tierId = options.tierId;
+  if (options?.action) filter.action = options.action;
+  if (options?.onlyUnresolved) filter.resolved = false;
 
-  // Sort by timestamp descending
-  filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  const entries = await PriceAuditLog.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(options?.limit || 0)
+    .lean();
 
-  if (options?.limit) {
-    filtered = filtered.slice(0, options.limit);
-  }
-
-  return filtered;
+  return entries.map((e) => ({
+    timestamp: e.createdAt,
+    tierId: e.tierId,
+    tierName: e.tierName,
+    action: e.action,
+    localPrice: e.localPrice,
+    stripePrice: e.stripePrice,
+    stripePriceId: e.stripePriceId,
+    couponId: e.couponId,
+    discountPercent: e.discountPercent,
+    details: e.details,
+    resolved: e.resolved,
+  }));
 }
 
 /**
@@ -694,11 +701,12 @@ export async function getPriceSyncStatus(): Promise<{
     (t) => t.discountPercentage && t.discountPercentage > 0,
   ).length;
 
-  const unresolvedMismatches = priceAuditLog.filter(
-    (e) => e.action === "mismatch" && !e.resolved,
-  ).length;
+  const unresolvedMismatches = await PriceAuditLog.countDocuments({
+    action: "mismatch",
+    resolved: false,
+  });
 
-  const recentAuditEntries = getPriceAuditLog({ limit: 10 });
+  const recentAuditEntries = await getPriceAuditLog({ limit: 10 });
 
   return {
     totalTiers: tiers.length,

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const status = await getPriceSyncStatus();
 
     // Get filtered audit log
-    const auditLog = getPriceAuditLog({
+    const auditLog = await getPriceAuditLog({
       tierId: tierId || undefined,
       action: action || undefined,
       onlyUnresolved,

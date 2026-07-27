@@ -4,6 +4,7 @@ import dbConnect from "@/lib/connectdb";
 import { Tier } from "@/models/tier";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { recordAuditLog } from "@/lib/auditLog";
 import {
   badRequest,
   internalError,
@@ -33,6 +34,18 @@ export async function PUT(req: NextRequest) {
     }));
 
     await Tier.bulkWrite(bulkOps);
+
+    await recordAuditLog({
+      actor: session.user,
+      action: "tier.reorder",
+      targetType: "Tier",
+      summary: `Reordered ${updatedTiers.length} pricing tier(s)`,
+      metadata: {
+        tierIds: updatedTiers.map((t) => t._id),
+      },
+      req,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating tiers:", error);

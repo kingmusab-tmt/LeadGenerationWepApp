@@ -40,6 +40,7 @@ import { handleSignOut } from "@/lib/signOutServerAction";
 import { useInitializeUser } from "@/app/hooks";
 import DarkModeToggle from "@/app/components/generalComponent/darkmodetoggle";
 import NotificationBell from "@/app/components/generalComponent/NotificationBell";
+import InactivityLogout from "@/app/components/generalComponent/InactivityLogout";
 import {
   hydrateBuyerOnboardingFromServer,
   isBuyerOnboardingFlowComplete,
@@ -174,6 +175,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>
       <CssBaseline />
+      <InactivityLogout />
       <AppBar position="fixed">
         <Toolbar>
           <IconButton

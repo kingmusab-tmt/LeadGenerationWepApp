@@ -4,13 +4,14 @@ import { Lead } from "@/models/leads";
 import Call from "@/models/call";
 import dbConnects from "@/lib/connectdb";
 import { requireAdmin } from "@/lib/api/adminAuth";
+import { recordAuditLog } from "@/lib/auditLog";
 import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; type: string }> },
 ) {
-  const { error } = await requireAdmin();
+  const { error, session } = await requireAdmin();
   if (error) return error;
 
   try {
@@ -30,6 +31,15 @@ export async function PUT(
         return notFound("Lead");
       }
 
+      await recordAuditLog({
+        actor: session!.user,
+        action: flagged ? "lead.flagged" : "lead.unflagged",
+        targetType: "Lead",
+        targetId: id,
+        summary: `${flagged ? "Flagged" : "Unflagged"} lead ${id}`,
+        req,
+      });
+
       return NextResponse.json({
         lead: {
           ...updatedLead,
@@ -47,6 +57,15 @@ export async function PUT(
       if (!updatedCall) {
         return notFound("Call");
       }
+
+      await recordAuditLog({
+        actor: session!.user,
+        action: flagged ? "call.flagged" : "call.unflagged",
+        targetType: "Call",
+        targetId: id,
+        summary: `${flagged ? "Flagged" : "Unflagged"} call ${id}`,
+        req,
+      });
 
       // Handle both array and object cases for updatedCall
       const callObj = Array.isArray(updatedCall) ? updatedCall[0] : updatedCall;

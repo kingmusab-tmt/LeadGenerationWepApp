@@ -221,6 +221,51 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const formOwnerId = formRecord.userId as unknown as string;
   const recaptchaRequired = Boolean(formRecord.recaptchaEnabled);
 
+  // Duplicate check — the same contact resubmitting the same form within a
+  // short window is almost always either an accidental double-submit or a
+  // bot hammering the endpoint, neither of which should mint a second Lead:
+  // leads are priced and sold to buyers, so a duplicate isn't just visual
+  // noise for the seller, it's a buyer risking payment for a contact they
+  // (or someone else) may already own. Checked before reCAPTCHA so a
+  // near-certain duplicate doesn't also spend a reCAPTCHA verification call.
+  const DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+  const dupEmailField = data.fields.find(
+    (f) => f.label.toLowerCase() === "email",
+  );
+  const dupPhoneField = data.fields.find(
+    (f) => f.label.toLowerCase() === "phone",
+  );
+  const dupEmail = dupEmailField?.value?.toString().trim();
+  const dupPhone = dupPhoneField?.value?.toString().trim();
+  if (dupEmail || dupPhone) {
+    const duplicateMatch: Record<string, unknown>[] = [];
+    if (dupEmail) {
+      // Case-insensitive exact match — stored emails aren't normalized to
+      // lowercase, so a plain equality check would miss same-address
+      // resubmissions that differ only in case.
+      const escaped = dupEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      duplicateMatch.push({ email: new RegExp(`^${escaped}$`, "i") });
+    }
+    if (dupPhone) duplicateMatch.push({ phone: dupPhone });
+
+    const existingLead = await Lead.exists({
+      formId: formObjectId,
+      submittedAt: { $gte: new Date(Date.now() - DUPLICATE_WINDOW_MS) },
+      $or: duplicateMatch,
+    });
+
+    if (existingLead) {
+      return NextResponse.json(
+        {
+          success: true,
+          message:
+            "Thank you! We already have a recent submission from you and will be in touch shortly.",
+        },
+        { status: 200 },
+      );
+    }
+  }
+
   if (recaptchaRequired) {
     const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
 
