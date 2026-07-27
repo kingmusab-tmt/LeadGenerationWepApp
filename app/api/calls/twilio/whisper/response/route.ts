@@ -17,16 +17,15 @@ const SCREEN_REJECT_TTL = 600; // 10 minutes
  */
 export async function POST(req: NextRequest) {
   try {
-    const shouldValidateWebhook = process.env.NODE_ENV === "production";
-    if (!shouldValidateWebhook) {
-      debugLog("Skipping Twilio webhook validation in non-production", {
-        nodeEnv: process.env.NODE_ENV,
-      });
-    }
-
+    // validateTwilioWebhook already carves out its own narrow, explicit
+    // development-only bypass — matching the other call routes by always
+    // requesting validation here (rather than a second, wider "skip unless
+    // NODE_ENV is exactly 'production'" gate) means a preview/staging
+    // deployment that isn't literally NODE_ENV=production still gets real
+    // signature checking instead of silently skipping it.
     const securityResponse = await callSecurityMiddleware(req, {
       rateLimit: true,
-      validateWebhook: shouldValidateWebhook,
+      validateWebhook: true,
     });
     if (securityResponse) return securityResponse;
 

@@ -137,10 +137,23 @@ export async function validateTwilioWebhook(req: NextRequest): Promise<{
   const authToken = process.env.TWILIO_AUTH_TOKEN;
 
   if (!authToken) {
-    console.warn(
-      "[CallSecurity] TWILIO_AUTH_TOKEN not set - webhook validation skipped",
+    // Unlike the signature-mismatch/error branches below, this check used
+    // to skip validation unconditionally — in every environment, not just
+    // development. A deployment that simply forgot to set
+    // TWILIO_AUTH_TOKEN (e.g. a misconfigured preview/staging environment
+    // handling real traffic) would silently accept any forged webhook
+    // instead of rejecting it. Only development gets the free pass now,
+    // matching every other bypass in this function.
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        "[CallSecurity] TWILIO_AUTH_TOKEN not set - webhook validation skipped (development only)",
+      );
+      return { valid: true };
+    }
+    console.error(
+      "[CallSecurity] TWILIO_AUTH_TOKEN not set - rejecting webhook (validation cannot be performed outside development)",
     );
-    return { valid: true }; // Skip validation if token not configured
+    return { valid: false, error: "Webhook validation is not configured" };
   }
 
   const signature = req.headers.get("x-twilio-signature");
