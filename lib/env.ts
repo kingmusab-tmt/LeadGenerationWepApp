@@ -88,6 +88,15 @@ const envSchema = z.object({
   // validation for deployments that haven't set up scheduling yet.
   CRON_SECRET: z.string().optional(),
 
+  // Base64 DER-encoded ECDSA public key from SendGrid's "Signed Event
+  // Webhook" setting — required to verify that bounce/complaint events at
+  // app/api/marketing/email/webhooks/sendgrid actually came from SendGrid.
+  // Optional here so its absence doesn't break env validation for
+  // deployments that haven't configured a SendGrid account yet; the route
+  // itself rejects all events if this isn't set, rather than silently
+  // trusting unverified requests.
+  SENDGRID_WEBHOOK_PUBLIC_KEY: z.string().optional(),
+
   // Frontend public keys
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
   NEXT_PUBLIC_TAWKPROPERTYID: z.string().optional(),

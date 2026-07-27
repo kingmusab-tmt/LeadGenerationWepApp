@@ -3,7 +3,78 @@ import { User } from "@/models";
 import dbConnect from "@/lib/connectdb";
 import { Types } from "mongoose";
 import { PDFDocument, StandardFonts, rgb, PDFFont } from "pdf-lib";
-import { addMoney, applyPercentage, subtractMoney, sumMoney } from "@/lib/money";
+import {
+  addMoney,
+  applyPercentage,
+  fromCents,
+  subtractMoney,
+  sumMoney,
+  toCents,
+} from "@/lib/money";
+
+// Every external caller of this module (API routes, and through them the
+// frontend) keeps working in plain dollar amounts — only the Invoice model
+// itself stores integer cents (see models/invoice.ts). This is the
+// dollar-denominated shape createInvoice/updateInvoice accept, distinct
+// from IInvoiceLineItem (the cents-denominated stored shape).
+export interface IInvoiceLineItemInput {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  tax?: number;
+  total: number;
+}
+
+function toStoredLineItem(item: IInvoiceLineItemInput): IInvoiceLineItem {
+  return {
+    description: item.description,
+    quantity: item.quantity,
+    unitPriceCents: toCents(item.unitPrice),
+    taxCents: item.tax !== undefined ? toCents(item.tax) : undefined,
+    totalCents: toCents(item.total),
+  };
+}
+
+export function fromStoredLineItem(item: IInvoiceLineItem): IInvoiceLineItemInput {
+  return {
+    description: item.description,
+    quantity: item.quantity,
+    unitPrice: fromCents(item.unitPriceCents),
+    tax: item.taxCents !== undefined ? fromCents(item.taxCents) : undefined,
+    total: fromCents(item.totalCents),
+  };
+}
+
+/**
+ * Maps a stored (integer-cents) invoice back to the plain-dollar shape the
+ * frontend has always consumed — the API response contract is unchanged by
+ * the R-31 storage migration, only what's in MongoDB changed.
+ */
+export function serializeInvoiceForClient(invoice: IInvoice) {
+  const plain =
+    typeof (invoice as { toObject?: () => Record<string, unknown> })
+      .toObject === "function"
+      ? (invoice as unknown as { toObject: () => Record<string, unknown> }).toObject()
+      : { ...(invoice as unknown as Record<string, unknown>) };
+
+  return {
+    ...plain,
+    lineItems: invoice.lineItems.map(fromStoredLineItem),
+    subtotal: fromCents(invoice.subtotalCents),
+    tax: fromCents(invoice.taxCents),
+    discount:
+      invoice.discountCents !== undefined
+        ? fromCents(invoice.discountCents)
+        : undefined,
+    total: fromCents(invoice.totalCents),
+    // These are the internal storage fields — not part of the public
+    // response shape (callers should use subtotal/tax/discount/total above).
+    subtotalCents: undefined,
+    taxCents: undefined,
+    discountCents: undefined,
+    totalCents: undefined,
+  };
+}
 
 class InvoiceNumberGenerator {
   static async generateNumber(userId: string): Promise<string> {
@@ -145,18 +216,14 @@ class InvoicePDFGenerator {
         });
       });
       page.drawText(String(item.quantity), { x: col.qty, y: rowTop, size: 9.5, font });
-      page.drawText(this.formatMoney(item.unitPrice, invoice.currency), {
-        x: col.unitPrice,
-        y: rowTop,
-        size: 9.5,
-        font,
-      });
-      page.drawText(this.formatMoney(item.total, invoice.currency), {
-        x: col.total,
-        y: rowTop,
-        size: 9.5,
-        font,
-      });
+      page.drawText(
+        this.formatMoney(fromCents(item.unitPriceCents), invoice.currency),
+        { x: col.unitPrice, y: rowTop, size: 9.5, font },
+      );
+      page.drawText(
+        this.formatMoney(fromCents(item.totalCents), invoice.currency),
+        { x: col.total, y: rowTop, size: 9.5, font },
+      );
       y = rowTop - Math.max(descLines.length * 12, 16) - 4;
 
       // A very large invoice could overflow the page — bail out gracefully
@@ -187,20 +254,27 @@ class InvoicePDFGenerator {
       y -= 16;
     };
 
-    drawSummaryRow("Subtotal:", this.formatMoney(invoice.subtotal, invoice.currency));
-    if (invoice.discount) {
+    drawSummaryRow(
+      "Subtotal:",
+      this.formatMoney(fromCents(invoice.subtotalCents), invoice.currency),
+    );
+    if (invoice.discountCents) {
       drawSummaryRow(
         "Discount:",
-        `-${this.formatMoney(invoice.discount, invoice.currency)}`,
+        `-${this.formatMoney(fromCents(invoice.discountCents), invoice.currency)}`,
       );
     }
-    if (invoice.tax > 0) {
+    if (invoice.taxCents > 0) {
       drawSummaryRow(
         `Tax${invoice.taxRate ? ` (${invoice.taxRate}%)` : ""}:`,
-        this.formatMoney(invoice.tax, invoice.currency),
+        this.formatMoney(fromCents(invoice.taxCents), invoice.currency),
       );
     }
-    drawSummaryRow("Total:", this.formatMoney(invoice.total, invoice.currency), true);
+    drawSummaryRow(
+      "Total:",
+      this.formatMoney(fromCents(invoice.totalCents), invoice.currency),
+      true,
+    );
 
     if (invoice.notes) {
       y -= 14;
@@ -255,7 +329,7 @@ class InvoiceEngine {
       buyerId?: string;
       buyerEmail?: string;
       buyerName?: string;
-      lineItems: IInvoiceLineItem[];
+      lineItems: IInvoiceLineItemInput[];
       dueDate: Date;
       taxRate?: number;
       discountPercent?: number;
@@ -270,8 +344,10 @@ class InvoiceEngine {
 
     const invoiceNumber = await InvoiceNumberGenerator.generateNumber(userId);
 
-    // Calculate totals — cent-safe (see lib/money.ts) so summing line items
-    // and applying discount/tax percentages can't accumulate float drift.
+    // Calculate totals in dollars — cent-safe (see lib/money.ts) so summing
+    // line items and applying discount/tax percentages can't accumulate
+    // float drift — then convert to integer cents for storage (R-31: the
+    // model stores cents natively, not floats).
     const subtotal = sumMoney(payload.lineItems.map((item) => item.total));
     const discountAmount = payload.discount
       ? payload.discount
@@ -288,13 +364,13 @@ class InvoiceEngine {
       invoiceNumber,
       invoiceDate: new Date(),
       dueDate: payload.dueDate,
-      lineItems: payload.lineItems,
-      subtotal,
-      tax,
+      lineItems: payload.lineItems.map(toStoredLineItem),
+      subtotalCents: toCents(subtotal),
+      taxCents: toCents(tax),
       taxRate: payload.taxRate,
-      discount: discountAmount,
+      discountCents: toCents(discountAmount),
       discountPercent: payload.discountPercent,
-      total,
+      totalCents: toCents(total),
       notes: payload.notes,
       termsConditions: payload.termsConditions,
       currency: payload.currency || "USD",
@@ -306,11 +382,23 @@ class InvoiceEngine {
     return invoice;
   }
 
-  async updateInvoice(invoiceId: string, updates: Partial<IInvoice>) {
+  /**
+   * `updates` uses the same plain-dollar shape callers have always passed —
+   * `lineItems` here is IInvoiceLineItemInput (dollars), not the stored
+   * IInvoiceLineItem (cents); `discount` is a dollar amount, converted to
+   * discountCents below along with everything else that gets recalculated.
+   */
+  async updateInvoice(
+    invoiceId: string,
+    updates: Partial<Omit<IInvoice, "lineItems" | "discount">> & {
+      lineItems?: IInvoiceLineItemInput[];
+      discount?: number;
+    },
+  ) {
     await dbConnect();
 
     // Recalculate totals if line items changed — cent-safe, see createInvoice.
-    let updateData = { ...updates };
+    let updateData: Record<string, unknown> = { ...updates };
     if (updates.lineItems) {
       const subtotal = sumMoney(updates.lineItems.map((item) => item.total));
       const discountAmount = updates.discount
@@ -322,11 +410,13 @@ class InvoiceEngine {
 
       updateData = {
         ...updateData,
-        subtotal,
-        tax,
-        discount: discountAmount,
-        total,
+        lineItems: updates.lineItems.map(toStoredLineItem),
+        subtotalCents: toCents(subtotal),
+        taxCents: toCents(tax),
+        discountCents: toCents(discountAmount),
+        totalCents: toCents(total),
       };
+      delete updateData.discount;
     }
 
     const invoice = await Invoice.findByIdAndUpdate(invoiceId, updateData, {
@@ -395,17 +485,19 @@ class InvoiceEngine {
         $group: {
           _id: "$status",
           count: { $sum: 1 },
-          totalAmount: { $sum: "$total" },
+          // Integer cents sum natively in Mongo with zero drift — this is
+          // exactly the aggregation R-31 exists to make safe.
+          totalAmountCents: { $sum: "$totalCents" },
         },
       },
     ]);
 
     const invoiceStats: Record<string, { count: number; total: number }> = {};
     stats.forEach(
-      (stat: { _id: string; count: number; totalAmount: number }) => {
+      (stat: { _id: string; count: number; totalAmountCents: number }) => {
         invoiceStats[stat._id] = {
           count: stat.count,
-          total: stat.totalAmount,
+          total: fromCents(stat.totalAmountCents),
         };
       },
     );
@@ -450,15 +542,20 @@ class InvoiceEngine {
     const template = await Invoice.findById(templateInvoiceId);
     if (!template) throw new Error("Template invoice not found");
 
-    // Create first recurring invoice
+    // Create first recurring invoice — template's fields are the stored
+    // (cents) shape, but createInvoice's payload is dollar-denominated, same
+    // as every other caller.
     const newInvoice = await this.createInvoice(userId, {
       buyerId: template.buyerId?.toString(),
       buyerEmail: template.buyerEmail,
       buyerName: template.buyerName,
-      lineItems: template.lineItems,
+      lineItems: template.lineItems.map(fromStoredLineItem),
       dueDate: this.calculateNextDueDate(new Date(), frequency),
       taxRate: template.taxRate,
-      discount: template.discount,
+      discount:
+        template.discountCents !== undefined
+          ? fromCents(template.discountCents)
+          : undefined,
       notes: template.notes,
       currency: template.currency,
       paymentMethod: template.paymentMethod,

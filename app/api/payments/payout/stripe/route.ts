@@ -5,6 +5,7 @@ import { User } from "@/models";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { Transaction } from "@/models/transactions";
+import { dollarTransactionCents } from "@/lib/transactionMoney";
 import { IdempotencyKey } from "@/models/idempotencyKey";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 import {
@@ -211,13 +212,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Save transaction record
+    const payoutPreviousBalance = debitedSeller.walletBalance + body.amount;
     const transaction = new Transaction({
       type: "seller_payout",
       userId: session.user.id,
       amount: body.amount,
       currency,
-      previousBalance: debitedSeller.walletBalance + body.amount,
+      previousBalance: payoutPreviousBalance,
       currentBalance: debitedSeller.walletBalance,
+      ...dollarTransactionCents("seller_payout", {
+        amount: body.amount,
+        previousBalance: payoutPreviousBalance,
+        currentBalance: debitedSeller.walletBalance,
+      }),
       status: "pending",
       paymentGateway: "stripe",
       gatewayTransactionId: transfer.id,

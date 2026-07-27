@@ -6,7 +6,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Invoice } from "@/models/invoice";
-import { invoiceEngine } from "@/lib/invoiceEngine";
+import { invoiceEngine, serializeInvoiceForClient } from "@/lib/invoiceEngine";
 import { ZodError } from "zod";
 import { mongoIdParamSchema } from "@/lib/validation/schemas";
 import {
@@ -54,7 +54,7 @@ export async function GET(
       return forbidden("You do not have access to this invoice");
     }
 
-    return successResponse({ invoice });
+    return successResponse({ invoice: serializeInvoiceForClient(invoice) });
   } catch (error) {
     console.error("Error fetching invoice:", error);
     return internalError("Failed to fetch invoice");
@@ -101,8 +101,11 @@ export async function PUT(
 
     const body = await req.json();
     const updatedInvoice = await invoiceEngine.updateInvoice(id, body);
+    if (!updatedInvoice) {
+      return notFound("Invoice");
+    }
 
-    return successResponse({ invoice: updatedInvoice });
+    return successResponse({ invoice: serializeInvoiceForClient(updatedInvoice) });
   } catch (error) {
     console.error("Error updating invoice:", error);
     return internalError("Failed to update invoice");

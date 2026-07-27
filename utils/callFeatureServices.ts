@@ -238,6 +238,47 @@ export interface GeoData {
   state?: string;
 }
 
+// ─── Two-Party (All-Party) Consent Recording Enforcement ──────
+
+/**
+ * US states commonly treated as requiring all-party consent to record a
+ * phone call, rather than the one-party-consent default most states use.
+ * Compiled from generally-cited public legal references (e.g. Justia's and
+ * the Digital Media Law Project's state-by-state call-recording law
+ * summaries) — this is engineering due diligence, not a legal opinion, and
+ * a few of these (Montana, Nevada) have genuinely contested/hybrid case
+ * law rather than a clean statutory rule. State laws change, and
+ * interstate calls can implicate more than one state's law at once
+ * regardless of what this list says. Treat this as a conservative
+ * starting point pending the Phase 3 legal review this finding already
+ * calls for, not a substitute for it.
+ */
+export const ALL_PARTY_CONSENT_STATES = new Set([
+  "CA", // California
+  "CT", // Connecticut
+  "FL", // Florida
+  "IL", // Illinois
+  "MD", // Maryland
+  "MA", // Massachusetts
+  "MT", // Montana
+  "NV", // Nevada
+  "NH", // New Hampshire
+  "PA", // Pennsylvania
+  "WA", // Washington
+]);
+
+/**
+ * Whether a resolved US state requires all-party consent to record a call.
+ * Returns false for an undetermined state (international/non-NANP callers,
+ * or an area code this app doesn't have a state mapping for) — treating
+ * "unknown" as "don't record" would silently disable recording far more
+ * broadly than the actual legal requirement, which is its own problem.
+ */
+export function requiresAllPartyConsent(state: string | undefined): boolean {
+  if (!state) return false;
+  return ALL_PARTY_CONSENT_STATES.has(state.toUpperCase());
+}
+
 /**
  * Extract geo data from a phone number's area code.
  */

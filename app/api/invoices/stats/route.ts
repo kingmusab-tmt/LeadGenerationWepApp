@@ -2,7 +2,7 @@
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
-import { invoiceEngine } from "@/lib/invoiceEngine";
+import { invoiceEngine, serializeInvoiceForClient } from "@/lib/invoiceEngine";
 import dbConnect from "@/lib/connectdb";
 import {
   successResponse,
@@ -28,7 +28,7 @@ export async function GET() {
 
     return successResponse({
       stats,
-      overdueInvoices,
+      overdueInvoices: overdueInvoices.map(serializeInvoiceForClient),
     });
   } catch (error) {
     console.error("Error fetching invoice stats:", error);

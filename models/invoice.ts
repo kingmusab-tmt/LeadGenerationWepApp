@@ -1,11 +1,20 @@
 import mongoose, { Document, Schema } from "mongoose";
 
+// Money fields are stored as integer cents (e.g. $19.99 -> 1999), not
+// floating-point dollars — see R-31 in the production readiness audit.
+// Renamed with a "Cents" suffix (rather than keeping the old names with a
+// silently-changed meaning) specifically so any code still written against
+// the old dollar-float contract fails to compile instead of silently
+// misreading a cents value as dollars. lib/invoiceEngine.ts is the only
+// place that should read/write these directly — everywhere else (API
+// responses, the PDF generator, the frontend) keeps working with plain
+// dollar numbers via the conversion helpers there.
 export interface IInvoiceLineItem {
   description: string;
   quantity: number;
-  unitPrice: number;
-  tax?: number;
-  total: number;
+  unitPriceCents: number;
+  taxCents?: number;
+  totalCents: number;
 }
 
 export interface IInvoice extends Document {
@@ -19,12 +28,12 @@ export interface IInvoice extends Document {
   invoiceDate: Date;
   dueDate: Date;
   lineItems: IInvoiceLineItem[];
-  subtotal: number;
-  tax: number;
+  subtotalCents: number;
+  taxCents: number;
   taxRate?: number; // Percentage (e.g., 8.5 for 8.5%)
-  discount?: number; // Flat amount
+  discountCents?: number; // Flat amount, in cents
   discountPercent?: number; // Percentage
-  total: number;
+  totalCents: number;
   status: "draft" | "sent" | "viewed" | "paid" | "overdue" | "cancelled";
   paymentMethod?: "stripe" | "bank_transfer" | "check";
   paymentDate?: Date;
@@ -47,9 +56,9 @@ export interface IInvoice extends Document {
 const invoiceLineItemSchema = new Schema({
   description: { type: String, required: true },
   quantity: { type: Number, required: true, min: 0.01 },
-  unitPrice: { type: Number, required: true, min: 0 },
-  tax: { type: Number },
-  total: { type: Number, required: true },
+  unitPriceCents: { type: Number, required: true, min: 0 },
+  taxCents: { type: Number },
+  totalCents: { type: Number, required: true },
 });
 
 const invoiceSchema = new Schema(
@@ -81,12 +90,12 @@ const invoiceSchema = new Schema(
     invoiceDate: { type: Date, default: Date.now, index: true },
     dueDate: { type: Date, required: true },
     lineItems: [invoiceLineItemSchema],
-    subtotal: { type: Number, required: true, min: 0 },
-    tax: { type: Number, required: true, min: 0 },
+    subtotalCents: { type: Number, required: true, min: 0 },
+    taxCents: { type: Number, required: true, min: 0 },
     taxRate: Number,
-    discount: Number,
+    discountCents: Number,
     discountPercent: Number,
-    total: { type: Number, required: true, min: 0, index: true },
+    totalCents: { type: Number, required: true, min: 0, index: true },
     status: {
       type: String,
       enum: ["draft", "sent", "viewed", "paid", "overdue", "cancelled"],

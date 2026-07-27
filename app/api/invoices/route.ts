@@ -5,7 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Invoice } from "@/models/invoice";
-import { invoiceEngine } from "@/lib/invoiceEngine";
+import { invoiceEngine, serializeInvoiceForClient } from "@/lib/invoiceEngine";
 import { invalidateAllUserSessions } from "@/lib/cachedSession"; // PHASE 3: Cache invalidation
 import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 import { ZodError } from "zod";
@@ -53,7 +53,13 @@ export async function GET(req: NextRequest) {
     const total = await Invoice.countDocuments(query);
 
     return successResponse({
-      invoices,
+      // Stored as integer cents (R-31) — map back to the plain-dollar shape
+      // the frontend has always consumed.
+      invoices: invoices.map((invoice) =>
+        serializeInvoiceForClient(
+          invoice as unknown as Parameters<typeof serializeInvoiceForClient>[0],
+        ),
+      ),
       pagination: {
         page,
         limit,
@@ -141,7 +147,7 @@ export async function POST(req: NextRequest) {
     // PHASE 3: Invalidate user cache after creating invoice
     await invalidateAllUserSessions(session.user.id);
 
-    return successResponse({ invoice }, 201);
+    return successResponse({ invoice: serializeInvoiceForClient(invoice) }, 201);
   } catch (error) {
     console.error("Error creating invoice:", error);
     return internalError("Failed to create invoice");

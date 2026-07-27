@@ -105,13 +105,24 @@ export class EmailTemplateEngine {
 
 // ==================== TRANSPORTER MANAGER ====================
 
+export interface ManagedTransporter {
+  transporter: nodemailer.Transporter;
+  // Whether this seller's configured SMTP host is SendGrid's relay
+  // (smtp.sendgrid.net). Only sends through SendGrid's own infrastructure
+  // generate events on SendGrid's Event Webhook (see R-18/bounce webhook
+  // below) — an arbitrary seller-configured SMTP provider (Gmail, Office365,
+  // a different ESP) has no such feed, so bounce-webhook correlation only
+  // applies when this is true.
+  isSendGrid: boolean;
+}
+
 export class TransporterManager {
-  private transporters: Map<string, nodemailer.Transporter> = new Map();
+  private transporters: Map<string, ManagedTransporter> = new Map();
 
   /**
    * Get or create transporter for a user (seller)
    */
-  async getTransporter(userId: string): Promise<nodemailer.Transporter> {
+  async getTransporter(userId: string): Promise<ManagedTransporter> {
     if (this.transporters.has(userId)) {
       return this.transporters.get(userId)!;
     }
@@ -146,8 +157,14 @@ export class TransporterManager {
       throw new Error("SMTP connection failed. Check email settings.");
     }
 
-    this.transporters.set(userId, transporter);
-    return transporter;
+    const managed: ManagedTransporter = {
+      transporter,
+      isSendGrid: /(^|\.)smtp\.sendgrid\.net$/i.test(
+        user.emailSettings.smtpServer.trim(),
+      ),
+    };
+    this.transporters.set(userId, managed);
+    return managed;
   }
 
   /**
@@ -248,7 +265,7 @@ export class EmailQueueManager {
       throw new Error(`Campaign ${campaignId} not found`);
     }
 
-    const transporter = await this.transporterManager.getTransporter(
+    const { transporter, isSendGrid } = await this.transporterManager.getTransporter(
       campaign.userId.toString(),
     );
 
@@ -317,6 +334,21 @@ export class EmailQueueManager {
           headers: {
             "X-Campaign-ID": campaignId,
             "X-Tracking-Token": queueItem.trackingToken || "",
+            // SendGrid's SMTP relay honors this legacy header even over
+            // plain SMTP (not just their Web API) and echoes unique_args
+            // back on every event it later posts to the Event Webhook —
+            // this is what lets a bounce/complaint event be correlated back
+            // to this exact queue item without switching off SMTP sending.
+            ...(isSendGrid
+              ? {
+                  "X-SMTPAPI": JSON.stringify({
+                    unique_args: {
+                      trackingToken: queueItem.trackingToken || "",
+                      campaignId,
+                    },
+                  }),
+                }
+              : {}),
           },
         };
 
@@ -789,7 +821,7 @@ export class EmailMarketingEngine {
       }
 
       const transporterManager = new TransporterManager();
-      const transporter = await transporterManager.getTransporter(
+      const { transporter } = await transporterManager.getTransporter(
         campaign.userId.toString(),
       );
 

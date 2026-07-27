@@ -17,6 +17,7 @@ import {
   handlePaymentFailed,
 } from "@/lib/stripeSubscriptionService";
 import { env } from "@/lib/env";
+import { toCents } from "@/lib/money";
 
 /**
  * Check if a Stripe event has already been processed.
@@ -825,6 +826,10 @@ async function handleCreditsPurchase(
         type: "units_purchase",
         userId: buyer._id,
         amount,
+        // amount is real dollars paid, but previousBalance/currentBalance
+        // for units_purchase are the buyer's wallet UNIT count, not
+        // dollars — only amount gets a cents counterpart here (R-31).
+        amountCents: toCents(amount),
         currency: session.currency || "usd",
         paymentGateway: "stripe",
         status: "completed",
@@ -871,6 +876,7 @@ async function handleCreditsPurchase(
           type: "seller_income",
           userId: buyer.registeredWith,
           amount,
+          amountCents: toCents(amount), // seller_income is always dollars (R-31)
           currency: session.currency || "usd",
           paymentGateway: "stripe",
           gatewayTransactionId: session.id,
@@ -911,6 +917,8 @@ async function handleCreditsPurchase(
             $set: {
               previousBalance: leadSeller.walletBalance - amount,
               currentBalance: leadSeller.walletBalance,
+              previousBalanceCents: toCents(leadSeller.walletBalance - amount),
+              currentBalanceCents: toCents(leadSeller.walletBalance),
               gatewayTransactionId: session.id,
             },
           },
@@ -1161,6 +1169,7 @@ async function handleSubscriptionPurchase(
     type: "subscription_payment",
     userId,
     amount,
+    amountCents: toCents(amount), // subscription_payment is always dollars (R-31)
     currency: session.currency || "usd",
     paymentGateway: "stripe",
     gatewayTransactionId: session.payment_intent?.toString() || session.id,
@@ -1432,6 +1441,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       type: "subscription_payment",
       userId,
       amount,
+      amountCents: toCents(amount),
       currency: subscription.currency || "usd",
       paymentGateway: "stripe",
       gatewayTransactionId: subscription.id,
@@ -1537,10 +1547,12 @@ async function handleInvoicePaidEvent(invoice: Stripe.Invoice) {
 
     if (user) {
       console.log("[handleInvoicePaidEvent] ✓ User found:", user.email);
+      const renewalAmount = invoice.amount_paid ? invoice.amount_paid / 100 : 0;
       const transaction = new Transaction({
         type: "subscription_renewal",
         userId: user._id,
-        amount: invoice.amount_paid ? invoice.amount_paid / 100 : 0,
+        amount: renewalAmount,
+        amountCents: toCents(renewalAmount),
         currency: invoice.currency || "usd",
         paymentGateway: "stripe",
         gatewayTransactionId: invoice.id,
@@ -1894,6 +1906,12 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
           type: "refund",
           userId: originalTransaction.userId,
           amount: -refundAmount,
+          // This path only fires from a real Stripe charge.refunded event —
+          // unlike the admin refund route (which can refund a unit-based
+          // lead/call purchase too), a Stripe charge here is always a real
+          // dollar payment (units_purchase/subscription), so amount is
+          // always dollars (R-31).
+          amountCents: -toCents(refundAmount),
           currency: charge.currency || "usd",
           paymentGateway: "stripe",
           gatewayTransactionId: charge.id,

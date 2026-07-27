@@ -14,6 +14,7 @@ import {
   doesBuyerServiceArea,
   extractGeoData,
   isOnDncList,
+  requiresAllPartyConsent,
 } from "@/utils/callFeatureServices";
 
 describe("doesBuyerServiceArea — geo-routing", () => {
@@ -147,5 +148,27 @@ describe("checkSpamStatus — STIR/SHAKEN attestation", () => {
     const result = checkSpamStatus(null, "+15551234567");
     expect(result.isSpam).toBe(false);
     expect(result.spamScore).toBe(60);
+  });
+});
+
+describe("requiresAllPartyConsent — jurisdiction-aware recording enforcement", () => {
+  it("flags known all-party-consent states", () => {
+    expect(requiresAllPartyConsent("CA")).toBe(true);
+    expect(requiresAllPartyConsent("FL")).toBe(true);
+    expect(requiresAllPartyConsent("PA")).toBe(true);
+  });
+
+  it("does not flag a one-party-consent state", () => {
+    expect(requiresAllPartyConsent("NY")).toBe(false);
+    expect(requiresAllPartyConsent("TX")).toBe(false);
+  });
+
+  it("matches case-insensitively", () => {
+    expect(requiresAllPartyConsent("ca")).toBe(true);
+  });
+
+  it("treats an undetermined state as not requiring consent, rather than blocking broadly", () => {
+    expect(requiresAllPartyConsent(undefined)).toBe(false);
+    expect(requiresAllPartyConsent("")).toBe(false);
   });
 });

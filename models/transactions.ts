@@ -13,11 +13,34 @@ export interface ITransaction extends Document {
     | "admin_adjustment" // Admin manually adjusts units/balance
     | "subscription_payment" // Seller subscribes to a package
     | "subscription_renewal" // Seller renews a subscription
-    | "subscription_cancellation"; // Seller cancels a subscription
+    | "subscription_cancellation" // Seller cancels a subscription
+    // Found while wiring up R-31: lib/autoAcceptPurchaseService.ts has
+    // always written these two type values, but neither was in this enum —
+    // Mongoose's default enum validator rejects unlisted values at
+    // save()/create() time, so every auto-accept purchase's Transaction
+    // writes were very likely failing (and, since they run inside the same
+    // DB session as the wallet debit, aborting the whole transaction).
+    | "lead_auto_purchase" // Buyer auto-purchases a lead (auto-accept)
+    | "seller_income_auto_accept"; // Seller income from an auto-accepted lead
   userId: mongoose.Types.ObjectId; // Reference to the User model (buyer or seller)
+  // amount/previousBalance/currentBalance are NOT reliably dollars — for
+  // lead_purchase, call_purchase, lead_auto_purchase, and the buyer side of
+  // units_purchase, they're a wallet UNIT count (not a fixed dollar rate).
+  // Renaming/rescaling this field uniformly would corrupt those unit
+  // counts, so it stays exactly as-is for those types.
   amount: number;
   previousBalance: number; // Previous balance before the transaction
   currentBalance: number; // Current balance after the transaction
+  // R-31: integer-cents counterparts, populated ONLY for genuinely
+  // dollar-denominated transactions (seller_income(_auto_accept),
+  // seller_payout, subscription_payment, subscription_renewal, and the
+  // dollar side of units_purchase) — see lib/transactionMoney.ts for the
+  // single source of truth on which types these apply to. Left undefined
+  // for unit-based types and for legacy documents predating this field
+  // (see scripts/backfill-transaction-cents.js).
+  amountCents?: number;
+  previousBalanceCents?: number;
+  currentBalanceCents?: number;
   currency: string;
   stripeAccountId?: string; // For seller_payout (Stripe account ID of the seller)
   relatedInvoices?: mongoose.Types.ObjectId[]; // PHASE 3: Link to related invoices
@@ -79,6 +102,8 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
         "subscription_payment",
         "subscription_renewal",
         "subscription_cancellation",
+        "lead_auto_purchase",
+        "seller_income_auto_accept",
       ],
     },
     userId: {
@@ -89,6 +114,11 @@ const TransactionSchema: Schema = new Schema<ITransaction>(
     amount: {
       type: Number,
     },
+    // R-31: only set for genuinely dollar-denominated transaction types —
+    // see lib/transactionMoney.ts. Left unset for unit-based types.
+    amountCents: { type: Number },
+    previousBalanceCents: { type: Number },
+    currentBalanceCents: { type: Number },
     stripeAccountId: {
       type: String, // For seller payouts, the Stripe account ID of the seller
     },

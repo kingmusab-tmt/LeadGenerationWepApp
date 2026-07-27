@@ -4,7 +4,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import dbConnect from "@/lib/connectdb";
 import { Invoice } from "@/models/invoice";
-import { invoiceEngine } from "@/lib/invoiceEngine";
+import {
+  fromStoredLineItem,
+  invoiceEngine,
+  serializeInvoiceForClient,
+} from "@/lib/invoiceEngine";
+import { fromCents } from "@/lib/money";
 import { ZodError } from "zod";
 import { mongoIdParamSchema } from "@/lib/validation/schemas";
 import {
@@ -77,9 +82,13 @@ export async function POST(
         paymentDate ? new Date(paymentDate) : undefined,
       );
 
+      if (!updatedInvoice) {
+        return notFound("Invoice");
+      }
+
       return successResponse({
         message: "Invoice marked as paid",
-        invoice: updatedInvoice,
+        invoice: serializeInvoiceForClient(updatedInvoice),
       });
     }
 
@@ -100,14 +109,20 @@ export async function POST(
 
     // ==================== DUPLICATE ====================
     if (action === "duplicate") {
+      // invoice.lineItems/discountCents are the stored (cents) shape;
+      // createInvoice's payload is dollar-denominated like every other
+      // caller, so convert back before re-submitting.
       const newInvoice = await invoiceEngine.createInvoice(session.user.id, {
         buyerId: invoice.buyerId?.toString(),
         buyerEmail: invoice.buyerEmail,
         buyerName: invoice.buyerName,
-        lineItems: invoice.lineItems,
+        lineItems: invoice.lineItems.map(fromStoredLineItem),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         taxRate: invoice.taxRate,
-        discount: invoice.discount,
+        discount:
+          invoice.discountCents !== undefined
+            ? fromCents(invoice.discountCents)
+            : undefined,
         discountPercent: invoice.discountPercent,
         notes: invoice.notes,
         termsConditions: invoice.termsConditions,
@@ -116,7 +131,10 @@ export async function POST(
       });
 
       return successResponse(
-        { message: "Invoice duplicated", invoice: newInvoice },
+        {
+          message: "Invoice duplicated",
+          invoice: serializeInvoiceForClient(newInvoice),
+        },
         201,
       );
     }

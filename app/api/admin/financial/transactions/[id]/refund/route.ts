@@ -7,6 +7,8 @@ import { requireSuperAdmin } from "@/lib/api/adminAuth";
 import { recordAuditLog } from "@/lib/auditLog";
 import { badRequest, internalError, notFound } from "@/lib/api/error-handler";
 import { env } from "@/lib/env";
+import { isDollarDenominatedAmount } from "@/lib/transactionMoney";
+import { toCents } from "@/lib/money";
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
@@ -163,11 +165,19 @@ export async function POST(
       );
     }
 
-    // Create a refund transaction record
+    // Create a refund transaction record. amountCents inherits from
+    // whether the ORIGINAL transaction being refunded was genuinely
+    // dollar-denominated (R-31) — "refund" alone doesn't say, since this
+    // one action refunds both unit-based (lead_purchase, call_purchase)
+    // and dollar-based (units_purchase, subscription_payment/renewal)
+    // transactions.
     await Transaction.create({
       type: "refund",
       userId: transaction.userId,
       amount: transaction.amount,
+      ...(isDollarDenominatedAmount(transaction.type)
+        ? { amountCents: toCents(transaction.amount) }
+        : {}),
       previousBalance: 0,
       currentBalance: 0,
       currency: transaction.currency || "USD",

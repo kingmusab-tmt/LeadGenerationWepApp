@@ -34,6 +34,7 @@ import {
   isBuyerAtConcurrentLimit,
   markCallActive,
   markCallInactive,
+  requiresAllPartyConsent,
 } from "@/utils/callFeatureServices";
 import { processCallAIAnalysis } from "@/lib/callAIAnalysis";
 
@@ -442,7 +443,7 @@ async function handleNewCall(
     forwardingType,
     forwardingNumbers,
     leadBuyers,
-    recordCall,
+    recordCall: sellerConfiguredRecordCall,
 
     welcomeMessage,
     passCallerId,
@@ -502,6 +503,24 @@ async function handleNewCall(
   // ─── Spam Detection ───
   const stirVerstat = formData.get("StirVerstat") as string;
   const geoData = extractGeoData(from);
+
+  // Jurisdiction-aware two-party-consent enforcement (R-20): recording is
+  // disabled — regardless of the seller's recordCall setting — whenever the
+  // caller's area code resolves to a state that requires all-party consent
+  // to record a call. This is a conservative, fail-closed guard (never
+  // record without consent) rather than a full interactive consent-capture
+  // flow; see requiresAllPartyConsent's own doc comment in
+  // utils/callFeatureServices.ts for the caveats on that state list and why
+  // this isn't a substitute for a real legal review.
+  const recordCall =
+    sellerConfiguredRecordCall && !requiresAllPartyConsent(geoData.state);
+  if (sellerConfiguredRecordCall && !recordCall) {
+    debugLog(
+      "Recording disabled for this call — caller's area code resolves to an all-party-consent state",
+      { from, state: geoData.state },
+    );
+  }
+
   const spamCheck = spamFilterEnabled
     ? checkSpamStatus(stirVerstat, from)
     : { isSpam: false, stirVerstat: stirVerstat || "", spamScore: 0 };
@@ -681,11 +700,12 @@ async function handleNewCall(
 
   // Play a recording disclosure whenever the call is actually being
   // recorded — decoupled from the separate recordingConsent toggle, which
-  // let a seller record with recordCall on but the disclosure off. This is
-  // a safe one-party-consent-state baseline; it is NOT a substitute for
-  // true all-party consent in two-party-consent states, which needs
-  // jurisdiction-aware enforcement still pending legal review (see R-20 in
-  // the production readiness audit).
+  // let a seller record with recordCall on but the disclosure off. Note
+  // `recordCall` here is already the jurisdiction-adjusted value computed
+  // above (false in all-party-consent states regardless of the seller's
+  // setting) — see R-20 in the production readiness audit for the caveats
+  // on that enforcement (state-list based, not a full consent-capture flow,
+  // not a substitute for real legal review).
   if (recordCall) {
     const consent =
       recordingConsentMessage ||

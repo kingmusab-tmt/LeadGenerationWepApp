@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import connectDB from "@/lib/connectdb";
 import { Buyer } from "@/models/leadbuyers";
 import { Transaction, ITransaction } from "@/models/transactions";
+import { dollarTransactionCents } from "@/lib/transactionMoney";
 import { User } from "@/models/userModel";
 import { IdempotencyKey } from "@/models/idempotencyKey";
 import { sendBuyerEmail } from "@/lib/buyerEmail";
@@ -187,6 +188,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
               currency: "usd",
               previousBalance: sellerPreviousBalance,
               currentBalance: sellerCurrentBalance,
+              ...dollarTransactionCents("seller_income", {
+                amount: cashPaid,
+                previousBalance: sellerPreviousBalance,
+                currentBalance: sellerCurrentBalance,
+              }),
               paymentGateway: "manual",
               status: "completed",
               metadata: {
