@@ -10,6 +10,7 @@ import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 import { withErrorHandler } from "@/lib/api/async-handler";
 import { badRequest, forbidden, unauthorized } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 const MAX_FILE_BYTES = 3 * 1024 * 1024; // 3MB
 const MAX_ROWS = 5000;
 
@@ -28,7 +29,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   // would import buyers registered to their own admin account rather than
   // any real seller's — a non-functional path, not a working
   // admin-on-behalf-of-seller feature.
-  if (session.user.role !== "seller") {
+  if (!isSellerRole(session.user.role)) {
     return forbidden("Only sellers can import buyers");
   }
 

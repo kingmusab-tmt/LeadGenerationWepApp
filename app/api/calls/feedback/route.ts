@@ -21,6 +21,7 @@ import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 import { requireCsrf } from "@/lib/security/requireCsrf";
 import { callFeedbackSchema } from "@/lib/validation/schemas";
 
+import { isSellerRole } from "@/lib/roles";
 type FeedbackState = {
   buyerRating?: boolean;
   sellerApproved?: boolean;
@@ -78,7 +79,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (isSellerReview) {
     const isAdmin = session.user.role === "admin";
     const isSellerOwner =
-      session.user.role === "seller" &&
+      isSellerRole(session.user.role) &&
       String(call.userId) === String(session.user.id);
 
     if (!isAdmin && !isSellerOwner) {

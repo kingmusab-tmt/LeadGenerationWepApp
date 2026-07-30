@@ -18,7 +18,7 @@ import type { NavigationContextProps } from "./useNavigationProvider";
  *
  * @example
  * const { navigateTo } = useNavigation();
- * navigateTo("seller/overview"); // Navigates to /dashboard/seller/overview
+ * navigateTo("overview"); // Navigates to /dashboard/overview
  */
 export const useNavigation = (): NavigationContextProps => {
   const context = useContext(NavigationContext);

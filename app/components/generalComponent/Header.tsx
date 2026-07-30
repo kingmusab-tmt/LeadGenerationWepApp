@@ -103,17 +103,17 @@ const Header = React.memo(function Header() {
   const navItems = [
     // {
     //   name: "Dashboard",
-    //   href: "/dashboard/seller/overview",
+    //   href: "/dashboard/overview",
     //   icon: <DashboardIcon fontSize="small" />,
     // },
     {
       name: "Leads",
-      href: "/dashboard/seller/lead_management",
+      href: "/dashboard/lead_management",
       icon: <PeopleIcon fontSize="small" />,
     },
     {
       name: "Analytics",
-      href: "/dashboard/seller/overview",
+      href: "/dashboard/overview",
       icon: <AnalyticsIcon fontSize="small" />,
     },
   ];
@@ -389,7 +389,7 @@ const Header = React.memo(function Header() {
                         variant="contained"
                         startIcon={<DashboardIcon />}
                         component={Link}
-                        href="/dashboard/seller/overview"
+                        href="/dashboard/overview"
                         sx={{
                           textTransform: "none",
                           fontWeight: 600,
@@ -466,14 +466,14 @@ const Header = React.memo(function Header() {
                     <MenuItem
                       onClick={handleMenuClose}
                       component={Link}
-                      href="/dashboard/seller/settings?tab=general"
+                      href="/dashboard/settings?tab=general"
                     >
                       Profile
                     </MenuItem>
                     <MenuItem
                       onClick={handleMenuClose}
                       component={Link}
-                      href="/dashboard/seller/settings"
+                      href="/dashboard/settings"
                     >
                       Settings
                     </MenuItem>
@@ -592,7 +592,7 @@ const Header = React.memo(function Header() {
                 <MenuItem
                   onClick={handleMenuClose}
                   component={Link}
-                  href="/dashboard/seller/overview"
+                  href="/dashboard/overview"
                 >
                   <Box
                     sx={{

@@ -15,6 +15,7 @@ import {
 import { requireCsrf } from "@/lib/security/requireCsrf";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
+import { isSellerRole } from "@/lib/roles";
 type TrackingNumberRecord = {
   phoneNumber?: string;
   method?: "Manual" | "Automatic" | string;
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
       return unauthorized("Unauthorized. Please log in.");
     }
 
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Seller or admin access required");
     }
 

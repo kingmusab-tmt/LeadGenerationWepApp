@@ -3,12 +3,28 @@ import EmailProvider from "next-auth/providers/email";
 import { clientPromise } from "./lib/db";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { clearStaleTokens } from "./lib/clearStaleTokensServerAction";
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, Session } from "next-auth";
 import dbConnect from "./lib/connectdb";
 import { User } from "./models";
 import { Buyer } from "./models/leadbuyers";
 import { createTransport } from "nodemailer";
 import { getCachedSession } from "./lib/cachedSession";
+
+/**
+ * What the session callback returns when there is no valid user behind the
+ * JWT (deleted account, or a cookie signed for another environment).
+ *
+ * It must NOT be null: next-auth serializes the callback's return value
+ * straight to /api/auth/session, and its client does
+ * `Object.keys(data).length` on the response (next-auth/client/_utils.js).
+ * A null body throws "Cannot convert undefined or null to object", surfacing
+ * as CLIENT_FETCH_ERROR and leaving useSession() stuck instead of resolving.
+ *
+ * An empty object is exactly what the endpoint returns for a signed-out
+ * visitor, so the client reads it as unauthenticated and the app's route
+ * guards send the user to sign-in — which is the intent here.
+ */
+const EMPTY_SESSION = {} as Session;
 
 export const authOptions = {
   adapter: MongoDBAdapter(clientPromise),
@@ -209,14 +225,14 @@ export const authOptions = {
       // This reduces database queries from 100% to ~1%
       const userEmail = typeof token?.email === "string" ? token.email : "";
       if (!userEmail) {
-        return null;
+        return EMPTY_SESSION;
       }
 
       const cachedSessionData = await getCachedSession(userEmail, token);
 
       if (!cachedSessionData) {
         // User deleted – invalidate session
-        return null;
+        return EMPTY_SESSION;
       }
 
       // Use cached data as base, but ALWAYS prefer JWT token for critical auth fields

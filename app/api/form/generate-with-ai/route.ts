@@ -11,6 +11,7 @@ import { checkFeatureAccess } from "@/lib/subscriptionLimitsService";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 import { formFieldSchema } from "@/lib/validation/schemas";
 
+import { isSellerRole } from "@/lib/roles";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
@@ -24,7 +25,7 @@ interface GenerateFormResponse {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user?.role !== "seller") {
+  if (!session?.user?.id || !isSellerRole(session.user?.role)) {
     return unauthorized("Authentication required");
   }
 

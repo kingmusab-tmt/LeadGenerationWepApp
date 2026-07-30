@@ -12,6 +12,7 @@ import {
 import { requireCsrf } from "@/lib/security/requireCsrf";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
+import { isSellerRole } from "@/lib/roles";
 const MAX_TEXT_LENGTH = 500;
 const MAX_LIST_ENTRIES = 200;
 const MAX_FORWARDING_NUMBERS = 10;
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     if (!session?.user?.id || !session.user?.role) {
       return unauthorized("Authentication required");
     }
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Seller or admin access required");
     }
 

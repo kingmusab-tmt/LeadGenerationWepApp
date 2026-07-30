@@ -12,6 +12,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 export async function GET(req: NextRequest) {
   try {
     // Verify authentication
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     // Authorization check: seller can access own data, admin can access any seller.
     const isAdmin = session.user.role === "admin";
     const isOwnSeller =
-      session.user.role === "seller" && session.user.id === sellerId;
+      isSellerRole(session.user.role) && session.user.id === sellerId;
     if (!isAdmin && !isOwnSeller) {
       return forbidden("Forbidden - You can only access your own data");
     }

@@ -114,7 +114,7 @@ export default function NewInvoicePage() {
       if (res.ok) {
         const invoice = await res.json();
         toast.success("Invoice created successfully");
-        router.push(`/dashboard/seller/invoices/${invoice._id}`);
+        router.push(`/dashboard/invoices/${invoice._id}`);
       } else {
         const error = await res.json();
         toast.error(error.error || "Failed to create invoice");
@@ -400,7 +400,7 @@ export default function NewInvoicePage() {
                 <Button
                   fullWidth
                   variant="outlined"
-                  href="/dashboard/seller/invoices"
+                  href="/dashboard/invoices"
                 >
                   Cancel
                 </Button>

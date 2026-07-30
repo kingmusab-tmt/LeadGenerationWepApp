@@ -441,7 +441,7 @@ export default function SmsCampaignsPage() {
         <Button
           variant="contained"
           onClick={() =>
-            (window.location.href = "/dashboard/seller/settings/subscription")
+            (window.location.href = "/dashboard/settings/subscription")
           }
         >
           View Subscription Plans
@@ -604,7 +604,7 @@ export default function SmsCampaignsPage() {
                     >
                       <Button
                         size="small"
-                        href={`/dashboard/seller/sms-campaigns/${campaign._id}?view=replies`}
+                        href={`/dashboard/sms-campaigns/${campaign._id}?view=replies`}
                       >
                         View Replies
                       </Button>
@@ -666,7 +666,7 @@ export default function SmsCampaignsPage() {
                         </Button>
                         <Button
                           size="small"
-                          href={`/dashboard/seller/sms-campaigns/${campaign._id}`}
+                          href={`/dashboard/sms-campaigns/${campaign._id}`}
                         >
                           Open
                         </Button>

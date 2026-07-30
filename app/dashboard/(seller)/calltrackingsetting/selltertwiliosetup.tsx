@@ -981,7 +981,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
                       </Typography>
                       <Button
                         component={NextLink}
-                        href="/dashboard/seller/settings/subscription"
+                        href="/dashboard/settings/subscription"
                         variant="contained"
                         size="small"
                       >
@@ -1468,7 +1468,7 @@ export default function CallPage({ sellerId }: { sellerId: string }) {
           <Button
             variant="contained"
             component={NextLink}
-            href="/dashboard/seller/settings/subscription"
+            href="/dashboard/settings/subscription"
           >
             Upgrade Now
           </Button>

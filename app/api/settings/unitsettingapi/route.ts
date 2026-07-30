@@ -11,6 +11,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 interface SettingsPayload {
   type: "unit" | "call";
   data: {
@@ -26,7 +27,7 @@ export async function GET() {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user?.role !== "seller") {
+    if (!session || !isSellerRole(session.user?.role)) {
       return unauthorized("Authentication required");
     }
 
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user?.role !== "seller") {
+    if (!session || !isSellerRole(session.user?.role)) {
       return unauthorized("Authentication required");
     }
 
@@ -130,7 +131,7 @@ export async function PUT(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user?.role !== "seller") {
+    if (!session || !isSellerRole(session.user?.role)) {
       return unauthorized("Authentication required");
     }
 
@@ -227,7 +228,7 @@ export async function DELETE(req: NextRequest) {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email || session.user?.role !== "seller") {
+    if (!session || !session.user?.email || !isSellerRole(session.user?.role)) {
       return unauthorized("Authentication required");
     }
 

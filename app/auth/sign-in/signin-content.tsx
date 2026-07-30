@@ -51,7 +51,7 @@ const SignInContent: React.FC = () => {
         return;
       }
 
-      router.replace("/dashboard/seller/overview");
+      router.replace("/dashboard/overview");
     } catch (error) {
       console.error("[SignIn] Failed to check subscription expiry:", error);
       router.replace(fallbackPath);
@@ -118,7 +118,7 @@ const SignInContent: React.FC = () => {
       ) {
         // User already has active subscription, clear trial intent and go to dashboard
         clearTrialIntent();
-        void routeSellerBasedOnSubscription("/dashboard/seller/overview");
+        void routeSellerBasedOnSubscription("/dashboard/overview");
       } else if (role === "buyer" || role === "staff") {
         router.replace("/dashboard/buyer/overview");
       } else if (role === "seller" || role === "business-admin") {

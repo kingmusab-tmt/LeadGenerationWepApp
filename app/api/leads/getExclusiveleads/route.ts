@@ -10,6 +10,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 export async function GET(req: NextRequest) {
   // Ensure the request is a GET request
   if (req.method !== "GET") {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   // Ensure the user is authenticated and has the role of "seller"
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "seller") {
+  if (!session || !isSellerRole(session.user.role)) {
     return unauthorized("Authentication required");
   }
 

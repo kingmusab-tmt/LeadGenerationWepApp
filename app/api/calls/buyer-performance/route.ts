@@ -12,6 +12,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 type BuyerPerformanceRow = {
   totalCalls: number;
   answeredCalls: number;
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
       return unauthorized("Authentication required");
     }
 
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Seller or admin access required");
     }
 

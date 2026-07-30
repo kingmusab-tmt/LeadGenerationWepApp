@@ -306,7 +306,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const handleNavigation = (path: string) => {
     const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
     setLoading(true);
-    router.push(`/dashboard/seller/${normalizedPath}`);
+    router.push(`/dashboard/${normalizedPath}`);
     setMobileOpen(false);
     setTimeout(() => setLoading(false), 500);
   };
@@ -338,7 +338,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   };
 
   const isActive = (path: string) => {
-    return pathname === `/dashboard/seller/${path}`;
+    return pathname === `/dashboard/${path}`;
   };
 
   const isParentActive = (item: NavItem) => {
@@ -350,13 +350,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
 
   // Filter nav items based on subscription limits (show all while loading)
   const filteredNavItems = navItems.filter((item) => {
-    // Manual credit's API requires the exact "seller" role — there's no
-    // parent-seller association for business-admin accounts to act through,
-    // so surfacing this nav entry to them is a guaranteed dead end (empty
-    // buyer list, then a 403 on submit).
-    if (item.path === "manual-credit" && currentUser?.role !== "seller") {
-      return false;
-    }
     if (!limits) return true;
     if (
       item.path === "email-campaigns" &&
@@ -602,7 +595,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
         onClose={() => setExpiryReminderOpen(false)}
         onRenewNow={() => {
           setExpiryReminderOpen(false);
-          router.push("/dashboard/seller/settings/subscription");
+          router.push("/dashboard/settings/subscription");
         }}
         onUpgradePlan={() => {
           setExpiryReminderOpen(false);

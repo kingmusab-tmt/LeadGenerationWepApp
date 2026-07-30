@@ -12,6 +12,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -48,7 +49,7 @@ export async function GET() {
         },
         { status: 200 },
       );
-    } else if (session.user.role === "seller") {
+    } else if (isSellerRole(session.user.role)) {
       const seller = await User.findOne({ email: session.user.email });
 
       return NextResponse.json(
@@ -73,7 +74,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user || session.user.role !== "seller") {
+    if (!session || !session.user || !isSellerRole(session.user.role)) {
       return unauthorized("Authentication required");
     }
     await dbConnect();

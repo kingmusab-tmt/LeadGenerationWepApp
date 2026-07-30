@@ -43,7 +43,7 @@ export default async function OverviewRedirect() {
     case "seller":
     case "business-admin":
       if (isSubActive && (daysRemaining === null || daysRemaining > 7)) {
-        redirect("/dashboard/seller/overview");
+        redirect("/dashboard/overview");
       } else {
         redirect("/plan");
       }

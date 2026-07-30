@@ -137,7 +137,7 @@ const BuyerOnboardingPage = () => {
         currentUser.role === "seller" ||
         currentUser.role === "business-admin"
       ) {
-        router.replace("/dashboard/seller/overview");
+        router.replace("/dashboard/overview");
       } else {
         router.replace("/completeregistration");
       }

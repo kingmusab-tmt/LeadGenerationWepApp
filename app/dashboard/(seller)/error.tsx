@@ -16,7 +16,7 @@ export default function SellerDashboardError({
       error={error}
       reset={reset}
       dashboardName={`${terms.org} Dashboard`}
-      homeHref="/dashboard/seller/overview"
+      homeHref="/dashboard/overview"
     />
   );
 }

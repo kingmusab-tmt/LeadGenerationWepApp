@@ -13,6 +13,7 @@ import {
 } from "@/lib/api/error-handler";
 import { env } from "@/lib/env";
 
+import { isSellerRole } from "@/lib/roles";
 // Ensure the Stripe secret key is defined
 const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover", // Use the latest Stripe API version
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     const actor = await User.findOne({ email: session.user.email }).select(
       "role name email",
     );
-    if (!actor || (actor.role !== "seller" && actor.role !== "admin")) {
+    if (!actor || (!isSellerRole(actor.role) && actor.role !== "admin")) {
       return forbidden("Refund access requires a seller or admin account");
     }
 

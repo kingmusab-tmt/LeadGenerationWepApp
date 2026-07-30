@@ -435,7 +435,7 @@ export default function EmailCampaigns() {
 
   const handleGoToEmailSettings = () => {
     setEmailSettingsRequiredOpen(false);
-    router.push("/dashboard/seller/settings/emailsetting");
+    router.push("/dashboard/settings/emailsetting");
   };
 
   // Check if user has access to email campaigns
@@ -462,7 +462,7 @@ export default function EmailCampaigns() {
         <Button
           variant="contained"
           onClick={() =>
-            (window.location.href = "/dashboard/seller/settings/subscription")
+            (window.location.href = "/dashboard/settings/subscription")
           }
         >
           View Subscription Plans

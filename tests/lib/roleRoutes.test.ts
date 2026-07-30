@@ -1,17 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { getRoleLandingPath } from "@/lib/roleRoutes";
 
-// Only /dashboard/seller and /dashboard/buyer exist as route segments. A role
-// that maps to a non-existent path is rejected by the proxy, whose seller
-// fallback is /plan — which sends the user straight back here, looping.
-const EXISTING_DASHBOARD_SEGMENTS = ["seller", "buyer"];
+// The seller/business-admin dashboard is /dashboard itself; /dashboard/buyer
+// is the only nested one. Interpolating a role into the path (the bug this
+// helper exists to prevent) yields a route the proxy rejects, and its seller
+// fallback is /plan — which sends the user straight back, looping. So every
+// path this returns must be one that actually exists.
+const REAL_ROUTES = [
+  "/admindashboard/overview",
+  "/dashboard/overview",
+  "/dashboard/buyer/overview",
+  "/completeregistration",
+];
+
+const ROLE_NAMES = [
+  "admin",
+  "seller",
+  "business-admin",
+  "buyer",
+  "staff",
+  "user",
+];
 
 describe("getRoleLandingPath", () => {
-  it("routes both seller-side roles to the seller dashboard", () => {
-    expect(getRoleLandingPath("seller")).toBe("/dashboard/seller/overview");
-    expect(getRoleLandingPath("business-admin")).toBe(
-      "/dashboard/seller/overview",
-    );
+  it("routes both seller-side roles to the shared dashboard root", () => {
+    expect(getRoleLandingPath("seller")).toBe("/dashboard/overview");
+    expect(getRoleLandingPath("business-admin")).toBe("/dashboard/overview");
   });
 
   it("routes both buyer-side roles to the buyer dashboard", () => {
@@ -31,22 +45,15 @@ describe("getRoleLandingPath", () => {
     expect(getRoleLandingPath("not-a-role")).toBe("/completeregistration");
   });
 
-  it("never points at a dashboard segment that does not exist", () => {
-    for (const role of [
-      "admin",
-      "seller",
-      "business-admin",
-      "buyer",
-      "staff",
-      "user",
-    ]) {
-      const segment = getRoleLandingPath(role).match(
-        /^\/dashboard\/([^/]+)\//,
-      )?.[1];
+  it("only ever returns a route that exists", () => {
+    for (const role of ROLE_NAMES) {
+      expect(REAL_ROUTES).toContain(getRoleLandingPath(role));
+    }
+  });
 
-      if (segment) {
-        expect(EXISTING_DASHBOARD_SEGMENTS).toContain(segment);
-      }
+  it("never interpolates a seller-side role into the path", () => {
+    for (const role of ["seller", "business-admin"]) {
+      expect(getRoleLandingPath(role)).not.toContain(role);
     }
   });
 });

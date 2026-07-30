@@ -160,7 +160,7 @@ export default function InvoicesPage() {
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" mb={3}>
         <Typography variant="h4">Invoices</Typography>
-        <Link href="/dashboard/seller/invoices/new">
+        <Link href="/dashboard/invoices/new">
           <Button variant="contained" color="primary">
             New Invoice
           </Button>
@@ -264,7 +264,7 @@ export default function InvoicesPage() {
               invoices.map((invoice) => (
                 <TableRow key={invoice._id}>
                   <TableCell>
-                    <Link href={`/dashboard/seller/invoices/${invoice._id}`}>
+                    <Link href={`/dashboard/invoices/${invoice._id}`}>
                       {invoice.invoiceNumber}
                     </Link>
                   </TableCell>
@@ -291,7 +291,7 @@ export default function InvoicesPage() {
                       <DownloadIcon fontSize="small" />
                     </IconButton>
                     <Link
-                      href={`/dashboard/seller/invoices/${invoice._id}/edit`}
+                      href={`/dashboard/invoices/${invoice._id}/edit`}
                     >
                       <IconButton size="small" title="Edit">
                         <EditIcon fontSize="small" />

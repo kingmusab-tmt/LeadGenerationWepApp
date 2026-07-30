@@ -151,7 +151,7 @@ export default function InvoiceDetailPage() {
         const newInvoice = await res.json();
         toast.success("Invoice duplicated");
         // Redirect to new invoice
-        window.location.href = `/dashboard/seller/invoices/${newInvoice.invoice._id}`;
+        window.location.href = `/dashboard/invoices/${newInvoice.invoice._id}`;
       } else {
         const error = await res.json();
         toast.error(error.error || "Failed to duplicate invoice");
@@ -243,7 +243,7 @@ export default function InvoiceDetailPage() {
                 </MenuItem>
                 <MenuItem
                   component={Link}
-                  href={`/dashboard/seller/invoices/${id}/edit`}
+                  href={`/dashboard/invoices/${id}/edit`}
                 >
                   Edit
                 </MenuItem>

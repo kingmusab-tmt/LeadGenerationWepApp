@@ -17,13 +17,14 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 export async function POST(req: NextRequest) {
   // Ensure the request is a POST request
   if (req.method !== "POST") {
     return methodNotAllowed();
   }
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "seller") {
+  if (!session || !isSellerRole(session.user.role)) {
     return unauthorized("Authentication required");
   }
 

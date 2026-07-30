@@ -48,9 +48,12 @@ const buyerRoutes = [
   "/buyer-onboarding",
   /^\/buyer\/onboarding\/.*$/,
 ];
+// The seller/business-admin dashboard sits at the root of /dashboard (its
+// files live in the URL-invisible app/dashboard/(seller) route group), so this
+// has to grant all of /dashboard EXCEPT the buyer subtree — a plain
+// "/dashboard" prefix would hand sellers the buyer dashboard too.
 const sellerRoutes = [
-  "/dashboard/seller",
-  /^\/dashboard\/seller\/.*$/,
+  /^\/dashboard(?!\/buyer(?:\/|$))(?:\/.*)?$/,
   "/checkout",
   /^\/checkout\/.*$/,
 ];

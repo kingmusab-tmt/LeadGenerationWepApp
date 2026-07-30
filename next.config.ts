@@ -3,6 +3,19 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  async redirects() {
+    return [
+      {
+        // The seller/business-admin dashboard moved from /dashboard/seller/*
+        // to /dashboard/* (its files live in the URL-invisible
+        // app/dashboard/(seller) route group). Keeps existing bookmarks and
+        // any already-issued Stripe return URLs working instead of 404ing.
+        source: "/dashboard/seller/:path*",
+        destination: "/dashboard/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

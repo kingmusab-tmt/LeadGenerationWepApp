@@ -18,11 +18,12 @@ import {
 import { ZodError } from "zod";
 import { checkAndIncrementUsage } from "@/lib/subscriptionLimitsService";
 
+import { isSellerRole } from "@/lib/roles";
 export const dynamic = "force-dynamic";
 
 async function getUserFromSession() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.role !== "seller" || !session.user.id) {
+  if (!session || !isSellerRole(session.user?.role) || !session.user.id) {
     return {
       error: unauthorized(),
     };

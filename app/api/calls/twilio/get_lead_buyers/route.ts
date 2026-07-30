@@ -12,6 +12,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 /**
  * GET /api/calls/twilio/get_lead_buyers?sellerId=...
  * Returns the list of buyers registered with the seller, for populating the
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     if (!session?.user?.id || !session.user.role) {
       return unauthorized("Authentication required");
     }
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Seller or admin access required");
     }
 

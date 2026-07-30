@@ -361,7 +361,7 @@ export default function EditForm() {
 
       // Redirect to forms list after a short delay
       setTimeout(() => {
-        router.push("/dashboard/seller/lead_management/forms");
+        router.push("/dashboard/lead_management/forms");
       }, 1500);
     } catch (error) {
       setSnackbar({
@@ -412,7 +412,7 @@ export default function EditForm() {
         </Typography>
         <Button
           variant="outlined"
-          onClick={() => router.push("/dashboard/seller/lead_management/forms")}
+          onClick={() => router.push("/dashboard/lead_management/forms")}
         >
           Back to Forms
         </Button>

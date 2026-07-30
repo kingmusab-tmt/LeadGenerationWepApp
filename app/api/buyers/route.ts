@@ -23,6 +23,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 export const GET = withErrorHandler(async (req: NextRequest) => {
   await dbConnect();
 
@@ -34,7 +35,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   // but never actually returned anything. Revisit once a real
   // parent-seller association exists.
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.role !== "seller") {
+  if (!session || !isSellerRole(session.user?.role)) {
     return unauthorized("Authentication required");
   }
 
@@ -124,7 +125,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return unauthorized("Authentication required");
   }
 
-  if (session.user.role !== "seller" && session.user.role !== "admin") {
+  if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
     return forbidden("Only sellers can add buyers");
   }
 
@@ -169,7 +170,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   // Verify seller exists
   const seller = await User.findById(registrationSellerId);
-  if (!seller || seller.role !== "seller") {
+  if (!seller || !isSellerRole(seller.role)) {
     return badRequest("Invalid seller");
   }
 
@@ -326,7 +327,7 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   const user = await User.findById(session.user.id);
   const isBuyerOwner = buyer.email === user?.email;
   const isSeller =
-    session.user.role === "seller" &&
+    isSellerRole(session.user.role) &&
     buyer.registeredWith?.toString() === session.user.id;
 
   if (!isBuyerOwner && !isSeller) {
@@ -452,7 +453,7 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   // the same class of non-functional role check fixed elsewhere in this
   // file. Revisit together with PUT/import if admin-on-behalf-of support
   // is wanted here too.
-  if (session.user.role !== "seller") {
+  if (!isSellerRole(session.user.role)) {
     return forbidden("Only sellers can delete buyers");
   }
 

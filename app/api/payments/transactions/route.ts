@@ -21,6 +21,7 @@ import {
   mongoIdParamSchema,
 } from "@/lib/validation/schemas";
 
+import { isSellerRole } from "@/lib/roles";
 // Fields the transactions list/detail UI actually renders — deliberately
 // excludes internal payment-gateway identifiers (stripeAccountId,
 // gatewayTransactionId, and the gateway-internal metadata sub-fields) that
@@ -89,7 +90,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       if (String(buyer._id) !== buyerId) {
         return forbidden("You do not have access to these transactions");
       }
-    } else if (currentUser.role === "seller") {
+    } else if (isSellerRole(currentUser.role)) {
       const managedBuyer = await Buyer.findOne({
         _id: buyerId,
         registeredWith: currentUser._id,
@@ -104,7 +105,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
     userId = buyerId;
   } else {
-    if (currentUser.role !== "seller") {
+    if (!isSellerRole(currentUser.role)) {
       return forbidden("Seller transaction history requires a seller account");
     }
 

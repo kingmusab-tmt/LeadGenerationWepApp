@@ -391,7 +391,7 @@ export default function CampaignEditor() {
         throw new Error(errorData.error || "Failed to delete campaign");
       }
       toast.success("Campaign deleted");
-      router.push("/dashboard/seller/email-campaigns");
+      router.push("/dashboard/email-campaigns");
     } catch (error: unknown) {
       toast.error(
         error instanceof Error ? error.message : "Error deleting campaign",

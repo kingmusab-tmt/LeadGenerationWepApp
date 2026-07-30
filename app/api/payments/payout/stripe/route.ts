@@ -20,6 +20,7 @@ import {
 import { env } from "@/lib/env";
 import { isSupportedCurrency } from "@/lib/currency";
 
+import { isSellerRole } from "@/lib/roles";
 const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-12-15.clover",
 });
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
       email: session.user.email,
     }).select("role stripeAccountId walletBalance name email");
 
-    if (!seller || seller.role !== "seller") {
+    if (!seller || !isSellerRole(seller.role)) {
       await releaseClaim();
       return forbidden("Payout access requires a seller account");
     }

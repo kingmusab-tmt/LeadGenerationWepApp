@@ -101,8 +101,8 @@ export async function POST() {
 async function createOnboardingLink(accountId: string): Promise<string> {
   const accountLink = await stripe.accountLinks.create({
     account: accountId,
-    refresh_url: `${env.NEXTAUTH_URL}/dashboard/seller/settings?tab=stripe-onboarding&stripe_onboarding=restart&account_id=${accountId}`,
-    return_url: `${env.NEXTAUTH_URL}/dashboard/seller/settings?tab=stripe-onboarding&stripe_onboarding=success&account_id=${accountId}`,
+    refresh_url: `${env.NEXTAUTH_URL}/dashboard/settings?tab=stripe-onboarding&stripe_onboarding=restart&account_id=${accountId}`,
+    return_url: `${env.NEXTAUTH_URL}/dashboard/settings?tab=stripe-onboarding&stripe_onboarding=success&account_id=${accountId}`,
     type: "account_onboarding",
   });
   return accountLink.url;

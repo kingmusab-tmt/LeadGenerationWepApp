@@ -16,6 +16,7 @@ import { resolveTwilioCountryCode, countryUsesAreaCode } from "@/lib/twilioCount
 import { requireCsrf } from "@/lib/security/requireCsrf";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
+import { isSellerRole } from "@/lib/roles";
 // Initialize Twilio client with system credentials
 const SYSTEM_TWILIO_ACCOUNT_SID = env.TWILIO_ACCOUNT_SID;
 const SYSTEM_TWILIO_AUTH_TOKEN = env.TWILIO_AUTH_TOKEN;
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (
-      userSession.user.role !== "seller" &&
+      !isSellerRole(userSession.user.role) &&
       userSession.user.role !== "admin"
     ) {
       return forbidden("Seller or admin access required");

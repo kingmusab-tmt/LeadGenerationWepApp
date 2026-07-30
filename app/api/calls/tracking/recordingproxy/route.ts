@@ -8,6 +8,7 @@ import { authOptions } from "@/auth";
 import { badRequest, forbidden, notFound, unauthorized } from "@/lib/api/error-handler";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
+import { isSellerRole } from "@/lib/roles";
 const twilioClient = new Twilio(
   process.env.TWILIO_ACCOUNT_SID!,
   process.env.TWILIO_AUTH_TOKEN!,
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
 
   const isAdmin = session.user.role === "admin";
   const isSellerOwner =
-    session.user.role === "seller" &&
+    isSellerRole(session.user.role) &&
     String(call.userId) === String(session.user.id);
 
   let isBuyerOwner = false;

@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { NextResponse } from "next/server";
 
+import { isSellerRole } from "@/lib/roles";
 /**
  * POST /api/maintenance/fix-marketplace-leads
  *
@@ -27,7 +28,7 @@ export async function POST() {
     // any authenticated buyer from hitting a lead-maintenance endpoint —
     // restrict it to the roles that can actually own leads, matching every
     // other route under /api/leads.
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return NextResponse.json(
         { success: false, message: "Forbidden" },
         { status: 403 },
@@ -106,7 +107,7 @@ export async function GET() {
         { status: 401 },
       );
     }
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return NextResponse.json(
         { success: false, message: "Forbidden" },
         { status: 403 },

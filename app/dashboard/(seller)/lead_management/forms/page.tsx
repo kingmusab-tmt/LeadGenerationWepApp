@@ -224,7 +224,7 @@ export default function SellerForms() {
   };
 
   const handleEdit = (formId: string) => {
-    router.push(`/dashboard/seller/lead_management/forms/edit/${formId}`);
+    router.push(`/dashboard/lead_management/forms/edit/${formId}`);
   };
 
   const handleCloseSnackbar = () => {
@@ -283,7 +283,7 @@ export default function SellerForms() {
             color="primary"
             sx={{ mt: 2 }}
             onClick={() =>
-              router.push("/dashboard/seller/lead_management/formbuilder")
+              router.push("/dashboard/lead_management/formbuilder")
             }
           >
             Click here to create a form

@@ -58,7 +58,7 @@ export default function ProfileCompletionCard({
           <Button
             variant="outlined"
             size="small"
-            onClick={() => router.push("/dashboard/seller/settings")}
+            onClick={() => router.push("/dashboard/settings")}
             sx={{ whiteSpace: "nowrap", ml: 2 }}
           >
             Complete profile

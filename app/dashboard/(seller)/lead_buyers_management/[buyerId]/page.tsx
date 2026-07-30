@@ -160,7 +160,7 @@ const BuyerDetailsPage: React.FC = () => {
         <>
           {/* Back navigation */}
           <Box
-            onClick={() => router.push("/dashboard/seller/lead_buyers_management")}
+            onClick={() => router.push("/dashboard/lead_buyers_management")}
             sx={{
               display: "inline-flex",
               alignItems: "center",

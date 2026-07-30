@@ -29,6 +29,7 @@ import { recordAuditLog } from "@/lib/auditLog";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 import { ZapierTriggerHelper } from "@/lib/integrations/zapierTriggerHelper";
 
+import { isSellerRole } from "@/lib/roles";
 // GET /api/leads - Fetch all leads with pagination
 export async function GET(req: NextRequest) {
   try {
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     if (!session) {
       return unauthorized();
     }
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Only sellers can access lead management.");
     }
 
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return unauthorized();
     }
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Only sellers can access lead management.");
     }
 
@@ -177,7 +178,7 @@ export async function PUT(req: NextRequest) {
     if (!session) {
       return unauthorized();
     }
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Only sellers can access lead management.");
     }
 
@@ -280,7 +281,7 @@ export async function DELETE(req: NextRequest) {
     if (!session) {
       return unauthorized();
     }
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Only sellers can access lead management.");
     }
 

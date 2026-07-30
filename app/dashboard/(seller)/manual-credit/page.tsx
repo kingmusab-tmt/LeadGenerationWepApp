@@ -187,7 +187,7 @@ const ManualCreditPage: React.FC = () => {
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Box
-        onClick={() => router.push("/dashboard/seller/overview")}
+        onClick={() => router.push("/dashboard/overview")}
         sx={{
           display: "inline-flex",
           alignItems: "center",

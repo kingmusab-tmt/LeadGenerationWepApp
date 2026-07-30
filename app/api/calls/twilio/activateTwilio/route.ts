@@ -13,6 +13,7 @@ import {
 import { requireCsrf } from "@/lib/security/requireCsrf";
 import { checkSimpleRateLimit } from "@/lib/security/simpleRateLimit";
 
+import { isSellerRole } from "@/lib/roles";
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
       return unauthorized("Authentication required");
     }
 
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Seller or admin access required");
     }
 

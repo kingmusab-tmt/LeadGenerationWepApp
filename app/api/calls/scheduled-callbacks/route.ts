@@ -13,6 +13,7 @@ import {
 } from "@/lib/api/error-handler";
 import { requireCsrf } from "@/lib/security/requireCsrf";
 
+import { isSellerRole } from "@/lib/roles";
 /**
  * Scheduled Callbacks API
  * GET: List scheduled callbacks for the authenticated seller
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
       return unauthorized("Authentication required");
     }
 
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Seller or admin access required");
     }
 
@@ -86,7 +87,7 @@ export async function PATCH(req: NextRequest) {
       return unauthorized("Authentication required");
     }
 
-    if (session.user.role !== "seller" && session.user.role !== "admin") {
+    if (!isSellerRole(session.user.role) && session.user.role !== "admin") {
       return forbidden("Seller or admin access required");
     }
 

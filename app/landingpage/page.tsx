@@ -1247,7 +1247,7 @@ const LandingPage = () => {
               variant="outlined"
               color="primary"
               size="large"
-              href="/dashboard/seller/integrations"
+              href="/dashboard/integrations"
             >
               View All Integrations
             </Button>

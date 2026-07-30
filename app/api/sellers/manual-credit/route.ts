@@ -22,6 +22,7 @@ import {
   unauthorized,
 } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 const IDEMPOTENCY_SCOPE = "sellers:manual-credit";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,7 +40,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (!session?.user?.id) {
     return unauthorized("Authentication required");
   }
-  if (session.user.role !== "seller") {
+  if (!isSellerRole(session.user.role)) {
     return forbidden("Only sellers can perform this action");
   }
 
@@ -70,7 +71,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const { buyerId, cashPaid, numberOfCredits, description } = parsed.data;
 
   const seller = await User.findById(session.user.id);
-  if (!seller || seller.role !== "seller") {
+  if (!seller || !isSellerRole(seller.role)) {
     return forbidden("Only sellers can perform this action");
   }
 

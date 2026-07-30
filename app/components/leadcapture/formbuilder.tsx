@@ -387,7 +387,7 @@ const FormBuilder = () => {
         setAllowedOriginsInput("");
 
         // Redirect to forms page
-        router.push("/dashboard/seller/lead_management/forms");
+        router.push("/dashboard/lead_management/forms");
       } else {
         let errorMessage = "Failed to publish.";
         if (result.duplicate) {

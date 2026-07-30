@@ -6,6 +6,7 @@ import { authOptions } from "@/auth";
 import { withErrorHandler } from "@/lib/api/async-handler";
 import { forbidden, unauthorized } from "@/lib/api/error-handler";
 
+import { isSellerRole } from "@/lib/roles";
 /**
  * POST /api/sellers/update-buyer-status
  * Checks all buyers with status "new" registered with the seller
@@ -26,7 +27,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const sellerId = session.user.id;
   const sellerRole = session.user.role;
 
-  if (!sellerId || sellerRole !== "seller") {
+  if (!sellerId || !isSellerRole(sellerRole)) {
     return forbidden("Only sellers can perform this action");
   }
 
@@ -80,7 +81,7 @@ export const GET = withErrorHandler(async () => {
   const sellerId = session.user.id;
   const sellerRole = session.user.role;
 
-  if (!sellerId || sellerRole !== "seller") {
+  if (!sellerId || !isSellerRole(sellerRole)) {
     return forbidden("Only sellers can perform this action");
   }
 
