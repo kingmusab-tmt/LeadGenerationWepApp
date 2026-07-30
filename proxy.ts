@@ -51,8 +51,6 @@ const buyerRoutes = [
 const sellerRoutes = [
   "/dashboard/seller",
   /^\/dashboard\/seller\/.*$/,
-  "/seller-onboarding",
-  /^\/seller-onboarding\/.*$/,
   "/checkout",
   /^\/checkout\/.*$/,
 ];

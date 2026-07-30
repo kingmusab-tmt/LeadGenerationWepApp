@@ -111,9 +111,10 @@ export interface IUser extends Document {
   stripeOnboarded?: boolean;
   stripeCustomerId?: string;
 
-  // Server-side source of truth for the seller-onboarding wizard (see
-  // lib/sellerOnboarding.ts) — completion was previously tracked only in
-  // browser localStorage.
+  // Step progress from the removed seller-onboarding wizard. Nothing reads or
+  // writes this any more (profile completeness is derived from the fields
+  // above, see lib/sellerOnboarding.ts); kept so existing documents round-trip
+  // unchanged rather than being stripped on the next save.
   onboardingProgress?: {
     completedSteps: string[];
     skippedSteps: string[];

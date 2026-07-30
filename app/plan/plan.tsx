@@ -31,6 +31,7 @@ import BusinessIcon from "@mui/icons-material/Business";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import { useInitializeUser } from "@/app/hooks";
 import { useCSRFFetch } from "@/app/hooks";
+import { getRoleLandingPath } from "@/lib/roleRoutes";
 
 interface Tier {
   discountPercentage: number;
@@ -100,7 +101,7 @@ export default function PricingSection() {
       setIsRedirecting(true);
       const userRole = session?.user?.role;
       if (userRole) {
-        router.replace(`/dashboard/${userRole}/overview`);
+        router.replace(getRoleLandingPath(userRole));
       }
     }
   }, [session, router, isRedirecting]);
@@ -225,7 +226,7 @@ export default function PricingSection() {
           userRole,
         );
         setIsRedirecting(true);
-        router.replace(`/dashboard/${userRole}/overview`);
+        router.replace(getRoleLandingPath(userRole));
       } else {
         console.log("[Plan Page] Cannot redirect - no role found");
       }
@@ -286,9 +287,10 @@ export default function PricingSection() {
         // Small delay to ensure session propagates before redirect
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Redirect to dashboard after session is refreshed
+        const role = session?.user?.role || currentUser?.role;
+
         console.log("[Plan Page] Session refreshed, redirecting to dashboard");
-        router.push(`/dashboard/${currentUser?.role}/overview`);
+        router.push(getRoleLandingPath(role));
       } else {
         // Redirect to checkout for paid tiers
         console.log(

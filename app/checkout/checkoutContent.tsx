@@ -34,6 +34,7 @@ import { useInitializeUser } from "@/app/hooks";
 import { useSession } from "next-auth/react";
 import axios from "axios";
 import { useCSRFFetch } from "@/app/hooks/useCSRF";
+import { getRoleLandingPath } from "@/lib/roleRoutes";
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
@@ -351,9 +352,9 @@ const CheckoutContent = () => {
 
     if (session) {
       console.log("[Checkout] Session refreshed, redirecting to dashboard");
-      router.push(`/dashboard/${session?.user?.role}/overview`);
+      router.push(getRoleLandingPath(session?.user?.role));
     } else if (currentUser) {
-      router.push(`/dashboard/${currentUser.role}/overview`);
+      router.push(getRoleLandingPath(currentUser.role));
     }
   };
 

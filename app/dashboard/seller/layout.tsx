@@ -51,10 +51,6 @@ import NotificationBell from "@/app/components/generalComponent/NotificationBell
 import { useInitializeUser, useDashboardTerms } from "@/app/hooks";
 import { useSession } from "next-auth/react";
 import { useSubscriptionLimits } from "@/app/hooks/useSubscriptionLimits";
-import {
-  hydrateSellerOnboardingFromServer,
-  isSellerOnboardingFlowComplete,
-} from "@/lib/sellerOnboarding";
 import SubscriptionExpiryModal from "./components/SubscriptionExpiryModal";
 
 interface UserDashboardProps {
@@ -195,22 +191,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
     }
   }, [userLoading, currentUser, status, router]);
 
-  // Onboarding progress used to live only in this browser's localStorage —
-  // pull the server's copy in before the gating check below runs, so a new
-  // device/browser (or cleared storage) sees real progress instead of
-  // looking like onboarding was never started.
-  const [onboardingHydrated, setOnboardingHydrated] = useState(false);
-  useEffect(() => {
-    if (!currentUser?.email) return;
-    let cancelled = false;
-    hydrateSellerOnboardingFromServer(currentUser.email).finally(() => {
-      if (!cancelled) setOnboardingHydrated(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [currentUser?.email]);
-
   useEffect(() => {
     if (status === "loading" || userLoading || limitsLoading || !currentUser)
       return;
@@ -227,29 +207,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       }
       return;
     }
-
-    if (!onboardingHydrated) return;
-
-    const onboardingFlowComplete = isSellerOnboardingFlowComplete(
-      currentUser.email,
-    );
-
-    // Always enforce onboarding for seller dashboard pages unless onboarding is complete
-    // Skip this check only for the onboarding page itself to prevent redirect loops
-    const isOnOnboardingPage = pathname === "/dashboard/seller/onboarding";
-
-    if (!isOnOnboardingPage && !onboardingFlowComplete) {
-      router.replace("/dashboard/seller/onboarding");
-    }
-  }, [
-    status,
-    userLoading,
-    limitsLoading,
-    currentUser,
-    pathname,
-    router,
-    onboardingHydrated,
-  ]);
+    // Profile setup is no longer a gate — sellers land here directly and the
+    // ProfileCompletionCard on the overview prompts for anything unfinished.
+  }, [status, userLoading, limitsLoading, currentUser, router]);
 
   useEffect(() => {
     if (status === "loading" || userLoading || limitsLoading) {

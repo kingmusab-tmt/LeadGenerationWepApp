@@ -2,9 +2,13 @@ import redis, { RedisClientType } from "redis";
 
 let redisClient: RedisClientType | null = null;
 let redisConnectPromise: Promise<RedisClientType | null> | null = null;
+let lastConnectFailureAt = 0;
 
 const DEFAULT_SESSION_TTL_SECONDS = 86400;
 const DEFAULT_USER_CACHE_TTL_SECONDS = 3600;
+const MAX_CONNECT_RETRIES = 3;
+const RECONNECT_DELAY_MS = 500;
+const CONNECT_RETRY_COOLDOWN_MS = 60_000;
 
 function getRedisUrl(): string {
   return process.env.REDIS_URL || "redis://localhost:6379";
@@ -22,15 +26,29 @@ export async function getRedisClient(): Promise<RedisClientType | null> {
     return redisConnectPromise;
   }
 
+  // After a failed connect, don't re-attempt on every request
+  if (Date.now() - lastConnectFailureAt < CONNECT_RETRY_COOLDOWN_MS) {
+    return null;
+  }
+
   redisConnectPromise = (async () => {
     try {
       if (!redisClient) {
         redisClient = redis.createClient({
           url: getRedisUrl(),
+          socket: {
+            reconnectStrategy: (retries) =>
+              retries >= MAX_CONNECT_RETRIES ? false : RECONNECT_DELAY_MS,
+          },
         });
 
         redisClient.on("error", (err) => {
-          console.error("[Redis Error]", err);
+          // Connection-refused errors are logged once by the catch below;
+          // the reconnect loop would otherwise repeat them for every attempt
+          const code = (err as NodeJS.ErrnoException)?.code;
+          if (code !== "ECONNREFUSED") {
+            console.error("[Redis Error]", err);
+          }
         });
 
         redisClient.on("connect", () => {
@@ -42,12 +60,20 @@ export async function getRedisClient(): Promise<RedisClientType | null> {
         await redisClient.connect();
       }
 
+      lastConnectFailureAt = 0;
       return redisClient;
     } catch (error) {
       console.warn(
         "[Redis] Connection failed - running without Redis cache:",
         error instanceof Error ? error.message : error,
       );
+      lastConnectFailureAt = Date.now();
+      try {
+        redisClient?.destroy();
+      } catch {
+        /* client already closed itself after exhausting reconnect attempts */
+      }
+      redisClient = null;
       return null;
     } finally {
       redisConnectPromise = null;

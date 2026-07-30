@@ -34,7 +34,7 @@ import {
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useMediaQuery } from "@mui/material";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { handleSignOut } from "@/lib/signOutServerAction";
 import { useInitializeUser } from "@/app/hooks";
@@ -59,7 +59,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const router = useRouter();
-  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -111,14 +110,12 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ children }) => {
       currentUser.email,
     );
 
-    // Always enforce onboarding for buyer dashboard pages unless onboarding is complete
-    // Skip this check only for the onboarding page itself to prevent redirect loops
-    const isOnOnboardingPage = pathname === "/buyer-onboarding";
-
-    if (!isOnOnboardingPage && !onboardingFlowComplete) {
+    // Always enforce onboarding for buyer dashboard pages unless onboarding
+    // is complete (the onboarding page itself lives outside this layout at /buyer-onboarding)
+    if (!onboardingFlowComplete) {
       router.replace("/buyer-onboarding");
     }
-  }, [status, userLoading, currentUser, pathname, router, onboardingHydrated]);
+  }, [status, userLoading, currentUser, router, onboardingHydrated]);
 
   const avatarSrc = currentUser?.image || "";
   const displayName = currentUser?.name || "User";

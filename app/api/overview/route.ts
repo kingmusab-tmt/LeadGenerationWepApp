@@ -61,7 +61,10 @@ export const GET = withAuth(async (req: NextRequest, session) => {
   ] = await Promise.all([
     // 1. BASIC METRICS
     Lead.countDocuments({ userId }),
-    User.countDocuments({ _id: userId, role: "seller" }),
+    User.countDocuments({
+      _id: userId,
+      role: { $in: ["seller", "business-admin"] },
+    }),
     Campaign.countDocuments({
       userId,
       status: "active",

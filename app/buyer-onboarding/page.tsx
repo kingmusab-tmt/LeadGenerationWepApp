@@ -30,6 +30,7 @@ import {
   Room as LocationIcon,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useInitializeUser } from "@/app/hooks";
 import { useNotification } from "@/app/hooks";
 import AccountSettings from "@/app/dashboard/buyer/settings/settings";
@@ -87,6 +88,7 @@ const stepMeta: Record<
 const BuyerOnboardingPage = () => {
   const router = useRouter();
   const notify = useNotification();
+  const { status: sessionStatus } = useSession();
   const { currentUser, loading: userLoading } = useInitializeUser();
 
   const [tabValue, setTabValue] = useState(0);
@@ -115,10 +117,16 @@ const BuyerOnboardingPage = () => {
   const { completedSteps, skippedSteps } = onboardingState;
 
   useEffect(() => {
-    if (userLoading) return;
+    if (sessionStatus === "loading" || userLoading) return;
 
     if (!currentUser) {
-      router.replace("/auth/sign-in");
+      // An empty Redux store means "not fetched yet", not "signed out" — only
+      // the session status can distinguish them. Treating it as signed-out
+      // bounces an authenticated buyer to /auth/sign-in, which sends them
+      // straight back here: a redirect loop.
+      if (sessionStatus === "unauthenticated") {
+        router.replace("/auth/sign-in");
+      }
       return;
     }
 
@@ -134,7 +142,7 @@ const BuyerOnboardingPage = () => {
         router.replace("/completeregistration");
       }
     }
-  }, [userLoading, currentUser, router]);
+  }, [sessionStatus, userLoading, currentUser, router]);
 
   const doneSteps = useMemo(
     () => new Set([...completedSteps, ...skippedSteps]),

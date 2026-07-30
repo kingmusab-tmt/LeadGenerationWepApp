@@ -223,7 +223,14 @@ const Overview: React.FC = () => {
 
     const fetchOverviewData = async () => {
       try {
-        if (currentUser && currentUser.role === "seller") {
+        // business-admin shares this dashboard with seller (see
+        // useDashboardTerms) — only the wording differs, so it needs the same
+        // data and the same trial/expiry checks.
+        const isSellerRole =
+          currentUser?.role === "seller" ||
+          currentUser?.role === "business-admin";
+
+        if (isSellerRole) {
           // Run subscription check and overview data fetch in PARALLEL
           const [, overviewResponse] = await Promise.all([
             checkSubscriptionStatus(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
@@ -34,6 +34,7 @@ import {
 } from "@mui/icons-material";
 import { useCSRF, useCSRFFetch } from "@/app/hooks/useCSRF";
 import { hasTrialIntent, clearTrialIntent } from "@/lib/trialIntent";
+import { getRoleLandingPath } from "@/lib/roleRoutes";
 
 type UserRole = "user" | "seller" | "buyer" | "business-admin" | "staff";
 
@@ -84,9 +85,16 @@ const RoleSelectionPage: React.FC = () => {
     }
   }, []);
 
+  // Set while handleRoleSelection is running, so the "already has a role"
+  // effect below stays out of the way: updateSession() gives the user their
+  // new role before the trial has been started, and this effect would
+  // otherwise see role-without-subscription and race the trial flow to /plan.
+  const roleSelectionInProgressRef = useRef(false);
+
   // Check if user already has a role - redirect them to the right place
   useEffect(() => {
     if (status === "loading" || isRedirecting) return;
+    if (roleSelectionInProgressRef.current) return;
 
     const role = session?.user?.role;
     const isSubActive = session?.user?.isSubActive;
@@ -106,7 +114,7 @@ const RoleSelectionPage: React.FC = () => {
         (role === "seller" || role === "business-admin") &&
         isSubActive
       ) {
-        router.replace("/dashboard/seller/onboarding");
+        router.replace(getRoleLandingPath(role));
       } else if (role === "seller" || role === "business-admin") {
         router.replace("/plan");
       } else if (role === "buyer" || role === "staff") {
@@ -155,8 +163,7 @@ const RoleSelectionPage: React.FC = () => {
             // Small delay so user sees the success message
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
-            // Redirect to onboarding page before dashboard access
-            router.push("/dashboard/seller/onboarding");
+            router.push(getRoleLandingPath(role));
             return;
           } else {
             const trialError = await trialResponse.json().catch(() => null);
@@ -189,15 +196,9 @@ const RoleSelectionPage: React.FC = () => {
     }
 
     // Redirect other roles to their dashboards
-    const dashboardPaths: Record<string, string> = {
-      buyer: "/buyer-onboarding",
-      staff: "/dashboard/staff/overview",
-    };
-
-    const path = dashboardPaths[role];
-    if (path) {
-      router.push(path);
-    }
+    router.push(
+      role === "buyer" ? "/buyer-onboarding" : getRoleLandingPath(role),
+    );
   };
 
   const handleRoleSelection = async (role: Exclude<UserRole, "user">) => {
@@ -208,6 +209,7 @@ const RoleSelectionPage: React.FC = () => {
 
     setSelectedRole(role);
     setLoading(true);
+    roleSelectionInProgressRef.current = true;
     try {
       const response = await fetchWithCSRF("/api/users/type", {
         method: "POST",
@@ -242,6 +244,8 @@ const RoleSelectionPage: React.FC = () => {
       } else {
         const errorData = await response.json();
 
+        roleSelectionInProgressRef.current = false;
+
         if (errorData?.code === "BUYER_PRE_REG_REQUIRED" && role === "buyer") {
           setBuyerPreRegBlocked({
             open: true,
@@ -263,6 +267,7 @@ const RoleSelectionPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error updating role:", error);
+      roleSelectionInProgressRef.current = false;
       setSnackbar({
         open: true,
         message: "An error occurred. Please try again.",

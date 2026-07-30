@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   Box,
   Button,
@@ -26,6 +27,25 @@ type CookieCategoryKey =
   | "analytics"
   | "functional"
   | "advertising";
+
+/* The consent banner auto-opens on public/marketing pages, but not inside
+   authenticated or mid-flow areas; there it appears solely via the
+   "open-cookie-preferences" event (e.g. footer link) */
+const PRIVATE_PATH_PREFIXES = [
+  "/dashboard",
+  "/admindashboard",
+  "/checkout",
+  "/completeregistration",
+  "/buyer-onboarding",
+  "/RegisterBuyer",
+  "/subscription-expired",
+  "/plan",
+];
+
+const isPublicPath = (pathname: string): boolean =>
+  !PRIVATE_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 
 const CONSENT_COOKIE = "brix_cookie_consent";
 const PREFS_COOKIE = "brix_cookie_preferences";
@@ -131,11 +151,20 @@ const safeParsePrefs = (value: string | null): CookiePrefs => {
   }
 };
 
+/* Whether the banner should auto-open for this path. Only ever called on the
+   client — this component is loaded with ssr: false — so reading cookies here
+   cannot cause a hydration mismatch. */
+const shouldAutoOpen = (pathname: string): boolean =>
+  typeof document !== "undefined" &&
+  isPublicPath(pathname) &&
+  !getConsent(CONSENT_COOKIE);
+
 const CookieConsentManager = () => {
-  const [open, setOpen] = useState(() => {
-    if (typeof document === "undefined") return false;
-    return !getConsent(CONSENT_COOKIE);
-  });
+  const pathname = usePathname();
+  const [open, setOpen] = useState(() => shouldAutoOpen(pathname));
+  // Opened via the footer's "Cookie Preferences" link rather than the
+  // automatic first-visit prompt — that one follows the user across routes.
+  const [manuallyOpened, setManuallyOpened] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [prefs, setPrefs] = useState<CookiePrefs>(() => {
     if (typeof document === "undefined") return defaultPrefs;
@@ -149,6 +178,18 @@ const CookieConsentManager = () => {
     functional: false,
     advertising: false,
   });
+
+  /* ---- auto-open on public pages only; close when entering private areas ----
+     Derived from the route rather than synced in an effect, so navigating
+     never costs an extra render pass. A banner the user opened themselves
+     (footer link) is left alone until they act on it. */
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
+    if (!manuallyOpened) {
+      setOpen(shouldAutoOpen(pathname));
+    }
+  }
 
   /* ---- visit / session cookies (independent of consent) ---- */
   useEffect(() => {
@@ -188,6 +229,7 @@ const CookieConsentManager = () => {
       const existingPrefs = safeParsePrefs(getCookie(PREFS_COOKIE));
       setPrefs(existingPrefs);
       setShowDetails(true);
+      setManuallyOpened(true);
       setOpen(true);
     };
 
@@ -207,6 +249,7 @@ const CookieConsentManager = () => {
     setCookie(PREFS_COOKIE, prefsJson, 365);
     setStorage(CONSENT_COOKIE, mode);
     setStorage(PREFS_COOKIE, prefsJson);
+    setManuallyOpened(false);
   };
 
   const handleAcceptAll = () => {
